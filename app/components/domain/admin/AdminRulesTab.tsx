@@ -42,9 +42,11 @@ import {
   DEFAULT_DISPATCH_AUTOMATION_CONFIG,
   normalizeDispatchAutomationConfig,
 } from '../../../core/services/config/admin-config.service';
-import type { DispatchAutomationConfig, DispatchRankingStrategy } from '../../../core/types/config';
+import { getAdminAuthService } from '../../../core/services/auth/admin-auth.service';
+import type { ConfigAuditEntry, DispatchAutomationConfig } from '../../../core/types/config';
 import { getZoneService } from '../../../core/services/zones/zone.service';
 import type { ZoneGeofence } from '../../../core/types/zone';
+import { AdminAutoDispatchControlPanel } from './rules/AdminAutoDispatchControlPanel';
 
 interface ModularTierCardProps {
   tierKey: 'tier1' | 'tier2' | 'tier3';
@@ -773,15 +775,38 @@ export function AdminRulesTab() {
         blacklistEnabled: config.tier3.enabled ?? true,
       };
 
+      const cachedSettings = getAdminConfigService().getCachedSettings();
+      const prevAutomation = normalizeDispatchAutomationConfig(cachedSettings.dispatchAutomation);
       const normalizedAutomation = normalizeDispatchAutomationConfig(dispatchAutomation);
       setDispatchAutomation(normalizedAutomation);
+
+      const currentActor = getAdminAuthService().getCurrentUser();
+      const auditEntry: ConfigAuditEntry = {
+        id: `aud-autodispatch-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        operatorId: currentActor?.uid || currentActor?.email || 'admin',
+        operatorEmail: currentActor?.email || 'admin@chesterfieldtaxi.com',
+        tab: 'rules',
+        section: 'auto_dispatch',
+        action: `Saved Auto-Dispatch Control Center (mode: ${normalizedAutomation.dispatchMode}, leadWindow: ${normalizedAutomation.scheduledDispatchLeadMinutes}m)`,
+        ipAddress: 'console',
+        changes: {
+          dispatchMode: { before: prevAutomation.dispatchMode, after: normalizedAutomation.dispatchMode },
+          scheduledDispatchLeadMinutes: {
+            before: prevAutomation.scheduledDispatchLeadMinutes,
+            after: normalizedAutomation.scheduledDispatchLeadMinutes,
+          },
+          isPaused: { before: prevAutomation.isPaused, after: normalizedAutomation.isPaused },
+        },
+      };
 
       await getAdminConfigService().updateSettings({
         bookingRulesConfig: syncConfig,
         dispatchAutomation: normalizedAutomation,
+        configAuditTrail: [auditEntry, ...(cachedSettings.configAuditTrail || [])].slice(0, 200),
         customerBookingConfig: {
           ...DEFAULT_CUSTOMER_BOOKING_CONFIG,
-          ...(getAdminConfigService().getCachedSettings().customerBookingConfig || {}),
+          ...(cachedSettings.customerBookingConfig || {}),
           lambertPickupInstructions: lambertInstructions,
         },
       });
@@ -933,277 +958,14 @@ export function AdminRulesTab() {
           onChange={(t3) => setConfig({ ...config, tier3: t3 })}
         />
 
-        {/* DISPATCH AUTOMATION & SCHEDULED SLA CONFIGURATION CARD */}
-        <Card className="border-2 border-blue-200 shadow-xs overflow-hidden bg-white">
-          <div className="p-4 sm:p-5 bg-blue-50/70 border-b border-blue-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="p-2 bg-blue-600 text-white rounded-xl shrink-0 shadow-2xs">
-                <BoltIcon className="w-5 h-5" />
-              </span>
-              <div>
-                <h3 className="text-sm sm:text-base font-black text-slate-900">
-                  Dispatch Automation &amp; Scheduled SLA Monitor
-                </h3>
-                <p className="text-xs text-slate-600 font-medium">
-                  Configure sequential driver offer cascades, candidate ranking strategy, and upcoming scheduled-ride SLA alert windows.
-                </p>
-              </div>
-            </div>
-            <Badge
-              variant={dispatchAutomation.autoOfferOnConfirm ? 'success' : 'primary'}
-              size="sm"
-              className="self-start sm:self-auto shrink-0 font-mono text-[10px]"
-            >
-              {dispatchAutomation.autoOfferOnConfirm
-                ? 'AUTO-OFFER ON CONFIRM'
-                : '1-TAP DISPATCHER INITIATED'}
-            </Badge>
-          </div>
-
-          <CardContent className="p-4 sm:p-6 space-y-6">
-            {/* 1. Trigger Mode Selection */}
-            <div className="space-y-2.5">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
-                1. Offer Cascade Initiation Mode
-              </span>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setDispatchAutomation((prev) => ({ ...prev, autoOfferOnConfirm: false }))
-                  }
-                  className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
-                    !dispatchAutomation.autoOfferOnConfirm
-                      ? 'border-blue-600 bg-blue-50/60 shadow-2xs'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-black text-slate-900">
-                      1-Tap Dispatcher Initiated (Default)
-                    </span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        !dispatchAutomation.autoOfferOnConfirm
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-100 text-slate-500'
-                      }`}
-                    >
-                      {!dispatchAutomation.autoOfferOnConfirm ? 'Active' : 'Select'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                    Dispatchers trigger sequential Auto-Offer Cascades on demand with 1 tap from the Trips Queue or Review Drawer.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setDispatchAutomation((prev) => ({ ...prev, autoOfferOnConfirm: true }))
-                  }
-                  className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
-                    dispatchAutomation.autoOfferOnConfirm
-                      ? 'border-emerald-600 bg-emerald-50/60 shadow-2xs'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-black text-slate-900">
-                      Full Auto-Offer on Confirmation
-                    </span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        dispatchAutomation.autoOfferOnConfirm
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-slate-100 text-slate-500'
-                      }`}
-                    >
-                      {dispatchAutomation.autoOfferOnConfirm ? 'Active' : 'Select'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                    Automatically starts sequential driver offer cascades whenever a ride becomes CONFIRMED or enters the ASAP queue.
-                  </p>
-                </button>
-              </div>
-            </div>
-
-            {/* 2. Candidate Ranking & Cascade Parameters */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 block">
-                  Candidate Ranking Strategy
-                </label>
-                <select
-                  value={dispatchAutomation.rankingStrategy}
-                  onChange={(e) =>
-                    setDispatchAutomation((prev) => ({
-                      ...prev,
-                      rankingStrategy: e.target.value as DispatchRankingStrategy,
-                    }))
-                  }
-                  className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                >
-                  <option value="nearest_in_zone">
-                    Nearest in Pickup Zone (Geofence + Haversine)
-                  </option>
-                  <option value="longest_idle_in_zone">
-                    Longest Idle in Pickup Zone (Fair Queue)
-                  </option>
-                  <option value="highest_driver_score">
-                    Highest Driver Score (Quality Priority)
-                  </option>
-                </select>
-                <span className="text-[10px] text-slate-500 block">
-                  Filters out off-duty, busy, grounded, blacklisted &amp; capacity-mismatched units first.
-                </span>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 block">
-                  Offer Timeout per Step (15–180s)
-                </label>
-                <Input
-                  type="number"
-                  min="15"
-                  max="180"
-                  value={dispatchAutomation.offerTimeoutSeconds}
-                  onChange={(e) =>
-                    setDispatchAutomation((prev) => ({
-                      ...prev,
-                      offerTimeoutSeconds: parseInt(e.target.value, 10) || 45,
-                    }))
-                  }
-                  className="text-xs h-9 bg-white"
-                />
-                <span className="text-[10px] text-slate-500 block">
-                  Seconds a driver has to accept before rolling over to the next candidate.
-                </span>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 block">
-                  Max Cascade Attempts (1–10)
-                </label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={dispatchAutomation.maxCascadeAttempts}
-                  onChange={(e) =>
-                    setDispatchAutomation((prev) => ({
-                      ...prev,
-                      maxCascadeAttempts: parseInt(e.target.value, 10) || 3,
-                    }))
-                  }
-                  className="text-xs h-9 bg-white"
-                />
-                <span className="text-[10px] text-slate-500 block">
-                  Reverts to CONFIRMED &amp; alerts Dispatch if exhausted without acceptance.
-                </span>
-              </div>
-            </div>
-
-            {/* 3. Scheduled-Ride SLA Lead Windows */}
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
-                <ClockIcon className="w-4 h-4 text-amber-600" />
-                <span>2. Scheduled-Ride SLA Urgency Windows</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl border border-amber-200/80 bg-amber-50/30">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-800 block">
-                    SLA Warning Window (Minutes)
-                  </label>
-                  <Input
-                    type="number"
-                    min="5"
-                    max="720"
-                    value={dispatchAutomation.slaWarningMinutes}
-                    onChange={(e) =>
-                      setDispatchAutomation((prev) => ({
-                        ...prev,
-                        slaWarningMinutes: parseInt(e.target.value, 10) || 60,
-                      }))
-                    }
-                    className="text-xs h-9 bg-white"
-                  />
-                  <span className="text-[10px] text-slate-500 block">
-                    Flags unassigned scheduled rides entering warning countdown (default 60m).
-                  </span>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-rose-800 block">
-                    SLA Critical Window (Minutes)
-                  </label>
-                  <Input
-                    type="number"
-                    min="5"
-                    max="720"
-                    value={dispatchAutomation.slaCriticalMinutes}
-                    onChange={(e) =>
-                      setDispatchAutomation((prev) => ({
-                        ...prev,
-                        slaCriticalMinutes: parseInt(e.target.value, 10) || 30,
-                      }))
-                    }
-                    className="text-xs h-9 bg-white"
-                  />
-                  <span className="text-[10px] text-slate-500 block">
-                    Triggers high-priority acoustic + serverless email/SMS alerts (default 30m).
-                  </span>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-blue-800 flex items-center gap-1">
-                    <PlaneIcon className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Airport Extra Lead Buffer (Minutes)</span>
-                  </label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="180"
-                    value={dispatchAutomation.airportExtraLeadMinutes}
-                    onChange={(e) =>
-                      setDispatchAutomation((prev) => ({
-                        ...prev,
-                        airportExtraLeadMinutes: parseInt(e.target.value, 10) || 0,
-                      }))
-                    }
-                    className="text-xs h-9 bg-white"
-                  />
-                  <span className="text-[10px] text-slate-500 block">
-                    Added automatically when STL, SUS, or CPS airport is detected (default +15m).
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-[11px] text-slate-500">
-              <span>
-                Active SLA thresholds for STL/SUS airport rides: Warning at{' '}
-                <strong className="text-slate-800">
-                  {dispatchAutomation.slaWarningMinutes + dispatchAutomation.airportExtraLeadMinutes}m
-                </strong>{' '}
-                · Critical at{' '}
-                <strong className="text-rose-700">
-                  {dispatchAutomation.slaCriticalMinutes + dispatchAutomation.airportExtraLeadMinutes}m
-                </strong>
-              </span>
-              <Button
-                size="sm"
-                variant="primary"
-                disabled={isSaving}
-                onClick={handleSave}
-                className="text-xs font-bold w-full sm:w-auto justify-center shrink-0 cursor-pointer"
-              >
-                {isSaving ? 'Saving...' : 'Save Dispatch Automation'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* DISPATCH AUTOMATION & PRE-PICKUP LEAD WINDOW CONTROL CENTER */}
+        <AdminAutoDispatchControlPanel
+          config={dispatchAutomation}
+          zones={zones}
+          isSaving={isSaving}
+          onChange={setDispatchAutomation}
+          onSave={handleSave}
+        />
 
         {/* AIRPORT RULES & CURBSIDE PICKUP INSTRUCTIONS CARD */}
         <div className="p-5 bg-white border border-blue-200 rounded-2xl shadow-xs space-y-4">

@@ -1271,6 +1271,41 @@ export interface PassengerAccount {
 - **`CustomerTelemetryMap.tsx`**:
   - Upgrades pickup, intermediate stop `1..N`, and dropoff markers to `buildRouteWaypointPinDataUrl` (`scaledSize: 32×40`, `anchor: (16, 38)`).
 
+## 39. Phase 50 Architecture (Wave 4 Phase 1): Intelligent Auto-Dispatch Engine (4 Modes + Pre-Pickup Lead Window + `/api/auto-dispatch`), Admin Control Center, `Auto-Pilot` Switch & `Auto-Dispatch Ready (N)` Sweep
+
+### 39.1 Security, Bundle & Line-Budget Guardrails (`constitution.md`)
+- **Zero Firestore Rule Regressions (`firestore.rules`)**:
+  - `/drivers` remains staff/driver-scoped; guest browsers never read `/drivers`. Unattended customer web bookings (`useCustomerBookingSubmission.ts`) fire a non-blocking `POST /api/auto-dispatch` (`{ tripId }`) which re-reads `/trips/{tripId}`, `/config/appSettings`, `/drivers`, and `/zones` server-side via Firestore REST (`getServiceAccountDatastoreToken()`) and verifies `isTripEligibleForAutoPilot` before mutating anything.
+  - Existing `/trips/{tripId}` rule already authorizes `request.auth.uid in resource.data.offeredToIds` for both 1-driver (`sequential_cascade`) and Top-K (`broadcast_pool`) offers with atomic first-accept (`offeredToIds.size() == 0`) and partial decline (`!(request.auth.uid in request.resource.data.offeredToIds)`).
+- **Bundle & Monolith Budgets**:
+  - `app/routes/api.auto-dispatch.ts` delegates exclusively to `app/core/services/dispatch/auto-dispatch.server.ts` (`0.00 kB` `< 1024`B client route chunk; `15` total `api.*.js` chunks).
+  - `AdminRulesTab.tsx < 1,350`L (enforced `< 1,400`L in `scripts/test-browser-smoke.ts`), `auto-dispatch.service.ts < 1,200`L (via extracted `auto-dispatch-ranking.ts`), `DispatchTripQueuePane.tsx < 900`L, `dispatch.tsx < 1,600`L, and `vercel.json` Hobby cron `"0 10 * * *"` untouched.
+
+### 39.2 Config Normalization, RBAC Helper & Candidate Ranking Split (`config.ts`, `trip.ts`, `auto-dispatch-ranking.ts`)
+- **`normalizeDispatchAutomationConfig` (`app/core/types/config.ts`)**:
+  - Preserves 100% backward compatibility: legacy documents lacking `dispatchMode` infer `'sequential_cascade'` when `raw?.autoOfferOnConfirm === true`, else `'manual_1tap'`; `autoOfferOnConfirm` stays synchronized as `dispatchMode !== 'manual_1tap'`.
+  - Clamps `broadcastPoolSize` (`2..8`), `scheduledDispatchLeadMinutes` (`15..240`), `stagedAutoReleaseLeadMinutes` (`15..240`), `maxPickupRadiusMiles` (`0..100`), `minDriverScore` (`0..100`), `maxGpsStaleSeconds` (`0..3600`), `windowStartHour` / `windowEndHour` (`0..23`), and normalizes `authorizedLeadWindowDispatcherIds` (trimmed non-empty UIDs / lowercase emails).
+- **`canOperatorConfigureLeadWindows(user, config)`**:
+  - Returns `true` when `user` holds `'admin'` (`user.role === 'admin' || user.roles?.includes('admin')`) OR holds `'dispatcher'` and matches `uid` or lowercase `email` in `config.authorizedLeadWindowDispatcherIds`.
+- **`auto-dispatch-ranking.ts` (`evaluateAutoDispatchCandidates`, Lead-Window & Operating-Hours Evaluators)**:
+  - Evaluates every driver in `drivers`, emitting sorted `eligible: RankedDispatchCandidate[]` (honoring `strictZoneFirst` across `nearest_in_zone`, `longest_idle_in_zone`, and `highest_driver_score`, plus boosting `trip.plannedDriverId` to `#1` when eligible) and `excluded: ExcludedDispatchCandidate[]` (`BLACKLISTED_OR_SUSPENDED`, `OFF_DUTY_OR_BREAK`, `BUSY_OR_CONFLICT`, `ALREADY_REJECTED_OR_ATTEMPTED`, `VEHICLE_GROUNDED_OR_INACTIVE`, `CAPACITY_OR_TIER_MISMATCH`, `SCORE_BELOW_MINIMUM`, `NO_GPS_TELEMETRY`, `GPS_TELEMETRY_STALE`, `OUTSIDE_MAX_RADIUS`).
+  - `isWithinAutoDispatchOperatingHours(config, nowDate)` handles `'always'` and `'custom_window'` (both daytime `08:00–18:00` and overnight `22:00–06:00` wrap-around).
+  - `isTripWithinDispatchLeadWindow(trip, config, nowMs)` admits unassigned `'CONFIRMED' | 'confirmed' | 'pending'` rides not in an active cascade when ASAP or within `[-60m, scheduledDispatchLeadMinutes + airportExtra]` (using `stagedAutoReleaseLeadMinutes` when `trip.plannedDriverId` is set), keeping future rides hours/days/weeks/months out untouched in `CONFIRMED`.
+
+### 39.3 4-Mode Execution Engine & Server Endpoint (`auto-dispatch.service.ts` & `auto-dispatch.server.ts`)
+- **`executeAutoDispatch` / `startOfferCascade` / `advanceOrExpireOfferCascade` / `runReadyAutoDispatchSweep`**:
+  - `sequential_cascade`: 1 driver per step (`offeredToIds: [top.driverId]`, `mode: 'sequential_cascade'`), rolling over up to `maxCascadeAttempts`, with optional `fallbackOnExhaustion === 'broadcast_all_eligible'` final simultaneous broadcast (`fallbackBroadcastUsed: true`) before `'exhausted'`.
+  - `broadcast_pool`: Top-K (`broadcastPoolSize`) simultaneous offers (`offeredToIds: batchIds`, `activeOfferedDriverIds: batchIds`, `mode: 'broadcast_pool'`); stays `'waiting'` while `>= 1` batch driver remains un-declined before `offerExpiresAt`, transitions to `'accepted'` on atomic claim, or rolls to next batch / `'exhausted'` on timeout or all-decline.
+  - `direct_auto_assign`: Immediately assigns `#1` candidate (`status: 'assigned'`, `assignedDriverId`, frozen `assignedVehicle`, `offeredToIds: []`, `DRIVER_ASSIGNED` `TripAuditEvent` with `actorRole: 'system'`, and push notification).
+  - `runReadyAutoDispatchSweep`: Iterates sequentially over `getReadyForAutoDispatchTrips` using `dispatchMode !== 'manual_1tap' ? dispatchMode : sweepExecutionMode`, feeding updated `activeTrips` forward on each iteration to prevent double-offering the same driver across simultaneous ready trips.
+
+### 39.4 Admin Control Center, Dispatch Header `Auto-Pilot` Switch & Queue `Ready` Sweep
+- **`app/components/domain/admin/rules/AdminAutoDispatchControlPanel.tsx` & `AdminAutoDispatchSimulator.tsx`**:
+  - Houses the 4 Mode Cards + `sweepExecutionMode`, Pre-Pickup Lead Window controls + `Authorized Dispatchers (Lead-Window Control)` checklist (`getOperatorService()`), Candidate Guardrails & Operating Window controls, SLA Warning/Critical windows, and Live/Sample-5-Car Dry-Run Simulator.
+- **`DispatchDesktopTopHeader.tsx`, `useDispatchSlaCascadeLoop.ts`, `TripQueueToolbar.tsx`, `DispatchCascadeSlaBadges.tsx`**:
+  - Top header renders `⚡ Auto-Pilot: ON` / `⏸ Auto-Pilot: PAUSED` (when `dispatchMode !== 'manual_1tap'`) and `⚙️` Console Settings Pre-Pickup Lead Window editor/viewer (`canOperatorConfigureLeadWindows`), appending `ConfigAuditEntry` records (`tab: 'rules'`, `section: 'auto_dispatch'`).
+  - `useDispatchSlaCascadeLoop.ts` drives continuous 3s `isTripEligibleForAutoPilot` dispatch + `handleRunAutoDispatchSweep`; `TripQueueToolbar.tsx` renders `⚡ Auto-Dispatch Ready (N)`; `DispatchCascadePill` renders `⚡ Pool (K cars) • Ns` for `broadcast_pool`.
+
 
 
 

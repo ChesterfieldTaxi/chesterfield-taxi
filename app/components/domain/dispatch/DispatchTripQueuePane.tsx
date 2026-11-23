@@ -126,6 +126,9 @@ export interface DispatchTripQueuePaneProps {
   onToggleSlaUrgentOnlyFilter: () => void;
   onStartAutoOffer: (trip: Trip) => void | Promise<void>;
   onCancelAutoOffer: (trip: Trip) => void | Promise<void>;
+  readyAutoDispatchCount?: number;
+  isRunningAutoDispatchSweep?: boolean;
+  onRunAutoDispatchSweep?: () => void | Promise<void>;
 }
 
 export function DispatchTripQueuePane({
@@ -203,6 +206,9 @@ export function DispatchTripQueuePane({
   onToggleSlaUrgentOnlyFilter,
   onStartAutoOffer,
   onCancelAutoOffer,
+  readyAutoDispatchCount,
+  isRunningAutoDispatchSweep,
+  onRunAutoDispatchSweep,
 }: DispatchTripQueuePaneProps) {
   const filterSignature = `${statusFilter}:${slaUrgentOnlyFilter ? '1' : '0'}:${searchTerm}:${
     filteredTrips.length === 0 ? 'empty' : 'rows'
@@ -295,6 +301,9 @@ export function DispatchTripQueuePane({
         onSelectTripOnQueue={onSelectTripOnQueue}
         onOpenReviewModal={onOpenReviewModal}
         onStartAutoOffer={onStartAutoOffer}
+        readyAutoDispatchCount={readyAutoDispatchCount}
+        isRunningAutoDispatchSweep={isRunningAutoDispatchSweep}
+        onRunAutoDispatchSweep={onRunAutoDispatchSweep}
       />
 
       {effectiveDisplayLayout === 'cards' ? (

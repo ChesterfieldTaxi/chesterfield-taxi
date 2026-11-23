@@ -1401,10 +1401,18 @@ export class FirebaseBookingService implements IBookingService {
               ...current.offerCascade,
               activeOfferedDriverId:
                 current.offerCascade.activeOfferedDriverId === driverId
-                  ? null
+                  ? remainingOffered[0] || null
                   : current.offerCascade.activeOfferedDriverId,
-              ...(current.offerCascade.activeOfferedDriverId === driverId
+              ...(current.offerCascade.activeOfferedDriverId === driverId &&
+              remainingOffered.length === 0
                 ? { activeOfferedDriverName: '' }
+                : {}),
+              ...(Array.isArray(current.offerCascade.activeOfferedDriverIds)
+                ? {
+                    activeOfferedDriverIds: current.offerCascade.activeOfferedDriverIds.filter(
+                      (id) => id !== driverId
+                    ),
+                  }
                 : {}),
               attemptedDriverIds: Array.from(
                 new Set([...(current.offerCascade.attemptedDriverIds || []), driverId])

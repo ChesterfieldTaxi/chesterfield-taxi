@@ -31,6 +31,7 @@ import {
   DEFAULT_OVERSIZED_BAG_CATEGORIES,
   DEFAULT_DISPATCH_AUTOMATION_CONFIG,
   normalizeDispatchAutomationConfig,
+  canOperatorConfigureLeadWindows,
 } from '../../types/config';
 import type { PricingConfig } from '../pricing/types';
 import { DEFAULT_PRICING_CONFIG } from '../pricing/rules';
@@ -47,6 +48,7 @@ export {
   DEFAULT_OVERSIZED_BAG_CATEGORIES,
   DEFAULT_DISPATCH_AUTOMATION_CONFIG,
   normalizeDispatchAutomationConfig,
+  canOperatorConfigureLeadWindows,
 };
 
 export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {

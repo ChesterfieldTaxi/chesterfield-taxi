@@ -264,8 +264,13 @@ export default function DispatchRoute() {
 
   const {
     slaSummary,
+    readyForAutoDispatchTrips,
+    isRunningReadySweep,
     handleStartAutoOffer,
     handleCancelAutoOffer,
+    handleRunAutoDispatchSweep,
+    handleToggleAutoPilotPause,
+    handleUpdateDispatchLeadWindows,
     autoOfferStartedIdsRef,
     autoOfferContextRef,
   } = useDispatchSlaCascadeLoop({
@@ -275,6 +280,7 @@ export default function DispatchRoute() {
     drivers,
     dispatchZones,
     settings,
+    setSettings,
     user,
     showDispatchToast,
   });
@@ -707,11 +713,7 @@ export default function DispatchRoute() {
         );
       } else if (
         autoOfferContextRef.current.autoOfferOnConfirm &&
-        !savedTrip.assignedDriverId &&
-        !savedTrip.offerCascade &&
-        (savedTrip.status === 'CONFIRMED' ||
-          savedTrip.status === 'confirmed' ||
-          savedTrip.status === 'pending')
+        autoOfferContextRef.current.isEligibleForAutoPilot(savedTrip)
       ) {
         void autoOfferContextRef.current.handleStartAutoOffer(savedTrip);
       }
@@ -906,6 +908,9 @@ export default function DispatchRoute() {
         onToggleKeepScreenAwake={handleToggleKeepScreenAwake}
         dispatchWakeLock={dispatchWakeLock}
         dispatchPush={dispatchPush}
+        user={user}
+        onToggleAutoPilotPause={handleToggleAutoPilotPause}
+        onUpdateLeadWindows={handleUpdateDispatchLeadWindows}
       />
 
       {/* 2. Slide-Out Drawer & Mobile 5-Tab Bottom Navigation */}
@@ -1106,6 +1111,9 @@ export default function DispatchRoute() {
             onToggleSlaUrgentOnlyFilter={() => setSlaUrgentOnlyFilter((prev) => !prev)}
             onStartAutoOffer={handleStartAutoOffer}
             onCancelAutoOffer={handleCancelAutoOffer}
+            readyAutoDispatchCount={readyForAutoDispatchTrips.length}
+            isRunningAutoDispatchSweep={isRunningReadySweep}
+            onRunAutoDispatchSweep={handleRunAutoDispatchSweep}
           />
         </div>
 

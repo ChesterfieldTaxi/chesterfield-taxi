@@ -243,6 +243,7 @@ export interface TripAuditEvent {
     | 'AUTO_CONFIRMED'
     | 'FLAGGED_FOR_HUMAN_REVIEW'
     | 'DISPATCH_OFFERED'
+    | 'DRIVER_ASSIGNED'
     | 'DRIVER_ACCEPTED'
     | 'DRIVER_DECLINED'
     | 'STATUS_CHANGED'
@@ -305,8 +306,11 @@ export type OfferCascadeState = 'active' | 'accepted' | 'exhausted' | 'cancelled
 
 export interface TripOfferCascade {
   state: OfferCascadeState;
+  mode?: 'sequential_cascade' | 'broadcast_pool' | 'direct_auto_assign';
   activeOfferedDriverId: string | null;
   activeOfferedDriverName?: string;
+  activeOfferedDriverIds?: string[];
+  fallbackBroadcastUsed?: boolean;
   offerStartedAt: string;
   offerExpiresAt: string;
   timeoutSeconds: number;
@@ -358,6 +362,12 @@ export interface Trip {
   /** Currently assigned driver, null if unassigned */
   assignedDriverId: string | null;
   assignedVehicle?: TripAssignedVehicle;
+
+  /** Pre-staged / planned driver metadata (Phase 50/51) */
+  plannedDriverId?: string | null;
+  plannedDriverLabel?: string;
+  plannedAt?: string;
+  plannedBy?: string;
 
   /** Audit Log */
   auditLog?: TripAuditEvent[];

@@ -560,14 +560,65 @@ export type DispatchRankingStrategy =
   | 'longest_idle_in_zone'
   | 'highest_driver_score';
 
+export type DispatchAutomationMode =
+  | 'manual_1tap'
+  | 'sequential_cascade'
+  | 'broadcast_pool'
+  | 'direct_auto_assign';
+
+export type ActiveAutoDispatchStrategyMode = Exclude<DispatchAutomationMode, 'manual_1tap'>;
+
+export type DispatchOperatingHoursMode = 'always' | 'custom_window';
+
+export type DispatchExhaustionFallbackMode = 'alert_dispatch' | 'broadcast_all_eligible';
+
 export interface DispatchAutomationConfig {
-  /** false = 1-tap dispatcher-initiated (default); true = auto-start cascade when a ride becomes CONFIRMED / ASAP pending */
+  /** false = 1-tap dispatcher-initiated (default); true = synchronized when dispatchMode !== 'manual_1tap' */
   autoOfferOnConfirm: boolean;
+  /** Primary assignment mode (default 'manual_1tap') */
+  dispatchMode: DispatchAutomationMode;
+  /** Strategy executed when clicking "Auto-Dispatch Ready (N)" while in 'manual_1tap' mode */
+  sweepExecutionMode: ActiveAutoDispatchStrategyMode;
+  /** Operational kill/pause switch for continuous Auto-Pilot */
+  isPaused: boolean;
+  pausedAt?: string;
+  pausedBy?: string;
+  pauseReason?: string;
   rankingStrategy: DispatchRankingStrategy;
-  /** Seconds per cascade offer step (default 45, clamped 15–180s) */
+  /** Seconds per cascade/pool offer step (default 45, clamped 15–180s) */
   offerTimeoutSeconds: number;
-  /** Maximum drivers offered sequentially per cascade (default 3, clamped 1–10) */
+  /** Maximum drivers/batches offered per cascade (default 3, clamped 1–10) */
   maxCascadeAttempts: number;
+  /** Simultaneous top candidates offered in 'broadcast_pool' mode (default 3, clamped 2–8) */
+  broadcastPoolSize: number;
+  /** Auto-dispatch immediate ASAP rides when Auto-Pilot is active (default true) */
+  autoDispatchAsapRides: boolean;
+  /** Auto-dispatch scheduled rides once inside the Pre-Pickup Lead Window (default true) */
+  autoDispatchScheduledRides: boolean;
+  /** Admin/Authorized-Dispatcher adjustable Pre-Pickup Lead Window in minutes (default 45, clamped 15–240) */
+  scheduledDispatchLeadMinutes: number;
+  /** Automatically release pre-staged/planned drivers inside lead window (default true) */
+  autoReleaseStagedDrivers: boolean;
+  /** Lead window in minutes for releasing staged drivers (default 45, clamped 15–240) */
+  stagedAutoReleaseLeadMinutes: number;
+  /** Normalized trimmed UIDs or lowercase emails of dispatchers granted Lead-Window permission */
+  authorizedLeadWindowDispatcherIds: string[];
+  /** Maximum pickup radius in miles (default 18, clamped 0–100; 0 = unlimited) */
+  maxPickupRadiusMiles: number;
+  /** Strictly rank pickup-zone candidates ahead of out-of-zone candidates (default true) */
+  strictZoneFirst: boolean;
+  /** Minimum driver quality score threshold (default 0, clamped 0–100) */
+  minDriverScore: number;
+  /** Maximum GPS staleness in seconds (default 300, clamped 0–3600; 0 = allow no-GPS on-duty drivers) */
+  maxGpsStaleSeconds: number;
+  /** Operating schedule mode ('always' 24/7 vs 'custom_window' hours) */
+  operatingHoursMode: DispatchOperatingHoursMode;
+  /** Start hour (0–23) when operatingHoursMode === 'custom_window' (default 22) */
+  windowStartHour: number;
+  /** End hour (0–23) when operatingHoursMode === 'custom_window' (default 6) */
+  windowEndHour: number;
+  /** Behavior when sequential/pool attempts exhaust without acceptance */
+  fallbackOnExhaustion: DispatchExhaustionFallbackMode;
   /** Minutes before scheduled pickup to enter SLA warning window (default 60) */
   slaWarningMinutes: number;
   /** Minutes before scheduled pickup to enter SLA critical window (default 30) */
@@ -578,9 +629,27 @@ export interface DispatchAutomationConfig {
 
 export const DEFAULT_DISPATCH_AUTOMATION_CONFIG: DispatchAutomationConfig = {
   autoOfferOnConfirm: false,
+  dispatchMode: 'manual_1tap',
+  sweepExecutionMode: 'sequential_cascade',
+  isPaused: false,
   rankingStrategy: 'nearest_in_zone',
   offerTimeoutSeconds: 45,
   maxCascadeAttempts: 3,
+  broadcastPoolSize: 3,
+  autoDispatchAsapRides: true,
+  autoDispatchScheduledRides: true,
+  scheduledDispatchLeadMinutes: 45,
+  autoReleaseStagedDrivers: true,
+  stagedAutoReleaseLeadMinutes: 45,
+  authorizedLeadWindowDispatcherIds: [],
+  maxPickupRadiusMiles: 18,
+  strictZoneFirst: true,
+  minDriverScore: 0,
+  maxGpsStaleSeconds: 300,
+  operatingHoursMode: 'always',
+  windowStartHour: 22,
+  windowEndHour: 6,
+  fallbackOnExhaustion: 'alert_dispatch',
   slaWarningMinutes: 60,
   slaCriticalMinutes: 30,
   airportExtraLeadMinutes: 15,
@@ -594,10 +663,40 @@ export function normalizeDispatchAutomationConfig(
     'longest_idle_in_zone',
     'highest_driver_score',
   ];
+  const validModes: readonly DispatchAutomationMode[] = [
+    'manual_1tap',
+    'sequential_cascade',
+    'broadcast_pool',
+    'direct_auto_assign',
+  ];
+  const validActiveModes: readonly ActiveAutoDispatchStrategyMode[] = [
+    'sequential_cascade',
+    'broadcast_pool',
+    'direct_auto_assign',
+  ];
+
   const rankingStrategy: DispatchRankingStrategy =
     raw?.rankingStrategy && validStrategies.includes(raw.rankingStrategy)
       ? raw.rankingStrategy
       : DEFAULT_DISPATCH_AUTOMATION_CONFIG.rankingStrategy;
+
+  let dispatchMode: DispatchAutomationMode;
+  if (raw?.dispatchMode && validModes.includes(raw.dispatchMode)) {
+    dispatchMode = raw.dispatchMode;
+  } else if (raw?.autoOfferOnConfirm === true) {
+    dispatchMode = 'sequential_cascade';
+  } else {
+    dispatchMode = 'manual_1tap';
+  }
+
+  const autoOfferOnConfirm = dispatchMode !== 'manual_1tap';
+
+  const sweepExecutionMode: ActiveAutoDispatchStrategyMode =
+    raw?.sweepExecutionMode && validActiveModes.includes(raw.sweepExecutionMode)
+      ? raw.sweepExecutionMode
+      : dispatchMode !== 'manual_1tap'
+      ? dispatchMode
+      : DEFAULT_DISPATCH_AUTOMATION_CONFIG.sweepExecutionMode;
 
   const clampInt = (val: unknown, fallback: number, min: number, max: number): number => {
     const num = typeof val === 'number' ? val : Number(val);
@@ -618,10 +717,46 @@ export function normalizeDispatchAutomationConfig(
     720
   );
 
+  const normalizedAuthorizedIds = Array.isArray(raw?.authorizedLeadWindowDispatcherIds)
+    ? Array.from(
+        new Set(
+          raw.authorizedLeadWindowDispatcherIds
+            .map((entry) => {
+              const trimmed = String(entry || '').trim();
+              if (!trimmed) return '';
+              return trimmed.includes('@') ? trimmed.toLowerCase() : trimmed;
+            })
+            .filter(Boolean)
+        )
+      )
+    : [];
+
+  const operatingHoursMode: DispatchOperatingHoursMode =
+    raw?.operatingHoursMode === 'custom_window' ? 'custom_window' : 'always';
+
+  const fallbackOnExhaustion: DispatchExhaustionFallbackMode =
+    raw?.fallbackOnExhaustion === 'broadcast_all_eligible'
+      ? 'broadcast_all_eligible'
+      : 'alert_dispatch';
+
+  const isPaused = Boolean(raw?.isPaused ?? DEFAULT_DISPATCH_AUTOMATION_CONFIG.isPaused);
+  const pausedAt =
+    typeof raw?.pausedAt === 'string' && raw.pausedAt.trim() ? raw.pausedAt.trim() : undefined;
+  const pausedBy =
+    typeof raw?.pausedBy === 'string' && raw.pausedBy.trim() ? raw.pausedBy.trim() : undefined;
+  const pauseReason =
+    typeof raw?.pauseReason === 'string' && raw.pauseReason.trim()
+      ? raw.pauseReason.trim()
+      : undefined;
+
   return {
-    autoOfferOnConfirm: Boolean(
-      raw?.autoOfferOnConfirm ?? DEFAULT_DISPATCH_AUTOMATION_CONFIG.autoOfferOnConfirm
-    ),
+    autoOfferOnConfirm,
+    dispatchMode,
+    sweepExecutionMode,
+    isPaused,
+    ...(pausedAt ? { pausedAt } : {}),
+    ...(pausedBy ? { pausedBy } : {}),
+    ...(pauseReason ? { pauseReason } : {}),
     rankingStrategy,
     offerTimeoutSeconds: clampInt(
       raw?.offerTimeoutSeconds,
@@ -635,6 +770,73 @@ export function normalizeDispatchAutomationConfig(
       1,
       10
     ),
+    broadcastPoolSize: clampInt(
+      raw?.broadcastPoolSize,
+      DEFAULT_DISPATCH_AUTOMATION_CONFIG.broadcastPoolSize,
+      2,
+      8
+    ),
+    autoDispatchAsapRides:
+      raw?.autoDispatchAsapRides !== undefined
+        ? Boolean(raw.autoDispatchAsapRides)
+        : DEFAULT_DISPATCH_AUTOMATION_CONFIG.autoDispatchAsapRides,
+    autoDispatchScheduledRides:
+      raw?.autoDispatchScheduledRides !== undefined
+        ? Boolean(raw.autoDispatchScheduledRides)
+        : DEFAULT_DISPATCH_AUTOMATION_CONFIG.autoDispatchScheduledRides,
+    scheduledDispatchLeadMinutes: clampInt(
+      raw?.scheduledDispatchLeadMinutes,
+      DEFAULT_DISPATCH_AUTOMATION_CONFIG.scheduledDispatchLeadMinutes,
+      15,
+      240
+    ),
+    autoReleaseStagedDrivers:
+      raw?.autoReleaseStagedDrivers !== undefined
+        ? Boolean(raw.autoReleaseStagedDrivers)
+        : DEFAULT_DISPATCH_AUTOMATION_CONFIG.autoReleaseStagedDrivers,
+    stagedAutoReleaseLeadMinutes: clampInt(
+      raw?.stagedAutoReleaseLeadMinutes,
+      DEFAULT_DISPATCH_AUTOMATION_CONFIG.stagedAutoReleaseLeadMinutes,
+      15,
+      240
+    ),
+    authorizedLeadWindowDispatcherIds: normalizedAuthorizedIds,
+    maxPickupRadiusMiles: clampInt(
+      raw?.maxPickupRadiusMiles,
+      DEFAULT_DISPATCH_AUTOMATION_CONFIG.maxPickupRadiusMiles,
+      0,
+      100
+    ),
+    strictZoneFirst:
+      raw?.strictZoneFirst !== undefined
+        ? Boolean(raw.strictZoneFirst)
+        : DEFAULT_DISPATCH_AUTOMATION_CONFIG.strictZoneFirst,
+    minDriverScore: clampInt(
+      raw?.minDriverScore,
+      DEFAULT_DISPATCH_AUTOMATION_CONFIG.minDriverScore,
+      0,
+      100
+    ),
+    maxGpsStaleSeconds: clampInt(
+      raw?.maxGpsStaleSeconds,
+      DEFAULT_DISPATCH_AUTOMATION_CONFIG.maxGpsStaleSeconds,
+      0,
+      3600
+    ),
+    operatingHoursMode,
+    windowStartHour: clampInt(
+      raw?.windowStartHour,
+      DEFAULT_DISPATCH_AUTOMATION_CONFIG.windowStartHour,
+      0,
+      23
+    ),
+    windowEndHour: clampInt(
+      raw?.windowEndHour,
+      DEFAULT_DISPATCH_AUTOMATION_CONFIG.windowEndHour,
+      0,
+      23
+    ),
+    fallbackOnExhaustion,
     slaWarningMinutes: Math.max(slaCriticalMinutes, rawWarning),
     slaCriticalMinutes,
     airportExtraLeadMinutes: clampInt(
@@ -644,6 +846,49 @@ export function normalizeDispatchAutomationConfig(
       180
     ),
   };
+}
+
+/**
+ * Pure RBAC helper checking whether an operator may adjust Auto-Dispatch Pre-Pickup /
+ * Staged Auto-Release Lead Windows directly from the Dispatch Console.
+ * Returns true for any 'admin' OR any 'dispatcher' whose UID or lowercase email is
+ * granted in `config.authorizedLeadWindowDispatcherIds`.
+ */
+export function canOperatorConfigureLeadWindows(
+  user:
+    | { uid?: string; email?: string | null; role?: string; roles?: string[] }
+    | null
+    | undefined,
+  config?: Partial<DispatchAutomationConfig> | null
+): boolean {
+  if (!user) return false;
+
+  const roleSet = new Set<string>(
+    [
+      ...(Array.isArray(user.roles) ? user.roles : []),
+      ...(user.role ? [user.role] : []),
+    ].map((r) => String(r).trim().toLowerCase())
+  );
+
+  if (roleSet.has('admin')) return true;
+  if (!roleSet.has('dispatcher')) return false;
+
+  const allowlist = Array.isArray(config?.authorizedLeadWindowDispatcherIds)
+    ? config!.authorizedLeadWindowDispatcherIds!
+    : [];
+  if (allowlist.length === 0) return false;
+
+  const uid = (user.uid || '').trim();
+  const emailLower = (user.email || '').trim().toLowerCase();
+
+  for (const item of allowlist) {
+    const clean = String(item || '').trim();
+    if (!clean) continue;
+    if (uid && clean === uid) return true;
+    if (emailLower && clean.toLowerCase() === emailLower) return true;
+  }
+
+  return false;
 }
 
 export interface TelephonyIntegrationConfig {

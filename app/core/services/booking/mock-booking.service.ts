@@ -755,10 +755,18 @@ export class MockBookingService implements IBookingService {
               ...trip.offerCascade,
               activeOfferedDriverId:
                 trip.offerCascade.activeOfferedDriverId === driverId
-                  ? null
+                  ? remainingOffered[0] || null
                   : trip.offerCascade.activeOfferedDriverId,
-              ...(trip.offerCascade.activeOfferedDriverId === driverId
+              ...(trip.offerCascade.activeOfferedDriverId === driverId &&
+              remainingOffered.length === 0
                 ? { activeOfferedDriverName: '' }
+                : {}),
+              ...(Array.isArray(trip.offerCascade.activeOfferedDriverIds)
+                ? {
+                    activeOfferedDriverIds: trip.offerCascade.activeOfferedDriverIds.filter(
+                      (id) => id !== driverId
+                    ),
+                  }
                 : {}),
               attemptedDriverIds: Array.from(
                 new Set([...(trip.offerCascade.attemptedDriverIds || []), driverId])

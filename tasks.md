@@ -776,6 +776,23 @@
   - [x] 49.5.1 Create and pass `scripts/test-multi-stop-and-route-pins.ts` verifying `buildRouteWaypointPinDataUrl`, multi-stop helpers, `useDispatchMapPreferences` defaults/resilience, 10-column `TripQueueTableView.tsx` invariant, `suppressMarkers: true`, `LiveFleetMap.tsx < 1350`L, and `DispatchTripQueuePane.tsx < 900`L.
   - [x] 49.5.2 Pass `npx tsx scripts/test-trip-queue-responsive.ts`, `npm run typecheck`, `npm run build`, `npm run test:smoke`, and `npm run test:e2e` with `0` errors, mark Phase 49 complete in `tasks.md`, and leave Phase 49 changes uncommitted for Control-Tower review.
 
+## Phase 50 (Wave 4 Phase 1): Intelligent Auto-Dispatch Engine (4 Modes + Pre-Pickup Lead Window + `/api/auto-dispatch`), Admin Control Center, `Auto-Pilot` Switch & 1-Click `Auto-Dispatch Ready (N)` Sweep
+- [x] 50.0 Baseline Hygiene & Specification Sync:
+  - [x] 50.0.1 Verify clean `git status` on `main` and update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 50 scope, security guardrails, and monolith line-count budgets before writing code.
+- [x] 50.1 Extend `DispatchAutomationConfig`, RBAC Helper & `Trip` Schema:
+  - [x] 50.1.1 Extend `DispatchAutomationConfig` (`DispatchAutomationMode`, `ActiveAutoDispatchStrategyMode`, lead windows, pause state, pool size, guardrails, operating hours, exhaustion fallback), `normalizeDispatchAutomationConfig` (100% backward-compatible), and `canOperatorConfigureLeadWindows` in `app/core/types/config.ts` (re-exporting from `admin-config.service.ts`).
+  - [x] 50.1.2 Extend `TripOfferCascade` (`mode`, `activeOfferedDriverIds`, `fallbackBroadcastUsed`), `TripAuditEvent` (`'DRIVER_ASSIGNED'`), and `Trip` (`plannedDriverId`, `plannedDriverLabel`, `plannedAt`, `plannedBy`) in `app/core/types/trip.ts`.
+- [x] 50.2 4-Mode Auto-Dispatch Engine, Pre-Pickup Lead-Window Gating & `/api/auto-dispatch`:
+  - [x] 50.2.1 Create `app/core/services/dispatch/auto-dispatch-ranking.ts` (`evaluateAutoDispatchCandidates`, `isWithinAutoDispatchOperatingHours`, `isTripWithinDispatchLeadWindow`, `getReadyForAutoDispatchTrips`, `isTripEligibleForAutoPilot`) and refactor `app/core/services/dispatch/auto-dispatch.service.ts` (`< 1,200`L) implementing `executeAutoDispatch`, `runReadyAutoDispatchSweep`, `sequential_cascade` (`+ broadcast_all_eligible` fallback), `broadcast_pool`, and `direct_auto_assign` (plus `broadcast_pool` partial-decline support in `firebase-booking.service.ts` and `mock-booking.service.ts`).
+  - [x] 50.2.2 Create `app/core/services/dispatch/auto-dispatch.server.ts` and `app/routes/api.auto-dispatch.ts` (`0.00 kB` client bundle), register `api/auto-dispatch` in `app/routes.ts`, wire non-blocking `/api/auto-dispatch` trigger into `useCustomerBookingSubmission.ts`, and wire server auto-dispatch pass into `sla-cron.server.ts`.
+- [x] 50.3 Admin Control Center (`AdminAutoDispatchControlPanel.tsx`), `Auto-Pilot` Switch & `Auto-Dispatch Ready (N)` Sweep:
+  - [x] 50.3.1 Create `AdminAutoDispatchControlPanel.tsx` and `AdminAutoDispatchSimulator.tsx` under `app/components/domain/admin/rules/`, wire into `AdminRulesTab.tsx` (`< 1,350`L), and add `{ relFile: 'app/components/domain/admin/AdminRulesTab.tsx', maxLines: 1400 }` to `scripts/test-browser-smoke.ts`.
+  - [x] 50.3.2 Add Top-Header `⚡ Auto-Pilot: ON` / `⏸ Auto-Pilot: PAUSED` pill and `⚙️` Console Settings Pre-Pickup Lead Window quick control (`canOperatorConfigureLeadWindows` + `ConfigAuditEntry` logging) in `DispatchDesktopTopHeader.tsx` & `dispatch.tsx` (`< 1,600`L).
+  - [x] 50.3.3 Wire continuous `isTripEligibleForAutoPilot` tick + `readyForAutoDispatchTrips` + `handleRunAutoDispatchSweep` in `useDispatchSlaCascadeLoop.ts` (and confirmation hooks), render `⚡ Auto-Dispatch Ready (N)` in `TripQueueToolbar.tsx` (`DispatchTripQueuePane.tsx < 900`L), and display `⚡ Pool (K cars) • Ns` in `DispatchCascadeSlaBadges.tsx`.
+- [x] 50.4 Automated Verification Suite & Master Regression Gates:
+  - [x] 50.4.1 Create and pass `scripts/test-auto-dispatch-admin-controls.ts` covering config normalization, RBAC lead-window helper, candidate guardrails/exclusions, operating hours, Pre-Pickup Lead-Window gating (`3h`, `2w`, `2mo` untouched), all 4 modes, and `/api/auto-dispatch` server isolation.
+  - [x] 50.4.2 Pass `npx tsx scripts/test-auto-dispatch-sla.ts`, `npx tsx scripts/test-trip-queue-responsive.ts`, `npm run typecheck`, `npm run build`, `npm run test:smoke`, and `npm run test:e2e` with `0` errors, mark Phase 50 complete in `tasks.md`, and leave uncommitted for Control-Tower review.
+
 
 
 

@@ -1,38 +1,34 @@
 /**
- * Pure Auto-Dispatch Candidate Ranking & Sequential Offer Cascade Service (Phase 35)
+ * Intelligent 4-Mode Auto-Dispatch & Offer Cascade Engine (`auto-dispatch.service.ts` — Phase 50)
  *
  * Responsibilities:
- * 1. `rankAutoDispatchCandidates(trip, drivers, zones, config, options)`:
- *    - Excludes off-duty/break, busy/en-route/conflicting, blacklisted/archived drivers,
- *      grounded/blacklisted fleet vehicles, and drivers in `rejectedByIds` / `attemptedDriverIds`.
- *    - Enforces passenger count, luggage capacity, wheelchair WAV, and SUV/Van upgrade rules.
- *    - Deterministically sorts eligible drivers via `nearest_in_zone`, `longest_idle_in_zone`,
- *      or `highest_driver_score`.
- * 2. Sequential single-target cascade lifecycle (`startOfferCascade`, `advanceOrExpireOfferCascade`,
- *    `cancelOfferCascade`):
- *    - Sets `status: 'offered'` and `offeredToIds: [activeOfferedDriverId]` (1 active target per step)
- *      for seamless compatibility with `acceptDriverOffer` / `declineDriverOffer` and `firestore.rules`.
- *    - Rolls over to the next ranked candidate on decline or timeout up to `maxCascadeAttempts`.
- *    - Cleanly transitions to `offerCascade.state = 'exhausted'` and reverts `status` to `'CONFIRMED'`
- *      (or `'pending'`) when exhausted.
+ * 1. Candidate evaluation & Pre-Pickup Lead-Window gating (re-exported from `./auto-dispatch-ranking`).
+ * 2. 4 Assignment Modes (`executeAutoDispatch`, `startOfferCascade`, `advanceOrExpireOfferCascade`,
+ *    `cancelOfferCascade`, `runReadyAutoDispatchSweep`):
+ *    - `manual_1tap`: Dispatcher-initiated 1-tap or on-demand `sweepExecutionMode` sweep.
+ *    - `sequential_cascade`: Offers 1 driver at a time (`offeredToIds: [top.driverId]`), rolling over
+ *      on decline/timeout up to `maxCascadeAttempts`, with optional `broadcast_all_eligible` fallback.
+ *    - `broadcast_pool`: Offers up to `broadcastPoolSize` top candidates simultaneously
+ *      (`offeredToIds: batchIds`, `activeOfferedDriverIds: batchIds`), waiting while >= 1 driver
+ *      remains active before `offerExpiresAt`, atomic first-accept win, or batch rollover/exhaustion.
+ *    - `direct_auto_assign`: Immediately assigns `#1` ranked candidate (`status: 'assigned'`,
+ *      frozen `assignedVehicle` snapshot, `DRIVER_ASSIGNED` audit event, and push alert).
  *
- * Zero React or browser DOM dependencies per `constitution.md`.
+ * Zero React, browser DOM, or `node:*` dependencies per `constitution.md`.
  */
 
-import { detectAirportInAddresses } from '../../config/airports';
 import {
   DEFAULT_DISPATCH_AUTOMATION_CONFIG,
   normalizeDispatchAutomationConfig,
+  type ActiveAutoDispatchStrategyMode,
   type DispatchAutomationConfig,
+  type DispatchAutomationMode,
   type DispatchRankingStrategy,
   type FleetCarConfig,
   type VehicleTierConfig,
 } from '../../types/config';
-import type { DriverDutyStatus, LiveDriverMapStatus } from '../../types/driver';
 import type { PhysicalFleetAsset } from '../../types/fleet';
 import type {
-  DriverTelemetryPing,
-  GeoPoint,
   Trip,
   TripAuditEvent,
   TripOfferCascade,
@@ -45,68 +41,15 @@ import { getBookingService } from '../booking';
 import type { IBookingService } from '../booking-service';
 import { formatDriverOfferNotificationPayload } from '../notifications/push-notification.service';
 import {
-  DEFAULT_ZONES,
-  calculateHaversineDistanceMiles,
-  isCoordinateInZone,
-} from '../zones/zone.service';
+  evaluateAutoDispatchCandidates,
+  getReadyForAutoDispatchTrips,
+  resolveDriverFrozenVehicleSnapshot,
+  type AutoDispatchDriverInput,
+  type ExcludedDispatchCandidate,
+  type RankedDispatchCandidate,
+} from './auto-dispatch-ranking';
 
-export interface AutoDispatchDriverInput {
-  id: string;
-  name: string;
-  cabNumber?: string;
-  vehicleUnit?: string;
-  vehicle?: string;
-  vehicleId?: string;
-  vehicleTier?: string;
-  tier?: string;
-  dutyStatus?: DriverDutyStatus;
-  mapStatus?: LiveDriverMapStatus;
-  status?: 'available' | 'on_trip' | 'break' | 'offline' | string;
-  currentTripId?: string | null;
-  activeTrip?: Partial<Trip> | null;
-  zone?: string;
-  phone?: string;
-  driverScore?: number;
-  isBlacklisted?: boolean;
-  isArchived?: boolean;
-  currentLocation?: DriverTelemetryPing | null;
-  telemetry?: DriverTelemetryPing | null;
-  coordinates?: GeoPoint | null;
-  lastActiveAt?: string;
-  locationUpdatedAt?: string;
-  idleSince?: string;
-  lastCompletedTripAt?: string;
-  formattedLabel?: string;
-  /** Optional inline vehicle health overrides for test/lightweight callers */
-  vehicleStatus?: FleetCarConfig['status'] | PhysicalFleetAsset['status'];
-  isVehicleGrounded?: boolean;
-  isVehicleBlacklisted?: boolean;
-}
-
-export interface RankCandidatesOptions {
-  fleetVehicles?: ReadonlyArray<FleetCarConfig | PhysicalFleetAsset>;
-  activeTrips?: ReadonlyArray<Partial<Trip>>;
-  vehicleTiers?: ReadonlyArray<VehicleTierConfig>;
-  nowMs?: number;
-  /** Scheduled pickup conflict window in minutes (default 45) */
-  conflictWindowMinutes?: number;
-}
-
-export interface RankedDispatchCandidate {
-  driverId: string;
-  driverName: string;
-  driverLabel: string;
-  cabNumber?: string;
-  vehicleUnit: string;
-  vehicleTier: string;
-  inPickupZone: boolean;
-  matchedZoneIds: string[];
-  distanceMiles: number | null;
-  idleDurationMs: number;
-  driverScore: number;
-  strategy: DispatchRankingStrategy;
-  rankReason: string;
-}
+export * from './auto-dispatch-ranking';
 
 export type PushOfferSender = (
   targetDriverId: string,
@@ -118,6 +61,7 @@ export interface StartOfferCascadeParams {
   drivers: ReadonlyArray<AutoDispatchDriverInput>;
   zones?: ReadonlyArray<ZoneGeofence>;
   config?: Partial<DispatchAutomationConfig> | null;
+  modeOverride?: ActiveAutoDispatchStrategyMode;
   fleetVehicles?: ReadonlyArray<FleetCarConfig | PhysicalFleetAsset>;
   activeTrips?: ReadonlyArray<Partial<Trip>>;
   vehicleTiers?: ReadonlyArray<VehicleTierConfig>;
@@ -127,6 +71,8 @@ export interface StartOfferCascadeParams {
   sendPush?: PushOfferSender | false;
   nowMs?: number;
 }
+
+export type ExecuteAutoDispatchParams = StartOfferCascadeParams;
 
 export interface AdvanceOfferCascadeParams {
   trip: Trip;
@@ -151,263 +97,49 @@ export interface CancelOfferCascadeParams {
 }
 
 export interface OfferCascadeStepResult {
-  outcome: 'offered' | 'advanced' | 'accepted' | 'exhausted' | 'cancelled' | 'waiting' | 'noop';
+  outcome:
+    | 'offered'
+    | 'assigned'
+    | 'advanced'
+    | 'accepted'
+    | 'exhausted'
+    | 'cancelled'
+    | 'waiting'
+    | 'noop';
   trip: Trip;
   candidate: RankedDispatchCandidate | null;
   candidates: RankedDispatchCandidate[];
+  offeredCandidates?: RankedDispatchCandidate[];
+  excludedCandidates?: ExcludedDispatchCandidate[];
+  mode?: DispatchAutomationMode;
   reason?: string;
 }
 
-type CanonicalVehicleCategory = 'standard' | 'premium' | 'xl' | 'van' | 'wheelchair';
-
-interface ResolvedVehicleCapacity {
-  category: CanonicalVehicleCategory;
-  maxPassengers: number;
-  maxLuggage: number;
+export interface RunAutoDispatchSweepParams {
+  trips: ReadonlyArray<Trip>;
+  drivers: ReadonlyArray<AutoDispatchDriverInput>;
+  zones?: ReadonlyArray<ZoneGeofence>;
+  config?: Partial<DispatchAutomationConfig> | null;
+  modeOverride?: ActiveAutoDispatchStrategyMode;
+  fleetVehicles?: ReadonlyArray<FleetCarConfig | PhysicalFleetAsset>;
+  vehicleTiers?: ReadonlyArray<VehicleTierConfig>;
+  actorRole?: 'dispatcher' | 'admin' | 'system';
+  actorId?: string;
+  bookingService?: IBookingService;
+  sendPush?: PushOfferSender | false;
+  nowMs?: number;
+  includeExhausted?: boolean;
 }
 
-function isValidGeoPoint(pt?: GeoPoint | null): pt is GeoPoint {
-  return Boolean(
-    pt &&
-      typeof pt.lat === 'number' &&
-      typeof pt.lng === 'number' &&
-      Number.isFinite(pt.lat) &&
-      Number.isFinite(pt.lng) &&
-      (pt.lat !== 0 || pt.lng !== 0)
-  );
-}
-
-function extractUnitDigits(raw?: string | null): string {
-  if (!raw) return '';
-  const match = String(raw).match(/#?(\d+)/);
-  return match ? match[1] : '';
-}
-
-function formatCandidateLabel(drv: AutoDispatchDriverInput): string {
-  if (drv.formattedLabel?.trim()) return drv.formattedLabel.trim();
-  const unitDigits = extractUnitDigits(drv.cabNumber || drv.vehicleUnit || drv.vehicle);
-  if (unitDigits) {
-    return `Car #${unitDigits} (${drv.name})`;
-  }
-  if (drv.vehicleUnit?.trim()) {
-    return `${drv.vehicleUnit.trim()} (${drv.name})`;
-  }
-  return drv.name;
-}
-
-function classifyVehicleCategory(rawTier: string): CanonicalVehicleCategory {
-  const norm = rawTier.trim().toLowerCase();
-  if (norm === 'wheelchair' || norm === 'wheelchair_wav' || norm === 'wav') {
-    return 'wheelchair';
-  }
-  if (norm === 'van' || norm === 'minivan' || norm === 'passenger_van') {
-    return 'van';
-  }
-  if (norm === 'xl' || norm === 'suv' || norm.includes('suv') || norm.includes('suburban')) {
-    return 'xl';
-  }
-  if (norm === 'premium' || norm === 'executive' || norm === 'luxury') {
-    return 'premium';
-  }
-  return 'standard';
-}
-
-function resolveDriverVehicleCapacity(
-  rawTier: string,
-  vehicleTiers?: ReadonlyArray<VehicleTierConfig>
-): ResolvedVehicleCapacity {
-  const norm = (rawTier || 'standard').trim().toLowerCase();
-  const category = classifyVehicleCategory(norm);
-
-  const canonicalDefaults: Record<CanonicalVehicleCategory, { maxPassengers: number; maxLuggage: number }> = {
-    standard: { maxPassengers: 4, maxLuggage: 3 },
-    premium: { maxPassengers: 4, maxLuggage: 3 },
-    xl: { maxPassengers: 6, maxLuggage: 5 },
-    van: { maxPassengers: 7, maxLuggage: 6 },
-    wheelchair: { maxPassengers: 4, maxLuggage: 3 },
-  };
-
-  if (vehicleTiers && vehicleTiers.length > 0) {
-    const matchedConfig =
-      vehicleTiers.find((vt) => !vt.isArchived && vt.id.trim().toLowerCase() === norm) ||
-      vehicleTiers.find(
-        (vt) => !vt.isArchived && classifyVehicleCategory(vt.id) === category
-      );
-
-    if (matchedConfig) {
-      return {
-        category,
-        maxPassengers: Math.max(
-          canonicalDefaults[category].maxPassengers,
-          Number(matchedConfig.maxPassengers || 0)
-        ),
-        maxLuggage: Math.max(
-          canonicalDefaults[category].maxLuggage,
-          Number(matchedConfig.maxLuggage || 0)
-        ),
-      };
-    }
-  }
-
-  return {
-    category,
-    ...canonicalDefaults[category],
-  };
-}
-
-function isDriverVehicleCompatibleWithTrip(
-  trip: Partial<Trip>,
-  driverTierRaw: string,
-  vehicleTiers?: ReadonlyArray<VehicleTierConfig>
-): boolean {
-  const driverCap = resolveDriverVehicleCapacity(driverTierRaw, vehicleTiers);
-  const requiredPax = Math.max(1, Number(trip.passenger?.passengerCount || 1));
-  const requiredBags = Math.max(0, Number(trip.passenger?.luggageCount || 0));
-
-  if (driverCap.maxPassengers < requiredPax || driverCap.maxLuggage < requiredBags) {
-    return false;
-  }
-
-  const meta = (trip.metadata || {}) as Record<string, any>;
-  const requestedRaw = String(meta.vehicleTypeId || trip.vehicleTier || 'standard')
-    .trim()
-    .toLowerCase();
-
-  const csb = (meta.carSeatsBreakdown || {}) as {
-    rearFacing?: number;
-    frontFacing?: number;
-    booster?: number;
-    total?: number;
-  };
-  const carSeatCount = Number(
-    csb.total ?? (csb.rearFacing || 0) + (csb.frontFacing || 0) + (csb.booster || 0)
-  );
-  const hasOversizedUpgrade = Boolean(meta.hasOversizedLuggage || meta.requiresVehicleUpgrade);
-  const requiresSuvOrVan =
-    requiredPax > 4 || requiredBags > 3 || hasOversizedUpgrade || carSeatCount >= 2;
-  const requiresWheelchair =
-    requestedRaw === 'wheelchair' ||
-    requestedRaw === 'wheelchair_wav' ||
-    Boolean(meta.wheelchairRequired);
-
-  if (requiresWheelchair) {
-    return driverCap.category === 'wheelchair';
-  }
-
-  if (driverCap.category === 'wheelchair' && requestedRaw !== 'any') {
-    return false;
-  }
-
-  if (requestedRaw === 'van' || requestedRaw === 'minivan') {
-    return driverCap.category === 'van';
-  }
-
-  if (requestedRaw === 'xl' || requestedRaw === 'suv' || requiresSuvOrVan) {
-    return driverCap.category === 'xl' || driverCap.category === 'van';
-  }
-
-  if (requestedRaw === 'premium' || requestedRaw === 'executive') {
-    return driverCap.category === 'premium';
-  }
-
-  // Standard / Sedan / Any request: any non-WAV active tier with sufficient capacity qualifies
-  return true;
-}
-
-function findDriverFleetVehicle(
-  drv: AutoDispatchDriverInput,
-  fleetVehicles?: ReadonlyArray<FleetCarConfig | PhysicalFleetAsset>
-): (FleetCarConfig | PhysicalFleetAsset) | undefined {
-  if (!fleetVehicles || fleetVehicles.length === 0) return undefined;
-
-  if (drv.vehicleId) {
-    const byId = fleetVehicles.find((v) => v.id === drv.vehicleId);
-    if (byId) return byId;
-  }
-
-  const byAssignedDriver = fleetVehicles.find((v) => v.assignedDriverId === drv.id);
-  if (byAssignedDriver) return byAssignedDriver;
-
-  const drvDigits = extractUnitDigits(drv.cabNumber || drv.vehicleUnit || drv.vehicle);
-  if (drvDigits) {
-    return fleetVehicles.find((v) => extractUnitDigits(v.unitNumber) === drvDigits);
-  }
-
-  return undefined;
-}
-
-function hasConflictingActiveTrip(
-  driverId: string,
-  targetTrip: Partial<Trip>,
-  activeTrips: ReadonlyArray<Partial<Trip>> | undefined,
-  nowMs: number,
-  conflictWindowMinutes: number
-): boolean {
-  if (!activeTrips || activeTrips.length === 0) return false;
-
-  const targetPickupMs = targetTrip.scheduledPickupTime
-    ? Date.parse(targetTrip.scheduledPickupTime)
-    : nowMs;
-  const conflictMs = Math.max(15, conflictWindowMinutes) * 60_000;
-
-  for (const other of activeTrips) {
-    if (!other || other.id === targetTrip.id) continue;
-    const status = String(other.status || '');
-    if (['completed', 'cancelled', 'DECLINED', 'declined'].includes(status)) continue;
-
-    // Driver already holding an active offer on a different trip
-    if (
-      status === 'offered' &&
-      Array.isArray(other.offeredToIds) &&
-      other.offeredToIds.includes(driverId)
-    ) {
-      return true;
-    }
-
-    if (other.assignedDriverId !== driverId) continue;
-
-    // Actively executing a live trip right now
-    if (status === 'en_route' || status === 'arrived' || status === 'in_progress') {
-      return true;
-    }
-
-    // Scheduled / ASAP overlap check for assigned/accepted trips
-    if (status === 'assigned' || status === 'accepted') {
-      if (targetTrip.bookingType === 'asap' && other.bookingType === 'asap') {
-        return true;
-      }
-      const otherPickupMs = other.scheduledPickupTime
-        ? Date.parse(other.scheduledPickupTime)
-        : nowMs;
-      if (
-        Number.isFinite(targetPickupMs) &&
-        Number.isFinite(otherPickupMs) &&
-        Math.abs(targetPickupMs - otherPickupMs) <= conflictMs
-      ) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-function resolveLastCompletedMsFromTrips(
-  driverId: string,
-  trips?: ReadonlyArray<Partial<Trip>>
-): number | null {
-  if (!trips || trips.length === 0) return null;
-  let latestMs: number | null = null;
-  for (const t of trips) {
-    if (t.assignedDriverId !== driverId || t.status !== 'completed') continue;
-    const rawTs = t.completedAt || t.updatedAt;
-    if (!rawTs) continue;
-    const ms = Date.parse(rawTs);
-    if (Number.isFinite(ms) && (latestMs === null || ms > latestMs)) {
-      latestMs = ms;
-    }
-  }
-  return latestMs;
+export interface AutoDispatchSweepSummary {
+  mode: ActiveAutoDispatchStrategyMode;
+  readyCount: number;
+  dispatchedCount: number;
+  offeredCount: number;
+  assignedCount: number;
+  exhaustedCount: number;
+  updatedTrips: Trip[];
+  results: OfferCascadeStepResult[];
 }
 
 function resolvePostExhaustionFallbackStatus(trip: Partial<Trip>): TripStatus {
@@ -415,9 +147,19 @@ function resolvePostExhaustionFallbackStatus(trip: Partial<Trip>): TripStatus {
     return 'CONFIRMED';
   }
   const history = Array.isArray(trip.statusHistory) ? trip.statusHistory : [];
+  if (
+    history.some(
+      (entry) =>
+        entry?.from === 'CONFIRMED' ||
+        entry?.from === 'confirmed' ||
+        entry?.to === 'CONFIRMED' ||
+        entry?.to === 'confirmed'
+    )
+  ) {
+    return 'CONFIRMED';
+  }
   for (let i = history.length - 1; i >= 0; i--) {
     const prev = history[i]?.from;
-    if (prev === 'CONFIRMED' || prev === 'confirmed') return 'CONFIRMED';
     if (prev === 'pending') return 'pending';
   }
   return 'CONFIRMED';
@@ -443,286 +185,43 @@ async function defaultTriggerServerPush(targetDriverId: string, trip: Trip): Pro
       }),
     });
   } catch {
-    // Non-fatal: active Driver PWA clients also receive offers via Firestore real-time snapshot
+    // Non-fatal: active Driver PWA clients also receive offers/assignments via Firestore snapshot
+  }
+}
+
+function dispatchPushBatch(
+  driverIds: ReadonlyArray<string>,
+  trip: Trip,
+  sendPush?: PushOfferSender | false
+): void {
+  if (sendPush === false || driverIds.length === 0) return;
+  const pushFn = typeof sendPush === 'function' ? sendPush : defaultTriggerServerPush;
+  for (const driverId of driverIds) {
+    if (!driverId) continue;
+    Promise.resolve(pushFn(driverId, trip)).catch(() => {});
   }
 }
 
 /**
- * Pure deterministic candidate ranking engine.
+ * Executes auto-dispatch for a single unassigned trip according to the active or overridden mode:
+ * - `'manual_1tap'` (without `modeOverride`): returns `'noop'` (never auto-dispatches unattended).
+ * - `'sequential_cascade'`: offers `#1` candidate (`offeredToIds: [top.driverId]`).
+ * - `'broadcast_pool'`: offers Top-K (`broadcastPoolSize`) candidates simultaneously.
+ * - `'direct_auto_assign'`: assigns `#1` candidate immediately with frozen `assignedVehicle`.
  */
-export function rankAutoDispatchCandidates(
-  trip: Partial<Trip>,
-  drivers: ReadonlyArray<AutoDispatchDriverInput>,
-  zones?: ReadonlyArray<ZoneGeofence> | null,
-  config?: Partial<DispatchAutomationConfig> | null,
-  options?: RankCandidatesOptions
-): RankedDispatchCandidate[] {
-  const cfg = normalizeDispatchAutomationConfig(config || DEFAULT_DISPATCH_AUTOMATION_CONFIG);
-  const nowMs = options?.nowMs ?? Date.now();
-  const conflictWindowMinutes = options?.conflictWindowMinutes ?? 45;
-
-  const activeZones = (zones && zones.length > 0 ? zones : DEFAULT_ZONES).filter(
-    (z) => z.isActive && !z.isArchived && !z.isBlacklisted
-  );
-
-  const rejectedSet = new Set<string>(trip.rejectedByIds || []);
-  const attemptedSet = new Set<string>(trip.offerCascade?.attemptedDriverIds || []);
-
-  // Resolve pickup zone containment
-  const pickupCoord = isValidGeoPoint(trip.pickupLocation?.coordinates)
-    ? trip.pickupLocation!.coordinates!
-    : null;
-  const pickupZoneIds = new Set<string>();
-  const pickupZoneNamesLower: string[] = [];
-
-  if (pickupCoord) {
-    for (const zone of activeZones) {
-      if (isCoordinateInZone(pickupCoord, zone)) {
-        pickupZoneIds.add(zone.id);
-        pickupZoneNamesLower.push(zone.name.toLowerCase());
-      }
-    }
-  }
-
-  const airportCheck = detectAirportInAddresses(
-    trip.pickupLocation?.address || '',
-    trip.dropoffLocation?.address || ''
-  );
-  if (airportCheck.isPickupAirport && airportCheck.airport) {
-    const airportZoneId =
-      airportCheck.airport.iataCode === 'SUS' ? 'zone-spirit-airport' : 'zone-lambert-airport';
-    pickupZoneIds.add(airportZoneId);
-    const matchingAirportZone = activeZones.find((z) => z.id === airportZoneId);
-    if (matchingAirportZone) {
-      pickupZoneNamesLower.push(matchingAirportZone.name.toLowerCase());
-    }
-  }
-
-  const candidates: RankedDispatchCandidate[] = [];
-
-  for (const drv of drivers) {
-    if (!drv || !drv.id) continue;
-
-    // 1. Exclude blacklisted / archived / suspended drivers
-    if (drv.isBlacklisted || drv.isArchived || drv.zone === 'Suspended') {
-      continue;
-    }
-
-    // 2. Exclude off-duty or on-break drivers
-    const resolvedDuty: DriverDutyStatus =
-      drv.dutyStatus ||
-      (drv.mapStatus === 'offline' || drv.status === 'offline'
-        ? 'off_duty'
-        : drv.mapStatus === 'break' || drv.status === 'break'
-        ? 'on_break'
-        : 'on_duty');
-
-    if (
-      resolvedDuty !== 'on_duty' ||
-      drv.mapStatus === 'offline' ||
-      drv.mapStatus === 'break' ||
-      drv.status === 'offline' ||
-      drv.status === 'break'
-    ) {
-      continue;
-    }
-
-    // 3. Exclude busy / en-route drivers or conflicting active trips
-    if (
-      drv.mapStatus === 'busy' ||
-      drv.mapStatus === 'en_route' ||
-      drv.status === 'on_trip' ||
-      Boolean(drv.activeTrip) ||
-      Boolean(drv.currentTripId)
-    ) {
-      continue;
-    }
-
-    if (
-      hasConflictingActiveTrip(
-        drv.id,
-        trip,
-        options?.activeTrips,
-        nowMs,
-        conflictWindowMinutes
-      )
-    ) {
-      continue;
-    }
-
-    // 4. Exclude already rejected or already attempted drivers
-    if (rejectedSet.has(drv.id) || attemptedSet.has(drv.id)) {
-      continue;
-    }
-
-    // 5. Exclude grounded / blacklisted / non-active fleet vehicles
-    if (
-      drv.isVehicleGrounded ||
-      drv.isVehicleBlacklisted ||
-      (drv.vehicleStatus && drv.vehicleStatus !== 'active')
-    ) {
-      continue;
-    }
-
-    const matchedFleetVeh = findDriverFleetVehicle(drv, options?.fleetVehicles);
-    if (matchedFleetVeh) {
-      const groundedReason = (matchedFleetVeh as FleetCarConfig).groundedReason;
-      if (
-        matchedFleetVeh.status !== 'active' ||
-        matchedFleetVeh.isBlacklisted ||
-        matchedFleetVeh.isArchived ||
-        Boolean(groundedReason)
-      ) {
-        continue;
-      }
-    }
-
-    // 6. Enforce vehicle capacity & tier compatibility
-    const effectiveDriverTier =
-      drv.vehicleTier || drv.tier || matchedFleetVeh?.vehicleTypeId || 'standard';
-    if (!isDriverVehicleCompatibleWithTrip(trip, effectiveDriverTier, options?.vehicleTiers)) {
-      continue;
-    }
-
-    // 7. Compute spatial metrics, idle duration, and driver score
-    const driverCoord = isValidGeoPoint(drv.currentLocation?.coordinates)
-      ? drv.currentLocation!.coordinates
-      : isValidGeoPoint(drv.telemetry?.coordinates)
-      ? drv.telemetry!.coordinates
-      : isValidGeoPoint(drv.coordinates)
-      ? drv.coordinates
-      : null;
-
-    const distanceMiles =
-      pickupCoord && driverCoord
-        ? Number(calculateHaversineDistanceMiles(pickupCoord, driverCoord).toFixed(3))
-        : null;
-
-    const matchedZoneIds: string[] = [];
-    if (driverCoord) {
-      for (const zone of activeZones) {
-        if (isCoordinateInZone(driverCoord, zone)) {
-          matchedZoneIds.push(zone.id);
-        }
-      }
-    }
-
-    let inPickupZone = false;
-    if (pickupZoneIds.size > 0) {
-      inPickupZone = matchedZoneIds.some((zId) => pickupZoneIds.has(zId));
-      if (!inPickupZone && !driverCoord && drv.zone) {
-        const drvZoneLower = drv.zone.trim().toLowerCase();
-        inPickupZone =
-          pickupZoneIds.has(drvZoneLower) ||
-          pickupZoneNamesLower.some(
-            (zName) => zName.includes(drvZoneLower) || drvZoneLower.includes(zName)
-          );
-      }
-    }
-
-    const rawIdleRef = drv.idleSince || drv.lastCompletedTripAt || drv.lastActiveAt || drv.locationUpdatedAt;
-    let idleDurationMs = 0;
-    if (rawIdleRef) {
-      const parsedIdleMs = Date.parse(rawIdleRef);
-      if (Number.isFinite(parsedIdleMs)) {
-        idleDurationMs = Math.max(0, nowMs - parsedIdleMs);
-      }
-    } else {
-      const completedMs = resolveLastCompletedMsFromTrips(drv.id, options?.activeTrips);
-      if (completedMs !== null) {
-        idleDurationMs = Math.max(0, nowMs - completedMs);
-      }
-    }
-
-    const driverScore =
-      typeof drv.driverScore === 'number' && Number.isFinite(drv.driverScore)
-        ? drv.driverScore
-        : 80;
-
-    const unitDigits = extractUnitDigits(
-      drv.cabNumber || drv.vehicleUnit || matchedFleetVeh?.unitNumber || drv.vehicle
-    );
-    const vehicleUnit = unitDigits
-      ? `Car #${unitDigits}`
-      : drv.vehicleUnit || matchedFleetVeh?.unitNumber || drv.vehicle || 'Unit';
-
-    const distStr = distanceMiles !== null ? `${distanceMiles.toFixed(1)} mi` : 'no GPS';
-    const idleMins = Math.round(idleDurationMs / 60_000);
-    const rankReason =
-      cfg.rankingStrategy === 'nearest_in_zone'
-        ? `${inPickupZone ? 'In pickup zone' : 'Outside pickup zone'} · ${distStr} · Score ${driverScore}`
-        : cfg.rankingStrategy === 'longest_idle_in_zone'
-        ? `${inPickupZone ? 'In pickup zone' : 'Outside pickup zone'} · Idle ${idleMins}m · ${distStr}`
-        : `Score ${driverScore} · ${inPickupZone ? 'In pickup zone' : 'Outside pickup zone'} · ${distStr}`;
-
-    candidates.push({
-      driverId: drv.id,
-      driverName: drv.name,
-      driverLabel: formatCandidateLabel(drv),
-      cabNumber: unitDigits || drv.cabNumber,
-      vehicleUnit,
-      vehicleTier: effectiveDriverTier,
-      inPickupZone,
-      matchedZoneIds,
-      distanceMiles,
-      idleDurationMs,
-      driverScore,
-      strategy: cfg.rankingStrategy,
-      rankReason,
-    });
-  }
-
-  const compareDistance = (a: RankedDispatchCandidate, b: RankedDispatchCandidate): number => {
-    const distA = a.distanceMiles ?? Number.POSITIVE_INFINITY;
-    const distB = b.distanceMiles ?? Number.POSITIVE_INFINITY;
-    if (distA !== distB) return distA - distB;
-    return 0;
-  };
-
-  candidates.sort((a, b) => {
-    if (cfg.rankingStrategy === 'nearest_in_zone') {
-      if (a.inPickupZone !== b.inPickupZone) return a.inPickupZone ? -1 : 1;
-      const distCmp = compareDistance(a, b);
-      if (distCmp !== 0) return distCmp;
-      if (a.driverScore !== b.driverScore) return b.driverScore - a.driverScore;
-      return a.driverId.localeCompare(b.driverId);
-    }
-
-    if (cfg.rankingStrategy === 'longest_idle_in_zone') {
-      if (a.inPickupZone !== b.inPickupZone) return a.inPickupZone ? -1 : 1;
-      if (a.idleDurationMs !== b.idleDurationMs) return b.idleDurationMs - a.idleDurationMs;
-      const distCmp = compareDistance(a, b);
-      if (distCmp !== 0) return distCmp;
-      if (a.driverScore !== b.driverScore) return b.driverScore - a.driverScore;
-      return a.driverId.localeCompare(b.driverId);
-    }
-
-    // 'highest_driver_score'
-    if (a.driverScore !== b.driverScore) return b.driverScore - a.driverScore;
-    if (a.inPickupZone !== b.inPickupZone) return a.inPickupZone ? -1 : 1;
-    const distCmp = compareDistance(a, b);
-    if (distCmp !== 0) return distCmp;
-    return a.driverId.localeCompare(b.driverId);
-  });
-
-  return candidates;
-}
-
-/**
- * Initiates a sequential offer cascade for an unassigned trip.
- */
-export async function startOfferCascade(
-  params: StartOfferCascadeParams
+export async function executeAutoDispatch(
+  params: ExecuteAutoDispatchParams
 ): Promise<OfferCascadeStepResult> {
   const {
     trip,
     drivers,
     zones,
     config,
+    modeOverride,
     fleetVehicles,
     activeTrips,
     vehicleTiers,
-    actorRole = 'dispatcher',
+    actorRole = 'system',
     actorId,
     bookingService = getBookingService(),
     sendPush,
@@ -730,20 +229,58 @@ export async function startOfferCascade(
   } = params;
 
   const cfg = normalizeDispatchAutomationConfig(config || DEFAULT_DISPATCH_AUTOMATION_CONFIG);
+  const effectiveMode: DispatchAutomationMode = modeOverride ?? cfg.dispatchMode;
+
+  if (effectiveMode === 'manual_1tap') {
+    return {
+      outcome: 'noop',
+      trip,
+      candidate: null,
+      candidates: [],
+      offeredCandidates: [],
+      excludedCandidates: [],
+      mode: 'manual_1tap',
+      reason: 'Dispatch mode is set to 1-Tap Manual.',
+    };
+  }
+
+  if (
+    trip.assignedDriverId ||
+    ['assigned', 'accepted', 'en_route', 'arrived', 'in_progress', 'completed', 'cancelled'].includes(
+      trip.status
+    )
+  ) {
+    return {
+      outcome: 'noop',
+      trip,
+      candidate: null,
+      candidates: [],
+      mode: effectiveMode,
+      reason: 'Trip is already assigned or in a terminal state.',
+    };
+  }
+
   const nowIso = new Date(nowMs).toISOString();
 
-  // Start a fresh cascade run (while still respecting explicit `trip.rejectedByIds` from prior declines)
-  const tripForFreshCascade: Partial<Trip> = {
+  // Start a fresh run while still respecting explicit `trip.rejectedByIds` from prior declines
+  const tripForFreshEvaluation: Partial<Trip> = {
     ...trip,
     offerCascade: undefined,
   };
 
-  const candidates = rankAutoDispatchCandidates(tripForFreshCascade, drivers, zones, cfg, {
-    fleetVehicles,
-    activeTrips,
-    vehicleTiers,
-    nowMs,
-  });
+  const evaluation = evaluateAutoDispatchCandidates(
+    tripForFreshEvaluation,
+    drivers,
+    zones,
+    cfg,
+    {
+      fleetVehicles,
+      activeTrips,
+      vehicleTiers,
+      nowMs,
+    }
+  );
+  const candidates = evaluation.eligible;
 
   if (candidates.length === 0) {
     const fallbackStatus: TripStatus =
@@ -755,12 +292,14 @@ export async function startOfferCascade(
 
     const exhaustedCascade: TripOfferCascade = {
       state: 'exhausted',
+      mode: effectiveMode,
       activeOfferedDriverId: null,
+      activeOfferedDriverIds: [],
       offerStartedAt: nowIso,
       offerExpiresAt: nowIso,
       timeoutSeconds: cfg.offerTimeoutSeconds,
       cascadeAttempt: 0,
-      maxAttempts: cfg.maxCascadeAttempts,
+      maxAttempts: effectiveMode === 'direct_auto_assign' ? 1 : cfg.maxCascadeAttempts,
       attemptedDriverIds: [],
       strategy: cfg.rankingStrategy,
     };
@@ -772,7 +311,7 @@ export async function startOfferCascade(
       actorRole,
       referenceNumber: `CSC-${Math.floor(1000 + Math.random() * 9000)}`,
       referenceType: 'offer',
-      context: `Auto-Offer Cascade exhausted immediately (0 eligible drivers matched strategy "${cfg.rankingStrategy}"). Manual dispatcher assignment required.`,
+      context: `Auto-Dispatch (${effectiveMode}) exhausted immediately (0 eligible drivers matched strategy "${cfg.rankingStrategy}"). Manual dispatcher assignment required.`,
     };
 
     const patch: Partial<Trip> = {
@@ -792,17 +331,178 @@ export async function startOfferCascade(
       trip: updatedTrip,
       candidate: null,
       candidates: [],
+      offeredCandidates: [],
+      excludedCandidates: evaluation.excluded,
+      mode: effectiveMode,
       reason: 'No eligible on-duty drivers matched trip requirements.',
     };
   }
 
+  // ─── MODE 3: DIRECT AUTO-ASSIGN (#1 DRIVER) ───
+  if (effectiveMode === 'direct_auto_assign') {
+    const top = candidates[0];
+    const matchedDriverInput = drivers.find((d) => d.id === top.driverId);
+    const frozenVehicle = resolveDriverFrozenVehicleSnapshot(
+      matchedDriverInput,
+      top,
+      fleetVehicles
+    );
+
+    const acceptedCascade: TripOfferCascade = {
+      state: 'accepted',
+      mode: 'direct_auto_assign',
+      activeOfferedDriverId: top.driverId,
+      activeOfferedDriverName: top.driverLabel,
+      activeOfferedDriverIds: [],
+      offerStartedAt: nowIso,
+      offerExpiresAt: nowIso,
+      timeoutSeconds: cfg.offerTimeoutSeconds,
+      cascadeAttempt: 1,
+      maxAttempts: 1,
+      attemptedDriverIds: [top.driverId],
+      strategy: cfg.rankingStrategy,
+    };
+
+    const historyEntry: TripStatusHistoryEntry = {
+      from: trip.status,
+      to: 'assigned',
+      timestamp: nowIso,
+      actorId,
+      actorRole: 'system',
+      reason: `Direct Auto-Assign (${cfg.rankingStrategy}): Assigned to ${top.driverLabel}`,
+    };
+
+    const assignAudit: TripAuditEvent = {
+      action: 'DRIVER_ASSIGNED',
+      timestamp: nowIso,
+      actorId,
+      actorRole: 'system',
+      referenceNumber: `ASN-${Math.floor(1000 + Math.random() * 9000)}`,
+      referenceType: 'lifecycle',
+      context: `Direct Auto-Assign (${cfg.rankingStrategy}): Assigned #1 candidate ${top.driverLabel} (${frozenVehicle.vehicleNumber}) [${top.rankReason}].`,
+    };
+
+    const patch: Partial<Trip> = {
+      status: 'assigned',
+      assignedDriverId: top.driverId,
+      assignedVehicle: frozenVehicle,
+      offeredToIds: [],
+      offerCascade: acceptedCascade,
+      metadata: {
+        ...(trip.metadata || {}),
+        assignedDriverName: top.driverName,
+        ...(matchedDriverInput?.phone ? { assignedDriverPhone: matchedDriverInput.phone } : {}),
+      },
+      statusHistory: [...(trip.statusHistory || []), historyEntry],
+      auditLog: [...(trip.auditLog || []), assignAudit],
+      updatedAt: nowIso,
+    };
+
+    const updatedTrip = bookingService.updateTrip
+      ? await bookingService.updateTrip(trip.id, patch)
+      : ({ ...trip, ...patch } as Trip);
+
+    dispatchPushBatch([top.driverId], updatedTrip, sendPush);
+
+    return {
+      outcome: 'assigned',
+      trip: updatedTrip,
+      candidate: top,
+      candidates,
+      offeredCandidates: [top],
+      excludedCandidates: evaluation.excluded,
+      mode: 'direct_auto_assign',
+    };
+  }
+
+  // ─── MODE 2: SIMULTANEOUS TOP-K BROADCAST POOL ───
+  if (effectiveMode === 'broadcast_pool') {
+    const batch = candidates.slice(0, cfg.broadcastPoolSize);
+    const batchIds = batch.map((c) => c.driverId);
+    const top = batch[0];
+    const expiresIso = new Date(nowMs + cfg.offerTimeoutSeconds * 1000).toISOString();
+    const poolSummaryLabel =
+      batch.length === 1 ? top.driverLabel : `Pool (${batch.length} cars)`;
+
+    const activeCascade: TripOfferCascade = {
+      state: 'active',
+      mode: 'broadcast_pool',
+      activeOfferedDriverId: top.driverId,
+      activeOfferedDriverName: poolSummaryLabel,
+      activeOfferedDriverIds: batchIds,
+      fallbackBroadcastUsed: false,
+      offerStartedAt: nowIso,
+      offerExpiresAt: expiresIso,
+      timeoutSeconds: cfg.offerTimeoutSeconds,
+      cascadeAttempt: 1,
+      maxAttempts: cfg.maxCascadeAttempts,
+      attemptedDriverIds: batchIds,
+      strategy: cfg.rankingStrategy,
+    };
+
+    const historyEntry: TripStatusHistoryEntry = {
+      from: trip.status,
+      to: 'offered',
+      timestamp: nowIso,
+      actorId,
+      actorRole: actorRole === 'dispatcher' ? 'admin' : actorRole,
+      reason: `Broadcast Pool Batch 1/${cfg.maxCascadeAttempts}: Offered to ${batch
+        .map((c) => c.driverLabel)
+        .join(', ')} (${cfg.offerTimeoutSeconds}s window)`,
+    };
+
+    const offerAudit: TripAuditEvent = {
+      action: 'DISPATCH_OFFERED',
+      timestamp: nowIso,
+      actorId,
+      actorRole,
+      referenceNumber: `OFR-${Math.floor(1000 + Math.random() * 9000)}`,
+      referenceType: 'offer',
+      context: `Top-${cfg.broadcastPoolSize} Broadcast Pool Batch 1/${cfg.maxCascadeAttempts} (${
+        cfg.rankingStrategy
+      }): Offered simultaneously to ${batch.map((c) => c.driverLabel).join(', ')}. Expires in ${
+        cfg.offerTimeoutSeconds
+      }s.`,
+    };
+
+    const patch: Partial<Trip> = {
+      status: 'offered',
+      assignedDriverId: null,
+      offeredToIds: batchIds,
+      offerCascade: activeCascade,
+      statusHistory: [...(trip.statusHistory || []), historyEntry],
+      auditLog: [...(trip.auditLog || []), offerAudit],
+      updatedAt: nowIso,
+    };
+
+    const updatedTrip = bookingService.updateTrip
+      ? await bookingService.updateTrip(trip.id, patch)
+      : ({ ...trip, ...patch } as Trip);
+
+    dispatchPushBatch(batchIds, updatedTrip, sendPush);
+
+    return {
+      outcome: 'offered',
+      trip: updatedTrip,
+      candidate: top,
+      candidates,
+      offeredCandidates: batch,
+      excludedCandidates: evaluation.excluded,
+      mode: 'broadcast_pool',
+    };
+  }
+
+  // ─── MODE 1: SEQUENTIAL 1-BY-1 CASCADE ───
   const top = candidates[0];
   const expiresIso = new Date(nowMs + cfg.offerTimeoutSeconds * 1000).toISOString();
 
   const activeCascade: TripOfferCascade = {
     state: 'active',
+    mode: 'sequential_cascade',
     activeOfferedDriverId: top.driverId,
     activeOfferedDriverName: top.driverLabel,
+    activeOfferedDriverIds: [top.driverId],
+    fallbackBroadcastUsed: false,
     offerStartedAt: nowIso,
     offerExpiresAt: expiresIso,
     timeoutSeconds: cfg.offerTimeoutSeconds,
@@ -845,25 +545,46 @@ export async function startOfferCascade(
     ? await bookingService.updateTrip(trip.id, patch)
     : ({ ...trip, ...patch } as Trip);
 
-  if (sendPush !== false) {
-    const pushFn = typeof sendPush === 'function' ? sendPush : defaultTriggerServerPush;
-    Promise.resolve(pushFn(top.driverId, updatedTrip)).catch(() => {});
-  }
+  dispatchPushBatch([top.driverId], updatedTrip, sendPush);
 
   return {
     outcome: 'offered',
     trip: updatedTrip,
     candidate: top,
     candidates,
+    offeredCandidates: [top],
+    excludedCandidates: evaluation.excluded,
+    mode: 'sequential_cascade',
   };
 }
 
 /**
- * Evaluates an active `offerCascade` trip and either:
- * - Marks `'accepted'` if already claimed by a driver,
- * - Waits if `offerExpiresAt` has not elapsed and the active driver has not declined,
- * - Rolls over to the next ranked driver if declined or expired and `cascadeAttempt < maxAttempts`, or
- * - Transitions to `'exhausted'` and reverts `status` to `'CONFIRMED'` (or `'pending'`) when exhausted.
+ * Initiates a single-trip dispatch action (1-tap manual trigger or automatic cascade start).
+ * When `config.dispatchMode === 'manual_1tap'`, runs `config.sweepExecutionMode` (default `'sequential_cascade'`).
+ */
+export async function startOfferCascade(
+  params: StartOfferCascadeParams
+): Promise<OfferCascadeStepResult> {
+  const cfg = normalizeDispatchAutomationConfig(params.config || DEFAULT_DISPATCH_AUTOMATION_CONFIG);
+  const resolvedMode: ActiveAutoDispatchStrategyMode =
+    params.modeOverride ??
+    (cfg.dispatchMode !== 'manual_1tap' ? cfg.dispatchMode : cfg.sweepExecutionMode);
+
+  return executeAutoDispatch({
+    ...params,
+    actorRole: params.actorRole ?? 'dispatcher',
+    modeOverride: resolvedMode,
+  });
+}
+
+/**
+ * Evaluates an active `offerCascade` (`sequential_cascade` or `broadcast_pool`) and:
+ * - Marks `'accepted'` if already claimed by a driver (`assignedDriverId`),
+ * - Marks `'cancelled'` if cancelled/declined at trip level,
+ * - Returns `'waiting'` while `nowMs < offerExpiresAt` and >= 1 offered driver remains active,
+ * - Rolls over to the next candidate / Top-K batch while `cascadeAttempt < maxAttempts`,
+ * - Executes optional `fallbackOnExhaustion === 'broadcast_all_eligible'` final broadcast, or
+ * - Transitions to `'exhausted'` and reverts `status` to `'CONFIRMED'` (or `'pending'`).
  */
 export async function advanceOrExpireOfferCascade(
   params: AdvanceOfferCascadeParams
@@ -888,7 +609,7 @@ export async function advanceOrExpireOfferCascade(
 
   const nowIso = new Date(nowMs).toISOString();
 
-  // Already accepted / assigned
+  // 1. Already accepted / assigned (atomic first-accept win)
   if (
     trip.assignedDriverId ||
     ['assigned', 'accepted', 'en_route', 'arrived', 'in_progress', 'completed'].includes(
@@ -899,8 +620,10 @@ export async function advanceOrExpireOfferCascade(
       ...cascade,
       state: 'accepted',
       activeOfferedDriverId: trip.assignedDriverId || cascade.activeOfferedDriverId,
+      activeOfferedDriverIds: [],
     };
     const patch: Partial<Trip> = {
+      offeredToIds: [],
       offerCascade: acceptedCascade,
       updatedAt: nowIso,
     };
@@ -908,16 +631,23 @@ export async function advanceOrExpireOfferCascade(
       ? await bookingService.updateTrip(trip.id, patch)
       : ({ ...trip, ...patch } as Trip);
 
-    return { outcome: 'accepted', trip: updatedTrip, candidate: null, candidates: [] };
+    return {
+      outcome: 'accepted',
+      trip: updatedTrip,
+      candidate: null,
+      candidates: [],
+      mode: cascade.mode || 'sequential_cascade',
+    };
   }
 
-  // Cancelled or declined trip
+  // 2. Cancelled or declined trip
   if (trip.status === 'cancelled' || trip.status === 'DECLINED' || trip.status === 'declined') {
     const cancelledCascade: TripOfferCascade = {
       ...cascade,
       state: 'cancelled',
       activeOfferedDriverId: null,
       activeOfferedDriverName: '',
+      activeOfferedDriverIds: [],
     };
     const patch: Partial<Trip> = {
       offerCascade: cancelledCascade,
@@ -928,23 +658,45 @@ export async function advanceOrExpireOfferCascade(
       ? await bookingService.updateTrip(trip.id, patch)
       : ({ ...trip, ...patch } as Trip);
 
-    return { outcome: 'cancelled', trip: updatedTrip, candidate: null, candidates: [] };
+    return {
+      outcome: 'cancelled',
+      trip: updatedTrip,
+      candidate: null,
+      candidates: [],
+      mode: cascade.mode || 'sequential_cascade',
+    };
   }
 
-  const activeDriverId = cascade.activeOfferedDriverId;
-  const activeDriverStillOffered = Boolean(
-    activeDriverId &&
-      Array.isArray(trip.offeredToIds) &&
-      trip.offeredToIds.includes(activeDriverId) &&
-      !(Array.isArray(trip.rejectedByIds) && trip.rejectedByIds.includes(activeDriverId))
+  const isPoolMode = cascade.mode === 'broadcast_pool';
+  const offeredSet = new Set(trip.offeredToIds || []);
+  const rejectedSet = new Set(trip.rejectedByIds || []);
+
+  const currentStepDriverIds: string[] = isPoolMode
+    ? Array.isArray(cascade.activeOfferedDriverIds) && cascade.activeOfferedDriverIds.length > 0
+      ? cascade.activeOfferedDriverIds
+      : cascade.activeOfferedDriverId
+      ? [cascade.activeOfferedDriverId]
+      : []
+    : cascade.activeOfferedDriverId
+    ? [cascade.activeOfferedDriverId]
+    : [];
+
+  const stillActiveStepDriverIds = currentStepDriverIds.filter(
+    (id) => offeredSet.has(id) && !rejectedSet.has(id)
   );
 
   const expiresMs = Date.parse(cascade.offerExpiresAt);
   const isExpired = Number.isFinite(expiresMs) && nowMs >= expiresMs;
-  const wasDeclined = !activeDriverStillOffered;
+  const allStepDriversDeclined = stillActiveStepDriverIds.length === 0;
 
-  if (!wasDeclined && !isExpired) {
-    return { outcome: 'waiting', trip, candidate: null, candidates: [] };
+  if (!allStepDriversDeclined && !isExpired) {
+    return {
+      outcome: 'waiting',
+      trip,
+      candidate: null,
+      candidates: [],
+      mode: cascade.mode || 'sequential_cascade',
+    };
   }
 
   const cfg = normalizeDispatchAutomationConfig({
@@ -954,65 +706,74 @@ export async function advanceOrExpireOfferCascade(
     maxCascadeAttempts: cascade.maxAttempts || config?.maxCascadeAttempts,
   });
 
-  // Record timed-out driver in rejectedByIds & attemptedDriverIds so they are never re-offered
+  // Record timed-out / declined step drivers in rejectedByIds & attemptedDriverIds
   const nextRejectedByIds = Array.from(
-    new Set([
-      ...(trip.rejectedByIds || []),
-      ...(activeDriverId ? [activeDriverId] : []),
-    ])
+    new Set([...(trip.rejectedByIds || []), ...currentStepDriverIds])
   );
   const baseAttemptedIds = Array.from(
-    new Set([
-      ...(cascade.attemptedDriverIds || []),
-      ...(activeDriverId ? [activeDriverId] : []),
-    ])
+    new Set([...(cascade.attemptedDriverIds || []), ...currentStepDriverIds])
   );
 
   const currentAttempt = Math.max(1, Number(cascade.cascadeAttempt || 1));
   const maxAttempts = Math.max(1, Number(cascade.maxAttempts || cfg.maxCascadeAttempts));
-  const transitionReason = wasDeclined
-    ? `Driver ${cascade.activeOfferedDriverName || activeDriverId || 'candidate'} declined`
-    : `Offer timed out after ${cascade.timeoutSeconds || cfg.offerTimeoutSeconds}s`;
+  const timeoutSeconds = cascade.timeoutSeconds || cfg.offerTimeoutSeconds;
 
-  if (currentAttempt < maxAttempts) {
-    const virtualTripForRanking: Partial<Trip> = {
-      ...trip,
-      rejectedByIds: nextRejectedByIds,
-      offerCascade: {
-        ...cascade,
-        attemptedDriverIds: baseAttemptedIds,
-      },
-    };
+  const transitionReason = allStepDriversDeclined
+    ? isPoolMode
+      ? `All offered pool drivers (${currentStepDriverIds.length}) declined`
+      : `Driver ${cascade.activeOfferedDriverName || cascade.activeOfferedDriverId || 'candidate'} declined`
+    : isPoolMode
+    ? `Broadcast pool timed out after ${timeoutSeconds}s`
+    : `Offer timed out after ${timeoutSeconds}s`;
 
-    const remainingCandidates = rankAutoDispatchCandidates(
-      virtualTripForRanking,
-      drivers,
-      zones,
-      cfg,
-      {
-        fleetVehicles,
-        activeTrips,
-        vehicleTiers,
-        nowMs,
-      }
-    );
+  const virtualTripForRanking: Partial<Trip> = {
+    ...trip,
+    rejectedByIds: nextRejectedByIds,
+    offerCascade: {
+      ...cascade,
+      attemptedDriverIds: baseAttemptedIds,
+    },
+  };
 
-    if (remainingCandidates.length > 0) {
-      const nextCandidate = remainingCandidates[0];
-      const nextAttempt = currentAttempt + 1;
-      const timeoutSeconds = cascade.timeoutSeconds || cfg.offerTimeoutSeconds;
-      const nextExpiresIso = new Date(nowMs + timeoutSeconds * 1000).toISOString();
+  const remainingEvaluation = evaluateAutoDispatchCandidates(
+    virtualTripForRanking,
+    drivers,
+    zones,
+    cfg,
+    {
+      fleetVehicles,
+      activeTrips,
+      vehicleTiers,
+      nowMs,
+    }
+  );
+  const remainingCandidates = remainingEvaluation.eligible;
+
+  // 3. Rollover to next step / batch while attempts remain (and not already on final fallback broadcast)
+  if (!cascade.fallbackBroadcastUsed && currentAttempt < maxAttempts && remainingCandidates.length > 0) {
+    const nextAttempt = currentAttempt + 1;
+    const nextExpiresIso = new Date(nowMs + timeoutSeconds * 1000).toISOString();
+
+    if (isPoolMode) {
+      const nextBatch = remainingCandidates.slice(0, cfg.broadcastPoolSize);
+      const nextBatchIds = nextBatch.map((c) => c.driverId);
+      const nextTop = nextBatch[0];
+      const poolLabel =
+        nextBatch.length === 1 ? nextTop.driverLabel : `Pool (${nextBatch.length} cars)`;
 
       const nextCascade: TripOfferCascade = {
+        ...cascade,
         state: 'active',
-        activeOfferedDriverId: nextCandidate.driverId,
-        activeOfferedDriverName: nextCandidate.driverLabel,
+        mode: 'broadcast_pool',
+        activeOfferedDriverId: nextTop.driverId,
+        activeOfferedDriverName: poolLabel,
+        activeOfferedDriverIds: nextBatchIds,
         offerStartedAt: nowIso,
         offerExpiresAt: nextExpiresIso,
         timeoutSeconds,
         cascadeAttempt: nextAttempt,
         maxAttempts,
-        attemptedDriverIds: Array.from(new Set([...baseAttemptedIds, nextCandidate.driverId])),
+        attemptedDriverIds: Array.from(new Set([...baseAttemptedIds, ...nextBatchIds])),
         strategy: cfg.rankingStrategy,
       };
 
@@ -1021,7 +782,9 @@ export async function advanceOrExpireOfferCascade(
         to: 'offered',
         timestamp: nowIso,
         actorRole: 'system',
-        reason: `${transitionReason}. Cascade Step ${nextAttempt}/${maxAttempts}: Offered to ${nextCandidate.driverLabel}`,
+        reason: `${transitionReason}. Pool Batch ${nextAttempt}/${maxAttempts}: Offered to ${nextBatch
+          .map((c) => c.driverLabel)
+          .join(', ')}`,
       };
 
       const rolloverAudit: TripAuditEvent = {
@@ -1030,13 +793,15 @@ export async function advanceOrExpireOfferCascade(
         actorRole: 'system',
         referenceNumber: `OFR-${Math.floor(1000 + Math.random() * 9000)}`,
         referenceType: 'offer',
-        context: `${transitionReason}. Auto-Offer Cascade Step ${nextAttempt}/${maxAttempts} (${cfg.rankingStrategy}): Rolled over to ${nextCandidate.driverLabel} [${nextCandidate.rankReason}].`,
+        context: `${transitionReason}. Broadcast Pool Batch ${nextAttempt}/${maxAttempts} (${
+          cfg.rankingStrategy
+        }): Rolled over to ${nextBatch.map((c) => c.driverLabel).join(', ')}.`,
       };
 
       const patch: Partial<Trip> = {
         status: 'offered',
         assignedDriverId: null,
-        offeredToIds: [nextCandidate.driverId],
+        offeredToIds: nextBatchIds,
         rejectedByIds: nextRejectedByIds,
         offerCascade: nextCascade,
         statusHistory: [...(trip.statusHistory || []), historyEntry],
@@ -1048,28 +813,163 @@ export async function advanceOrExpireOfferCascade(
         ? await bookingService.updateTrip(trip.id, patch)
         : ({ ...trip, ...patch } as Trip);
 
-      if (sendPush !== false) {
-        const pushFn = typeof sendPush === 'function' ? sendPush : defaultTriggerServerPush;
-        Promise.resolve(pushFn(nextCandidate.driverId, updatedTrip)).catch(() => {});
-      }
+      dispatchPushBatch(nextBatchIds, updatedTrip, sendPush);
 
       return {
         outcome: 'advanced',
         trip: updatedTrip,
-        candidate: nextCandidate,
+        candidate: nextTop,
         candidates: remainingCandidates,
+        offeredCandidates: nextBatch,
+        mode: 'broadcast_pool',
         reason: transitionReason,
       };
     }
+
+    const nextCandidate = remainingCandidates[0];
+    const nextCascade: TripOfferCascade = {
+      ...cascade,
+      state: 'active',
+      mode: 'sequential_cascade',
+      activeOfferedDriverId: nextCandidate.driverId,
+      activeOfferedDriverName: nextCandidate.driverLabel,
+      activeOfferedDriverIds: [nextCandidate.driverId],
+      offerStartedAt: nowIso,
+      offerExpiresAt: nextExpiresIso,
+      timeoutSeconds,
+      cascadeAttempt: nextAttempt,
+      maxAttempts,
+      attemptedDriverIds: Array.from(new Set([...baseAttemptedIds, nextCandidate.driverId])),
+      strategy: cfg.rankingStrategy,
+    };
+
+    const historyEntry: TripStatusHistoryEntry = {
+      from: trip.status,
+      to: 'offered',
+      timestamp: nowIso,
+      actorRole: 'system',
+      reason: `${transitionReason}. Cascade Step ${nextAttempt}/${maxAttempts}: Offered to ${nextCandidate.driverLabel}`,
+    };
+
+    const rolloverAudit: TripAuditEvent = {
+      action: 'DISPATCH_OFFERED',
+      timestamp: nowIso,
+      actorRole: 'system',
+      referenceNumber: `OFR-${Math.floor(1000 + Math.random() * 9000)}`,
+      referenceType: 'offer',
+      context: `${transitionReason}. Auto-Offer Cascade Step ${nextAttempt}/${maxAttempts} (${cfg.rankingStrategy}): Rolled over to ${nextCandidate.driverLabel} [${nextCandidate.rankReason}].`,
+    };
+
+    const patch: Partial<Trip> = {
+      status: 'offered',
+      assignedDriverId: null,
+      offeredToIds: [nextCandidate.driverId],
+      rejectedByIds: nextRejectedByIds,
+      offerCascade: nextCascade,
+      statusHistory: [...(trip.statusHistory || []), historyEntry],
+      auditLog: [...(trip.auditLog || []), rolloverAudit],
+      updatedAt: nowIso,
+    };
+
+    const updatedTrip = bookingService.updateTrip
+      ? await bookingService.updateTrip(trip.id, patch)
+      : ({ ...trip, ...patch } as Trip);
+
+    dispatchPushBatch([nextCandidate.driverId], updatedTrip, sendPush);
+
+    return {
+      outcome: 'advanced',
+      trip: updatedTrip,
+      candidate: nextCandidate,
+      candidates: remainingCandidates,
+      offeredCandidates: [nextCandidate],
+      mode: 'sequential_cascade',
+      reason: transitionReason,
+    };
   }
 
-  // Exhausted (`currentAttempt >= maxAttempts` or 0 eligible candidates left)
+  // 4. Optional Fallback Broadcast to All Remaining Eligible Drivers before Exhaustion
+  if (
+    cfg.fallbackOnExhaustion === 'broadcast_all_eligible' &&
+    !cascade.fallbackBroadcastUsed &&
+    remainingCandidates.length > 0
+  ) {
+    const fallbackIds = remainingCandidates.map((c) => c.driverId);
+    const fallbackTop = remainingCandidates[0];
+    const fallbackExpiresIso = new Date(nowMs + timeoutSeconds * 1000).toISOString();
+
+    const fallbackCascade: TripOfferCascade = {
+      ...cascade,
+      state: 'active',
+      mode: 'broadcast_pool',
+      activeOfferedDriverId: fallbackTop.driverId,
+      activeOfferedDriverName: `Pool (${fallbackIds.length} cars)`,
+      activeOfferedDriverIds: fallbackIds,
+      fallbackBroadcastUsed: true,
+      offerStartedAt: nowIso,
+      offerExpiresAt: fallbackExpiresIso,
+      timeoutSeconds,
+      cascadeAttempt: currentAttempt + 1,
+      maxAttempts,
+      attemptedDriverIds: Array.from(new Set([...baseAttemptedIds, ...fallbackIds])),
+      strategy: cfg.rankingStrategy,
+    };
+
+    const historyEntry: TripStatusHistoryEntry = {
+      from: trip.status,
+      to: 'offered',
+      timestamp: nowIso,
+      actorRole: 'system',
+      reason: `${transitionReason}. Exhaustion Fallback Broadcast: Offered to all ${fallbackIds.length} remaining eligible driver(s)`,
+    };
+
+    const fallbackAudit: TripAuditEvent = {
+      action: 'DISPATCH_OFFERED',
+      timestamp: nowIso,
+      actorRole: 'system',
+      referenceNumber: `FBK-${Math.floor(1000 + Math.random() * 9000)}`,
+      referenceType: 'offer',
+      context: `${transitionReason}. Final Fallback Broadcast sent to all ${
+        fallbackIds.length
+      } remaining eligible driver(s): ${remainingCandidates.map((c) => c.driverLabel).join(', ')}.`,
+    };
+
+    const patch: Partial<Trip> = {
+      status: 'offered',
+      assignedDriverId: null,
+      offeredToIds: fallbackIds,
+      rejectedByIds: nextRejectedByIds,
+      offerCascade: fallbackCascade,
+      statusHistory: [...(trip.statusHistory || []), historyEntry],
+      auditLog: [...(trip.auditLog || []), fallbackAudit],
+      updatedAt: nowIso,
+    };
+
+    const updatedTrip = bookingService.updateTrip
+      ? await bookingService.updateTrip(trip.id, patch)
+      : ({ ...trip, ...patch } as Trip);
+
+    dispatchPushBatch(fallbackIds, updatedTrip, sendPush);
+
+    return {
+      outcome: 'advanced',
+      trip: updatedTrip,
+      candidate: fallbackTop,
+      candidates: remainingCandidates,
+      offeredCandidates: remainingCandidates,
+      mode: 'broadcast_pool',
+      reason: `${transitionReason}; launched fallback broadcast to ${fallbackIds.length} eligible driver(s).`,
+    };
+  }
+
+  // 5. Exhausted (`currentAttempt >= maxAttempts` or 0 eligible candidates left)
   const fallbackStatus = resolvePostExhaustionFallbackStatus(trip);
   const exhaustedCascade: TripOfferCascade = {
     ...cascade,
     state: 'exhausted',
     activeOfferedDriverId: null,
     activeOfferedDriverName: '',
+    activeOfferedDriverIds: [],
     attemptedDriverIds: baseAttemptedIds,
   };
 
@@ -1110,6 +1010,7 @@ export async function advanceOrExpireOfferCascade(
     trip: updatedTrip,
     candidate: null,
     candidates: [],
+    mode: cascade.mode || 'sequential_cascade',
     reason: `${transitionReason}; cascade exhausted after ${baseAttemptedIds.length} attempt(s).`,
   };
 }
@@ -1144,6 +1045,7 @@ export async function cancelOfferCascade(
     state: 'cancelled',
     activeOfferedDriverId: null,
     activeOfferedDriverName: '',
+    activeOfferedDriverIds: [],
   };
 
   const historyEntry: TripStatusHistoryEntry = {
@@ -1184,5 +1086,92 @@ export async function cancelOfferCascade(
     candidate: null,
     candidates: [],
     reason,
+  };
+}
+
+/**
+ * Runs a 1-click Auto-Dispatch sweep across all open trips currently inside `isTripWithinDispatchLeadWindow`.
+ * Never touches rides outside the Pre-Pickup Lead Window (e.g., 3 hours, 2 weeks, or 2 months ahead),
+ * and updates `workingTrips` sequentially so the same driver is never double-offered across ready rides.
+ */
+export async function runReadyAutoDispatchSweep(
+  params: RunAutoDispatchSweepParams
+): Promise<AutoDispatchSweepSummary> {
+  const {
+    trips,
+    drivers,
+    zones,
+    config,
+    modeOverride,
+    fleetVehicles,
+    vehicleTiers,
+    actorRole = 'dispatcher',
+    actorId,
+    bookingService = getBookingService(),
+    sendPush,
+    nowMs = Date.now(),
+    includeExhausted = false,
+  } = params;
+
+  const cfg = normalizeDispatchAutomationConfig(config || DEFAULT_DISPATCH_AUTOMATION_CONFIG);
+  const resolvedMode: ActiveAutoDispatchStrategyMode =
+    modeOverride ??
+    (cfg.dispatchMode !== 'manual_1tap' ? cfg.dispatchMode : cfg.sweepExecutionMode);
+
+  const readyTrips = getReadyForAutoDispatchTrips(trips, cfg, nowMs, { includeExhausted });
+  if (readyTrips.length === 0) {
+    return {
+      mode: resolvedMode,
+      readyCount: 0,
+      dispatchedCount: 0,
+      offeredCount: 0,
+      assignedCount: 0,
+      exhaustedCount: 0,
+      updatedTrips: [...trips],
+      results: [],
+    };
+  }
+
+  const workingTripMap = new Map<string, Trip>(trips.map((t) => [t.id, t]));
+  const results: OfferCascadeStepResult[] = [];
+  let offeredCount = 0;
+  let assignedCount = 0;
+  let exhaustedCount = 0;
+
+  for (const readyTrip of readyTrips) {
+    const currentTrip = workingTripMap.get(readyTrip.id) || readyTrip;
+    const stepRes = await executeAutoDispatch({
+      trip: currentTrip,
+      drivers,
+      zones,
+      config: cfg,
+      modeOverride: resolvedMode,
+      fleetVehicles,
+      activeTrips: Array.from(workingTripMap.values()),
+      vehicleTiers,
+      actorRole,
+      actorId,
+      bookingService,
+      sendPush,
+      nowMs,
+    });
+
+    workingTripMap.set(readyTrip.id, stepRes.trip);
+    results.push(stepRes);
+
+    if (stepRes.outcome === 'offered') offeredCount++;
+    else if (stepRes.outcome === 'assigned') assignedCount++;
+    else if (stepRes.outcome === 'exhausted') exhaustedCount++;
+  }
+
+  return {
+    mode: resolvedMode,
+    readyCount: readyTrips.length,
+    dispatchedCount: offeredCount + assignedCount,
+    offeredCount,
+    assignedCount,
+    exhaustedCount,
+    updatedTrips: trips.map((t) => workingTripMap.get(t.id) || t),
+    results,
   };
 }

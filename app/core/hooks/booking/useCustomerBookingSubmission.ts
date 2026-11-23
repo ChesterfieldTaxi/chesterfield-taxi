@@ -1937,6 +1937,37 @@ export function useCustomerBookingSubmission({
         });
       }
 
+      // Non-blocking unattended Auto-Dispatch trigger when newly created customer booking is CONFIRMED
+      if (!editingTripId && typeof fetch === 'function') {
+        const confirmedTripIds: string[] = [];
+        if (createdTrip.status === 'CONFIRMED' || createdTrip.status === 'confirmed') {
+          if (Array.isArray(createdTrip.multiCarTripIds) && createdTrip.multiCarTripIds.length > 1) {
+            confirmedTripIds.push(...createdTrip.multiCarTripIds);
+          } else {
+            confirmedTripIds.push(createdTrip.id);
+          }
+        }
+        if (
+          createdReturnTripObj &&
+          (createdReturnTripObj.status === 'CONFIRMED' ||
+            createdReturnTripObj.status === 'confirmed')
+        ) {
+          confirmedTripIds.push(createdReturnTripObj.id);
+        }
+
+        if (confirmedTripIds.length > 0) {
+          fetch('/api/auto-dispatch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(
+              confirmedTripIds.length === 1
+                ? { tripId: confirmedTripIds[0] }
+                : { tripIds: confirmedTripIds }
+            ),
+          }).catch(() => {});
+        }
+      }
+
       setConfirmedTrip(createdTrip);
       onBookingSuccess?.(createdTrip);
     } catch (err: unknown) {

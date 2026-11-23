@@ -402,7 +402,7 @@ async function runTests() {
     baseTrip,
     driverPool,
     DEFAULT_ZONES,
-    { rankingStrategy: 'nearest_in_zone' },
+    { rankingStrategy: 'nearest_in_zone', maxPickupRadiusMiles: 0 },
     { fleetVehicles, nowMs }
   );
   assert(
@@ -420,7 +420,7 @@ async function runTests() {
     baseTrip,
     driverPool,
     DEFAULT_ZONES,
-    { rankingStrategy: 'longest_idle_in_zone' },
+    { rankingStrategy: 'longest_idle_in_zone', maxPickupRadiusMiles: 0 },
     { fleetVehicles, nowMs }
   );
   assert(
@@ -434,7 +434,7 @@ async function runTests() {
     baseTrip,
     driverPool,
     DEFAULT_ZONES,
-    { rankingStrategy: 'highest_driver_score' },
+    { rankingStrategy: 'highest_driver_score', maxPickupRadiusMiles: 0, strictZoneFirst: false },
     { fleetVehicles, nowMs }
   );
   assert(
@@ -457,7 +457,7 @@ async function runTests() {
     largePartyTrip,
     driverPool,
     DEFAULT_ZONES,
-    { rankingStrategy: 'nearest_in_zone' },
+    { rankingStrategy: 'nearest_in_zone', maxPickupRadiusMiles: 0 },
     { fleetVehicles, nowMs }
   );
   assert(

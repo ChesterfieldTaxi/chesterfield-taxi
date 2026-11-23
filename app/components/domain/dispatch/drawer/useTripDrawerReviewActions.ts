@@ -10,6 +10,7 @@ import {
   getContextualEmailMeta,
   sendDispatchContextualTripEmail,
 } from '../../../../core/services/dispatch/dispatch-trip-email.util';
+import { isTripEligibleForAutoPilot } from '../../../../core/services/dispatch/auto-dispatch-ranking';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import { getPayLinkService } from '../../../../core/services/payments/pay-link.service';
 import { getFlightStatusService } from '../../../../core/services/flight/flight-status.service';
@@ -531,13 +532,18 @@ export function useTripDrawerReviewActions({
       );
       onReviewTripChange(updatedConfirmedTrip);
 
-      if (
-        settings.dispatchAutomation?.autoOfferOnConfirm &&
-        !updatedConfirmedTrip.assignedDriverId &&
-        onStartAutoOffer
-      ) {
-        void Promise.resolve(onStartAutoOffer(updatedConfirmedTrip)).catch(() => {});
-        if (shouldConfirmBoth && linkedTripObj && !linkedTripObj.assignedDriverId) {
+      if (onStartAutoOffer) {
+        if (isTripEligibleForAutoPilot(updatedConfirmedTrip, settings.dispatchAutomation)) {
+          void Promise.resolve(onStartAutoOffer(updatedConfirmedTrip)).catch(() => {});
+        }
+        if (
+          shouldConfirmBoth &&
+          linkedTripObj &&
+          isTripEligibleForAutoPilot(
+            { ...linkedTripObj, status: 'CONFIRMED' },
+            settings.dispatchAutomation
+          )
+        ) {
           void Promise.resolve(
             onStartAutoOffer({ ...linkedTripObj, status: 'CONFIRMED' })
           ).catch(() => {});

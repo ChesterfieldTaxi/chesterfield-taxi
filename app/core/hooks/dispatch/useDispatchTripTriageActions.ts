@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { getAdminAuthService } from '../../services/auth/admin-auth.service';
 import { authorizedFetch } from '../../services/auth/auth-headers';
 import { getBookingService } from '../../services/booking';
+import { isTripEligibleForAutoPilot } from '../../services/dispatch/auto-dispatch-ranking';
 import { getEmailDispatchService } from '../../services/email/resend-email.service';
 import type { DriverRosterItem } from '../../services/operator.service';
 import { formatLocalDateStr } from '../../services/pricing/vehicle-matching';
@@ -196,11 +197,10 @@ export function useDispatchTripTriageActions({
       setSelectedTripIds([]);
       showDispatchToast(`Confirmed ${tripsToConfirm.length} selected trip(s).`, 'success');
 
-      if (settings.dispatchAutomation?.autoOfferOnConfirm) {
-        for (const t of tripsToConfirm) {
-          if (!t.assignedDriverId && !t.offerCascade) {
-            void handleStartAutoOffer({ ...t, status: 'CONFIRMED' });
-          }
+      for (const t of tripsToConfirm) {
+        const confirmedCandidate: Trip = { ...t, status: 'CONFIRMED' };
+        if (isTripEligibleForAutoPilot(confirmedCandidate, settings.dispatchAutomation)) {
+          void handleStartAutoOffer(confirmedCandidate);
         }
       }
     } catch (err) {

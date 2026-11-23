@@ -1,5 +1,8 @@
 import React from 'react';
-import type { AppSettings } from '../../../../core/types/config';
+import {
+  normalizeDispatchAutomationConfig,
+  type AppSettings,
+} from '../../../../core/types/config';
 import type { Trip, TripStatus } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import type { DisplayLayout } from '../../../../core/hooks/useDisplayLayout';
@@ -176,6 +179,11 @@ export interface TripQueueToolbarProps {
   onSelectTripOnQueue: (trip: Trip, shouldZoom: boolean) => void;
   onOpenReviewModal: (trip: Trip, initialTab?: 'details' | 'audit') => void;
   onStartAutoOffer: (trip: Trip) => void | Promise<void>;
+
+  // Phase 50: 1-Click Auto-Dispatch Ready (N) Sweep
+  readyAutoDispatchCount?: number;
+  isRunningAutoDispatchSweep?: boolean;
+  onRunAutoDispatchSweep?: () => void | Promise<void>;
 }
 
 export function TripQueueToolbar({
@@ -235,7 +243,17 @@ export function TripQueueToolbar({
   onSelectTripOnQueue,
   onOpenReviewModal,
   onStartAutoOffer,
+  readyAutoDispatchCount = 0,
+  isRunningAutoDispatchSweep = false,
+  onRunAutoDispatchSweep,
 }: TripQueueToolbarProps) {
+  const autoConfig = normalizeDispatchAutomationConfig(settings.dispatchAutomation);
+  const isManualOrPaused =
+    autoConfig.dispatchMode === 'manual_1tap' || autoConfig.isPaused;
+  const effectiveSweepMode =
+    autoConfig.dispatchMode !== 'manual_1tap'
+      ? autoConfig.dispatchMode
+      : autoConfig.sweepExecutionMode;
   const layoutTriggerLabel = isAutoCardsFallback
     ? 'Cards (Auto)'
     : effectiveDisplayLayout === 'cards'
@@ -561,8 +579,28 @@ export function TripQueueToolbar({
             </div>
           </div>
 
-          {/* Right Side: Mobile Filter Toggle, Desktop Queue Layout Dropdown, Search Magnifier */}
+          {/* Right Side: Auto-Dispatch Ready Sweep, Mobile Filter Toggle, Layout Dropdown, Search */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {readyAutoDispatchCount > 0 && onRunAutoDispatchSweep && (
+              <button
+                type="button"
+                disabled={isRunningAutoDispatchSweep}
+                onClick={() => void onRunAutoDispatchSweep()}
+                className={`h-7 px-2.5 rounded-lg border text-[11px] font-extrabold tracking-tight flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs disabled:opacity-50 ${
+                  isManualOrPaused
+                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700'
+                    : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border-indigo-300'
+                }`}
+                title={`Run ${effectiveSweepMode.replace(/_/g, ' ')} for ${readyAutoDispatchCount} open trip(s) inside the ${autoConfig.scheduledDispatchLeadMinutes}m Pre-Pickup Lead Window`}
+              >
+                <span>
+                  {isRunningAutoDispatchSweep
+                    ? '⚡ Dispatching...'
+                    : `⚡ Auto-Dispatch Ready (${readyAutoDispatchCount})`}
+                </span>
+              </button>
+            )}
+
             {/* Mobile Filters Toggle Button */}
             <button
               type="button"

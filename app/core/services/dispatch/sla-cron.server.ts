@@ -41,7 +41,8 @@ import { sanitizePayload } from '../firestore-sanitizer';
 import { DEFAULT_ZONES } from '../zones/zone.service';
 import {
   advanceOrExpireOfferCascade,
-  startOfferCascade,
+  executeAutoDispatch,
+  isTripEligibleForAutoPilot,
   type AutoDispatchDriverInput,
 } from './auto-dispatch.service';
 import {
@@ -65,7 +66,7 @@ function safeTimingEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-async function getServiceAccountDatastoreToken(): Promise<string | null> {
+export async function getServiceAccountDatastoreToken(): Promise<string | null> {
   if (cachedDatastoreToken && Date.now() < cachedDatastoreToken.expiresAt - 60_000) {
     return cachedDatastoreToken.token;
   }
@@ -152,7 +153,7 @@ function encodeFirestoreRestValue(val: unknown): Record<string, unknown> {
   return { stringValue: String(val) };
 }
 
-async function listCollectionFirestoreRest<T>(
+export async function listCollectionFirestoreRest<T>(
   collectionName: string,
   bearerToken: string,
   pageSize: number = 250
@@ -186,7 +187,7 @@ async function listCollectionFirestoreRest<T>(
   }
 }
 
-async function patchFirestoreTripRest(
+export async function patchFirestoreTripRest(
   tripId: string,
   updates: Partial<Trip>,
   bearerToken: string
@@ -505,33 +506,6 @@ export async function executeSlaDispatchCronCycle(options?: {
         ).catch(() => null),
       ]);
     }
-
-    // Optional unattended Auto-Offer startup when `autoOfferOnConfirm` is enabled
-    const latestTrip = tripMap.get(trip.id) || trip;
-    if (
-      dispatchConfig.autoOfferOnConfirm &&
-      drivers.length > 0 &&
-      !latestTrip.assignedDriverId &&
-      ['CONFIRMED', 'confirmed', 'pending'].includes(latestTrip.status) &&
-      !latestTrip.offerCascade
-    ) {
-      const cascadeRes = await startOfferCascade({
-        trip: latestTrip,
-        drivers,
-        zones,
-        config: dispatchConfig,
-        fleetVehicles: settings?.fleet,
-        activeTrips: Array.from(tripMap.values()),
-        vehicleTiers: settings?.vehicles,
-        actorRole: 'system',
-        bookingService: persistenceAdapter,
-        sendPush: false,
-        nowMs,
-      });
-      if (cascadeRes.outcome === 'offered') {
-        autoOfferedTripIds.push(trip.id);
-      }
-    }
   }
 
   // 4. Advance or Expire Active Offer Cascades while unattended
@@ -554,6 +528,31 @@ export async function executeSlaDispatchCronCycle(options?: {
       });
       if (stepRes.outcome === 'advanced') cascadeAdvancedCount++;
       if (stepRes.outcome === 'exhausted') cascadeExhaustedCount++;
+    }
+  }
+
+  // 5. Server Auto-Dispatch Pass across all trips eligible for Auto-Pilot (inside Pre-Pickup Lead Window)
+  if (drivers.length > 0 && dispatchConfig.dispatchMode !== 'manual_1tap' && !dispatchConfig.isPaused) {
+    for (const candidateTrip of Array.from(tripMap.values())) {
+      const latestTrip = tripMap.get(candidateTrip.id) || candidateTrip;
+      if (isTripEligibleForAutoPilot(latestTrip, dispatchConfig, nowMs)) {
+        const autoRes = await executeAutoDispatch({
+          trip: latestTrip,
+          drivers,
+          zones,
+          config: dispatchConfig,
+          fleetVehicles: settings?.fleet,
+          activeTrips: Array.from(tripMap.values()),
+          vehicleTiers: settings?.vehicles,
+          actorRole: 'system',
+          bookingService: persistenceAdapter,
+          sendPush: false,
+          nowMs,
+        });
+        if (autoRes.outcome === 'offered' || autoRes.outcome === 'assigned') {
+          autoOfferedTripIds.push(latestTrip.id);
+        }
+      }
     }
   }
 

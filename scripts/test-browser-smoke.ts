@@ -311,6 +311,7 @@ function verifyCutoverConfigInvariants(rootDir: string): void {
     { relFile: 'app/components/domain/dispatch/CommsHub.tsx', maxLines: 1800 },
     { relFile: 'app/components/domain/admin/subpages/AdminInvoicingSubpage.tsx', maxLines: 1400 },
     { relFile: 'app/components/domain/admin/AdminZonesTab.tsx', maxLines: 1300 },
+    { relFile: 'app/components/domain/admin/AdminRulesTab.tsx', maxLines: 1400 },
     { relFile: 'app/core/services/comms/telephony-gateway.server.ts', maxLines: 1400 },
     { relFile: 'app/core/services/email/dispatch-email.service.ts', maxLines: 1400 },
     { relFile: 'app/core/services/email/dispatch-email.server.ts', maxLines: 1400 },

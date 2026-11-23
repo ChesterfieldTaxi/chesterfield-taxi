@@ -70,7 +70,7 @@ export const DispatchCascadePill = React.memo(function DispatchCascadePill({
   const isExhausted = !trip.assignedDriverId && cascade?.state === 'exhausted';
 
   const expiresAt = isActive ? cascade?.offerExpiresAt : undefined;
-  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  const [nowMs, setNowMs] = useState<number>(0);
 
   useEffect(() => {
     if (!expiresAt) return;
@@ -83,9 +83,20 @@ export const DispatchCascadePill = React.memo(function DispatchCascadePill({
 
   if (isActive && cascade) {
     const expiresMs = Date.parse(cascade.offerExpiresAt);
-    const remainingSec = Number.isFinite(expiresMs)
-      ? Math.max(0, Math.ceil((expiresMs - nowMs) / 1000))
-      : cascade.timeoutSeconds || 45;
+    const remainingSec =
+      nowMs > 0 && Number.isFinite(expiresMs)
+        ? Math.max(0, Math.ceil((expiresMs - nowMs) / 1000))
+        : cascade.timeoutSeconds || 45;
+    const isBroadcastPool = cascade.mode === 'broadcast_pool';
+    const activePoolIds = Array.isArray(cascade.activeOfferedDriverIds)
+      ? cascade.activeOfferedDriverIds.filter(
+          (id) =>
+            Array.isArray(trip.offeredToIds) &&
+            trip.offeredToIds.includes(id) &&
+            !(Array.isArray(trip.rejectedByIds) && trip.rejectedByIds.includes(id))
+        )
+      : [];
+    const poolCarCount = activePoolIds.length || trip.offeredToIds?.length || 1;
     const rawTargetLabel = cascade.activeOfferedDriverName || cascade.activeOfferedDriverId || 'Driver';
     const shortTargetLabel = compact
       ? rawTargetLabel.split('(')[0].trim() || rawTargetLabel
@@ -94,11 +105,19 @@ export const DispatchCascadePill = React.memo(function DispatchCascadePill({
     return (
       <span
         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-300 text-[10.5px] font-extrabold shrink-0"
-        title={`Sequential Offer Cascade (${cascade.strategy}): Step ${cascade.cascadeAttempt} of ${cascade.maxAttempts}`}
+        title={
+          isBroadcastPool
+            ? `Top-K Broadcast Pool (${cascade.strategy}): ${poolCarCount} car(s) offered · Batch ${cascade.cascadeAttempt}/${cascade.maxAttempts}`
+            : `Sequential Offer Cascade (${cascade.strategy}): Step ${cascade.cascadeAttempt} of ${cascade.maxAttempts}`
+        }
       >
-        <BoltIcon className="w-3 h-3 text-indigo-600 animate-pulse shrink-0" />
-        <span className="truncate max-w-[165px]">
-          Offering {shortTargetLabel} • {remainingSec}s · {cascade.cascadeAttempt}/{cascade.maxAttempts}
+        {!isBroadcastPool && (
+          <BoltIcon className="w-3 h-3 text-indigo-600 animate-pulse shrink-0" />
+        )}
+        <span className="truncate max-w-[175px]">
+          {isBroadcastPool
+            ? `⚡ Pool (${poolCarCount} ${poolCarCount === 1 ? 'car' : 'cars'}) • ${remainingSec}s`
+            : `Offering ${shortTargetLabel} • ${remainingSec}s · ${cascade.cascadeAttempt}/${cascade.maxAttempts}`}
         </span>
         {onCancel && (
           <button

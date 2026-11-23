@@ -93,6 +93,7 @@ export interface UseDispatchWorkspaceSyncParams {
   onOpenEditTrip: (trip: Trip) => void;
   autoOfferContextRef: React.MutableRefObject<{
     autoOfferOnConfirm: boolean;
+    isEligibleForAutoPilot: (trip: Trip) => boolean;
     handleStartAutoOffer: (trip: Trip) => Promise<void>;
   }>;
   autoOfferStartedIdsRef: React.MutableRefObject<Set<string>>;
@@ -602,14 +603,10 @@ export function useDispatchWorkspaceSync({
 
         if (autoOfferContextRef.current.autoOfferOnConfirm) {
           for (const nt of newTrips) {
-            const isAutoEligible =
-              !nt.assignedDriverId &&
-              !nt.offerCascade &&
+            if (
               !autoOfferStartedIdsRef.current.has(nt.id) &&
-              (nt.status === 'CONFIRMED' ||
-                nt.status === 'confirmed' ||
-                (nt.bookingType === 'asap' && nt.status === 'pending'));
-            if (isAutoEligible) {
+              autoOfferContextRef.current.isEligibleForAutoPilot(nt)
+            ) {
               void autoOfferContextRef.current.handleStartAutoOffer(nt);
             }
           }

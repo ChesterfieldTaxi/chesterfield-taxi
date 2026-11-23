@@ -1,5 +1,10 @@
-import React, { Suspense } from 'react';
-import type { AppSettings } from '../../../../core/types/config';
+import React, { Suspense, useEffect, useState } from 'react';
+import type { AdminUser } from '../../../../core/services/auth/admin-auth.service';
+import {
+  canOperatorConfigureLeadWindows,
+  normalizeDispatchAutomationConfig,
+  type AppSettings,
+} from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
@@ -25,6 +30,8 @@ import {
   SunIcon,
   SettingsIcon,
   MapPinIcon,
+  BoltIcon,
+  LockIcon,
 } from '../../../ui/Icons';
 
 const AppSuiteLauncher = React.lazy(() =>
@@ -107,6 +114,15 @@ export interface DispatchDesktopTopHeaderProps {
   onToggleKeepScreenAwake: () => void;
   dispatchWakeLock: DispatchWakeLockInfo;
   dispatchPush: DispatchPushInfo;
+
+  // Phase 50: Auto-Pilot Switch & Pre-Pickup Lead Window Quick Control
+  user?: AdminUser | null;
+  onToggleAutoPilotPause?: () => void | Promise<void>;
+  onUpdateLeadWindows?: (updates: {
+    scheduledDispatchLeadMinutes: number;
+    airportExtraLeadMinutes: number;
+    stagedAutoReleaseLeadMinutes?: number;
+  }) => void | Promise<void>;
 }
 
 export function DispatchDesktopTopHeader({
@@ -159,8 +175,26 @@ export function DispatchDesktopTopHeader({
   onToggleKeepScreenAwake,
   dispatchWakeLock,
   dispatchPush,
+  user,
+  onToggleAutoPilotPause,
+  onUpdateLeadWindows,
 }: DispatchDesktopTopHeaderProps) {
   const { preferences: mapPrefs, togglePreference: toggleMapPref } = useDispatchMapPreferences();
+  const autoConfig = normalizeDispatchAutomationConfig(settings.dispatchAutomation);
+  const canEditLeadWindows = canOperatorConfigureLeadWindows(user, autoConfig);
+
+  const [draftLeadMinutes, setDraftLeadMinutes] = useState<number>(
+    autoConfig.scheduledDispatchLeadMinutes
+  );
+  const [draftAirportExtraMinutes, setDraftAirportExtraMinutes] = useState<number>(
+    autoConfig.airportExtraLeadMinutes
+  );
+  const [isSavingLeadWindow, setIsSavingLeadWindow] = useState<boolean>(false);
+
+  useEffect(() => {
+    setDraftLeadMinutes(autoConfig.scheduledDispatchLeadMinutes);
+    setDraftAirportExtraMinutes(autoConfig.airportExtraLeadMinutes);
+  }, [autoConfig.scheduledDispatchLeadMinutes, autoConfig.airportExtraLeadMinutes]);
 
   return (
     <>
@@ -341,8 +375,29 @@ export function DispatchDesktopTopHeader({
           </span>
         </div>
 
-        {/* Right: Active Call HUD + Tactical Alerts + Audio + Settings + App Suite */}
+        {/* Right: Auto-Pilot Switch + Active Call HUD + Tactical Alerts + Audio + Settings + App Suite */}
         <div className="flex items-center gap-2">
+          {autoConfig.dispatchMode !== 'manual_1tap' && (
+            <button
+              type="button"
+              onClick={() => void onToggleAutoPilotPause?.()}
+              className={`h-8 px-2.5 sm:px-3 rounded-full border text-[11px] font-extrabold tracking-tight flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-2xs ${
+                autoConfig.isPaused
+                  ? 'bg-amber-100 hover:bg-amber-200 text-amber-950 border-amber-300'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-700'
+              }`}
+              title={
+                autoConfig.isPaused
+                  ? `Auto-Pilot (${autoConfig.dispatchMode.replace(/_/g, ' ')}) is PAUSED — Click to resume`
+                  : `Auto-Pilot (${autoConfig.dispatchMode.replace(/_/g, ' ')}) is ON (Lead Window: ${autoConfig.scheduledDispatchLeadMinutes}m) — Click to pause`
+              }
+            >
+              <span>
+                {autoConfig.isPaused ? '⏸ Auto-Pilot: PAUSED' : '⚡ Auto-Pilot: ON'}
+              </span>
+            </button>
+          )}
+
           <DispatchHeaderCallHud
             trips={trips}
             missedCallsCount={missedCallsCount}
@@ -751,6 +806,100 @@ export function DispatchDesktopTopHeader({
                         </div>
                       );
                     })}
+                  </div>
+
+                  {/* Pre-Pickup Lead Window Quick Control (Phase 50) */}
+                  <div className="pt-2 border-t border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between gap-1.5 px-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <BoltIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-500">
+                          Pre-Pickup Lead Window
+                        </span>
+                      </div>
+                      {!canEditLeadWindows && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-[9.5px] font-bold text-slate-600">
+                          <LockIcon className="w-2.5 h-2.5" />
+                          <span>Set by Admin</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {canEditLeadWindows ? (
+                      <div className="p-2.5 rounded-xl bg-blue-50/50 border border-blue-200 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10.5px] font-bold text-slate-700 block mb-0.5">
+                              Standard (15–240m)
+                            </label>
+                            <input
+                              type="number"
+                              min={15}
+                              max={240}
+                              value={draftLeadMinutes}
+                              onChange={(e) =>
+                                setDraftLeadMinutes(parseInt(e.target.value, 10) || 45)
+                              }
+                              className="w-full h-7 px-2 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10.5px] font-bold text-slate-700 block mb-0.5">
+                              Airport +Buffer (m)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={180}
+                              value={draftAirportExtraMinutes}
+                              onChange={(e) =>
+                                setDraftAirportExtraMinutes(
+                                  Math.max(0, parseInt(e.target.value, 10) || 0)
+                                )
+                              }
+                              className="w-full h-7 px-2 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 pt-0.5">
+                          <span className="text-[10px] text-slate-600">
+                            STL/SUS: <strong>T &minus; {draftLeadMinutes + draftAirportExtraMinutes}m</strong>
+                          </span>
+                          <button
+                            type="button"
+                            disabled={isSavingLeadWindow || !onUpdateLeadWindows}
+                            onClick={async () => {
+                              if (!onUpdateLeadWindows) return;
+                              setIsSavingLeadWindow(true);
+                              try {
+                                await onUpdateLeadWindows({
+                                  scheduledDispatchLeadMinutes: draftLeadMinutes,
+                                  airportExtraLeadMinutes: draftAirportExtraMinutes,
+                                });
+                              } finally {
+                                setIsSavingLeadWindow(false);
+                              }
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-[11px] font-bold cursor-pointer"
+                          >
+                            {isSavingLeadWindow ? 'Saving...' : 'Save Window'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+                        <div>
+                          <span className="font-bold text-slate-800 block leading-tight">
+                            {autoConfig.scheduledDispatchLeadMinutes}m Standard · +
+                            {autoConfig.airportExtraLeadMinutes}m Airport
+                          </span>
+                          <span className="text-[10.5px] text-slate-500 block">
+                            Scheduled rides hold in CONFIRMED until T &minus;{' '}
+                            {autoConfig.scheduledDispatchLeadMinutes}m
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
