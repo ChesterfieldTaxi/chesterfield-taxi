@@ -297,6 +297,7 @@ function DispatchBookingEngineComponent({
   const [repeatOccurrences, setRepeatOccurrences] = useState(5);
   const [repeatUntilDate, setRepeatUntilDate] = useState('');
   const [repeatWeeksPattern, setRepeatWeeksPattern] = useState<'all' | 'odd' | 'even'>('all');
+  const [repeatSkipDates, setRepeatSkipDates] = useState<string[]>([]);
 
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
   const [manualFare, setManualFare] = useState('');
@@ -713,6 +714,7 @@ function DispatchBookingEngineComponent({
     repeatOccurrences,
     repeatUntilDate,
     repeatWeeksPattern,
+    repeatSkipDates,
     manualFare,
     isFareOverridden,
     isSymmetricRoundTrip,
@@ -857,6 +859,7 @@ function DispatchBookingEngineComponent({
       setRepeatOccurrences,
       setRepeatUntilDate,
       setRepeatWeeksPattern,
+      setRepeatSkipDates,
       setEstimatedFare,
       setReturnEstimatedFare,
       setReturnEstimatedDurationMinutes,
@@ -979,6 +982,7 @@ function DispatchBookingEngineComponent({
       repeatOccurrences,
       repeatUntilDate,
       repeatWeeksPattern,
+      repeatSkipDates,
       estimatedFare,
       manualFare,
       isFareOverridden,
@@ -1492,6 +1496,8 @@ function DispatchBookingEngineComponent({
           setRepeatUntilDate={setRepeatUntilDate}
           repeatWeeksPattern={repeatWeeksPattern}
           setRepeatWeeksPattern={setRepeatWeeksPattern}
+          repeatSkipDates={repeatSkipDates}
+          setRepeatSkipDates={setRepeatSkipDates}
           onSwapReturnRoute={handleSwapReturnRoute}
           onToggleReturnCarSeats={handleToggleReturnCarSeats}
           onAddReturnVehicle={handleAddReturnVehicle}

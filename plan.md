@@ -1401,3 +1401,8 @@ export interface PassengerAccount {
   - `useDriverMultiStopProgress` runs a `1000ms` ticker strictly while `activeTrip.status === 'in_progress'` and an intermediate stop has `status === 'arrived'`.
 - **Route Timeline UI (`app/components/domain/driver/DriverRouteTimelineCard.tsx`)**:
   - Replaces inline route blocks in `DriverLiveMeterCard.tsx` (`< 1,080`L) and `DriverOfferSheet.tsx` (`< 400`L), and surfaces live read-only stop status pills in `TripDrawerOverviewSection.tsx`.
+
+## Phase 54: Standing Orders & Recurring Rides Series Manager
+- **Recurrence Engine & Domain Service**: Extend `generateRecurringDates` (`booking-form.utils.ts`) with `repeatWeeksPattern` (`'all' | 'odd' | 'even'`), `skipDates`, `maxCap` (`<= 60`), and `includeStartDate`; implement `standing-order.service.ts` with Firestore `/standingOrders/{seriesId}` + `localStorage` + Node memory store.
+- **Booking & Drawer Integration**: Wire `repeatSkipDates` and `registerStandingOrderFromDispatchBooking` into `DispatchReturnRepeatSection.tsx`, `useDispatchBookingSubmission.ts`, `useDispatchDraftSync.ts`, and `DispatchBookingEngine.tsx` (`< 1,800`L); display `🔁 Standing Order Series` banner in `TripDrawerOverviewSection.tsx`.
+- **Zero-Line-Growth Workspace Mount**: Lazily mount `StandingOrdersDrawer.tsx` inside `DispatchDesktopTopHeader.tsx` (`dispatch.tsx` remains `< 1,600`L with 0 lines added) and `AdminTripsSubpage.tsx`.

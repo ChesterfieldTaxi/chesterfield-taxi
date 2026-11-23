@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import type { Trip, TripStatus } from '../../../../core/types/trip';
 import { getBookingService } from '../../../../core/services/booking';
 import { getEmailDispatchService } from '../../../../core/services/email';
@@ -31,6 +31,12 @@ import { UniversalArchiveDrawer, ArchiveBoxIcon } from '../UniversalArchiveDrawe
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
 import { LayoutToggle } from '../../../ui/LayoutToggle';
 import { useDisplayLayout } from '../../../../core/hooks/useDisplayLayout';
+
+const StandingOrdersDrawer = React.lazy(() =>
+  import('../../dispatch/StandingOrdersDrawer').then((m) => ({
+    default: m.StandingOrdersDrawer,
+  }))
+);
 
 interface TripRowActionDropdownProps {
   trip: Trip;
@@ -238,6 +244,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
   const [includeArchivedInHistory, setIncludeArchivedInHistory] = useState(false);
   const [archiveRefreshKey, setArchiveRefreshKey] = useState(0);
   const [openActionTripId, setOpenActionTripId] = useState<string | null>(null);
+  const [isStandingOrdersOpen, setIsStandingOrdersOpen] = useState(false);
 
   // Sync initialSubTab when parent tab query changes
   useEffect(() => {
@@ -580,7 +587,16 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
           )}
         </div>
 
-        <div className="flex items-center gap-2 justify-between lg:justify-end shrink-0">
+        <div className="flex items-center gap-2 justify-between lg:justify-end shrink-0 flex-wrap">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsStandingOrdersOpen(true)}
+            className="text-xs font-extrabold inline-flex items-center gap-1.5 border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-900"
+          >
+            <span>🔁 Standing Orders</span>
+          </Button>
           <LayoutToggle
             layout={displayLayout}
             onChange={setDisplayLayout}
@@ -1153,6 +1169,16 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
           onClose={() => setIsArchiveDrawerOpen(false)}
           onEntityRestored={() => setArchiveRefreshKey((k) => k + 1)}
         />
+      )}
+
+      {isStandingOrdersOpen && (
+        <Suspense fallback={null}>
+          <StandingOrdersDrawer
+            isOpen={isStandingOrdersOpen}
+            onClose={() => setIsStandingOrdersOpen(false)}
+            trips={trips}
+          />
+        </Suspense>
       )}
     </div>
   );

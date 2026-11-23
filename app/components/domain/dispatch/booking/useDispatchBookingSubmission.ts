@@ -4,6 +4,7 @@ import {
   evaluateDispatchBookingConflicts,
   type BookingConflictCheckSummary,
 } from '../../../../core/services/dispatch/booking-conflict-checker.service';
+import { registerStandingOrderFromDispatchBooking } from '../../../../core/services/dispatch/standing-order.service';
 import type {
   Trip,
   TripPricing,
@@ -114,6 +115,7 @@ export interface RepeatTripDetails {
   repeatOccurrences: number;
   repeatUntilDate: string;
   repeatWeeksPattern: 'all' | 'odd' | 'even';
+  repeatSkipDates?: string[];
   repeatsRoundTrip?: boolean;
 }
 
@@ -282,6 +284,7 @@ export interface DispatchHydrationSetters {
   setRepeatOccurrences: (v: number) => void;
   setRepeatUntilDate: (v: string) => void;
   setRepeatWeeksPattern: (v: 'all' | 'odd' | 'even') => void;
+  setRepeatSkipDates?: (v: string[]) => void;
   setEstimatedFare: (v: number) => void;
   setReturnEstimatedFare: (v: number) => void;
   setManualFare: (v: string) => void;
@@ -541,6 +544,9 @@ export function applySavedDraftOverlayToDispatchState(
   }
   if (parsed.repeatWeeksPattern || rep?.repeatWeeksPattern) {
     s.setRepeatWeeksPattern(parsed.repeatWeeksPattern || rep?.repeatWeeksPattern);
+  }
+  if (Array.isArray(parsed.repeatSkipDates) || Array.isArray(rep?.repeatSkipDates)) {
+    s.setRepeatSkipDates?.(parsed.repeatSkipDates || rep?.repeatSkipDates || []);
   }
   if (parsed.estimatedFare) s.setEstimatedFare(parsed.estimatedFare);
   if (parsed.returnEstimatedFare) s.setReturnEstimatedFare(parsed.returnEstimatedFare);
@@ -991,6 +997,7 @@ export interface UseDispatchBookingSubmissionParams {
   repeatOccurrences: number;
   repeatUntilDate: string;
   repeatWeeksPattern: 'all' | 'odd' | 'even';
+  repeatSkipDates?: string[];
   manualFare: string;
   isFareOverridden: boolean;
   isSymmetricRoundTrip: boolean;
@@ -1126,6 +1133,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     repeatOccurrences,
     repeatUntilDate,
     repeatWeeksPattern,
+    repeatSkipDates = [],
     manualFare,
     isFareOverridden,
     isSymmetricRoundTrip,
@@ -2720,8 +2728,14 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
             repeatFrequency,
             repeatDays,
             repeatOccurrences,
-            repeatUntilDate
+            repeatUntilDate,
+            {
+              repeatWeeksPattern,
+              skipDates: repeatSkipDates,
+            }
           );
+          const recurringOccurrences: Array<{ date: string; trips: Trip[] }> = [];
+
           for (let occIdx = 0; occIdx < extraDates.length; occIdx++) {
             const occDate = extraDates[occIdx];
             try {
@@ -2805,12 +2819,81 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                   )
                 );
               }
+              recurringOccurrences.push({ date: occDate, trips: occTrips });
             } catch (recErr) {
               console.warn(
                 `[DispatchBookingEngine] Failed creating recurring occurrence ${occDate}:`,
                 recErr
               );
             }
+          }
+
+          try {
+            await registerStandingOrderFromDispatchBooking({
+              primaryTrips: createdOutboundTrips,
+              recurringOccurrences,
+              passenger: {
+                firstName,
+                lastName,
+                phone,
+                email: email || undefined,
+                passengerCount: passengers,
+                luggageCount: bags,
+                specialRequests: specialRequests || undefined,
+              },
+              route: {
+                pickupLocation: {
+                  address: pickupAddress,
+                  coordinates: pickupCoordinates,
+                  placeId: pickupPlaceId,
+                  notes: notesForAll || undefined,
+                },
+                intermediateStops:
+                  intermediateStops.length > 0
+                    ? intermediateStops.map((s) => ({
+                        address: s.address,
+                        coordinates: s.coordinates,
+                        placeId: s.placeId,
+                      }))
+                    : undefined,
+                dropoffLocation: {
+                  address: dropoffAddress,
+                  coordinates: dropoffCoordinates,
+                  placeId: dropoffPlaceId,
+                },
+              },
+              schedule: {
+                startDate: scheduledDate,
+                pickupTime: scheduledTime,
+                frequency: repeatFrequency,
+                repeatDays,
+                repeatWeeksPattern,
+                untilDate: repeatUntilDate || undefined,
+                skipDates: repeatSkipDates,
+              },
+              vehicleTier: String(tier) as VehicleTier,
+              vehicleDisplayName: primaryVehicleDisplayName,
+              pricingSnapshot: persistedOutboundPricing,
+              paymentMethod: method,
+              corporateAccountId: matchedCorporateAccount?.id,
+              corporateAccountName:
+                paymentMethod === 'account'
+                  ? matchedCorporateAccount?.companyName || corporateAccount || undefined
+                  : undefined,
+              billingPo: paymentMethod === 'account' && billingPo ? billingPo : undefined,
+              driverNotes: notesForAll || undefined,
+              driverId,
+              driverLabel: resolvedPlannedDriverLabel || undefined,
+              driverAssignmentMode,
+              createdBy: stagingActorUser?.email || stagingActorName,
+              metadata: metadataPayload,
+              bookingService: service,
+            });
+          } catch (soErr) {
+            console.warn(
+              '[DispatchBookingEngine] Non-blocking standing order registration warning:',
+              soErr
+            );
           }
         }
 

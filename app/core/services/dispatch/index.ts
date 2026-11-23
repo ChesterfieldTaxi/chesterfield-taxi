@@ -5,3 +5,4 @@ export * from './auto-dispatch.service';
 export * from './staged-driver-planner.service';
 export * from './booking-conflict-checker.service';
 export * from './dispatch-trip-email.util';
+export * from './standing-order.service';

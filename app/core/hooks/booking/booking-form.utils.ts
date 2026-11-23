@@ -146,22 +146,45 @@ export function computeDefaultLeadDateTime(
   return { todayLocalDate, defaultDate, defaultTime };
 }
 
+export interface GenerateRecurringDatesOptions {
+  repeatWeeksPattern?: 'all' | 'odd' | 'even';
+  skipDates?: ReadonlyArray<string>;
+  maxCap?: number;
+  includeStartDate?: boolean;
+  /** Optional week parity anchor YYYY-MM-DD (defaults to startDateStr) */
+  anchorDateStr?: string;
+}
+
 /**
- * Generates subsequent local YYYY-MM-DD dates for recurring dispatch schedules (excludes first date).
+ * Generates local YYYY-MM-DD dates for recurring dispatch schedules.
+ * By default (`includeStartDate = false`), excludes `startDateStr` and returns up to `maxOccurrences - 1`
+ * subsequent dates (capped at `maxCap`, default 20, up to 60 for standing-order horizon extension).
  */
 export function generateRecurringDates(
   startDateStr: string,
   frequency: 'daily' | 'weekdays' | 'weekly' | 'custom',
   repeatDays: string[],
   maxOccurrences: number,
-  untilDateStr?: string
+  untilDateStr?: string,
+  options?: GenerateRecurringDatesOptions
 ): string[] {
   const results: string[] = [];
-  const cap = Math.min(Math.max(1, maxOccurrences), 20);
-  if (cap <= 1 || !startDateStr) return results;
+  if (!startDateStr) return results;
+
+  const effectiveMaxCap = Math.min(Math.max(1, options?.maxCap ?? 20), 60);
+  const cap = Math.min(Math.max(1, maxOccurrences), effectiveMaxCap);
+  const includeStartDate = Boolean(options?.includeStartDate);
+  const targetCount = includeStartDate ? cap : cap - 1;
+  if (targetCount <= 0) return results;
 
   const [y, m, d] = startDateStr.split('-').map(Number);
   if (!y || !m || !d) return results;
+
+  const anchorStr = options?.anchorDateStr || startDateStr;
+  const [ay, am, ad] = anchorStr.split('-').map(Number);
+  const anchorUtcMs = ay && am && ad ? Date.UTC(ay, am - 1, ad) : Date.UTC(y, m - 1, d);
+  const anchorDow = ay && am && ad ? new Date(ay, am - 1, ad).getDay() : new Date(y, m - 1, d).getDay();
+
   const cursor = new Date(y, m - 1, d);
   const untilDate = untilDateStr
     ? (() => {
@@ -170,11 +193,22 @@ export function generateRecurringDates(
       })()
     : null;
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const weeksPattern = options?.repeatWeeksPattern ?? 'all';
+  const skipSet = new Set(
+    (options?.skipDates || [])
+      .map((s) => String(s || '').trim())
+      .filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s))
+  );
 
+  const maxScanDays = Math.max(366, targetCount * 21);
   let safety = 0;
-  while (results.length < cap - 1 && safety < 180) {
+
+  while (results.length < targetCount && safety < maxScanDays) {
+    if (safety > 0 || !includeStartDate) {
+      cursor.setDate(cursor.getDate() + 1);
+    }
     safety += 1;
-    cursor.setDate(cursor.getDate() + 1);
+
     if (untilDate && cursor > untilDate) break;
 
     const dow = cursor.getDay();
@@ -183,14 +217,22 @@ export function generateRecurringDates(
     if (frequency === 'daily') include = true;
     else if (frequency === 'weekdays') include = dow >= 1 && dow <= 5;
     else if (frequency === 'weekly' || frequency === 'custom') {
-      include =
-        repeatDays.length > 0
-          ? repeatDays.includes(dayName)
-          : dow === new Date(y, m - 1, d).getDay();
+      include = repeatDays.length > 0 ? repeatDays.includes(dayName) : dow === anchorDow;
+    }
+
+    if (include && weeksPattern !== 'all') {
+      const cursorUtcMs = Date.UTC(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
+      const diffDays = Math.floor((cursorUtcMs - anchorUtcMs) / 86_400_000);
+      const weekIndex = Math.floor(diffDays / 7);
+      const parity = ((weekIndex % 2) + 2) % 2;
+      include = weeksPattern === 'even' ? parity === 0 : parity === 1;
     }
 
     if (include) {
-      results.push(formatLocalDate(cursor));
+      const dateStr = formatLocalDate(cursor);
+      if (!skipSet.has(dateStr)) {
+        results.push(dateStr);
+      }
     }
   }
   return results;

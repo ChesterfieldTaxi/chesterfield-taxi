@@ -139,6 +139,7 @@ export interface UseDispatchDraftSyncParams {
     repeatOccurrences: number;
     repeatUntilDate: string;
     repeatWeeksPattern: 'all' | 'odd' | 'even';
+    repeatSkipDates?: string[];
     estimatedFare: number;
     manualFare: string;
     isFareOverridden: boolean;
@@ -447,6 +448,7 @@ export function useDispatchDraftSync({
         repeatOccurrences: v.repeatOccurrences,
         repeatUntilDate: v.repeatUntilDate,
         repeatWeeksPattern: v.repeatWeeksPattern,
+        repeatSkipDates: v.repeatSkipDates || [],
         repeatsRoundTrip: v.returnTrip,
       },
       estimatedFare: v.returnTrip ? balancedLeg : Math.ceil(v.estimatedFare),
@@ -524,6 +526,7 @@ export function useDispatchDraftSync({
       repeatOccurrences: v.repeatOccurrences,
       repeatUntilDate: v.repeatUntilDate,
       repeatWeeksPattern: v.repeatWeeksPattern,
+      repeatSkipDates: v.repeatSkipDates || [],
       returnProvideFlightInfo: v.returnProvideFlightInfo,
       returnAirline: v.returnAirline,
       returnFlightNumber: v.returnFlightNumber,
@@ -638,6 +641,7 @@ export function useDispatchDraftSync({
     s.setReturnBooster(0);
     s.setReturnVehicles(['any']);
     s.setRepeat(false);
+    s.setRepeatSkipDates?.([]);
     s.setEstimatedFare(0);
     s.setOutboundPricing(null);
     s.setReturnEstimatedFare(0);

@@ -110,6 +110,14 @@ export function TripDrawerOverviewSection({
   const linkedTripId = tripMeta.linkedTripId ? String(tripMeta.linkedTripId) : null;
   const linkedLegId = isReturnRide ? linkedTripId : returnTripId;
   const hasLinkedLeg = Boolean(linkedLegId);
+  const standingOrderId = tripMeta.standingOrderId ? String(tripMeta.standingOrderId) : null;
+  const standingOrderLabel = tripMeta.standingOrderLabel
+    ? String(tripMeta.standingOrderLabel)
+    : null;
+  const standingOrderOccurrence =
+    typeof tripMeta.recurringOccurrenceIndex === 'number'
+      ? tripMeta.recurringOccurrenceIndex
+      : null;
   const luggageType = tripMeta.luggageType ? String(tripMeta.luggageType) : 'Standard';
   const oversizedLuggageNotes = tripMeta.oversizedLuggageNotes
     ? String(tripMeta.oversizedLuggageNotes)
@@ -302,6 +310,52 @@ export function TripDrawerOverviewSection({
             className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors shrink-0 shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
           >
             <span>↗ Switch to {isReturnRide ? 'Outbound Leg' : 'Return Leg'} #{linkedLegId}</span>
+          </button>
+        </div>
+      )}
+
+      {/* Linked Standing Order Series Banner Card */}
+      {standingOrderId && (
+        <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-emerald-950 shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+              <span>🔁</span>
+            </div>
+            <div className="min-w-0">
+              <div className="font-extrabold text-xs text-emerald-950 flex items-center gap-1.5 flex-wrap">
+                <span>🔁 Standing Order Series</span>
+                <span
+                  className="bg-emerald-200/80 text-emerald-900 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
+                  title={standingOrderId}
+                >
+                  Series #{standingOrderId.slice(-8).toUpperCase()}
+                </span>
+                {standingOrderOccurrence !== null && (
+                  <span className="bg-white border border-emerald-300 text-emerald-800 text-[10px] px-1.5 py-0.5 rounded font-bold">
+                    Occurrence #{standingOrderOccurrence}
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-emerald-800 truncate">
+                {standingOrderLabel ||
+                  'Managed recurring ride series — supports pause/resume, skip dates, and horizon extension.'}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(
+                  new CustomEvent('ct:open-standing-orders', {
+                    detail: { seriesId: standingOrderId },
+                  })
+                );
+              }
+            }}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shrink-0 shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <span>Manage Series →</span>
           </button>
         </div>
       )}

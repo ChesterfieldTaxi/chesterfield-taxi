@@ -40,6 +40,12 @@ const AppSuiteLauncher = React.lazy(() =>
   }))
 );
 
+const StandingOrdersDrawer = React.lazy(() =>
+  import('../StandingOrdersDrawer').then((m) => ({
+    default: m.StandingOrdersDrawer,
+  }))
+);
+
 export interface DispatchWakeLockInfo {
   isSupported: boolean;
   isActive: boolean;
@@ -197,6 +203,18 @@ export function DispatchDesktopTopHeader({
     autoConfig.stagedAutoReleaseLeadMinutes
   );
   const [isSavingLeadWindow, setIsSavingLeadWindow] = useState<boolean>(false);
+  const [showStandingOrdersDrawer, setShowStandingOrdersDrawer] = useState<boolean>(false);
+  const [focusedStandingSeriesId, setFocusedStandingSeriesId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleOpenStandingOrders = (e: Event) => {
+      const custom = e as CustomEvent<{ seriesId?: string }>;
+      setFocusedStandingSeriesId(custom?.detail?.seriesId || null);
+      setShowStandingOrdersDrawer(true);
+    };
+    window.addEventListener('ct:open-standing-orders', handleOpenStandingOrders);
+    return () => window.removeEventListener('ct:open-standing-orders', handleOpenStandingOrders);
+  }, []);
 
   useEffect(() => {
     setDraftLeadMinutes(autoConfig.scheduledDispatchLeadMinutes);
@@ -389,8 +407,21 @@ export function DispatchDesktopTopHeader({
           </span>
         </div>
 
-        {/* Right: Auto-Pilot Switch + Active Call HUD + Tactical Alerts + Audio + Settings + App Suite */}
+        {/* Right: Standing Orders + Auto-Pilot Switch + Active Call HUD + Tactical Alerts + Audio + Settings + App Suite */}
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setFocusedStandingSeriesId(null);
+              setShowStandingOrdersDrawer(true);
+            }}
+            className="h-8 px-2.5 rounded-xl border border-emerald-200 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-900 text-[11px] font-extrabold tracking-tight flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs"
+            title="Standing Orders & Recurring Rides Series Manager"
+          >
+            <span>🔁</span>
+            <span className="hidden sm:inline">Series</span>
+          </button>
+
           {autoConfig.dispatchMode !== 'manual_1tap' && (
             <button
               type="button"
@@ -980,6 +1011,21 @@ export function DispatchDesktopTopHeader({
           </Suspense>
         </div>
       </header>
+
+      {showStandingOrdersDrawer && (
+        <Suspense fallback={null}>
+          <StandingOrdersDrawer
+            isOpen={showStandingOrdersDrawer}
+            onClose={() => {
+              setShowStandingOrdersDrawer(false);
+              setFocusedStandingSeriesId(null);
+            }}
+            trips={trips}
+            drivers={drivers}
+            initialSeriesId={focusedStandingSeriesId}
+          />
+        </Suspense>
+      )}
 
       {/* ─── ACTIVE CALL TOP STICKY GREEN BANNER (SMALL SCREENS ONLY) ─── */}
       {activeCallStatus !== 'idle' &&

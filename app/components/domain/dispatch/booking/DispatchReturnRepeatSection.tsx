@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { GeoPoint, TripPricing } from '../../../../core/types';
 import type { OversizedBagCategory } from '../../../../core/types/config';
 import type { FlightTelemetrySnapshot } from '../../../../core/types/flight';
@@ -127,6 +127,8 @@ export interface DispatchReturnRepeatSectionProps {
   setRepeatUntilDate: (val: string) => void;
   repeatWeeksPattern: 'all' | 'odd' | 'even';
   setRepeatWeeksPattern: (val: 'all' | 'odd' | 'even') => void;
+  repeatSkipDates?: string[];
+  setRepeatSkipDates?: (val: string[]) => void;
   onSwapReturnRoute: () => void;
   onToggleReturnCarSeats: (checked: boolean) => void;
   onAddReturnVehicle: () => void;
@@ -221,6 +223,8 @@ export function DispatchReturnRepeatSection({
   setRepeatUntilDate,
   repeatWeeksPattern,
   setRepeatWeeksPattern,
+  repeatSkipDates = [],
+  setRepeatSkipDates,
   onSwapReturnRoute,
   onToggleReturnCarSeats,
   onAddReturnVehicle,
@@ -228,6 +232,20 @@ export function DispatchReturnRepeatSection({
   onUpdateReturnVehicle,
   onToggleRepeatDay,
 }: DispatchReturnRepeatSectionProps) {
+  const [pendingSkipDate, setPendingSkipDate] = useState('');
+
+  const handleAddSkipDate = () => {
+    const trimmed = pendingSkipDate.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return;
+    const next = Array.from(new Set([...repeatSkipDates, trimmed])).sort();
+    setRepeatSkipDates?.(next);
+    setPendingSkipDate('');
+  };
+
+  const handleRemoveSkipDate = (dateToRemove: string) => {
+    setRepeatSkipDates?.(repeatSkipDates.filter((d) => d !== dateToRemove));
+  };
+
   return (
     <div className="pt-2 border-t border-slate-200 space-y-2">
       {/* Return Trip (Full Route, Details & Vehicles) */}
@@ -1107,30 +1125,41 @@ export function DispatchReturnRepeatSection({
         )}
       </div>
 
-      {/* Repeat / Recurring (Until Date & Weeks Pattern) */}
+      {/* Repeat / Recurring (Standing Order Series + Skip Dates) */}
       <div>
-        <label className="flex items-center gap-1.5 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={repeat}
-            onChange={(e) => setRepeat(e.target.checked)}
-            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="font-bold text-slate-800">Repeat / Recurring Ride</span>
+        <label className="flex items-center justify-between gap-1.5 cursor-pointer select-none">
+          <span className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={repeat}
+              onChange={(e) => setRepeat(e.target.checked)}
+              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="font-bold text-slate-800">Repeat / Recurring Ride</span>
+          </span>
+          <span className="text-[9.5px] font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+            Standing Order Series
+          </span>
         </label>
 
         {repeat && (
           <div className="mt-1.5 p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-lg space-y-2">
-            <div className="text-[10px] font-bold text-emerald-900 flex items-center justify-between">
-              <span className="inline-flex items-center gap-1">
-                <RefreshCwIcon className="w-3 h-3 text-emerald-700 shrink-0" />
-                <span>RECURRING SCHEDULE</span>
-              </span>
-              {returnTrip && (
-                <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded font-bold">
-                  Repeats Round Trip
+            <div className="space-y-0.5">
+              <div className="text-[10px] font-bold text-emerald-900 flex items-center justify-between">
+                <span className="inline-flex items-center gap-1">
+                  <RefreshCwIcon className="w-3 h-3 text-emerald-700 shrink-0" />
+                  <span>MANAGED STANDING ORDER SERIES</span>
                 </span>
-              )}
+                {returnTrip && (
+                  <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded font-bold">
+                    Repeats Round Trip
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-emerald-800/90 leading-snug">
+                Automatically registers a Managed Standing Order Series with skip-date/holiday
+                exclusions, preferred staged driver hold, and 1-click horizon extension.
+              </p>
             </div>
 
             {/* Frequency Pills */}
@@ -1237,6 +1266,58 @@ export function DispatchReturnRepeatSection({
                   +
                 </button>
               </div>
+            </div>
+
+            {/* Holiday / Skip Dates Picker */}
+            <div className="pt-1.5 border-t border-emerald-200/70 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[9.5px] font-bold text-emerald-900">
+                  Holiday / Skip Dates (Optional)
+                </span>
+                {repeatSkipDates.length > 0 && (
+                  <span className="text-[9px] font-mono font-bold text-emerald-800 bg-white px-1.5 py-0.2 rounded border border-emerald-200">
+                    {repeatSkipDates.length} excluded
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={pendingSkipDate}
+                  min={scheduledDate || undefined}
+                  onChange={(e) => setPendingSkipDate(e.target.value)}
+                  className="flex-1 px-2 py-1 bg-white border border-emerald-300 rounded text-[11px] font-mono text-slate-800"
+                  aria-label="Holiday or skip date"
+                />
+                <button
+                  type="button"
+                  disabled={!pendingSkipDate}
+                  onClick={handleAddSkipDate}
+                  className="px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-white font-bold text-[10px] transition-colors cursor-pointer shrink-0"
+                >
+                  + Skip Date
+                </button>
+              </div>
+              {repeatSkipDates.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-0.5">
+                  {repeatSkipDates.map((d) => (
+                    <span
+                      key={d}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white border border-emerald-300 text-[10px] font-mono font-bold text-emerald-900"
+                    >
+                      <span>{d}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSkipDate(d)}
+                        className="text-slate-400 hover:text-rose-600 font-sans cursor-pointer leading-none"
+                        title={`Remove skip date ${d}`}
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
