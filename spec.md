@@ -954,5 +954,21 @@ The booking portal will guide the user through a sequential, config-driven flow:
     - `app/core/services/email/dispatch-email.service.ts < 1400` lines
     - `app/core/services/email/dispatch-email.server.ts < 1400` lines
 
+## 48. Phase 48 (Wave 3 Phase 5 — Final Wave 3 Phase): Rates, Pricing Rules & Surcharge Enable/Disable Audit Trail
+- **Staff-Only Audit Persistence & Zero Public PII Leakage**:
+  - Preserves public read access on `/pricingConfig/{document=**}`, `/tariffs/{document=**}`, and `/pricingRules/{document=**}` for upfront customer quotes with **zero** operator emails, names, UIDs, or internal audit notes ever written into public pricing documents.
+  - Persists the structured 4-pillar pricing audit log in **`/config/pricingAuditLog`** (`{ events: PricingAuditEvent[], updatedAt: string }`, capped to the latest `500` events and sanitized via `sanitizePayload`), already protected by `match /config/{document=**} { allow read, write: if isDispatcher(); }` in `firestore.rules` with zero rule modifications required.
+  - Mirrors summary `ConfigAuditEntry` items into `AppSettings.configAuditTrail` so system-wide configuration auditing remains unified.
+- **Instant 1-Click Surcharge Enable/Disable Toggle, Optional Note & Live Provenance (`SurchargesPanel.tsx`)**:
+  - Clicking a surcharge card's `Enabled` / `Disabled` switch performs an **instant 1-click persisted save + audit event** (with per-card saving spinner/guard and zero blocking confirmation modals or separate `Save Surcharges` step required) without discarding unsaved rate, mode, or policy edits on other cards.
+  - Pairs each surcharge card with a lightweight inline **optional audit note** input (`Optional reason / note (e.g. Winter storm I-64)...`) captured automatically when toggling in 1 click or clicking `Save Surcharges`, plus `+ Add note` / `Edit note` inline editing on existing provenance records (`updateAuditEventNote(eventId, note)`).
+  - Displays live per-surcharge enable/disable provenance directly on each card:
+    - When enabled: timestamp, operator identity, optional note badge, and quick `History →` drawer deep-link.
+    - When disabled: timestamp, operator identity, automatically computed **`Was active {duration}`** (`activeDurationMinutes` from the matching prior `surcharge_enabled` event), optional note badge, and `History →` deep-link.
+- **Full 4-Pillar Deterministic Diffing & Slide-Over Audit Inspector (`PricingAuditDrawer.tsx` & `PricingAdminWorkspace.tsx`)**:
+  - Pure deterministic diff calculators (`diffSurchargesConfig`, `diffTariffChange`, `diffPricingRuleChange`, `diffUniversalExtrasChange`) emit structured `{ field, label, before, after }` diffs across Surcharges, Service Rates, Pricing Rules (`rule_enabled` / `rule_disabled` with active duration + `surchargeActions` directives), and Universal Extras while suppressing no-op saves (`diffs.length === 0`).
+  - Slide-over `PricingAuditDrawer` mounted alongside `Live Fare Preview` in `PricingAdminWorkspace.tsx` featuring `All · Surcharges On/Off · Surcharges (All) · Rates · Rules · Extras` filter pills, per-surcharge dropdown filter, instant text search, color-coded timeline cards with `{ before → after }` diff chips, inline note editing, and RFC-4180 `Export CSV` (`chesterfield-pricing-audit-YYYY-MM-DD.csv`).
+
+
 
 

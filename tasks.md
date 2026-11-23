@@ -741,5 +741,22 @@
   - [x] 47.3.1 Extend `monolithBudgets` in `scripts/test-browser-smoke.ts` to assert `AdminInvoicingSubpage.tsx < 1400`L, `AdminZonesTab.tsx < 1300`L, `telephony-gateway.server.ts < 1400`L, `dispatch-email.service.ts < 1400`L, and `dispatch-email.server.ts < 1400`L.
   - [x] 47.3.2 Pass `npm run typecheck`, `npm run build`, `npm run test:smoke`, `npm run test:e2e`, `npx tsx scripts/test-comms-threads-telephony.ts`, `npx tsx scripts/test-dispatch-email-webhook.ts`, and `npx tsx scripts/test-email-dock-service.ts` with `0` errors, mark Phase 47 complete in `tasks.md`, and leave Phase 47 changes uncommitted for Control-Tower review.
 
+## Phase 48 (Wave 3 Phase 5 — Final Wave 3 Phase): Rates, Pricing Rules & Surcharge Enable/Disable Audit Trail
+- [x] 48.0 Baseline Hygiene & Specification Sync:
+  - [x] 48.0.1 Commit reviewed Phase 47 baseline cleanly on `main` (`feat(phase-47): decompose AdminInvoicingSubpage, AdminZonesTab, and Wave 2 comms/email services`).
+  - [x] 48.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 48 scope, staff-only `/config/pricingAuditLog` privacy architecture, and 1-click surcharge UX before writing code.
+- [x] 48.1 Pricing Audit Schema, Pure Diff Calculators & Staff-Scoped Service:
+  - [x] 48.1.1 Create `app/core/types/pricing-audit.ts` defining `PricingAuditPillar`, `PricingAuditAction`, `PricingFieldDiff`, `PricingAuditEvent`, `PricingAuditActor`, and `SurchargeProvenanceEntry`.
+  - [x] 48.1.2 Create `app/core/services/pricing/pricing-audit.service.ts` implementing pure deterministic diff calculators (`diffSurchargesConfig`, `diffTariffChange`, `diffPricingRuleChange`, `diffUniversalExtrasChange`), `formatActiveDuration`, RFC-4180 `exportPricingAuditCsv`, `getLatestSurchargeStatusMap`, and `PricingAuditService` (`localStorage` `ct_pricing_audit_log_v1` + Firestore `/config/pricingAuditLog` real-time sync capped at `500` events).
+- [x] 48.2 `SurchargesPanel.tsx` — Instant 1-Click Toggle, Optional Note & Live Provenance:
+  - [x] 48.2.1 Upgrade `app/components/domain/admin/pricing/surcharges/SurchargesPanel.tsx` with instant 1-click `onToggleSurcharge` persistence (preserving unsaved edits on other cards), compact inline optional audit note input, post-toggle `+ Add note` / `Edit note` inline editing, and live per-card enable/disable provenance (`Was active ...` duration + `History →` deep-link).
+- [x] 48.3 `PricingAuditDrawer.tsx` & Full 4-Pillar Wiring in `PricingAdminWorkspace.tsx`:
+  - [x] 48.3.1 Create `app/components/domain/admin/pricing/audit/PricingAuditDrawer.tsx` inside `AdminSlideOverDrawer` with `All · Surcharges On/Off · Surcharges (All) · Rates · Rules · Extras` filter pills, surcharge selector dropdown, instant search, RFC-4180 `Export CSV` download, color-coded timeline cards, `{ before → after }` diff chips, and inline note editing.
+  - [x] 48.3.2 Wire all 4 pricing pillars (`handleToggleSurcharge`, `handleSaveSurcharges`, `handleMigrateLegacyToFirewall`, `handleSaveTariff`, `handleDeleteTariff`, `handleSaveRule`, `handleDeleteRule`, `handleSaveExtras`) + `AppSettings.configAuditTrail` mirroring + top utility bar `Audit History` button in `app/components/domain/admin/pricing/PricingAdminWorkspace.tsx`.
+- [x] 48.4 Automated Verification Suite & Regression Gates:
+  - [x] 48.4.1 Create and pass `scripts/test-pricing-audit-trail.ts` verifying `surcharge_enabled` -> `surcharge_disabled` `activeDurationMinutes` (`136` / `'2h 16m'`), pre-toggle and post-toggle notes (`updateAuditEventNote`), zero noisy no-op events, 4-pillar `{ before → after }` diffs, RFC-4180 CSV escaping, zero PII in `/pricingConfig/*`, and `firestore.rules` `/config/{document=**}` dispatcher lockdown.
+  - [x] 48.4.2 Pass `npm run typecheck`, `npm run build`, `npm run test:smoke`, and `npm run test:e2e` with `0` errors, mark Phase 48 complete in `tasks.md`, and leave Phase 48 changes uncommitted for Control-Tower code review.
+
+
 
 

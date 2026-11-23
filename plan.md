@@ -1199,6 +1199,41 @@ export interface PassengerAccount {
   - `app/core/services/email/dispatch-email.service.ts < 1400` lines
   - `app/core/services/email/dispatch-email.server.ts < 1400` lines
 
+## 37. Phase 48 Architecture (Wave 3 Phase 5 — Final Wave 3 Phase): Rates, Pricing Rules & Surcharge Enable/Disable Audit Trail
+
+### 37.1 Security, Privacy & SSR/Bundle Guardrails (`constitution.md`)
+- **Zero Public PII in `/pricingConfig/*`**:
+  - `/pricingConfig/{document=**}`, `/tariffs/{document=**}`, and `/pricingRules/{document=**}` remain public-read (`allow read: if true;`) so guest and customer booking flows compute fares without authentication. Operator UIDs, names, emails, and internal operational notes are NEVER written to those collections.
+  - Full pricing audit history is persisted in `/config/pricingAuditLog` (`{ events: PricingAuditEvent[], updatedAt: string }`, capped at `500` events, sanitized via `sanitizePayload`), governed by existing `match /config/{document=**} { allow read, write: if isDispatcher(); }` in `firestore.rules`.
+  - Summary `ConfigAuditEntry` records are mirrored into `AppSettings.configAuditTrail` via `PricingAdminWorkspace`'s `onSave` callback (falling back to `AdminConfigService.updateSettings`).
+- **SSR Determinism & Bundle Integrity**:
+  - All `window` / `localStorage` (`ct_pricing_audit_log_v1`) reads/writes are guarded behind `typeof window !== 'undefined'`, and React state in `PricingAdminWorkspace` initializes deterministically (`[]`) before hydrating inside `useEffect`.
+  - Zero `*.server.ts` or `node:*` imports in client modules; all 14 `/api/*` client route chunks remain `0.00 kB`, `admin-*.js` remains `< 150 KB`, and `vercel.json` (`"0 10 * * *"`) remains untouched.
+
+### 37.2 Pricing Audit Schema & Deterministic Diff Engine (`app/core/types/pricing-audit.ts` & `app/core/services/pricing/pricing-audit.service.ts`)
+- **Schema (`app/core/types/pricing-audit.ts`)**:
+  - `PricingAuditPillar`: `'surcharges' | 'rates' | 'rules' | 'extras'`
+  - `PricingAuditAction`: `'surcharge_enabled' | 'surcharge_disabled' | 'surcharge_created' | 'surcharge_updated' | 'surcharge_deleted' | 'surcharge_legacy_migrated' | 'tariff_created' | 'tariff_updated' | 'tariff_deleted' | 'rule_enabled' | 'rule_disabled' | 'rule_created' | 'rule_updated' | 'rule_deleted' | 'extras_updated'`
+  - `PricingFieldDiff`: `{ field: string; label: string; before: string | number | boolean | null; after: string | number | boolean | null }`
+  - `PricingAuditEvent`: `{ id, timestamp, timestampMs, pillar, action, targetId, targetName, summary, note?, activeDurationMinutes?, enabledSince?, diffs, operatorId, operatorName, operatorEmail, operatorRole? }`
+- **Pure Diff Calculators & Formatters (`pricing-audit.service.ts`)**:
+  - `diffSurchargesConfig(prev, next, existingEvents, options?)`: Compares normalized `getSurchargeCatalogItems`, emitting `'surcharge_enabled'` / `'surcharge_disabled'` (computing `activeDurationMinutes` and `enabledSince` from the latest prior `'surcharge_enabled'` event for that `targetId`, while bundling any simultaneous rate/mode/policy diffs), `'surcharge_created'`, `'surcharge_updated'`, `'surcharge_deleted'`, and optional `'surcharge_legacy_migrated'`. Returns `[]` when unchanged.
+  - `diffTariffChange(prev, next, options?)`: Emits `'tariff_created'`, `'tariff_updated'`, and `'tariff_deleted'` across rate name, active/default flags, calculation model (`pricingMethod`), taximeter start/mile/then/minimum/waiting/grace fields, step increment tiers, hourly charter rates/minimums, rounding modes, cancellation/no-show fees, flat corridors, and zip matrices.
+  - `diffPricingRuleChange(prev, next, existingEvents, options?)`: Emits `'rule_enabled'` / `'rule_disabled'` (with `activeDurationMinutes` & `enabledSince` when prior `'rule_enabled'` exists), `'rule_created'`, `'rule_updated'`, and `'rule_deleted'` covering `name`, `priority`, `stopProcessingOnMatch`, `allowDriverSelection`, `triggers` summary, `tariffId`, fare overrides/multipliers/discounts, `surchargeActions`, and `extraActions`.
+  - `diffUniversalExtrasChange(prev, next, options?)`: Emits `'extras_updated'` across car seat fee/auto-upgrade, passenger allowance & extra passenger fee, intermediate stop fee & free wait, curb waiting grace & per-minute rate, pet fee, fee waivers, oversized bag categories, and custom bookable add-ons.
+  - `formatActiveDuration(minutes?)` (`< 1m`, `42m`, `2h 16m`, `3d 4h`) & RFC-4180 `exportPricingAuditCsv(events)`.
+- **`PricingAuditService` Singleton**:
+  - Resolves actor from `getAdminAuthService().getCurrentUser()` (with test override support), syncs `localStorage` (`ct_pricing_audit_log_v1`) + Firestore `/config/pricingAuditLog` (`onSnapshot`), and exposes `getEvents()`, `subscribe(cb)`, `recordEvents(newEvents)`, `updateAuditEventNote(eventId, note)`, `getLatestSurchargeStatusMap(events)`, and `resetForTests()`.
+
+### 37.3 1-Click Surcharge Toggle, Inline Note & Slide-Over Audit Drawer (`SurchargesPanel.tsx`, `PricingAuditDrawer.tsx`, `PricingAdminWorkspace.tsx`)
+- **`SurchargesPanel.tsx`**:
+  - Clicking `Enabled` / `Disabled` invokes `onToggleSurcharge(surchargeId, nextEnabled, note)` immediately in 1 click with a per-card in-flight guard, preserving unsaved local edits on other surcharge cards.
+  - Each card includes a zero-modal optional note input (attached automatically on 1-click toggle or `Save Surcharges`) plus a live provenance footer displaying last enable/disable actor, timestamp, `Was active ...` duration, note badge, inline `+ Add note` / `Edit note` editor, and `History →` drawer trigger.
+- **`PricingAuditDrawer.tsx` & `PricingAdminWorkspace.tsx`**:
+  - `PricingAuditDrawer` renders inside `AdminSlideOverDrawer` with `All · Surcharges On/Off · Surcharges (All) · Rates · Rules · Extras` filter pills, surcharge item dropdown, search bar, 1-click CSV download, color-coded timeline badges, `{ before → after }` diff chips, and inline note editing.
+  - `PricingAdminWorkspace` wires all 4 pillar save/toggle/delete/migrate handlers into `PricingAuditService` and mounts the `Audit History` button (with live count badge) beside `Live Fare Preview`.
+
+
 
 
 

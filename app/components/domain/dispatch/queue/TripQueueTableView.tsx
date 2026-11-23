@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import type { AppSettings } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
@@ -45,7 +45,11 @@ export interface TripQueueTableViewProps {
   slaSummary: SlaScanSummary;
   onStartAutoOffer: (trip: Trip) => void | Promise<void>;
   onCancelAutoOffer: (trip: Trip) => void | Promise<void>;
+  onTableOverflowDetected?: (overflowDeltaPx: number) => void;
 }
+
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? React.useLayoutEffect : useEffect;
 
 export function TripQueueTableView({
   isDesktop,
@@ -76,11 +80,42 @@ export function TripQueueTableView({
   slaSummary,
   onStartAutoOffer,
   onCancelAutoOffer,
+  onTableOverflowDetected,
 }: TripQueueTableViewProps) {
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const tableRef = useRef<HTMLTableElement | null>(null);
+
+  useIsomorphicLayoutEffect(() => {
+    const scroller = scrollContainerRef.current;
+    const tableEl = tableRef.current;
+    if (!scroller || !onTableOverflowDetected || typeof window === 'undefined') return;
+
+    const checkHorizontalOverflow = () => {
+      const clientW = scroller.clientWidth;
+      const scrollW = scroller.scrollWidth;
+      if (clientW > 0 && scrollW > clientW + 1) {
+        onTableOverflowDetected(scrollW - clientW);
+      }
+    };
+
+    checkHorizontalOverflow();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', checkHorizontalOverflow);
+      return () => window.removeEventListener('resize', checkHorizontalOverflow);
+    }
+
+    const observer = new ResizeObserver(() => {
+      checkHorizontalOverflow();
+    });
+    observer.observe(scroller);
+    if (tableEl) observer.observe(tableEl);
+    return () => observer.disconnect();
+  }, [filteredTrips, drivers.length, slaSummary, onTableOverflowDetected]);
+
   return (
-    <div className="flex-1 overflow-auto text-xs">
-      <div className="overflow-x-auto custom-scrollbar min-w-full">
-        <table className="w-full text-left border-collapse min-w-[850px]">
+    <div ref={scrollContainerRef} className="flex-1 overflow-auto custom-scrollbar text-xs">
+      <table ref={tableRef} className="w-full text-left border-collapse min-w-[1020px]">
           <thead className="bg-slate-100/90 sticky top-0 border-b border-slate-200 text-slate-600 font-semibold text-[11px] z-10">
             <tr>
               <th className="py-2 px-3 w-8 text-center">
@@ -95,15 +130,15 @@ export function TripQueueTableView({
                   title="Select/Deselect All Filtered Trips"
                 />
               </th>
-              <th className="py-2 px-3">DATE/TIME ▲</th>
-              <th className="py-2 px-3">PASSENGER</th>
-              <th className="py-2 px-3">PICKUP</th>
-              <th className="py-2 px-3">DROPOFF</th>
-              <th className="py-2 px-3">DRIVER</th>
-              <th className="py-2 px-3">VEHICLE</th>
-              <th className="py-2 px-3">PRICE</th>
-              <th className="py-2 px-3">STATUS</th>
-              <th className="py-2 px-3 text-center">ACTION</th>
+              <th className="py-2 px-3 whitespace-nowrap">DATE/TIME ▲</th>
+              <th className="py-2 px-3 whitespace-nowrap">PASSENGER</th>
+              <th className="py-2 px-3 whitespace-nowrap">PICKUP</th>
+              <th className="py-2 px-3 whitespace-nowrap">DROPOFF</th>
+              <th className="py-2 px-3 whitespace-nowrap">DRIVER</th>
+              <th className="py-2 px-3 whitespace-nowrap">VEHICLE</th>
+              <th className="py-2 px-3 whitespace-nowrap">PRICE</th>
+              <th className="py-2 px-3 whitespace-nowrap">STATUS</th>
+              <th className="py-2 px-3 text-center whitespace-nowrap">ACTION</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-slate-800">
@@ -146,7 +181,7 @@ export function TripQueueTableView({
                       className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
                   </td>
-                  <td className="py-2 px-3 font-semibold text-slate-700">
+                  <td className="py-2 px-3 font-semibold text-slate-700 whitespace-nowrap">
                     <div className="flex flex-col items-start gap-1">
                       <span>{pickupTimeStr}</span>
                       <DispatchSlaBadge sla={slaSummary.byTripId[trip.id]} />
@@ -155,7 +190,7 @@ export function TripQueueTableView({
                   </td>
                   <td className="py-2 px-3 font-medium">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span>
+                      <span className="whitespace-nowrap">
                         {trip.passenger.firstName} {trip.passenger.lastName}
                       </span>
                       {trip.multiCarGroupId && (trip.multiCarTotal || 1) > 1 && (
@@ -166,7 +201,7 @@ export function TripQueueTableView({
                             onSearchTermChange(trip.multiCarGroupId!);
                             onSearchExpandedChange(true);
                           }}
-                          className="px-1.5 py-0.2 rounded bg-violet-100 hover:bg-violet-200 text-violet-800 border border-violet-300 text-[10px] font-black cursor-pointer"
+                          className="px-1.5 py-0.2 rounded bg-violet-100 hover:bg-violet-200 text-violet-800 border border-violet-300 text-[10px] font-black cursor-pointer whitespace-nowrap"
                           title={`Multi-car order ${trip.multiCarGroupId} (${
                             (trip.multiCarAssociates || []).filter((a) => Boolean(a.driverId)).length
                           }/${trip.multiCarTotal} assigned) — click to filter convoy`}
@@ -175,7 +210,7 @@ export function TripQueueTableView({
                         </button>
                       )}
                     </div>
-                    <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                    <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1 whitespace-nowrap">
                       <span>{trip.passenger.phone}</span>
                       {trip.passenger.phone && (
                         <button
@@ -312,7 +347,6 @@ export function TripQueueTableView({
             )}
           </tbody>
         </table>
-      </div>
     </div>
   );
 }

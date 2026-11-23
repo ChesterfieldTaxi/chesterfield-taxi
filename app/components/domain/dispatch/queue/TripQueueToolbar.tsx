@@ -116,6 +116,7 @@ export interface TripQueueToolbarProps {
   displayLayout: DisplayLayout;
   effectiveDisplayLayout: DisplayLayout;
   isAutoCardsFallback: boolean;
+  effectiveMinTableWidthPx?: number;
   onDisplayLayoutChange: (layout: DisplayLayout) => void;
   isLayoutDropdownOpen: boolean;
   onLayoutDropdownOpenChange: (open: boolean) => void;
@@ -184,6 +185,7 @@ export function TripQueueToolbar({
   displayLayout,
   effectiveDisplayLayout,
   isAutoCardsFallback,
+  effectiveMinTableWidthPx = TABLE_OVERFLOW_MIN_WIDTH_PX,
   onDisplayLayoutChange,
   isLayoutDropdownOpen,
   onLayoutDropdownOpenChange,
@@ -242,7 +244,7 @@ export function TripQueueToolbar({
     : 'Compact';
 
   const layoutTriggerTooltip = isAutoCardsFallback
-    ? `Auto-switched to Cards because Trips queue is narrower than ${TABLE_OVERFLOW_MIN_WIDTH_PX}px. Table view restores automatically when widened.`
+    ? `Auto-switched to Cards because Trips table would overflow horizontally (${effectiveMinTableWidthPx}px needed). Table view restores automatically when widened.`
     : `Queue Layout: ${displayLayout}. Click to change.`;
 
   return (

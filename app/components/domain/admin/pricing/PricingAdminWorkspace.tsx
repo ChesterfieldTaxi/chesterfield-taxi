@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import type { AppSettings, NamedPricingRule } from '~/core/types/config';
+import type { AppSettings, ConfigAuditEntry, NamedPricingRule } from '~/core/types/config';
 import type { TariffProfile } from '~/core/types/tariff';
+import type { PricingAuditEvent, PricingAuditFilterMode } from '~/core/types/pricing-audit';
 import type { UniversalExtrasConfig } from '~/core/services/pricing/extras.service';
 import type { SurchargesConfig } from '~/core/services/pricing/surcharges.service';
 
-import { SlidersIcon } from '~/components/ui/Icons';
+import { HistoryIcon, SlidersIcon } from '~/components/ui/Icons';
 import { Button } from '~/components/ui/Button';
 import { Badge } from '~/components/ui/Badge';
 
@@ -13,8 +14,10 @@ import { UniversalExtrasPanel } from './extras/UniversalExtrasPanel';
 import { SurchargesPanel } from './surcharges/SurchargesPanel';
 import { PricingRulesPanel } from './rules/PricingRulesPanel';
 import { PersistentFareSimulator } from './simulator/PersistentFareSimulator';
+import { PricingAuditDrawer } from './audit/PricingAuditDrawer';
 import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
 
+import { getAdminConfigService } from '~/core/services/config/admin-config.service';
 import { getTariffService, DEFAULT_TARIFF_PROFILES } from '~/core/services/pricing/tariff.service';
 import {
   getPricingRulesService,
@@ -33,6 +36,14 @@ import {
   getSurchargeCatalogItems,
   DEFAULT_SURCHARGES_CONFIG,
 } from '~/core/services/pricing/surcharges.service';
+import {
+  diffPricingRuleChange,
+  diffSurchargesConfig,
+  diffTariffChange,
+  diffUniversalExtrasChange,
+  getPricingAuditService,
+  toConfigAuditEntries,
+} from '~/core/services/pricing/pricing-audit.service';
 
 export type PricingPillarTab = 'rates' | 'extras' | 'surcharges' | 'rules';
 
@@ -45,12 +56,19 @@ export interface PricingAdminWorkspaceProps {
 
 export function PricingAdminWorkspace({
   settings,
+  onSave,
   isLoading = false,
   initialTab = 'rates',
 }: PricingAdminWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<PricingPillarTab>(initialTab);
   const [isSimulatorOpen, setIsSimulatorOpen] = useState<boolean>(false);
   const [focusedRuleId, setFocusedRuleId] = useState<string | null>(null);
+
+  // Staff-only Pricing Audit Trail state (deterministic [] on SSR, hydrated in useEffect)
+  const [auditEvents, setAuditEvents] = useState<PricingAuditEvent[]>([]);
+  const [isAuditDrawerOpen, setIsAuditDrawerOpen] = useState<boolean>(false);
+  const [auditFilterMode, setAuditFilterMode] = useState<PricingAuditFilterMode>('all');
+  const [auditSurchargeId, setAuditSurchargeId] = useState<string>('');
 
   // Live unsaved draft state from active panel so Simulator previews unsaved edits immediately
   const [draftTariff, setDraftTariff] = useState<TariffProfile | null>(null);
@@ -103,7 +121,7 @@ export function PricingAdminWorkspace({
     }
   });
 
-  // Subscribe LIVE to all 4 pricing pillars from Firestore
+  // Subscribe LIVE to all 4 pricing pillars + staff-only PricingAuditService
   React.useEffect(() => {
     let mounted = true;
     const unsubTariffs = getTariffService().subscribeToTariffs((liveTariffs) => {
@@ -123,6 +141,10 @@ export function PricingAdminWorkspace({
       if (!mounted) return;
       if (liveRules && liveRules.length > 0) setRules(liveRules);
     });
+    const unsubAudit = getPricingAuditService().subscribe((liveAuditEvents) => {
+      if (!mounted) return;
+      setAuditEvents(liveAuditEvents);
+    });
 
     return () => {
       mounted = false;
@@ -130,7 +152,85 @@ export function PricingAdminWorkspace({
       unsubExtras();
       unsubSurcharges();
       unsubRules();
+      unsubAudit();
     };
+  }, []);
+
+  // Mirror pricing audit summaries into unified AppSettings.configAuditTrail
+  const mirrorIntoAppSettingsTrail = useCallback(
+    (entries: ConfigAuditEntry[]) => {
+      if (entries.length === 0) return;
+      const existingTrail =
+        settings?.configAuditTrail ||
+        getAdminConfigService().getCachedSettings().configAuditTrail ||
+        [];
+      const mergedMap = new Map<string, ConfigAuditEntry>();
+      for (const entry of [...entries, ...existingTrail]) {
+        if (entry?.id && !mergedMap.has(entry.id)) {
+          mergedMap.set(entry.id, entry);
+        }
+      }
+      const updatedTrail = Array.from(mergedMap.values()).slice(0, 100);
+      if (settings && onSave) {
+        onSave({ configAuditTrail: updatedTrail }).catch((err) =>
+          console.warn('[PricingAdminWorkspace] Failed to mirror configAuditTrail via onSave:', err)
+        );
+      } else {
+        getAdminConfigService()
+          .updateSettings({ configAuditTrail: updatedTrail })
+          .catch((err) =>
+            console.warn('[PricingAdminWorkspace] Failed to mirror configAuditTrail:', err)
+          );
+      }
+    },
+    [settings, onSave]
+  );
+
+  const recordAndMirrorAuditEvents = useCallback(
+    async (newEvents: PricingAuditEvent[]) => {
+      if (!newEvents || newEvents.length === 0) return;
+      const recorded = await getPricingAuditService().recordEvents(newEvents);
+      if (recorded.length > 0) {
+        mirrorIntoAppSettingsTrail(toConfigAuditEntries(recorded));
+      }
+    },
+    [mirrorIntoAppSettingsTrail]
+  );
+
+  const handleUpdateAuditNote = useCallback(
+    async (eventId: string, note: string) => {
+      const updated = await getPricingAuditService().updateAuditEventNote(eventId, note);
+      if (!updated) return;
+
+      const existingTrail =
+        settings?.configAuditTrail ||
+        getAdminConfigService().getCachedSettings().configAuditTrail ||
+        [];
+      if (existingTrail.some((e) => e.id === eventId)) {
+        const [mirroredUpdated] = toConfigAuditEntries([updated]);
+        const nextTrail = existingTrail.map((e) => (e.id === eventId ? mirroredUpdated : e));
+        if (settings && onSave) {
+          onSave({ configAuditTrail: nextTrail }).catch(() => {});
+        } else {
+          getAdminConfigService()
+            .updateSettings({ configAuditTrail: nextTrail })
+            .catch(() => {});
+        }
+      }
+    },
+    [settings, onSave]
+  );
+
+  const handleOpenAuditDrawerAll = useCallback(() => {
+    setAuditSurchargeId('');
+    setAuditFilterMode('all');
+    setIsAuditDrawerOpen(true);
+  }, []);
+
+  const handleOpenSurchargeAuditHistory = useCallback((surchargeId?: string) => {
+    setAuditSurchargeId(surchargeId || '');
+    setAuditFilterMode(surchargeId ? 'surcharges' : 'surcharges_on_off');
+    setIsAuditDrawerOpen(true);
   }, []);
 
   // Cross-tab jump helper (e.g. clicking a Rule pill on a Surcharge or Rate card)
@@ -139,13 +239,16 @@ export function PricingAdminWorkspace({
     setActiveTab('rules');
   }, []);
 
-  // Save Handlers
+  // Save & Audit Handlers across all 4 Pricing Pillars
   const handleSaveTariff = async (updated: TariffProfile) => {
+    const prevTariff = tariffs.find((t) => t.id === updated.id) || null;
+    const events = diffTariffChange(prevTariff, updated);
     try {
       const svc = getTariffService();
       await svc.saveTariff(updated);
       setTariffs([...svc.getAllTariffProfiles().filter((t) => !t.isArchived)]);
       setDraftTariff(null);
+      await recordAndMirrorAuditEvents(events);
     } catch (e) {
       console.error('Error saving rate profile:', e);
       setTariffs((prev) => {
@@ -156,11 +259,14 @@ export function PricingAdminWorkspace({
   };
 
   const handleDeleteTariff = async (id: string) => {
+    const prevTariff = tariffs.find((t) => t.id === id) || null;
+    const events = diffTariffChange(prevTariff, null);
     try {
       const svc = getTariffService();
       await svc.deleteTariff(id);
       setTariffs([...svc.getAllTariffProfiles().filter((t) => !t.isArchived)]);
       setDraftTariff(null);
+      await recordAndMirrorAuditEvents(events);
     } catch (e) {
       console.error('Error deleting rate profile:', e);
       setTariffs((prev) => prev.filter((t) => t.id !== id));
@@ -168,21 +274,65 @@ export function PricingAdminWorkspace({
   };
 
   const handleSaveExtras = async (updated: UniversalExtrasConfig) => {
+    const prevExtras = universalExtras;
+    const events = diffUniversalExtrasChange(prevExtras, updated);
     try {
       await saveUniversalExtrasConfig(updated);
       setUniversalExtras(updated);
       setDraftExtras(null);
+      await recordAndMirrorAuditEvents(events);
     } catch (e) {
       console.error('Error saving universal extras:', e);
       setUniversalExtras(updated);
     }
   };
 
-  const handleSaveSurcharges = async (updated: SurchargesConfig) => {
+  // Instant 1-click surcharge On/Off persistence + audit recording
+  const handleToggleSurcharge = async (
+    surchargeId: string,
+    nextEnabled: boolean,
+    note?: string
+  ) => {
+    const prevSurcharges = surcharges;
+    const nextItems = getSurchargeCatalogItems(prevSurcharges).map((item) =>
+      item.id === surchargeId ? { ...item, enabled: nextEnabled } : item
+    );
+    const nextSurcharges: SurchargesConfig = {
+      ...prevSurcharges,
+      catalogVersion: 2,
+      items: nextItems,
+    };
+    const events = diffSurchargesConfig(
+      prevSurcharges,
+      nextSurcharges,
+      getPricingAuditService().getEvents(),
+      {
+        note,
+        noteForSurchargeId: surchargeId,
+      }
+    );
+
+    await saveSurchargesConfig(nextSurcharges);
+    setSurcharges(nextSurcharges);
+    await recordAndMirrorAuditEvents(events);
+  };
+
+  const handleSaveSurcharges = async (
+    updated: SurchargesConfig,
+    notesBySurchargeId?: Record<string, string>
+  ) => {
+    const prevSurcharges = surcharges;
+    const events = diffSurchargesConfig(
+      prevSurcharges,
+      updated,
+      getPricingAuditService().getEvents(),
+      { notesBySurchargeId }
+    );
     try {
       await saveSurchargesConfig(updated);
       setSurcharges(updated);
       setDraftSurcharges(null);
+      await recordAndMirrorAuditEvents(events);
     } catch (e) {
       console.error('Error saving surcharges:', e);
       setSurcharges(updated);
@@ -190,11 +340,18 @@ export function PricingAdminWorkspace({
   };
 
   const handleSaveRule = async (updated: NamedPricingRule) => {
+    const prevRule = rules.find((r) => r.id === updated.id) || null;
+    const events = diffPricingRuleChange(
+      prevRule,
+      updated,
+      getPricingAuditService().getEvents()
+    );
     try {
       const svc = getPricingRulesService();
       await svc.saveRule(updated);
       setRules([...svc.getAllRules()]);
       setDraftRule(null);
+      await recordAndMirrorAuditEvents(events);
     } catch (e) {
       console.error('Error saving pricing rule:', e);
       setRules((prev) => {
@@ -205,11 +362,14 @@ export function PricingAdminWorkspace({
   };
 
   const handleDeleteRule = async (id: string) => {
+    const prevRule = rules.find((r) => r.id === id) || null;
+    const events = diffPricingRuleChange(prevRule, null, getPricingAuditService().getEvents());
     try {
       const svc = getPricingRulesService();
       await svc.deleteRule(id);
       setRules([...svc.getAllRules()]);
       setDraftRule(null);
+      await recordAndMirrorAuditEvents(events);
     } catch (e) {
       console.error('Error deleting pricing rule:', e);
       setRules((prev) => prev.filter((r) => r.id !== id));
@@ -218,21 +378,42 @@ export function PricingAdminWorkspace({
 
   // One-click lossless upgrade from pre-v2 Firestore surcharges to v2 Firewall Catalog + Rules
   const handleMigrateLegacyToFirewall = async () => {
-    const v2Items = getSurchargeCatalogItems(surcharges);
-    await handleSaveSurcharges({
-      ...surcharges,
+    const prevSurcharges = surcharges;
+    const v2Items = getSurchargeCatalogItems(prevSurcharges);
+    const nextSurcharges: SurchargesConfig = {
+      ...prevSurcharges,
       catalogVersion: 2,
       items: v2Items,
-    });
+    };
+
+    const migrationAuditBatch: PricingAuditEvent[] = [
+      ...diffSurchargesConfig(
+        prevSurcharges,
+        nextSurcharges,
+        getPricingAuditService().getEvents(),
+        { isLegacyMigration: true }
+      ),
+    ];
+
+    await saveSurchargesConfig(nextSurcharges);
+    setSurcharges(nextSurcharges);
+    setDraftSurcharges(null);
+
     const ruleSvc = getPricingRulesService();
     const existingIds = new Set(rules.map((r) => r.id));
     for (const defaultRule of DEFAULT_NAMED_PRICING_RULES) {
       if (!existingIds.has(defaultRule.id)) {
-        await ruleSvc.saveRule(defaultRule);
+        const saved = await ruleSvc.saveRule(defaultRule);
+        migrationAuditBatch.push(
+          ...diffPricingRuleChange(null, saved, getPricingAuditService().getEvents())
+        );
       } else if (defaultRule.id === 'rule-airport-transfer-flat') {
         const existing = rules.find((r) => r.id === defaultRule.id);
-        if (existing && (!existing.modifier.surchargeActions || existing.modifier.surchargeActions.length === 0)) {
-          await ruleSvc.saveRule({
+        if (
+          existing &&
+          (!existing.modifier.surchargeActions || existing.modifier.surchargeActions.length === 0)
+        ) {
+          const upgradedRule: NamedPricingRule = {
             ...existing,
             triggers: {
               ...existing.triggers,
@@ -244,11 +425,16 @@ export function PricingAdminWorkspace({
               surchargeActions: defaultRule.modifier.surchargeActions,
               overruleSurcharges: undefined,
             },
-          });
+          };
+          const saved = await ruleSvc.saveRule(upgradedRule);
+          migrationAuditBatch.push(
+            ...diffPricingRuleChange(existing, saved, getPricingAuditService().getEvents())
+          );
         }
       }
     }
     setRules([...ruleSvc.getAllRules()]);
+    await recordAndMirrorAuditEvents(migrationAuditBatch);
   };
 
   // Merge active unsaved drafts into Simulator inputs for live preview!
@@ -291,7 +477,7 @@ export function PricingAdminWorkspace({
             'Automatic pricing rules connecting trip conditions to Rates, Surcharges, and Extras.'}
         </p>
 
-        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
           {hasUnsavedDraft && (
             <Badge
               variant="warning"
@@ -301,6 +487,21 @@ export function PricingAdminWorkspace({
               Unsaved Draft Active
             </Badge>
           )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleOpenAuditDrawerAll}
+            className="text-xs border-slate-300 bg-white text-slate-800 hover:bg-slate-50 shadow-2xs shrink-0 cursor-pointer flex-1 sm:flex-none justify-center"
+          >
+            <HistoryIcon className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+            <span>Audit History</span>
+            {auditEvents.length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-mono text-[10px] font-bold">
+                {auditEvents.length}
+              </span>
+            )}
+          </Button>
           <Button
             type="button"
             variant="outline"
@@ -342,6 +543,10 @@ export function PricingAdminWorkspace({
             surcharges={surcharges}
             rules={rules}
             onSave={handleSaveSurcharges}
+            onToggleSurcharge={handleToggleSurcharge}
+            auditEvents={auditEvents}
+            onUpdateAuditNote={handleUpdateAuditNote}
+            onOpenAuditHistory={handleOpenSurchargeAuditHistory}
             onDraftChange={setDraftSurcharges}
             onNavigateToRule={handleNavigateToRule}
             onMigrateLegacyToFirewall={handleMigrateLegacyToFirewall}
@@ -364,6 +569,17 @@ export function PricingAdminWorkspace({
           />
         )}
       </div>
+
+      {/* Staff-Only Pricing & Surcharge Audit History Slide-Over Drawer */}
+      <PricingAuditDrawer
+        isOpen={isAuditDrawerOpen}
+        onClose={() => setIsAuditDrawerOpen(false)}
+        events={auditEvents}
+        surcharges={surcharges}
+        initialFilterMode={auditFilterMode}
+        initialSurchargeId={auditSurchargeId}
+        onUpdateNote={handleUpdateAuditNote}
+      />
 
       {/* On-Demand Live Fare Preview Slide-Over Drawer (previews live unsaved drafts!) */}
       <AdminSlideOverDrawer

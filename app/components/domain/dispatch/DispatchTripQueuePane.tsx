@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import type { AppSettings } from '../../../core/types/config';
 import type { Trip } from '../../../core/types/trip';
 import type { DateTimeRange } from './CustomDateTimePicker';
@@ -30,7 +30,7 @@ import {
   ShieldCheckIcon,
 } from '../../ui/Icons';
 import {
-  resolveEffectiveQueueDisplayLayout,
+  useResponsiveQueueLayout,
   getDispatchStatusBadge,
   TripQueueToolbar,
   TripQueueCardsGrid,
@@ -204,46 +204,22 @@ export function DispatchTripQueuePane({
   onStartAutoOffer,
   onCancelAutoOffer,
 }: DispatchTripQueuePaneProps) {
-  const queueContainerRef = useRef<HTMLDivElement | null>(null);
-  // Deterministic SSR initial state (0 = pre-measurement)
-  const [queueWidthPx, setQueueWidthPx] = useState<number>(0);
+  const filterSignature = `${statusFilter}:${slaUrgentOnlyFilter ? '1' : '0'}:${searchTerm}:${
+    filteredTrips.length === 0 ? 'empty' : 'rows'
+  }`;
 
-  useEffect(() => {
-    const el = queueContainerRef.current;
-    if (!el || typeof window === 'undefined') return;
-
-    const commitMeasuredWidth = (rawWidth: number) => {
-      const rounded = Math.round(rawWidth);
-      if (rounded > 0) {
-        setQueueWidthPx((prev) => (prev === rounded ? prev : rounded));
-      }
-    };
-
-    const initialRect = el.getBoundingClientRect();
-    if (initialRect.width > 0) {
-      commitMeasuredWidth(initialRect.width);
-    }
-
-    if (typeof ResizeObserver === 'undefined') {
-      const handleWindowResize = () => commitMeasuredWidth(el.getBoundingClientRect().width);
-      window.addEventListener('resize', handleWindowResize);
-      return () => window.removeEventListener('resize', handleWindowResize);
-    }
-
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const width = entry.contentRect?.width || el.getBoundingClientRect().width;
-        commitMeasuredWidth(width);
-      }
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [isDesktop, activeMobileTab]);
-
-  const { effectiveDisplayLayout, isAutoCardsFallback } = resolveEffectiveQueueDisplayLayout({
+  const {
+    queueContainerRef,
+    queueWidthPx,
+    effectiveDisplayLayout,
+    isAutoCardsFallback,
+    effectiveMinTableWidthPx,
+    handleTableOverflowDetected,
+  } = useResponsiveQueueLayout({
     displayLayout,
     isDesktop,
-    queueWidthPx,
+    activeMobileTab,
+    filterSignature,
   });
 
   return (
@@ -251,6 +227,8 @@ export function DispatchTripQueuePane({
       ref={queueContainerRef}
       data-queue-layout={effectiveDisplayLayout}
       data-queue-auto-cards={isAutoCardsFallback ? 'true' : 'false'}
+      data-queue-width={queueWidthPx}
+      data-queue-min-table-width={effectiveMinTableWidthPx}
       style={{
         height: isDesktop ? `${queueHeight}px` : undefined,
       }}
@@ -268,6 +246,7 @@ export function DispatchTripQueuePane({
         displayLayout={displayLayout}
         effectiveDisplayLayout={effectiveDisplayLayout}
         isAutoCardsFallback={isAutoCardsFallback}
+        effectiveMinTableWidthPx={effectiveMinTableWidthPx}
         onDisplayLayoutChange={onDisplayLayoutChange}
         isLayoutDropdownOpen={isLayoutDropdownOpen}
         onLayoutDropdownOpenChange={onLayoutDropdownOpenChange}
@@ -406,6 +385,7 @@ export function DispatchTripQueuePane({
           slaSummary={slaSummary}
           onStartAutoOffer={onStartAutoOffer}
           onCancelAutoOffer={onCancelAutoOffer}
+          onTableOverflowDetected={handleTableOverflowDetected}
         />
       )}
     </div>

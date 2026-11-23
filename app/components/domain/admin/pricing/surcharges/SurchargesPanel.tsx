@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useBottomSheetDragToClose } from '~/core/hooks/useBottomSheetDragToClose';
 import type {
   SurchargesConfig,
@@ -7,7 +7,12 @@ import type {
   SurchargeDefaultPolicy,
   NamedPricingRule,
 } from '~/core/types/config';
+import type { PricingAuditEvent } from '~/core/types/pricing-audit';
 import { getSurchargeCatalogItems } from '~/core/services/pricing/surcharges.service';
+import {
+  formatActiveDuration,
+  getLatestSurchargeStatusMap,
+} from '~/core/services/pricing/pricing-audit.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 import { Badge } from '~/components/ui/Badge';
@@ -20,13 +25,26 @@ import {
   EditIcon,
   AlertTriangleIcon,
   SlidersIcon,
+  SpinnerIcon,
+  HistoryIcon,
   XIcon,
 } from '~/components/ui/Icons';
 
 export interface SurchargesPanelProps {
   surcharges: SurchargesConfig;
   rules?: NamedPricingRule[];
-  onSave: (updated: SurchargesConfig) => Promise<void>;
+  onSave: (
+    updated: SurchargesConfig,
+    notesBySurchargeId?: Record<string, string>
+  ) => Promise<void>;
+  onToggleSurcharge?: (
+    surchargeId: string,
+    nextEnabled: boolean,
+    note?: string
+  ) => Promise<void>;
+  auditEvents?: PricingAuditEvent[];
+  onUpdateAuditNote?: (eventId: string, note: string) => Promise<void>;
+  onOpenAuditHistory?: (surchargeId?: string) => void;
   onDraftChange?: (draft: SurchargesConfig | null) => void;
   onNavigateToRule?: (ruleId?: string) => void;
   onMigrateLegacyToFirewall?: () => Promise<void>;
@@ -40,10 +58,35 @@ function formatAmountBadge(item: SurchargeCatalogItem): string {
   return `+$${item.amount.toFixed(2)}`;
 }
 
+function formatAuditTimestampShort(iso?: string): string {
+  if (!iso) return '';
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return iso;
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(new Date(ms));
+  } catch {
+    return new Date(ms).toLocaleString();
+  }
+}
+
+function stripEnabledField(item: SurchargeCatalogItem): Omit<SurchargeCatalogItem, 'enabled'> {
+  const { enabled: _enabled, ...rest } = item;
+  return rest;
+}
+
 export function SurchargesPanel({
   surcharges,
   rules = [],
   onSave,
+  onToggleSurcharge,
+  auditEvents = [],
+  onUpdateAuditNote,
+  onOpenAuditHistory,
   onDraftChange,
   onNavigateToRule,
   onMigrateLegacyToFirewall,
@@ -53,9 +96,25 @@ export function SurchargesPanel({
   const [items, setItems] = useState<SurchargeCatalogItem[]>(() =>
     JSON.parse(JSON.stringify(initialItems))
   );
+  const baselineByIdRef = useRef<Map<string, SurchargeCatalogItem>>(
+    new Map(
+      initialItems.map((it) => [it.id, JSON.parse(JSON.stringify(it)) as SurchargeCatalogItem])
+    )
+  );
+
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Instant 1-click toggle per-card state & optional inline note state
+  const [togglingById, setTogglingById] = useState<Record<string, boolean>>({});
+  const [justToggledById, setJustToggledById] = useState<Record<string, boolean>>({});
+  const [noteDraftById, setNoteDraftById] = useState<Record<string, string>>({});
+
+  // Post-toggle inline note editor state for existing provenance events
+  const [editingNoteEventId, setEditingNoteEventId] = useState<string | null>(null);
+  const [editingNoteValue, setEditingNoteValue] = useState<string>('');
+  const [isSavingEventNote, setIsSavingEventNote] = useState<boolean>(false);
 
   // Add / Edit Surcharge Modal State (pure catalog definition — zero triggers/tariffs!)
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -69,9 +128,44 @@ export function SurchargesPanel({
   const [formPolicy, setFormPolicy] = useState<SurchargeDefaultPolicy>('rule_only');
   const [formEnabled, setFormEnabled] = useState<boolean>(true);
 
+  // Sync persisted updates without discarding unsaved rate/mode/policy edits on other cards
   useEffect(() => {
-    setItems(JSON.parse(JSON.stringify(getSurchargeCatalogItems(surcharges))));
-  }, [surcharges]);
+    setItems((prevLocal) => {
+      const prevBaseline = baselineByIdRef.current;
+      const nextBaseline = new Map(
+        initialItems.map((it) => [it.id, JSON.parse(JSON.stringify(it)) as SurchargeCatalogItem])
+      );
+      const localById = new Map(prevLocal.map((it) => [it.id, it]));
+
+      const merged: SurchargeCatalogItem[] = initialItems.map((incoming) => {
+        const localItem = localById.get(incoming.id);
+        const oldBase = prevBaseline.get(incoming.id);
+        if (!localItem || !oldBase) {
+          return JSON.parse(JSON.stringify(incoming));
+        }
+        const hasLocalConfigEdits =
+          JSON.stringify(stripEnabledField(localItem)) !==
+          JSON.stringify(stripEnabledField(oldBase));
+        if (hasLocalConfigEdits) {
+          return {
+            ...localItem,
+            enabled: incoming.enabled,
+          };
+        }
+        return JSON.parse(JSON.stringify(incoming));
+      });
+
+      // Keep any newly added unsaved catalog items
+      for (const localItem of prevLocal) {
+        if (!nextBaseline.has(localItem.id) && !prevBaseline.has(localItem.id)) {
+          merged.push(localItem);
+        }
+      }
+
+      baselineByIdRef.current = nextBaseline;
+      return merged;
+    });
+  }, [initialItems]);
 
   const isDirty = useMemo(
     () => JSON.stringify(items) !== JSON.stringify(initialItems),
@@ -91,11 +185,24 @@ export function SurchargesPanel({
     });
   }, [items, isDirty, surcharges, onDraftChange]);
 
+  // Fast provenance map per surchargeId
+  const provenanceBySurcharge = useMemo(
+    () => getLatestSurchargeStatusMap(auditEvents),
+    [auditEvents]
+  );
+
   // Index rule directives per surchargeId for live firewall visibility
   const ruleRefsBySurcharge = useMemo(() => {
     const map: Record<
       string,
-      Array<{ ruleId: string; ruleName: string; priority: number; isActive: boolean; action: string; detail?: string }>
+      Array<{
+        ruleId: string;
+        ruleName: string;
+        priority: number;
+        isActive: boolean;
+        action: string;
+        detail?: string;
+      }>
     > = {};
 
     for (const rule of rules) {
@@ -129,14 +236,114 @@ export function SurchargesPanel({
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
   };
 
+  // Instant 1-click Enable/Disable persistence + audit trail recording
+  const handleInstantToggle = async (item: SurchargeCatalogItem) => {
+    if (togglingById[item.id]) return;
+
+    const prevEnabled = item.enabled;
+    const nextEnabled = !prevEnabled;
+    const trimmedNote = (noteDraftById[item.id] || '').trim() || undefined;
+    const isPersistedItem = initialItems.some((init) => init.id === item.id);
+
+    // If this is a brand-new unsaved item not yet in persisted catalog, toggle locally until saved
+    if (!isPersistedItem) {
+      updateItem(item.id, { enabled: nextEnabled });
+      return;
+    }
+
+    setTogglingById((prev) => ({ ...prev, [item.id]: true }));
+    updateItem(item.id, { enabled: nextEnabled });
+    const existingBase = baselineByIdRef.current.get(item.id);
+    if (existingBase) {
+      baselineByIdRef.current.set(item.id, { ...existingBase, enabled: nextEnabled });
+    }
+
+    try {
+      if (onToggleSurcharge) {
+        await onToggleSurcharge(item.id, nextEnabled, trimmedNote);
+      } else {
+        const patchedPersistedItems = initialItems.map((init) =>
+          init.id === item.id ? { ...init, enabled: nextEnabled } : init
+        );
+        await onSave(
+          {
+            ...surcharges,
+            catalogVersion: 2,
+            items: patchedPersistedItems,
+          },
+          trimmedNote ? { [item.id]: trimmedNote } : undefined
+        );
+      }
+
+      if (trimmedNote) {
+        setNoteDraftById((prev) => {
+          const next = { ...prev };
+          delete next[item.id];
+          return next;
+        });
+      }
+
+      setJustToggledById((prev) => ({ ...prev, [item.id]: true }));
+      setTimeout(() => {
+        setJustToggledById((prev) => ({ ...prev, [item.id]: false }));
+      }, 2400);
+    } catch (err) {
+      console.error('[SurchargesPanel] Failed to toggle surcharge:', err);
+      updateItem(item.id, { enabled: prevEnabled });
+      if (existingBase) {
+        baselineByIdRef.current.set(item.id, { ...existingBase, enabled: prevEnabled });
+      }
+    } finally {
+      setTogglingById((prev) => ({ ...prev, [item.id]: false }));
+    }
+  };
+
   const handleSaveAll = async () => {
-    await onSave({
-      ...surcharges,
-      catalogVersion: 2,
-      items,
-    });
+    const cleanNotes: Record<string, string> = {};
+    for (const [k, val] of Object.entries(noteDraftById)) {
+      if (typeof val === 'string' && val.trim()) {
+        cleanNotes[k] = val.trim();
+      }
+    }
+
+    await onSave(
+      {
+        ...surcharges,
+        catalogVersion: 2,
+        items,
+      },
+      Object.keys(cleanNotes).length > 0 ? cleanNotes : undefined
+    );
+    setNoteDraftById({});
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleDiscardAll = () => {
+    baselineByIdRef.current = new Map(
+      initialItems.map((it) => [it.id, JSON.parse(JSON.stringify(it)) as SurchargeCatalogItem])
+    );
+    setItems(JSON.parse(JSON.stringify(initialItems)));
+    setNoteDraftById({});
+  };
+
+  const startEditingEventNote = (ev: PricingAuditEvent) => {
+    setEditingNoteEventId(ev.id);
+    setEditingNoteValue(ev.note || '');
+  };
+
+  const handleSaveEventNote = async (eventId: string) => {
+    if (!onUpdateAuditNote) {
+      setEditingNoteEventId(null);
+      return;
+    }
+    setIsSavingEventNote(true);
+    try {
+      await onUpdateAuditNote(eventId, editingNoteValue);
+      setEditingNoteEventId(null);
+    } finally {
+      setIsSavingEventNote(false);
+    }
   };
 
   const openAddModal = () => {
@@ -215,14 +422,13 @@ export function SurchargesPanel({
                 size="sm"
                 className="text-[10px] bg-amber-100 text-amber-800 border-amber-300"
               >
-                Unsaved Changes
+                Unsaved Rate/Policy Edits
               </Badge>
             )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Each surcharge has an <strong>On/Off Switch</strong> and a <strong>Default Behavior</strong>: either{' '}
-            <strong>All Trips</strong> (unless waived by a Pricing Rule) or{' '}
-            <strong>Rule-Only</strong> (off unless turned on by a Pricing Rule).
+            Clicking <strong>Enabled / Disabled</strong> saves &amp; logs instantly in 1 click. Use{' '}
+            <strong>Save Surcharges</strong> after editing amounts, modes, or default behavior.
           </p>
         </div>
 
@@ -248,7 +454,7 @@ export function SurchargesPanel({
             variant="outline"
             size="sm"
             disabled={!isDirty}
-            onClick={() => setItems(JSON.parse(JSON.stringify(initialItems)))}
+            onClick={handleDiscardAll}
             className="h-8 text-xs border-slate-300 bg-white text-slate-700 cursor-pointer"
           >
             Discard
@@ -301,9 +507,22 @@ export function SurchargesPanel({
       <div className="grid grid-cols-1 gap-3.5">
         {items.map((item) => {
           const refs = ruleRefsBySurcharge[item.id] || [];
-          const hasActiveApplyRule = refs.some((r) => r.isActive && (r.action === 'apply' || r.action === 'override'));
+          const hasActiveApplyRule = refs.some(
+            (r) => r.isActive && (r.action === 'apply' || r.action === 'override')
+          );
           const showUnreferencedRuleOnlyHint =
-            item.enabled && item.defaultPolicy === 'rule_only' && !hasActiveApplyRule && !item.legacyAutoCondition;
+            item.enabled &&
+            item.defaultPolicy === 'rule_only' &&
+            !hasActiveApplyRule &&
+            !item.legacyAutoCondition;
+
+          const isCardToggling = Boolean(togglingById[item.id]);
+          const wasJustToggled = Boolean(justToggledById[item.id]);
+          const cardNoteDraft = noteDraftById[item.id] || '';
+          const prov = provenanceBySurcharge[item.id];
+          const primaryAuditEv = prov?.latestToggleEvent || prov?.latestEvent;
+          const isEditingThisEventNote =
+            Boolean(primaryAuditEv) && editingNoteEventId === primaryAuditEv?.id;
 
           return (
             <div
@@ -311,11 +530,11 @@ export function SurchargesPanel({
               className={`p-4.5 rounded-xl border transition-all shadow-2xs space-y-3.5 ${
                 item.enabled
                   ? 'bg-white border-slate-200'
-                  : 'bg-slate-50/70 border-slate-200/80 opacity-85'
+                  : 'bg-slate-50/70 border-slate-200/80 opacity-90'
               }`}
             >
-              {/* Top Row: Identity, Master Toggle, Amount Badge, Edit/Delete */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              {/* Top Row: Identity, Optional Note Input, 1-Click Master Switch, Amount Badge, Edit/Delete */}
+              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
                 <div className="flex items-start gap-3 min-w-0">
                   <div
                     className={`p-2 rounded-lg border shrink-0 mt-0.5 ${
@@ -340,6 +559,12 @@ export function SurchargesPanel({
                           Core
                         </Badge>
                       )}
+                      {wasJustToggled && (
+                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                          <CheckIcon className="w-3 h-3" />
+                          Saved &amp; logged
+                        </span>
+                      )}
                     </div>
                     {item.description && (
                       <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
@@ -347,7 +572,24 @@ export function SurchargesPanel({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  {/* Optional Zero-Friction Audit Note Input */}
+                  <input
+                    type="text"
+                    value={cardNoteDraft}
+                    onChange={(e) =>
+                      setNoteDraftById((prev) => ({ ...prev, [item.id]: e.target.value }))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                      }
+                    }}
+                    placeholder="Optional reason / note (e.g. Winter storm I-64)..."
+                    aria-label={`Optional audit note for ${item.name}`}
+                    className="h-8 w-full sm:w-64 rounded-lg border border-slate-200 bg-slate-50/80 focus:bg-white focus:border-blue-400 focus:outline-none px-2.5 text-xs text-slate-800 placeholder:text-slate-400 transition-colors"
+                  />
+
                   <span
                     className={`text-base font-mono font-extrabold px-2.5 py-0.5 rounded-lg border ${
                       item.enabled
@@ -358,17 +600,30 @@ export function SurchargesPanel({
                     {formatAmountBadge(item)}
                   </span>
 
-                  {/* Master Kill Switch */}
+                  {/* 1-Click Persisted Master Kill Switch */}
                   <button
                     type="button"
-                    onClick={() => updateItem(item.id, { enabled: !item.enabled })}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                    disabled={isCardToggling}
+                    onClick={() => handleInstantToggle(item)}
+                    title="1-click instant save & audit log"
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors inline-flex items-center gap-1.5 ${
+                      isCardToggling
+                        ? 'opacity-70 cursor-wait'
+                        : 'cursor-pointer'
+                    } ${
                       item.enabled
                         ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
                         : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
                     }`}
                   >
-                    {item.enabled ? 'Enabled' : 'Disabled'}
+                    {isCardToggling && <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />}
+                    <span>
+                      {isCardToggling
+                        ? 'Saving...'
+                        : item.enabled
+                        ? 'Enabled'
+                        : 'Disabled'}
+                    </span>
                   </button>
 
                   <button
@@ -543,6 +798,121 @@ export function SurchargesPanel({
                   </button>
                 )}
               </div>
+
+              {/* Live Audit Provenance Footer */}
+              {(primaryAuditEv || onOpenAuditHistory) && (
+                <div className="pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
+                  {primaryAuditEv ? (
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      <span
+                        className={`inline-block w-2 h-2 rounded-full shrink-0 ${
+                          item.enabled && primaryAuditEv.action === 'surcharge_enabled'
+                            ? 'bg-emerald-500'
+                            : !item.enabled && primaryAuditEv.action === 'surcharge_disabled'
+                            ? 'bg-slate-400'
+                            : 'bg-blue-500'
+                        }`}
+                        aria-hidden="true"
+                      />
+
+                      <span className="text-slate-600">
+                        {item.enabled && primaryAuditEv.action === 'surcharge_enabled' ? (
+                          <>
+                            <strong className="text-emerald-800">Enabled</strong>{' '}
+                            {formatAuditTimestampShort(primaryAuditEv.timestamp)} by{' '}
+                            <strong className="text-slate-800">{primaryAuditEv.operatorName}</strong>{' '}
+                            <span className="text-slate-400">({primaryAuditEv.operatorEmail})</span>
+                          </>
+                        ) : !item.enabled && primaryAuditEv.action === 'surcharge_disabled' ? (
+                          <>
+                            <strong className="text-slate-700">Disabled</strong>{' '}
+                            {formatAuditTimestampShort(primaryAuditEv.timestamp)} by{' '}
+                            <strong className="text-slate-800">{primaryAuditEv.operatorName}</strong>
+                            {primaryAuditEv.activeDurationMinutes !== undefined && (
+                              <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 font-semibold">
+                                Was active {formatActiveDuration(primaryAuditEv.activeDurationMinutes)}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <strong className="text-blue-800">Last updated</strong>{' '}
+                            {formatAuditTimestampShort(primaryAuditEv.timestamp)} by{' '}
+                            <strong className="text-slate-800">{primaryAuditEv.operatorName}</strong>
+                          </>
+                        )}
+                      </span>
+
+                      {!isEditingThisEventNote && primaryAuditEv.note && (
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 font-medium italic">
+                          &ldquo;{primaryAuditEv.note}&rdquo;
+                        </span>
+                      )}
+
+                      {!isEditingThisEventNote && onUpdateAuditNote && (
+                        <button
+                          type="button"
+                          onClick={() => startEditingEventNote(primaryAuditEv)}
+                          className="text-blue-600 hover:text-blue-800 font-semibold underline-offset-2 hover:underline cursor-pointer"
+                        >
+                          {primaryAuditEv.note ? 'Edit note' : '+ Add note'}
+                        </button>
+                      )}
+
+                      {isEditingThisEventNote && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <input
+                            type="text"
+                            value={editingNoteValue}
+                            onChange={(e) => setEditingNoteValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSaveEventNote(primaryAuditEv.id);
+                              } else if (e.key === 'Escape') {
+                                setEditingNoteEventId(null);
+                              }
+                            }}
+                            placeholder="Reason / operational note..."
+                            autoFocus
+                            className="h-7 w-52 rounded-md border border-blue-300 bg-white px-2 text-xs text-slate-900 focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            disabled={isSavingEventNote}
+                            onClick={() => handleSaveEventNote(primaryAuditEv.id)}
+                            className="px-2 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer"
+                          >
+                            {isSavingEventNote ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingNoteEventId(null)}
+                            className="px-2 py-1 rounded-md bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <HistoryIcon className="w-3 h-3" />
+                      No On/Off history recorded yet
+                    </span>
+                  )}
+
+                  {onOpenAuditHistory && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenAuditHistory(item.id)}
+                      className="text-slate-600 hover:text-blue-700 font-semibold inline-flex items-center gap-1 shrink-0 cursor-pointer self-start sm:self-auto"
+                    >
+                      <span>History →</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
