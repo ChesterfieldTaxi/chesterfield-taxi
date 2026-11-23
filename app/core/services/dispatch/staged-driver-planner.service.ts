@@ -7,7 +7,7 @@
  *    `plannedAt`, and `plannedBy` (plus `DRIVER_STAGED` audit log) while keeping `assignedDriverId: null`
  *    and `offeredToIds: []`. Under `firestore.rules`, drivers cannot read or list staged trips, and zero
  *    push/SMS notifications are emitted when staging.
- * 2. Strict Wording: Operator-facing summaries and errors use "Send to Driver" / "Staged" (never "HUD Now").
+ * 2. Strict Wording: Operator-facing summaries and errors use "Send to Driver" / "Send" / "Staged" exclusively.
  * 3. Pure & Deterministic: Browser/SSR/Node-safe with injectable `nowMs`, `bookingService`, and `sendPush`.
  */
 
