@@ -4,12 +4,15 @@ import type { Trip, TripStatus } from '../../../core/types/trip';
 import type { VehicleTierConfig } from '../../../core/types/config';
 import type { BottomSheetDragHandlers } from '../../../core/hooks/useBottomSheetDragToClose';
 import type { DriverMultiStopProgressController } from '../../../core/hooks/useDriverMultiStopProgress';
+import type { DriverTripUpdateAckController } from '../../../core/hooks/useDriverTripUpdateAck';
+import { hasUnacknowledgedDriverUpdate } from '../../../core/services/dispatch/trip-update-ack.service';
 import { summarizeTripStopProgress } from '../../../core/services/driver/driver-stop-progress';
 import { getTripIntermediateStopCount } from '../../../core/utils/route-markers.util';
 import { formatVehicleTierDisplay } from '../../../core/utils/vehicle-tier-format.util';
 import { DriverTripManifest } from './DriverTripManifest';
 import { DriverCascadeCountdownBar } from './DriverCascadeCountdownBar';
 import { DriverRouteTimelineCard } from './DriverRouteTimelineCard';
+import { DriverTripUpdateAckBanner } from './DriverTripUpdateAckBanner';
 import {
   formatCabUnitLabel,
   formatTimer,
@@ -62,6 +65,7 @@ export interface DriverLiveMeterCardProps {
   meterDistance: number;
   actionLoading: string | null;
   multiStop?: DriverMultiStopProgressController;
+  tripUpdateAck?: DriverTripUpdateAckController;
   // Active-trip modals state
   showNoShowModal: boolean;
   noShowReason: string;
@@ -113,6 +117,7 @@ export const DriverLiveMeterCard = React.memo(function DriverLiveMeterCard({
   meterDistance,
   actionLoading,
   multiStop,
+  tripUpdateAck,
   showNoShowModal,
   noShowReason,
   showSmsModal,
@@ -168,6 +173,7 @@ export const DriverLiveMeterCard = React.memo(function DriverLiveMeterCard({
             {scheduledTrips.map((trip, idx) => {
               const isSelected = activeTrip?.id === trip.id;
               const stopCount = getTripIntermediateStopCount(trip);
+              const needsUpdateAck = hasUnacknowledgedDriverUpdate(trip);
               const pickupTime = trip.scheduledPickupTime
                 ? new Date(trip.scheduledPickupTime).toLocaleTimeString([], {
                     hour: 'numeric',
@@ -180,14 +186,22 @@ export const DriverLiveMeterCard = React.memo(function DriverLiveMeterCard({
                   type="button"
                   onClick={() => onSelectActiveTrip(trip.id)}
                   className={`px-3 py-2 min-h-[44px] rounded-xl text-left border shrink-0 transition-all cursor-pointer flex flex-col gap-0.5 min-w-[136px] ${
-                    isSelected
+                    needsUpdateAck
+                      ? 'bg-amber-500/15 border-amber-400 text-amber-200 shadow-sm'
+                      : isSelected
                       ? 'bg-blue-600/15 border-blue-600 text-blue-300 shadow-sm'
                       : 'bg-slate-800/80 border-slate-700/80 text-slate-400 hover:bg-slate-800'
                   }`}
                 >
                   <div className="flex items-center justify-between w-full gap-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider">
-                      #{idx + 1} {trip.bookingType === 'asap' ? 'ASAP' : pickupTime}
+                    <span className="text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+                      {needsUpdateAck && (
+                        <span
+                          className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0"
+                          title="Trip updated — please acknowledge"
+                        />
+                      )}
+                      <span>#{idx + 1} {trip.bookingType === 'asap' ? 'ASAP' : pickupTime}</span>
                     </span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase bg-slate-900/80">
                       {trip.status.replace('_', ' ').slice(0, 10)}
@@ -213,6 +227,14 @@ export const DriverLiveMeterCard = React.memo(function DriverLiveMeterCard({
       {/* ACTIVE ASSIGNED TRIP CARD */}
       {activeTrip ? (
         <section className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col gap-4 relative overflow-hidden">
+          {hasUnacknowledgedDriverUpdate(activeTrip) && (
+            <DriverTripUpdateAckBanner
+              trip={activeTrip}
+              isAcknowledging={tripUpdateAck?.acknowledgingTripId === activeTrip.id}
+              onAcknowledge={tripUpdateAck?.acknowledgeTripUpdate}
+            />
+          )}
+
           {/* Status Header */}
           <div className="flex items-center justify-between bg-slate-800/80 px-3.5 py-2.5 rounded-2xl border border-slate-700">
             <div className="flex items-center gap-2">

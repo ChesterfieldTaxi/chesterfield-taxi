@@ -354,23 +354,29 @@ export function DispatchLeftBookingSidebar({
 
         {/* Persistent Draft / Edit Form Container */}
         <div className="flex-1 overflow-hidden relative">
-          {drafts.map((d) => (
-            <MemoizedDraftBookingPane
-              key={d.id}
-              draftId={d.id}
-              isActive={d.id === activeDraftId}
-              isNew={d.isNew}
-              trip={d.trip}
-              tripId={d.tripId}
-              allTrips={trips}
-              drivers={drivers}
-              onValuesChangeByDraft={onValuesChangeByDraft}
-              onBookingSuccessByDraft={onBookingSuccessByDraft}
-              onClearDraftById={onClearDraftById}
-              onCloneBooking={onCloneBooking}
-              onOpenLinkedTrip={onOpenLinkedTrip}
-            />
-          ))}
+          {drafts.map((d) => {
+            const liveTrip =
+              (!d.isNew && (d.tripId || d.trip?.id)
+                ? trips.find((t) => t.id === (d.tripId || d.trip?.id))
+                : undefined) || d.trip;
+            return (
+              <MemoizedDraftBookingPane
+                key={d.id}
+                draftId={d.id}
+                isActive={d.id === activeDraftId}
+                isNew={d.isNew}
+                trip={liveTrip}
+                tripId={d.tripId}
+                allTrips={trips}
+                drivers={drivers}
+                onValuesChangeByDraft={onValuesChangeByDraft}
+                onBookingSuccessByDraft={onBookingSuccessByDraft}
+                onClearDraftById={onClearDraftById}
+                onCloneBooking={onCloneBooking}
+                onOpenLinkedTrip={onOpenLinkedTrip}
+              />
+            );
+          })}
         </div>
       </aside>
 

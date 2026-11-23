@@ -43,6 +43,7 @@ import {
 } from '../components/ui/Icons';
 import { useDriverTelemetry } from '../core/hooks/useDriverTelemetry';
 import { useDriverMultiStopProgress } from '../core/hooks/useDriverMultiStopProgress';
+import { useDriverTripUpdateAck } from '../core/hooks/useDriverTripUpdateAck';
 import { useWakeLock } from '../core/hooks/useWakeLock';
 import { usePushNotifications } from '../core/hooks/usePushNotifications';
 import { validatePhoneNumber } from '../core/utils/phone';
@@ -516,6 +517,15 @@ export default function DriverAppRoute() {
 
   const multiStop = useDriverMultiStopProgress({
     activeTrip,
+    setAllDriverTrips,
+    onSuccessNotice: handleMultiStopSuccess,
+    onErrorNotice: handleMultiStopError,
+  });
+
+  const tripUpdateAck = useDriverTripUpdateAck({
+    driverId: driver?.id,
+    dutyStatus: driver?.dutyStatus,
+    allDriverTrips,
     setAllDriverTrips,
     onSuccessNotice: handleMultiStopSuccess,
     onErrorNotice: handleMultiStopError,
@@ -1636,6 +1646,7 @@ export default function DriverAppRoute() {
               meterDistance={meterDistance}
               actionLoading={actionLoading}
               multiStop={multiStop}
+              tripUpdateAck={tripUpdateAck}
               showNoShowModal={showNoShowModal}
               noShowReason={noShowReason}
               showSmsModal={showSmsModal}
@@ -1680,6 +1691,7 @@ export default function DriverAppRoute() {
               adminVehicles={adminVehicles}
               preferredNavApp={preferredNavApp}
               actionLoading={actionLoading}
+              tripUpdateAck={tripUpdateAck}
               onAcceptOffer={handleAcceptOffer}
               onDeclineOffer={handleDeclineOffer}
               onSelectScheduledTrip={handleSelectScheduledTrip}

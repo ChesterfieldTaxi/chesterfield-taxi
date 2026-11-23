@@ -10,6 +10,10 @@ import {
   hasStagedDriver,
   isTripEligibleForStaging,
 } from '../../../../core/services/dispatch/staged-driver-planner.service';
+import {
+  getPendingDriverUpdateAck,
+  hasUnacknowledgedDriverUpdate,
+} from '../../../../core/services/dispatch/trip-update-ack.service';
 import type { SlaScanSummary } from '../../../../core/services/dispatch/sla-monitor.service';
 import { formatDriverAssignmentLabel } from '../../../../core/services/operator.service';
 import {
@@ -33,10 +37,8 @@ import {
   MapPinIcon,
   CarIcon,
 } from '../../../ui/Icons';
-import {
-  computeResponsiveTripCardColumns,
-  getDriverDropdownDot,
-} from './trip-queue-layout.util';
+import { computeResponsiveTripCardColumns } from './trip-queue-layout.util';
+import { DriverAssignDropdown } from './DriverAssignDropdown';
 import { getDispatchStatusBadge } from './TripQueueToolbar';
 
 export interface TripQueueCardsGridProps {
@@ -289,6 +291,22 @@ export function TripQueueCardsGrid({
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {getDispatchStatusBadge(trip.status)}
+                    {hasUnacknowledgedDriverUpdate(trip) &&
+                      (() => {
+                        const pendingAck = getPendingDriverUpdateAck(trip);
+                        return (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-400 text-[10px] font-extrabold animate-pulse whitespace-nowrap"
+                            title={
+                              pendingAck
+                                ? `Trip updated — awaiting driver acknowledgement:\n• ${pendingAck.changesSummary.join('\n• ')}`
+                                : 'Awaiting driver acknowledgement of trip update'
+                            }
+                          >
+                            ⏳ Awaiting Ack
+                          </span>
+                        );
+                      })()}
                     {!isDesktop && (
                       <button
                         type="button"
@@ -644,54 +662,48 @@ export function TripQueueCardsGrid({
                   </div>
 
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <select
-                      value={
-                        trip.assignedDriverId ||
-                        (stagedPlanner?.queueAssignMode === 'stage_hold' && trip.plannedDriverId
-                          ? trip.plannedDriverId
-                          : 'unassigned')
-                      }
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        const val = e.target.value;
-                        if (
-                          !trip.assignedDriverId &&
-                          stagedPlanner?.queueAssignMode === 'stage_hold'
-                        ) {
-                          void stagedPlanner.stageTripDriver(trip, val);
-                        } else {
-                          void onQuickAssignDriver(trip.id, val);
+                    <div className="flex-1 min-w-0">
+                      <DriverAssignDropdown
+                        value={
+                          trip.assignedDriverId ||
+                          (stagedPlanner?.queueAssignMode === 'stage_hold' && trip.plannedDriverId
+                            ? trip.plannedDriverId
+                            : 'unassigned')
                         }
-                      }}
-                      className={`flex-1 text-[11px] font-semibold rounded-lg border py-1.5 px-2 cursor-pointer transition-colors min-w-0 truncate ${
-                        trip.assignedDriverId
-                          ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
-                          : stagedPlanner?.queueAssignMode === 'stage_hold'
-                          ? 'bg-indigo-50 text-indigo-900 border-dashed border-indigo-400 font-bold hover:bg-indigo-100'
-                          : 'bg-amber-50 text-amber-800 border-amber-300 font-bold hover:bg-amber-100'
-                      }`}
-                      title={
-                        !trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
-                          ? 'Select driver to stage (Hold in Dispatch)'
-                          : 'Select driver to send immediately'
-                      }
-                    >
-                      <option value="unassigned">
-                        {!trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
-                          ? '📌 Stage Driver...'
-                          : 'Unassigned Driver'}
-                      </option>
-                      {drivers.map((drv) => (
-                        <option
-                          key={drv.id}
-                          value={drv.id}
-                          disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
-                        >
-                          {getDriverDropdownDot(drv)} {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
-                        </option>
-                      ))}
-                    </select>
+                        drivers={drivers}
+                        mode={
+                          !trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
+                            ? 'stage_hold'
+                            : 'send_to_driver'
+                        }
+                        isAssigned={Boolean(trip.assignedDriverId)}
+                        fallbackAssignedLabel={
+                          String(
+                            (trip.metadata as Record<string, unknown> | undefined)?.assignedDriverName ||
+                              trip.plannedDriverLabel ||
+                              ''
+                          ).trim() || null
+                        }
+                        onChange={(val) => {
+                          if (
+                            !trip.assignedDriverId &&
+                            stagedPlanner?.queueAssignMode === 'stage_hold'
+                          ) {
+                            void stagedPlanner.stageTripDriver(trip, val);
+                          } else {
+                            void onQuickAssignDriver(trip.id, val);
+                          }
+                        }}
+                        size="sm"
+                        fullWidth
+                        isDesktop={isDesktop}
+                        title={
+                          !trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
+                            ? 'Select driver to stage (Hold in Dispatch)'
+                            : 'Select driver to send immediately'
+                        }
+                      />
+                    </div>
 
                     {isTripCascadeActive(trip) && (
                       <button

@@ -252,6 +252,7 @@ function DispatchBookingEngineComponent({
     'send_to_driver' | 'stage_hold'
   >('send_to_driver');
   const [hasManualDriverModeOverride, setHasManualDriverModeOverride] = useState(false);
+  const driverExplicitlyChangedByUserRef = useRef<boolean>(false);
   const [notesForAll, setNotesForAll] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
 
@@ -680,6 +681,7 @@ function DispatchBookingEngineComponent({
     company,
     driverId,
     driverAssignmentMode,
+    driverExplicitlyChangedByUserRef,
     driverOptions,
     notesForAll,
     internalNotes,
@@ -769,6 +771,7 @@ function DispatchBookingEngineComponent({
     corporateAccountList,
     availableNamedRules,
     skipFirstEditQuoteRef,
+    driverExplicitlyChangedByUserRef,
     setters: {
       setTimingType,
       setScheduledDate,
@@ -1397,12 +1400,28 @@ function DispatchBookingEngineComponent({
           company={company}
           setCompany={setCompany}
           driverId={driverId}
-          setDriverId={setDriverId}
+          setDriverId={(nextDriverId) => {
+            driverExplicitlyChangedByUserRef.current = true;
+            setDriverId(nextDriverId);
+          }}
           driverAssignmentMode={driverAssignmentMode}
           onChangeDriverAssignmentMode={(mode) => {
+            driverExplicitlyChangedByUserRef.current = true;
             setDriverAssignmentMode(mode);
             setHasManualDriverModeOverride(true);
           }}
+          isDriverAssigned={Boolean(
+            initialTrip?.assignedDriverId &&
+              driverId === initialTrip.assignedDriverId &&
+              driverAssignmentMode !== 'stage_hold'
+          )}
+          fallbackAssignedLabel={
+            String(
+              (initialTrip?.metadata as Record<string, unknown> | undefined)?.assignedDriverName ||
+                initialTrip?.plannedDriverLabel ||
+                ''
+            ).trim() || null
+          }
           driverOptions={driverOptions}
           notesForAll={notesForAll}
           setNotesForAll={setNotesForAll}

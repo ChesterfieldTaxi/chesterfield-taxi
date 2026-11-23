@@ -4,15 +4,12 @@ import type {
   NamedPricingRule,
 } from '../../../../core/types/config';
 import type { PoValidationResult } from '../../../../core/services/corporate-account.service';
-import {
-  formatDriverAssignmentLabel,
-  type DriverRosterItem,
-} from '../../../../core/services/operator.service';
+import type { DriverRosterItem } from '../../../../core/services/operator.service';
 import {
   DEFAULT_CORPORATE_ACCOUNTS,
   DEFAULT_DISPATCH_COMPANIES as DEFAULT_COMPANIES,
-  getDriverStatusEmoji,
 } from '../../../../core/hooks/booking';
+import { DriverAssignDropdown } from '../queue/DriverAssignDropdown';
 import {
   AlertTriangleIcon,
   CheckIcon,
@@ -66,6 +63,8 @@ export interface DispatchPaymentAssignmentSectionProps {
   setDriverId: (val: string) => void;
   driverAssignmentMode?: 'send_to_driver' | 'stage_hold';
   onChangeDriverAssignmentMode?: (mode: 'send_to_driver' | 'stage_hold') => void;
+  isDriverAssigned?: boolean;
+  fallbackAssignedLabel?: string | null;
   driverOptions: DriverRosterItem[];
   notesForAll: string;
   setNotesForAll: (val: string) => void;
@@ -118,6 +117,8 @@ export function DispatchPaymentAssignmentSection({
   setDriverId,
   driverAssignmentMode = 'send_to_driver',
   onChangeDriverAssignmentMode,
+  isDriverAssigned = false,
+  fallbackAssignedLabel = null,
   driverOptions,
   notesForAll,
   setNotesForAll,
@@ -529,26 +530,17 @@ export function DispatchPaymentAssignmentSection({
           </div>
           <div>
             <span className="block text-[10px] text-slate-500 font-semibold mb-0.5">Driver</span>
-            <select
+            <DriverAssignDropdown
               value={driverId}
-              onChange={(e) => setDriverId(e.target.value)}
-              className={`w-full px-2 py-1.5 bg-white border rounded text-xs focus:ring-1 focus:ring-blue-500 ${
-                driverId !== 'unassigned' && driverAssignmentMode === 'stage_hold'
-                  ? 'border-dashed border-indigo-400 bg-indigo-50/40 text-indigo-950 font-semibold'
-                  : 'border-slate-300 text-slate-800'
-              }`}
-            >
-              <option value="unassigned">Unassigned</option>
-              {driverOptions.map((d) => (
-                <option
-                  key={d.id}
-                  value={d.id}
-                  disabled={d.isBlacklisted || d.zone === 'Suspended'}
-                >
-                  {getDriverStatusEmoji(d)} {d.formattedLabel || formatDriverAssignmentLabel(d)}
-                </option>
-              ))}
-            </select>
+              drivers={driverOptions}
+              onChange={(nextId) => setDriverId(nextId)}
+              mode={driverAssignmentMode}
+              isAssigned={isDriverAssigned}
+              fallbackAssignedLabel={fallbackAssignedLabel}
+              size="md"
+              fullWidth
+              ariaLabel="Assign driver"
+            />
           </div>
         </div>
 

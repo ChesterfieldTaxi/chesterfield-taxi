@@ -1,4 +1,5 @@
 export * from './trip-queue-layout.util';
+export * from './DriverAssignDropdown';
 export * from './TripQueueFilterPopovers';
 export * from './TripQueueBatchActionBar';
 export * from './TripQueueToolbar';

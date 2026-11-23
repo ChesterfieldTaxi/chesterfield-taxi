@@ -11,8 +11,11 @@ import {
   hasStagedDriver,
   isTripEligibleForStaging,
 } from '../../../../core/services/dispatch/staged-driver-planner.service';
+import {
+  getPendingDriverUpdateAck,
+  hasUnacknowledgedDriverUpdate,
+} from '../../../../core/services/dispatch/trip-update-ack.service';
 import type { SlaScanSummary } from '../../../../core/services/dispatch/sla-monitor.service';
-import { formatDriverAssignmentLabel } from '../../../../core/services/operator.service';
 import {
   buildTripItineraryTooltip,
   formatShortStopPreview,
@@ -27,10 +30,8 @@ import {
   DispatchSlaBadge,
 } from '../DispatchCascadeSlaBadges';
 import { PhoneIcon } from '../../../ui/Icons';
-import {
-  getDriverDropdownDot,
-  splitAddressForTwoLineCell,
-} from './trip-queue-layout.util';
+import { splitAddressForTwoLineCell } from './trip-queue-layout.util';
+import { DriverAssignDropdown } from './DriverAssignDropdown';
 import { getDispatchStatusBadge } from './TripQueueToolbar';
 
 export interface TripQueueTableViewProps {
@@ -445,17 +446,28 @@ export function TripQueueTableView({
                         </div>
                       )}
 
-                      <select
+                      <DriverAssignDropdown
                         value={
                           trip.assignedDriverId ||
                           (stagedPlanner?.queueAssignMode === 'stage_hold' && trip.plannedDriverId
                             ? trip.plannedDriverId
                             : 'unassigned')
                         }
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          const val = e.target.value;
+                        drivers={drivers}
+                        mode={
+                          !trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
+                            ? 'stage_hold'
+                            : 'send_to_driver'
+                        }
+                        isAssigned={Boolean(trip.assignedDriverId)}
+                        fallbackAssignedLabel={
+                          String(
+                            (trip.metadata as Record<string, unknown> | undefined)?.assignedDriverName ||
+                              trip.plannedDriverLabel ||
+                              ''
+                          ).trim() || null
+                        }
+                        onChange={(val) => {
                           if (
                             !trip.assignedDriverId &&
                             stagedPlanner?.queueAssignMode === 'stage_hold'
@@ -465,34 +477,15 @@ export function TripQueueTableView({
                             void onQuickAssignDriver(trip.id, val);
                           }
                         }}
-                        className={`text-xs font-semibold rounded-lg border py-1 px-1.5 cursor-pointer transition-colors outline-hidden focus:ring-2 focus:ring-blue-500 max-w-[155px] truncate ${
-                          trip.assignedDriverId
-                            ? 'bg-blue-50/90 text-blue-800 border-blue-200 hover:bg-blue-100/80'
-                            : stagedPlanner?.queueAssignMode === 'stage_hold'
-                            ? 'bg-indigo-50/90 text-indigo-900 border-dashed border-indigo-400 font-bold hover:bg-indigo-100/80'
-                            : 'bg-amber-50/90 text-amber-900 border-amber-300 font-bold hover:bg-amber-100/80'
-                        }`}
+                        size="xs"
+                        maxWidthClass="max-w-[165px]"
+                        isDesktop={isDesktop}
                         title={
                           !trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
                             ? 'Select driver to stage (Hold in Dispatch)'
                             : 'Select driver to send immediately'
                         }
-                      >
-                        <option value="unassigned">
-                          {!trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
-                            ? '📌 Stage Driver...'
-                            : 'Unassigned'}
-                        </option>
-                        {drivers.map((drv) => (
-                          <option
-                            key={drv.id}
-                            value={drv.id}
-                            disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
-                          >
-                            {getDriverDropdownDot(drv)} {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
-                          </option>
-                        ))}
-                      </select>
+                      />
 
                       <DispatchCascadePill
                         trip={trip}
@@ -513,7 +506,27 @@ export function TripQueueTableView({
                   <td className="py-2 px-2 font-bold text-slate-900 whitespace-nowrap">
                     ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                   </td>
-                  <td className="py-2 px-2 whitespace-nowrap">{getDispatchStatusBadge(trip.status)}</td>
+                  <td className="py-2 px-2 whitespace-nowrap">
+                    <div className="flex flex-col items-start gap-1">
+                      {getDispatchStatusBadge(trip.status)}
+                      {hasUnacknowledgedDriverUpdate(trip) &&
+                        (() => {
+                          const pendingAck = getPendingDriverUpdateAck(trip);
+                          return (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-400 text-[10px] font-extrabold animate-pulse whitespace-nowrap"
+                              title={
+                                pendingAck
+                                  ? `Trip updated — awaiting driver acknowledgement:\n• ${pendingAck.changesSummary.join('\n• ')}`
+                                  : 'Awaiting driver acknowledgement of trip update'
+                              }
+                            >
+                              ⏳ Awaiting Ack
+                            </span>
+                          );
+                        })()}
+                    </div>
+                  </td>
                   <td className="py-2 px-2 text-center whitespace-nowrap">
                     <div className="flex items-center justify-center gap-1.5">
                       {isUnconfirmedTrip && (

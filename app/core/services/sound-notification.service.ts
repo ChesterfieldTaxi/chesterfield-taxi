@@ -173,6 +173,14 @@ class SoundNotificationService {
   }
 
   /**
+   * Non-looping high-clarity alert chime for live dispatch/driver trip updates.
+   * Respects mute state and SSR safety.
+   */
+  public playAlertChime(): void {
+    this.playAsapRideChime();
+  }
+
+  /**
    * Single urgent 4-note driver offer chime burst (G5 -> B5 -> D6 -> G6).
    * High-clarity timbre designed to cut through road/cabin ambient noise.
    */

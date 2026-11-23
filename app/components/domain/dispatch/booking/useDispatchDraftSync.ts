@@ -36,6 +36,7 @@ export interface UseDispatchDraftSyncParams {
   corporateAccountList: CorporateAccountConfig[];
   availableNamedRules: NamedPricingRule[];
   skipFirstEditQuoteRef: React.MutableRefObject<boolean>;
+  driverExplicitlyChangedByUserRef?: React.MutableRefObject<boolean>;
   setters: DispatchHydrationSetters & {
     setCardCvc: (v: string) => void;
     setReturnEstimatedDurationMinutes: (v: number) => void;
@@ -170,6 +171,7 @@ export function useDispatchDraftSync({
   corporateAccountList,
   availableNamedRules,
   skipFirstEditQuoteRef,
+  driverExplicitlyChangedByUserRef,
   setters,
   values,
   onValuesChange,
@@ -198,6 +200,9 @@ export function useDispatchDraftSync({
       return;
     }
     hydratedIdentityRef.current = hydrationIdentity;
+    if (driverExplicitlyChangedByUserRef) {
+      driverExplicitlyChangedByUserRef.current = false;
+    }
 
     const liveExtrasCfg = (() => {
       try {
@@ -230,7 +235,10 @@ export function useDispatchDraftSync({
         if (savedEdit) {
           const parsed = JSON.parse(savedEdit);
           if (parsed && parsed._editTripId === initialTrip.id) {
-            applySavedDraftOverlayToDispatchState(parsed, settersRef.current, liveExtrasCfg);
+            applySavedDraftOverlayToDispatchState(parsed, settersRef.current, liveExtrasCfg, {
+              initialTrip,
+              driverExplicitlyChangedByUserRef,
+            });
             if (parsed._savedAt) setDraftSavedAt(parsed._savedAt);
           }
         }
@@ -250,6 +258,45 @@ export function useDispatchDraftSync({
 
     setHasHydratedDraft(true);
   }, [initialTrip?.id, draftStorageKey]);
+
+  // Keep open Edit tabs synced with external Queue / Driver App assignment or acceptance
+  // unless the operator explicitly modified Driver in the form dropdown.
+  useEffect(() => {
+    if (!hasHydratedDraft || !isEditMode || !initialTrip) return;
+    if (driverExplicitlyChangedByUserRef?.current) return;
+
+    const s = settersRef.current;
+    if (initialTrip.assignedDriverId) {
+      if (values.driverId !== initialTrip.assignedDriverId) {
+        s.setDriverId(initialTrip.assignedDriverId);
+      }
+      if (values.driverAssignmentMode !== 'send_to_driver') {
+        s.setDriverAssignmentMode?.('send_to_driver');
+      }
+    } else if (initialTrip.plannedDriverId) {
+      if (values.driverId !== initialTrip.plannedDriverId) {
+        s.setDriverId(initialTrip.plannedDriverId);
+      }
+      if (values.driverAssignmentMode !== 'stage_hold') {
+        s.setDriverAssignmentMode?.('stage_hold');
+      }
+    } else if (
+      values.driverId !== 'unassigned' &&
+      ['pending', 'confirmed', 'CONFIRMED', 'UNCONFIRMED', 'unconfirmed', 'offered'].includes(
+        initialTrip.status
+      )
+    ) {
+      s.setDriverId('unassigned');
+      s.setDriverAssignmentMode?.('send_to_driver');
+    }
+  }, [
+    hasHydratedDraft,
+    isEditMode,
+    initialTrip?.id,
+    initialTrip?.assignedDriverId,
+    initialTrip?.plannedDriverId,
+    initialTrip?.status,
+  ]);
 
   // Listen for POPULATE_BOOKING on WorkspaceBus
   useEffect(() => {
@@ -471,6 +518,10 @@ export function useDispatchDraftSync({
   const draftPersistJson = useMemo(() => {
     return JSON.stringify({
       _editTripId: isEditMode ? initialTrip?.id : undefined,
+      _explicitlyChangedDriver: Boolean(driverExplicitlyChangedByUserRef?.current),
+      _explicitlyUnassigned: Boolean(
+        driverExplicitlyChangedByUserRef?.current && v.driverId === 'unassigned'
+      ),
       ...currentFormValues,
       pickupPlaceId: v.pickupPlaceId,
       dropoffPlaceId: v.dropoffPlaceId,
@@ -569,6 +620,9 @@ export function useDispatchDraftSync({
   }, [hasHydratedDraft, draftStorageKey, isEditMode, draftPersistJson]);
 
   const handleClear = () => {
+    if (driverExplicitlyChangedByUserRef) {
+      driverExplicitlyChangedByUserRef.current = false;
+    }
     const s = settersRef.current;
     s.setTimingType('asap');
     s.setPickupAddress('');

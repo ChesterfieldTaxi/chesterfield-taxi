@@ -242,15 +242,15 @@ export function getDriverStatusEmoji(
   d: DriverRosterItem & { mapStatus?: string }
 ): string {
   const mapStatus = d.mapStatus;
-  if (mapStatus === 'available') return '[Avail]';
-  if (mapStatus === 'en_route') return '[En Route]';
-  if (mapStatus === 'busy') return '[Busy]';
-  if (mapStatus === 'break') return '[Break]';
-  if (mapStatus === 'offline') return '[Off]';
-  if (d.status === 'available') return '[Avail]';
-  if (d.status === 'on_trip') return '[Busy]';
-  if (d.status === 'break') return '[Break]';
-  return '[Off]';
+  if (mapStatus === 'available') return 'Available';
+  if (mapStatus === 'en_route') return 'En Route';
+  if (mapStatus === 'busy') return 'Busy';
+  if (mapStatus === 'break') return 'Break';
+  if (mapStatus === 'offline') return 'Offline';
+  if (d.status === 'available') return 'Available';
+  if (d.status === 'on_trip') return 'Busy';
+  if (d.status === 'break') return 'Break';
+  return 'Offline';
 }
 
 /**

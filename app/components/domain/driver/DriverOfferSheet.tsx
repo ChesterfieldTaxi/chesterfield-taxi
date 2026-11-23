@@ -1,9 +1,12 @@
 import React from 'react';
 import type { Trip } from '../../../core/types/trip';
 import type { VehicleTierConfig } from '../../../core/types/config';
+import type { DriverTripUpdateAckController } from '../../../core/hooks/useDriverTripUpdateAck';
+import { hasUnacknowledgedDriverUpdate } from '../../../core/services/dispatch/trip-update-ack.service';
 import { DriverTripManifest } from './DriverTripManifest';
 import { DriverCascadeCountdownBar } from './DriverCascadeCountdownBar';
 import { DriverRouteTimelineCard } from './DriverRouteTimelineCard';
+import { DriverTripUpdateAckBanner } from './DriverTripUpdateAckBanner';
 import {
   resolveCallPassengerHref,
   type PreferredNavApp,
@@ -18,6 +21,7 @@ export interface DriverOfferSheetProps {
   adminVehicles: VehicleTierConfig[];
   preferredNavApp: PreferredNavApp;
   actionLoading: string | null;
+  tripUpdateAck?: DriverTripUpdateAckController;
   onAcceptOffer: (offerId: string) => void;
   onDeclineOffer: (offerId: string) => void;
   onSelectScheduledTrip: (tripId: string) => void;
@@ -31,6 +35,7 @@ export const DriverOfferSheet = React.memo(function DriverOfferSheet({
   adminVehicles,
   preferredNavApp,
   actionLoading,
+  tripUpdateAck,
   onAcceptOffer,
   onDeclineOffer,
   onSelectScheduledTrip,
@@ -204,6 +209,15 @@ export const DriverOfferSheet = React.memo(function DriverOfferSheet({
                     ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                   </span>
                 </div>
+
+                {hasUnacknowledgedDriverUpdate(trip) && (
+                  <DriverTripUpdateAckBanner
+                    trip={trip}
+                    compact
+                    isAcknowledging={tripUpdateAck?.acknowledgingTripId === trip.id}
+                    onAcknowledge={tripUpdateAck?.acknowledgeTripUpdate}
+                  />
+                )}
 
                 <div className="flex items-center justify-between">
                   <div>

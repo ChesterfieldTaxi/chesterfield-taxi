@@ -13,6 +13,7 @@
 
 import { arrayRemove, arrayUnion, doc, setDoc } from 'firebase/firestore';
 import type { Trip } from '../../types/trip';
+import type { PendingDriverUpdateAck } from '../dispatch/trip-update-ack.service';
 import { authorizedFetch } from '../auth/auth-headers';
 import { getFirebaseApp, getFirestoreDb, isFirebaseConfigured } from '../firebase';
 
@@ -113,6 +114,52 @@ export function formatDriverOfferNotificationPayload(
       tripId: trip.id || null,
       bookingType: trip.bookingType || 'asap',
       kind: 'driver_offer',
+    },
+  };
+}
+
+/**
+ * Pure deterministic payload builder for live assigned-trip modifications requiring driver acknowledgement.
+ */
+export function formatDriverTripUpdatedPayload(
+  trip: Partial<Trip>,
+  ack: PendingDriverUpdateAck
+): FormattedNotificationPayload {
+  const passengerName = [trip.passenger?.firstName, trip.passenger?.lastName]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  const shortTripRef = trip.id ? ` #${String(trip.id).slice(-6).toUpperCase()}` : '';
+  const sourceLabel = ack.source === 'guest_manage_ride' ? 'Passenger' : 'Dispatch';
+  const title = passengerName
+    ? `⚠️ Trip Updated (${passengerName}) — Please Acknowledge`
+    : `⚠️ Trip${shortTripRef} Updated by ${sourceLabel}`;
+
+  const body =
+    Array.isArray(ack.changesSummary) && ack.changesSummary.length > 0
+      ? ack.changesSummary.join(' • ')
+      : `${sourceLabel} updated your assigned trip — open Driver Console to acknowledge.`;
+
+  const tag = `ct-driver-trip-update-${trip.id || 'trip'}-${ack.revisionId}`;
+  const url = '/app/driver';
+
+  return {
+    title,
+    body,
+    url,
+    tag,
+    icon: '/icon-driver-192.svg',
+    badge: '/icon-driver-192.svg',
+    requireInteraction: true,
+    vibrate: [250, 100, 250, 100, 300],
+    data: {
+      url,
+      tag,
+      tripId: trip.id || null,
+      revisionId: ack.revisionId,
+      source: ack.source,
+      changesSummary: ack.changesSummary,
+      kind: 'driver_trip_update',
     },
   };
 }
@@ -646,6 +693,18 @@ class PushNotificationService {
     trip: Partial<Trip>
   ): Promise<NotificationDispatchResult> {
     const payload = formatDriverOfferNotificationPayload(trip);
+    return this.dispatchViaServiceWorker(payload);
+  }
+
+  /**
+   * Triggers a high-priority notification + haptic vibration when an assigned trip is updated
+   * and requires driver acknowledgement.
+   */
+  public async notifyDriverTripUpdated(
+    trip: Partial<Trip>,
+    ack: PendingDriverUpdateAck
+  ): Promise<NotificationDispatchResult> {
+    const payload = formatDriverTripUpdatedPayload(trip, ack);
     return this.dispatchViaServiceWorker(payload);
   }
 

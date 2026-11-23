@@ -22,6 +22,7 @@ import {
   type DriverRosterItem,
 } from '../../../core/services/operator.service';
 import { getAdminAuthService } from '../../../core/services/auth/admin-auth.service';
+import { DriverAssignDropdown } from './queue/DriverAssignDropdown';
 import {
   CarIcon,
   CheckIcon,
@@ -501,21 +502,21 @@ function StandingOrderSeriesCard({
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <select
-            value={draftDriverId}
-            onChange={(e) => setDraftDriverId(e.target.value)}
-            className="flex-1 px-2.5 py-1.5 rounded-lg bg-white border border-indigo-300 text-xs font-semibold text-slate-800"
-            aria-label="Preferred driver"
-          >
-            <option value="">Unassigned (Open Dispatch Queue)</option>
-            {drivers
-              .filter((d) => !d.isArchived && !d.isBlacklisted)
-              .map((d) => (
-                <option key={d.id} value={d.id}>
-                  {resolveDriverDropdownLabel(d)}
-                </option>
-              ))}
-          </select>
+          <div className="flex-1 min-w-0">
+            <DriverAssignDropdown
+              value={draftDriverId}
+              unassignedValue=""
+              unassignedLabel="Unassigned (Open Dispatch Queue)"
+              drivers={drivers.filter((d) => !d.isArchived)}
+              mode={draftDriverId ? draftDriverMode : 'send_to_driver'}
+              isAssigned={Boolean(draftDriverId && draftDriverMode === 'send_to_driver')}
+              fallbackAssignedLabel={series.preferredDriverLabel || null}
+              onChange={(nextId) => setDraftDriverId(nextId)}
+              size="md"
+              fullWidth
+              ariaLabel="Preferred driver"
+            />
+          </div>
 
           <div className="inline-flex rounded-lg border border-indigo-300 bg-white p-0.5 shrink-0">
             <button

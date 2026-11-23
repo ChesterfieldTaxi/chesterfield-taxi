@@ -240,15 +240,15 @@ export function useResponsiveQueueLayout({
 export function getDriverDropdownDot(driver: LiveFleetDriver): string {
   switch (driver.mapStatus) {
     case 'available':
-      return '[Avail]';
+      return 'Available';
     case 'en_route':
-      return '[En Route]';
+      return 'En Route';
     case 'busy':
-      return '[Busy]';
+      return 'Busy';
     case 'break':
-      return '[Break]';
+      return 'Break';
     default:
-      return '[Off]';
+      return 'Offline';
   }
 }
 

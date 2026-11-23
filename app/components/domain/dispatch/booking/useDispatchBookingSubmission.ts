@@ -5,6 +5,11 @@ import {
   type BookingConflictCheckSummary,
 } from '../../../../core/services/dispatch/booking-conflict-checker.service';
 import { registerStandingOrderFromDispatchBooking } from '../../../../core/services/dispatch/standing-order.service';
+import {
+  ACTIVE_DRIVER_LIFECYCLE_STATUSES,
+  buildPendingDriverUpdateAck,
+  resolveAssignedTripEditPreservation,
+} from '../../../../core/services/dispatch/trip-update-ack.service';
 import type {
   Trip,
   TripPricing,
@@ -312,7 +317,11 @@ export interface DispatchHydrationSetters {
 export function applySavedDraftOverlayToDispatchState(
   parsed: Record<string, any>,
   s: DispatchHydrationSetters,
-  universalExtrasConfig?: UniversalExtrasConfig
+  universalExtrasConfig?: UniversalExtrasConfig,
+  options?: {
+    initialTrip?: Trip | null;
+    driverExplicitlyChangedByUserRef?: React.MutableRefObject<boolean>;
+  }
 ): void {
   if (parsed.timingType) s.setTimingType(parsed.timingType);
   if (parsed.scheduledDate) s.setScheduledDate(parsed.scheduledDate);
@@ -438,12 +447,36 @@ export function applySavedDraftOverlayToDispatchState(
   if (parsed.waiveMultiStopFees !== undefined) s.setWaiveMultiStopFees(parsed.waiveMultiStopFees);
   if (parsed.bypassSurge !== undefined) s.setBypassSurge(parsed.bypassSurge);
   if (parsed.company) s.setCompany(parsed.company);
-  if (parsed.driverId) s.setDriverId(parsed.driverId);
+  const hasLiveAssignedDriver = Boolean(options?.initialTrip?.assignedDriverId);
+  const explicitlyUnassignedInDraft = parsed._explicitlyUnassigned === true;
+  const explicitlyChangedDriverInDraft =
+    parsed._explicitlyChangedDriver === true || explicitlyUnassignedInDraft;
+
+  if (parsed.driverId) {
+    const shouldBlockStaleDriverOverlay =
+      hasLiveAssignedDriver &&
+      ((parsed.driverId === 'unassigned' && !explicitlyUnassignedInDraft) ||
+        (!explicitlyChangedDriverInDraft &&
+          parsed.driverId !== options?.initialTrip?.assignedDriverId));
+
+    if (!shouldBlockStaleDriverOverlay) {
+      s.setDriverId(parsed.driverId);
+      if (options?.driverExplicitlyChangedByUserRef && explicitlyChangedDriverInDraft) {
+        options.driverExplicitlyChangedByUserRef.current = true;
+      }
+    }
+  }
   if (
     parsed.driverAssignmentMode === 'stage_hold' ||
     parsed.driverAssignmentMode === 'send_to_driver'
   ) {
-    s.setDriverAssignmentMode?.(parsed.driverAssignmentMode);
+    const shouldBlockStaleStageOverlay =
+      hasLiveAssignedDriver &&
+      parsed.driverAssignmentMode === 'stage_hold' &&
+      !explicitlyChangedDriverInDraft;
+    if (!shouldBlockStaleStageOverlay) {
+      s.setDriverAssignmentMode?.(parsed.driverAssignmentMode);
+    }
   }
   if (parsed.notesForAll !== undefined) s.setNotesForAll(parsed.notesForAll);
   if (parsed.internalNotes !== undefined) s.setInternalNotes(parsed.internalNotes);
@@ -783,6 +816,9 @@ export function hydrateInitialTripIntoDispatchState(
   } else if (initialTrip.plannedDriverId) {
     s.setDriverId(initialTrip.plannedDriverId);
     s.setDriverAssignmentMode?.('stage_hold');
+  } else {
+    s.setDriverId('unassigned');
+    s.setDriverAssignmentMode?.('send_to_driver');
   }
 
   if (meta.pricingRuleId) s.setSelectedRuleId(meta.pricingRuleId);
@@ -963,6 +999,7 @@ export interface UseDispatchBookingSubmissionParams {
   company: string;
   driverId: string;
   driverAssignmentMode?: 'send_to_driver' | 'stage_hold';
+  driverExplicitlyChangedByUserRef?: React.MutableRefObject<boolean>;
   driverOptions: DriverRosterItem[];
   notesForAll: string;
   internalNotes: string;
@@ -1099,6 +1136,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     company,
     driverId,
     driverAssignmentMode = 'send_to_driver',
+    driverExplicitlyChangedByUserRef,
     driverOptions,
     notesForAll,
     internalNotes,
@@ -1901,6 +1939,19 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
         : null;
 
       if (isEditMode && initialTrip) {
+        const editPreservation = resolveAssignedTripEditPreservation({
+          initialTrip,
+          formDriverId: driverId,
+          driverAssignmentMode,
+          driverExplicitlyChangedByUser: Boolean(driverExplicitlyChangedByUserRef?.current),
+          isCompleted,
+          isCancelled,
+        });
+        const preservedDriverInfo = editPreservation.assignedDriverId
+          ? driverOptions.find((d) => d.id === editPreservation.assignedDriverId)
+          : undefined;
+        const editStagingSelectedDriver = editPreservation.isStagingSelectedDriver;
+
         const shouldSplitIntoMultiCar =
           !isCompleted &&
           !isCancelled &&
@@ -1965,9 +2016,8 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
             driverNotes: notesForAll,
             flightNotes: outboundFlightNotes || undefined,
             ...(validDispOutboundTelemetry ? { flightTelemetry: validDispOutboundTelemetry } : {}),
-            assignedDriverId:
-              driverId === 'unassigned' || isStagingSelectedDriver ? null : driverId,
-            ...(isStagingSelectedDriver
+            assignedDriverId: editPreservation.assignedDriverId,
+            ...(editStagingSelectedDriver
               ? {
                   offeredToIds: [],
                   plannedDriverId: driverId,
@@ -1981,16 +2031,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                   plannedAt: null,
                   plannedBy: null,
                 }),
-            status:
-              driverId !== 'unassigned' &&
-              !isStagingSelectedDriver &&
-              ['pending', 'confirmed', 'CONFIRMED', 'UNCONFIRMED', 'unconfirmed'].includes(
-                initialTrip.status
-              )
-                ? 'assigned'
-                : isStagingSelectedDriver && initialTrip.status === 'assigned'
-                ? 'CONFIRMED'
-                : initialTrip.status,
+            status: editPreservation.status,
             pricing: car1Spec.pricing,
             payment: {
               ...initialTrip.payment,
@@ -2016,14 +2057,49 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
               multiCarTotalPassengers: passengers,
               multiCarTotalBags: bags,
               multiCarOrderTotalFare: finalFare,
-              ...(selectedDriverInfo && !isStagingSelectedDriver
+              ...(editPreservation.shouldClearPendingUpdateAck
+                ? { pendingDriverUpdateAck: null }
+                : {}),
+              ...(preservedDriverInfo && !editStagingSelectedDriver
                 ? {
-                    assignedDriverName: selectedDriverInfo.name,
-                    assignedDriverPhone: selectedDriverInfo.phone,
+                    assignedDriverName: preservedDriverInfo.name,
+                    assignedDriverPhone: preservedDriverInfo.phone,
                   }
                 : {}),
             },
           };
+
+          if (
+            editPreservation.retainedSameAssignedDriver &&
+            editPreservation.assignedDriverId &&
+            ACTIVE_DRIVER_LIFECYCLE_STATUSES.has(editPreservation.status)
+          ) {
+            const car1Ack = buildPendingDriverUpdateAck({
+              before: initialTrip,
+              after: car1Updates,
+              updatedBy: stagingActorName,
+              source: 'dispatch_edit',
+            });
+            if (car1Ack) {
+              car1Updates.metadata = {
+                ...(car1Updates.metadata || {}),
+                pendingDriverUpdateAck: car1Ack,
+              };
+              car1Updates.auditLog = [
+                ...(initialTrip.auditLog || []),
+                {
+                  action: 'TRIP_MODIFIED',
+                  timestamp: car1Ack.updatedAt,
+                  actorId: stagingActorUser?.uid,
+                  actorRole:
+                    stagingActorUser?.role === 'admin' ? ('admin' as const) : ('dispatcher' as const),
+                  referenceNumber: `UPD-${Math.floor(1000 + Math.random() * 9000)}`,
+                  referenceType: 'edit' as const,
+                  context: `Trip updated by dispatch — awaiting driver acknowledgement: ${car1Ack.changesSummary.join('; ')}`,
+                },
+              ];
+            }
+          }
 
           const car1Updated = service.updateTrip
             ? await service.updateTrip(initialTrip.id, car1Updates)
@@ -2112,14 +2188,14 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           const associates = convoyTrips.map((t, idx) =>
             buildAssociateEntryFromTrip(
               t,
-              idx === 0 && selectedDriverInfo && !isStagingSelectedDriver
+              idx === 0 && preservedDriverInfo && !editStagingSelectedDriver
                 ? {
-                    driverId: selectedDriverInfo.id,
-                    driverName: selectedDriverInfo.name,
-                    driverPhone: selectedDriverInfo.phone,
-                    vehicleUnit: selectedDriverInfo.cabNumber
-                      ? `Car #${selectedDriverInfo.cabNumber}`
-                      : selectedDriverInfo.vehicle,
+                    driverId: preservedDriverInfo.id,
+                    driverName: preservedDriverInfo.name,
+                    driverPhone: preservedDriverInfo.phone,
+                    vehicleUnit: preservedDriverInfo.cabNumber
+                      ? `Car #${preservedDriverInfo.cabNumber}`
+                      : preservedDriverInfo.vehicle,
                   }
                 : undefined
             )
@@ -2140,6 +2216,9 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
             );
           }
 
+          if (driverExplicitlyChangedByUserRef) {
+            driverExplicitlyChangedByUserRef.current = false;
+          }
           try {
             localStorage.removeItem(draftStorageKey);
           } catch {}
@@ -2205,15 +2284,10 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           driverNotes: notesForAll,
           flightNotes: outboundFlightNotes || undefined,
           ...(validDispOutboundTelemetry ? { flightTelemetry: validDispOutboundTelemetry } : {}),
-          assignedDriverId:
-            isCompleted || isCancelled
-              ? initialTrip.assignedDriverId
-              : driverId === 'unassigned' || isStagingSelectedDriver
-              ? null
-              : driverId,
+          assignedDriverId: editPreservation.assignedDriverId,
           ...(isCompleted || isCancelled
             ? {}
-            : isStagingSelectedDriver
+            : editStagingSelectedDriver
             ? {
                 offeredToIds: [],
                 plannedDriverId: driverId,
@@ -2240,18 +2314,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                 plannedAt: null,
                 plannedBy: null,
               }),
-          status:
-            isCompleted || isCancelled
-              ? initialTrip.status
-              : driverId !== 'unassigned' &&
-                !isStagingSelectedDriver &&
-                ['pending', 'confirmed', 'CONFIRMED', 'UNCONFIRMED', 'unconfirmed'].includes(
-                  initialTrip.status
-                )
-              ? 'assigned'
-              : isStagingSelectedDriver && initialTrip.status === 'assigned'
-              ? 'CONFIRMED'
-              : initialTrip.status,
+          status: editPreservation.status,
           pricing: persistedOutboundPricing,
           payment: {
             ...initialTrip.payment,
@@ -2262,19 +2325,64 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           metadata: {
             ...initialTrip.metadata,
             ...metadataPayload,
-            ...(selectedDriverInfo && !isStagingSelectedDriver
+            ...(editPreservation.shouldClearPendingUpdateAck
+              ? { pendingDriverUpdateAck: null }
+              : {}),
+            ...(preservedDriverInfo && !editStagingSelectedDriver
               ? {
-                  assignedDriverName: selectedDriverInfo.name,
-                  assignedDriverPhone: selectedDriverInfo.phone,
+                  assignedDriverName: preservedDriverInfo.name,
+                  assignedDriverPhone: preservedDriverInfo.phone,
+                }
+              : !editPreservation.assignedDriverId
+              ? {
+                  assignedDriverName: null,
+                  assignedDriverPhone: null,
                 }
               : {}),
           },
         };
 
+        if (
+          !isCompleted &&
+          !isCancelled &&
+          editPreservation.retainedSameAssignedDriver &&
+          editPreservation.assignedDriverId &&
+          ACTIVE_DRIVER_LIFECYCLE_STATUSES.has(editPreservation.status)
+        ) {
+          const pendingAck = buildPendingDriverUpdateAck({
+            before: initialTrip,
+            after: updates,
+            updatedBy: stagingActorName,
+            source: 'dispatch_edit',
+          });
+          if (pendingAck) {
+            updates.metadata = {
+              ...(updates.metadata || {}),
+              pendingDriverUpdateAck: pendingAck,
+            };
+            updates.auditLog = [
+              ...(updates.auditLog || initialTrip.auditLog || []),
+              {
+                action: 'TRIP_MODIFIED',
+                timestamp: pendingAck.updatedAt,
+                actorId: stagingActorUser?.uid,
+                actorRole:
+                  stagingActorUser?.role === 'admin' ? ('admin' as const) : ('dispatcher' as const),
+                referenceNumber: `UPD-${Math.floor(1000 + Math.random() * 9000)}`,
+                referenceType: 'edit' as const,
+                context: `Trip updated by dispatch — awaiting driver acknowledgement: ${pendingAck.changesSummary.join('; ')}`,
+              },
+            ];
+          }
+        }
+
         const updatedTrip = service.updateTrip
           ? await service.updateTrip(initialTrip.id, updates)
           : ({ ...initialTrip, ...updates } as Trip);
 
+        if (driverExplicitlyChangedByUserRef) {
+          driverExplicitlyChangedByUserRef.current = false;
+        }
         try {
           localStorage.removeItem(draftStorageKey);
         } catch {}

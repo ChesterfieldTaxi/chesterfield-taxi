@@ -7,13 +7,18 @@ import {
   hasStagedDriver,
   isTripEligibleForStaging,
 } from '../../../../core/services/dispatch/staged-driver-planner.service';
+import {
+  getPendingDriverUpdateAck,
+  hasAcknowledgedDriverUpdate,
+  hasUnacknowledgedDriverUpdate,
+} from '../../../../core/services/dispatch/trip-update-ack.service';
 import { summarizeTripStopProgress } from '../../../../core/services/driver/driver-stop-progress';
 import {
   formatVehicleTier,
   formatVehicleTierDisplay,
 } from '../../../../core/utils/vehicle-tier-format.util';
-import { formatDriverAssignmentLabel } from '../../../../core/services/operator.service';
 import { PriceBreakdownPanel } from '../../booking/PriceBreakdownPanel';
+import { DriverAssignDropdown } from '../queue/DriverAssignDropdown';
 import {
   DispatchCascadePill,
   DispatchFlightTelemetryPill,
@@ -911,8 +916,74 @@ export function TripDrawerOverviewSection({
                 <span>Unassigned</span>
               </span>
             )}
+            {hasUnacknowledgedDriverUpdate(reviewTrip) &&
+              (() => {
+                const pendingAck = getPendingDriverUpdateAck(reviewTrip);
+                return (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-950 border border-amber-400 animate-pulse"
+                    title={
+                      pendingAck
+                        ? `Awaiting driver acknowledgement:\n• ${pendingAck.changesSummary.join('\n• ')}`
+                        : 'Awaiting driver acknowledgement'
+                    }
+                  >
+                    ⏳ Awaiting Ack
+                  </span>
+                );
+              })()}
+            {hasAcknowledgedDriverUpdate(reviewTrip) &&
+              (() => {
+                const ack = getPendingDriverUpdateAck(reviewTrip);
+                const ackTime =
+                  ack?.acknowledgedAt && Number.isFinite(Date.parse(ack.acknowledgedAt))
+                    ? new Date(ack.acknowledgedAt).toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })
+                    : null;
+                return (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-300"
+                    title={
+                      ack
+                        ? `Driver acknowledged trip update${ackTime ? ` at ${ackTime}` : ''}:\n• ${ack.changesSummary.join('\n• ')}`
+                        : 'Driver acknowledged trip update'
+                    }
+                  >
+                    ✓ Driver Acked{ackTime ? ` · ${ackTime}` : ''}
+                  </span>
+                );
+              })()}
           </div>
         </div>
+
+        {/* Driver Update Acknowledgement Summary Callout */}
+        {hasUnacknowledgedDriverUpdate(reviewTrip) &&
+          (() => {
+            const pendingAck = getPendingDriverUpdateAck(reviewTrip);
+            if (!pendingAck) return null;
+            return (
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-950 space-y-1">
+                <div className="font-extrabold text-[11px] flex items-center justify-between gap-2">
+                  <span>⏳ Trip Update Sent — Awaiting Driver Acknowledgement</span>
+                  {pendingAck.updatedAt && Number.isFinite(Date.parse(pendingAck.updatedAt)) && (
+                    <span className="font-mono text-[10px] text-amber-800">
+                      {new Date(pendingAck.updatedAt).toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  )}
+                </div>
+                <ul className="space-y-0.5 text-[11px] text-amber-900">
+                  {pendingAck.changesSummary.map((item, idx) => (
+                    <li key={idx}>• {item}</li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })()}
 
         {/* Staged Driver Status Callout + Send to Driver / Clear Stage */}
         {hasStagedDriver(reviewTrip) && (
@@ -978,61 +1049,59 @@ export function TripDrawerOverviewSection({
             </div>
           )}
 
-          <select
-            value={
-              reviewTrip.assignedDriverId ||
-              (stagedPlanner?.queueAssignMode === 'stage_hold' && reviewTrip.plannedDriverId
-                ? reviewTrip.plannedDriverId
-                : 'unassigned')
-            }
-            onChange={(e) => {
-              const newDriverId = e.target.value;
-              if (
-                !reviewTrip.assignedDriverId &&
-                stagedPlanner?.queueAssignMode === 'stage_hold'
-              ) {
-                void stagedPlanner.stageTripDriver(reviewTrip, newDriverId);
-                return;
+          <div className="flex-1 min-w-0">
+            <DriverAssignDropdown
+              value={
+                reviewTrip.assignedDriverId ||
+                (stagedPlanner?.queueAssignMode === 'stage_hold' && reviewTrip.plannedDriverId
+                  ? reviewTrip.plannedDriverId
+                  : 'unassigned')
               }
-              onQuickAssignDriver(reviewTrip.id, newDriverId);
-              onReviewTripChange((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      assignedDriverId: newDriverId === 'unassigned' ? null : newDriverId,
-                      ...(newDriverId !== 'unassigned'
-                        ? {
-                            plannedDriverId: null,
-                            plannedDriverLabel: null,
-                            plannedAt: null,
-                            plannedBy: null,
-                          }
-                        : {}),
-                    }
-                  : null
-              );
-            }}
-            className={`flex-1 px-3 py-2 bg-white border rounded-lg text-xs font-semibold text-slate-800 cursor-pointer focus:ring-1 focus:ring-blue-500 shadow-2xs ${
-              !reviewTrip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
-                ? 'border-dashed border-indigo-400 bg-indigo-50/40 text-indigo-950'
-                : 'border-slate-300'
-            }`}
-          >
-            <option value="unassigned">
-              {!reviewTrip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
-                ? '📌 Select driver to stage (Hold in Dispatch)...'
-                : 'Unassigned (No driver assigned)'}
-            </option>
-            {drivers.map((drv) => (
-              <option
-                key={drv.id}
-                value={drv.id}
-                disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
-              >
-                {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
-              </option>
-            ))}
-          </select>
+              drivers={drivers}
+              mode={
+                !reviewTrip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
+                  ? 'stage_hold'
+                  : 'send_to_driver'
+              }
+              isAssigned={Boolean(reviewTrip.assignedDriverId)}
+              fallbackAssignedLabel={
+                String(
+                  (reviewTrip.metadata as Record<string, unknown> | undefined)?.assignedDriverName ||
+                    reviewTrip.plannedDriverLabel ||
+                    ''
+                ).trim() || null
+              }
+              unassignedLabel="Unassigned (No driver assigned)"
+              onChange={(newDriverId) => {
+                if (
+                  !reviewTrip.assignedDriverId &&
+                  stagedPlanner?.queueAssignMode === 'stage_hold'
+                ) {
+                  void stagedPlanner.stageTripDriver(reviewTrip, newDriverId);
+                  return;
+                }
+                void onQuickAssignDriver(reviewTrip.id, newDriverId);
+                onReviewTripChange((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        assignedDriverId: newDriverId === 'unassigned' ? null : newDriverId,
+                        ...(newDriverId !== 'unassigned'
+                          ? {
+                              plannedDriverId: null,
+                              plannedDriverLabel: null,
+                              plannedAt: null,
+                              plannedBy: null,
+                            }
+                          : {}),
+                      }
+                    : null
+                );
+              }}
+              size="md"
+              fullWidth
+            />
+          </div>
 
           {isTripCascadeActive(reviewTrip) && onCancelAutoOffer ? (
             <button
