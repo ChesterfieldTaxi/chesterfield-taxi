@@ -1,6 +1,10 @@
 import { type RouteConfig, index, layout, route } from "@react-router/dev/routes";
 
 export default [
+  // Dynamic SEO Resource Routes (0.00 kB Client Bundle)
+  route("robots.txt", "routes/robots.txt.ts"),
+  route("sitemap.xml", "routes/sitemap.xml.ts"),
+
   // Public Customer-Facing Layout & Routes (Open Guest Checkout & Info)
   layout("routes/layout.tsx", [
     index("routes/_index.tsx"),
@@ -8,6 +12,8 @@ export default [
     route("booking/status/:tripId", "routes/booking.status.tsx"),
     route("track/:tripToken?", "routes/track.tsx"),
     route("services", "routes/services.tsx"),
+    route("service-areas", "routes/service-areas._index.tsx"),
+    route("service-areas/:corridorSlug", "routes/service-areas.$corridorSlug.tsx"),
     route("about", "routes/about.tsx"),
     route("contact", "routes/contact.tsx"),
     route("apply", "routes/apply.tsx"),

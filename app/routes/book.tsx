@@ -1,19 +1,29 @@
 import React from 'react';
-import { useLoaderData } from 'react-router';
+import { useLoaderData, useLocation, type LoaderFunctionArgs } from 'react-router';
 import { BookingEngineV2 } from '../components/domain/BookingEngineV2';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { loadPublicSettingsForServer } from '../core/services/config/public-settings.server';
+import { parseBookRouteQueryInitialValues } from '../core/services/seo';
 import type { AppSettings } from '../core/types/config';
 
-export async function loader() {
+export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const initialValues = parseBookRouteQueryInitialValues(url.searchParams);
+
   try {
     const settings = await Promise.race<Partial<AppSettings> | null>([
       loadPublicSettingsForServer(),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
     ]);
-    return { initialSettings: settings ?? undefined };
+    return {
+      initialSettings: settings ?? undefined,
+      initialValues,
+    };
   } catch {
-    return { initialSettings: undefined };
+    return {
+      initialSettings: undefined,
+      initialValues,
+    };
   }
 }
 
@@ -29,8 +39,20 @@ export function meta() {
 }
 
 export default function BookRoute() {
-  const { initialSettings } = useLoaderData<typeof loader>();
+  const { initialSettings, initialValues } = useLoaderData<typeof loader>();
+  const location = useLocation();
   const [isConfirmed, setIsConfirmed] = React.useState(false);
+
+  const effectiveInitialValues = React.useMemo(
+    () =>
+      initialValues ??
+      (location.search
+        ? parseBookRouteQueryInitialValues(new URLSearchParams(location.search))
+        : undefined),
+    [initialValues, location.search]
+  );
+
+  const routeQueryKey = location.search || 'default';
 
   return (
     <div className="py-5 sm:py-8 bg-gradient-to-b from-slate-50 via-white to-blue-50/20 flex-1 pb-28 lg:pb-16">
@@ -49,14 +71,17 @@ export default function BookRoute() {
 
         {/* Client Booking Engine */}
         <div className={isConfirmed ? '' : 'mt-4'}>
-          <BookingEngineV2 onConfirmedChange={setIsConfirmed} initialSettings={initialSettings} />
+          <BookingEngineV2
+            key={routeQueryKey}
+            onConfirmedChange={setIsConfirmed}
+            initialSettings={initialSettings}
+            initialValues={effectiveInitialValues}
+          />
         </div>
 
         {/* Live Support Footnote */}
         <div className="mt-10 text-center text-xs text-slate-500 space-y-1">
-          <p>
-            Need a pickup right away or booking for a large group?
-          </p>
+          <p>Need a pickup right away or booking for a large group?</p>
           <p className="font-semibold text-slate-700">
             Call {COMPANY_CONFIG.name} 24/7 at{' '}
             <a

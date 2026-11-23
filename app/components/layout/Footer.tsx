@@ -16,9 +16,21 @@ const QUICK_LINKS = [
   { label: 'Home', path: '/' },
   { label: 'Book a Ride', path: '/book' },
   { label: 'Services & Rates', path: '/services' },
+  { label: 'Service Areas & Airport Rates', path: '/service-areas' },
   { label: 'About Us', path: '/about' },
   { label: 'Contact Us', path: '/contact' },
   { label: 'Drive With Us', path: '/apply' },
+];
+
+const FEATURED_CORRIDOR_LINKS = [
+  { label: 'Chesterfield ↔ STL Airport', path: '/service-areas/chesterfield-to-stl-airport' },
+  { label: 'Spirit Airport (SUS) FBO', path: '/service-areas/spirit-of-st-louis-airport-sus' },
+  { label: 'Clayton ↔ STL Airport', path: '/service-areas/clayton-to-stl-airport' },
+  { label: 'Town & Country Car Service', path: '/service-areas/town-and-country-car-service' },
+  { label: 'Creve Coeur Executive Taxi', path: '/service-areas/creve-coeur-executive-taxi' },
+  { label: 'Wildwood & Ellisville Taxi', path: '/service-areas/wildwood-and-ellisville-taxi' },
+  { label: 'Maryland Hts & Westport', path: '/service-areas/maryland-heights-westport-taxi' },
+  { label: 'Downtown St. Louis ↔ STL', path: '/service-areas/downtown-st-louis-airport-transfer' },
 ];
 
 export function Footer() {
@@ -122,15 +134,30 @@ export function Footer() {
           {/* Column 3: Service Area Coverage */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-blue-400 mb-4">
-              Service Areas
+              <Link to="/service-areas" className="hover:text-blue-300 transition-colors">
+                Service Areas &amp; Corridors
+              </Link>
             </h3>
             <ul className="space-y-2 text-xs text-slate-400">
-              {COMPANY_CONFIG.serviceAreas.map((area) => (
-                <li key={area} className="flex items-center gap-2">
-                  <MapPinIcon className="w-3.5 h-3.5 text-blue-400/80 shrink-0" />
-                  <span>{area}</span>
+              {FEATURED_CORRIDOR_LINKS.map((corridor) => (
+                <li key={corridor.path}>
+                  <Link
+                    to={corridor.path}
+                    className="flex items-center gap-2 hover:text-white transition-colors group"
+                  >
+                    <MapPinIcon className="w-3.5 h-3.5 text-blue-400/80 group-hover:text-blue-400 shrink-0" />
+                    <span>{corridor.label}</span>
+                  </Link>
                 </li>
               ))}
+              <li className="pt-1">
+                <Link
+                  to="/service-areas"
+                  className="text-blue-400 hover:text-blue-300 font-bold transition-colors inline-flex items-center gap-1"
+                >
+                  <span>View All Service Areas &rarr;</span>
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -188,6 +215,9 @@ export function Footer() {
           <div className="flex flex-wrap items-center justify-center gap-6">
             <Link to="/book" className="hover:text-blue-400 transition-colors">
               Book a Ride
+            </Link>
+            <Link to="/service-areas" className="hover:text-blue-400 transition-colors">
+              Service Areas
             </Link>
             <Link to="/services" className="hover:text-blue-400 transition-colors">
               Airport Rates

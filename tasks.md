@@ -926,3 +926,19 @@
 - [x] 57.4 Automated Verification Suite (`scripts/test-operational-analytics.ts`) & Full Regression Gate:
   - [x] 57.4.1 Create and pass `scripts/test-operational-analytics.ts` covering all pure intelligence functions, chronological bucketing, surcharge/audit correlation, RFC-4180 + formula-safe CSV exports across all 4 report types, monolith line ceilings, untouched `firestore.rules` & `vercel.json`, zero `"HUD Now"`, and zero bracket status strings.
   - [x] 57.4.2 Execute full verification pipeline (`npm run typecheck`, `test-operational-analytics.ts`, `test-guest-manage-ride.ts`, `test-assigned-edit-ack-and-driver-dropdown.ts`, `test-standing-orders.ts`, `test-staged-driver-planner.ts`, and `npm run build`) with `0` errors.
+
+## Phase 58 (Wave 4 Phase 9 — Final Wave 4 Phase): Local Airport & West County SEO Engine (`/robots.txt`, Dynamic `/sitemap.xml` & Pre-Quoted Corridor Landing Pages)
+- [x] 58.0 Baseline Hygiene & Specification Sync:
+  - [x] 58.0.1 Commit verified Phase 57 baseline cleanly on `main` (`feat(phase-57): operational SLA, auto-dispatch, surcharge & revenue intelligence dashboard with RFC-4180 CSV export`) while keeping `firestore.rules` and `vercel.json` untouched.
+  - [x] 58.0.2 Document Phase 58 in `spec.md`, `plan.md`, and `tasks.md`.
+- [x] 58.1 Pure Local SEO, Corridor Catalog, Fare Estimator & JSON-LD Engine (`app/core/services/seo/local-corridor-seo.service.ts`, `local-corridor-seo.server.ts`, `index.ts`):
+  - [x] 58.1.1 Implement `LOCAL_SEO_CORRIDORS` (all 8 St. Louis Airport & West County corridors), `getCorridorBySlug`, and `getRelatedCorridors`.
+  - [x] 58.1.2 Implement `computeCorridorFareEstimates` (`outbound` & `inbound`, vehicle tier scaling, passenger capacity, and STL/SUS airport surcharge), `buildPrepopulatedBookUrl`, and `parseBookRouteQueryInitialValues`.
+  - [x] 58.1.3 Implement `buildTaxiServiceJsonLd`, `buildFaqPageJsonLd`, `buildBreadcrumbListJsonLd`, `serializeJsonLdScriptPayload`, `resolveCanonicalSiteOrigin`, `generateRobotsTxt`, and `generateSitemapXml`.
+- [x] 58.2 Dynamic SSR Routes, Pre-Quoted Landing Pages & `/book` Prefill Integration:
+  - [x] 58.2.1 Delete static shadowing files `public/robots.txt` and `public/sitemap.xml`, create `app/routes/robots.txt.ts` and `app/routes/sitemap.xml.ts` (`0.00 kB` client bundle), and register `robots.txt`, `sitemap.xml`, `service-areas`, and `service-areas/:corridorSlug` in `app/routes.ts`.
+  - [x] 58.2.2 Wire SSR + client query prefill in `app/routes/book.tsx` (`< 200`L) and `BookingEngineV2.tsx` (`< 1,350`L) / `createInitialCustomerBookingFormState` with zero hydration mismatch.
+  - [x] 58.2.3 Create `app/routes/service-areas._index.tsx` (`/service-areas` hub) and `app/routes/service-areas.$corridorSlug.tsx` (`/service-areas/:corridorSlug` with `404` for unknown slugs, JSON-LD, interactive Direction Swap + `1–6` passengers calculator, terminal/FBO guide, ZIPs/landmarks, FAQs, and related corridors), and wire internal crawl links in `Footer.tsx` and `services.tsx`.
+- [x] 58.3 Automated Verification Suite (`scripts/test-local-seo-engine.ts`) & Master Wave 4 Gate:
+  - [x] 58.3.1 Create and pass `scripts/test-local-seo-engine.ts` covering all 8 corridors, `computeCorridorFareEstimates`, `/book` prefill round-trip & coordinate validation, XSS-safe JSON-LD serialization, `robots.txt` & `sitemap.xml` SSR loaders + `0.00 kB` client chunks, `404` corridor loader handling, deleted `public/robots.txt` & `public/sitemap.xml`, and monolith/terminology/immutable-file guardrails.
+  - [x] 58.3.2 Pass Master Wave 4 Verification Gate (`typecheck`, `build`, `test-local-seo-engine.ts`, `test-operational-analytics.ts`, `test-guest-manage-ride.ts`, `test-assigned-edit-ack-and-driver-dropdown.ts`, `test-standing-orders.ts`, and `test-staged-driver-planner.ts`) with `0` errors.

@@ -119,14 +119,54 @@ const SERVICES: ServiceItem[] = [
 
 
 const SERVICE_ZONES = [
-  { city: 'Chesterfield', zip: '63005, 63017', note: 'Primary Hub & Instant Dispatch' },
-  { city: 'Wildwood', zip: '63038, 63040', note: 'Full Coverage Residential & Commercial' },
-  { city: 'Ballwin & Ellisville', zip: '63011, 63021', note: 'Manchester Corridor Service' },
-  { city: 'Town & Country', zip: '63131', note: 'Mason & Clayton Rd Area' },
-  { city: 'Creve Coeur & Maryland Hts', zip: '63141, 63043', note: 'Corporate Business Parks' },
-  { city: 'Lambert STL Airport', zip: '63145', note: 'Terminals 1 & 2 Scheduled Service' },
-  { city: 'Spirit of St. Louis (SUS)', zip: '63005', note: 'Private FBO Ramp Access' },
-  { city: 'Downtown St. Louis', zip: '63101 - 63103', note: 'Sports & Convention Shuttles' },
+  {
+    city: 'Chesterfield ↔ STL Airport',
+    zip: '63005, 63017',
+    note: 'Primary Hub & 24/7 Airport Transfers',
+    slug: 'chesterfield-to-stl-airport',
+  },
+  {
+    city: 'Spirit of St. Louis (SUS) FBO',
+    zip: '63005',
+    note: 'Signature, Million Air & Jet Aviation Ramp Access',
+    slug: 'spirit-of-st-louis-airport-sus',
+  },
+  {
+    city: 'Clayton Business District',
+    zip: '63105, 63124',
+    note: 'Hotels, Financial Towers & STL Express',
+    slug: 'clayton-to-stl-airport',
+  },
+  {
+    city: 'Town & Country & Frontenac',
+    zip: '63131',
+    note: 'Mason, Clayton Rd & Hospital Campuses',
+    slug: 'town-and-country-car-service',
+  },
+  {
+    city: 'Creve Coeur Corporate Campus',
+    zip: '63141, 63167',
+    note: 'Bayer, 39 North, Mercy & BJC West County',
+    slug: 'creve-coeur-executive-taxi',
+  },
+  {
+    city: 'Wildwood, Ballwin & Ellisville',
+    zip: '63038, 63040',
+    note: 'Guaranteed Far-West County Staging',
+    slug: 'wildwood-and-ellisville-taxi',
+  },
+  {
+    city: 'Maryland Heights & Westport',
+    zip: '63146, 63043',
+    note: '14-Min STL Airport & Westport Hotels',
+    slug: 'maryland-heights-westport-taxi',
+  },
+  {
+    city: 'Downtown St. Louis',
+    zip: '63101 - 63103',
+    note: "America's Center, Busch Stadium & Union Station",
+    slug: 'downtown-st-louis-airport-transfer',
+  },
 ];
 
 export default function ServicesRoute() {
@@ -369,7 +409,7 @@ export default function ServicesRoute() {
 
                 <div className="px-6 pb-6 pt-2">
                   <Link
-                    to={`/book?vehicle=${encodeURIComponent(tier.id)}`}
+                    to={`/book?vehicle=${tier.id === 'xl' ? 'suv' : 'sedan'}`}
                     className="text-xs font-bold text-slate-900 hover:text-blue-600 inline-flex items-center gap-1 transition-colors"
                   >
                     <span>Book This Vehicle</span>
@@ -391,25 +431,39 @@ export default function ServicesRoute() {
               West County &amp; Regional Hubs
             </h2>
             <p className="text-sm text-slate-600">
-              We provide continuous, round-the-clock service across the following primary zones:
+              Select any corridor below to view instant upfront quotes, STL terminal door guides,
+              and local landmarks:
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
             {SERVICE_ZONES.map((zone) => (
-              <div
-                key={zone.city}
-                className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start justify-between gap-3 text-sm"
+              <Link
+                key={zone.slug}
+                to={`/service-areas/${zone.slug}`}
+                className="p-4 rounded-xl bg-slate-50 hover:bg-blue-50/50 border border-slate-200/80 hover:border-blue-400 flex items-start justify-between gap-3 text-sm transition-all group"
               >
                 <div>
-                  <span className="font-bold text-slate-900 block">{zone.city}</span>
+                  <span className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors block">
+                    {zone.city}
+                  </span>
                   <span className="text-slate-500 text-xs mt-0.5 block">{zone.note}</span>
                 </div>
                 <span className="font-mono text-xs text-blue-700 bg-blue-100/70 px-2 py-1 rounded-md font-semibold shrink-0">
                   {zone.zip}
                 </span>
-              </div>
+              </Link>
             ))}
+          </div>
+
+          <div className="pt-2 text-center">
+            <Link
+              to="/service-areas"
+              className="inline-flex items-center gap-2 text-xs sm:text-sm font-extrabold text-blue-600 hover:text-blue-700"
+            >
+              <span>Explore All 8 Pre-Quoted Airport &amp; West County Corridors</span>
+              <ChevronRightIcon className="w-4 h-4" />
+            </Link>
           </div>
         </div>
 

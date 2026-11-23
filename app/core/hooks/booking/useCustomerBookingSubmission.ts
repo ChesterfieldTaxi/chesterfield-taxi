@@ -212,13 +212,23 @@ export function createInitialCustomerBookingFormState(
   initialValues?: BookingEngineV2InitialValues,
   corporatePortalContext?: CorporatePortalBookingContext
 ): CustomerBookingFormState {
+  const initialVehicleChoice = initialValues?.vehicleChoice || 'any';
+  const initialPassengers =
+    typeof initialValues?.passengers === 'number' &&
+    Number.isFinite(initialValues.passengers) &&
+    initialValues.passengers >= 1
+      ? Math.min(14, Math.max(1, Math.trunc(initialValues.passengers)))
+      : 1;
+
   return {
     timingType: initialValues?.timingType || 'later',
     scheduledDate: initialValues?.scheduledDate || '',
     scheduledTime: initialValues?.scheduledTime || '',
 
-    pickupAddress: '',
-    dropoffAddress: '',
+    pickupAddress: initialValues?.pickupAddress || '',
+    pickupCoordinates: initialValues?.pickupCoordinates,
+    dropoffAddress: initialValues?.dropoffAddress || '',
+    dropoffCoordinates: initialValues?.dropoffCoordinates,
     intermediateStops: [],
 
     provideFlightInfo: false,
@@ -229,18 +239,18 @@ export function createInitialCustomerBookingFormState(
     fboFacility: '',
     hasCheckedLuggage: false,
 
-    passengerName: '',
-    passengerPhone: '',
-    passengerEmail: '',
+    passengerName: initialValues?.passengerName || '',
+    passengerPhone: initialValues?.passengerPhone || '',
+    passengerEmail: initialValues?.passengerEmail || '',
     additionalPassengers: [],
 
-    isBookerDifferent: false,
-    contactName: '',
-    contactPhone: '',
-    contactEmail: '',
-    contactRole: DEFAULT_BOOKER_ROLES[0],
+    isBookerDifferent: initialValues?.isBookerDifferent ?? false,
+    contactName: initialValues?.contactName || '',
+    contactPhone: initialValues?.contactPhone || '',
+    contactEmail: initialValues?.contactEmail || '',
+    contactRole: initialValues?.contactRole || DEFAULT_BOOKER_ROLES[0],
 
-    passengers: 1,
+    passengers: initialPassengers,
     carryOnBags: 1,
     checkedBags: 0,
     bags: 1,
@@ -255,9 +265,9 @@ export function createInitialCustomerBookingFormState(
     frontFacingCount: 0,
     boosterCount: 0,
 
-    vehicleChoice: 'any',
-    isVehicleAutoAssigned: true,
-    selectedVehicles: ['any'],
+    vehicleChoice: initialVehicleChoice,
+    isVehicleAutoAssigned: initialVehicleChoice === 'any',
+    selectedVehicles: [initialVehicleChoice],
 
     returnTrip: false,
     returnPickupAddress: '',
@@ -293,7 +303,7 @@ export function createInitialCustomerBookingFormState(
       musicOk: false,
     },
     gateCode: '',
-    driverNotes: '',
+    driverNotes: initialValues?.driverNotes || '',
     smsConsent: true,
 
     paymentMethod: corporatePortalContext

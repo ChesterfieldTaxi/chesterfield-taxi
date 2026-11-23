@@ -18,6 +18,7 @@ import {
   DEFAULT_UNIVERSAL_EXTRAS,
 } from '../../core/services/pricing/extras.service';
 import { getSurchargesService } from '../../core/services/pricing/surcharges.service';
+import { parseBookRouteQueryInitialValues } from '../../core/services/seo';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import type { FlightTelemetrySnapshot } from '../../core/types/flight';
 import {
@@ -496,54 +497,25 @@ export function BookingEngineV2({
   useEffect(() => {
     if (!location.search) return;
     try {
-      const params = new URLSearchParams(location.search);
-      const pickupParam = params.get('pickup');
-      const dropoffParam = params.get('dropoff');
-      const notesParam = params.get('notes');
-      const vehicleParam = params.get('vehicle') as CustomerVehicleChoice | null;
-      const passengersParam = params.get('passengers');
-      const timingParam = params.get('timing');
-      const pickupLat = params.get('pickupLat');
-      const pickupLng = params.get('pickupLng');
-      const dropoffLat = params.get('dropoffLat');
-      const dropoffLng = params.get('dropoffLng');
-
-      if (
-        pickupParam ||
-        dropoffParam ||
-        notesParam ||
-        vehicleParam ||
-        passengersParam ||
-        timingParam
-      ) {
-        setForm((prev) => ({
-          ...prev,
-          timingType:
-            timingParam === 'asap' || timingParam === 'later' ? timingParam : prev.timingType,
-          pickupAddress: pickupParam !== null ? pickupParam : prev.pickupAddress,
-          pickupCoordinates:
-            pickupLat && pickupLng
-              ? { lat: parseFloat(pickupLat), lng: parseFloat(pickupLng) }
-              : prev.pickupCoordinates,
-          dropoffAddress: dropoffParam !== null ? dropoffParam : prev.dropoffAddress,
-          dropoffCoordinates:
-            dropoffLat && dropoffLng
-              ? { lat: parseFloat(dropoffLat), lng: parseFloat(dropoffLng) }
-              : prev.dropoffCoordinates,
-          driverNotes: notesParam !== null ? notesParam : prev.driverNotes,
-          vehicleChoice:
-            vehicleParam && ['any', 'sedan', 'suv', 'van'].includes(vehicleParam)
-              ? vehicleParam
-              : prev.vehicleChoice,
-          selectedVehicles:
-            vehicleParam && ['any', 'sedan', 'suv', 'van'].includes(vehicleParam)
-              ? [vehicleParam]
-              : prev.selectedVehicles,
-          passengers: passengersParam
-            ? Math.max(1, parseInt(passengersParam, 10) || 1)
-            : prev.passengers,
-        }));
-      }
+      const parsed = parseBookRouteQueryInitialValues(new URLSearchParams(location.search));
+      if (!parsed) return;
+      setForm((prev) => ({
+        ...prev,
+        ...(parsed.timingType ? { timingType: parsed.timingType } : {}),
+        ...(parsed.pickupAddress !== undefined ? { pickupAddress: parsed.pickupAddress } : {}),
+        ...(parsed.pickupCoordinates ? { pickupCoordinates: parsed.pickupCoordinates } : {}),
+        ...(parsed.dropoffAddress !== undefined ? { dropoffAddress: parsed.dropoffAddress } : {}),
+        ...(parsed.dropoffCoordinates ? { dropoffCoordinates: parsed.dropoffCoordinates } : {}),
+        ...(parsed.driverNotes !== undefined ? { driverNotes: parsed.driverNotes } : {}),
+        ...(parsed.vehicleChoice
+          ? {
+              vehicleChoice: parsed.vehicleChoice,
+              selectedVehicles: [parsed.vehicleChoice],
+              isVehicleAutoAssigned: parsed.vehicleChoice === 'any',
+            }
+          : {}),
+        ...(parsed.passengers ? { passengers: parsed.passengers } : {}),
+      }));
     } catch (err) {
       console.warn('[BookingEngineV2] Error parsing search params:', err);
     }
@@ -575,6 +547,7 @@ export function BookingEngineV2({
         ? {
             vehicleChoice: initialValues.vehicleChoice,
             selectedVehicles: [initialValues.vehicleChoice],
+            isVehicleAutoAssigned: initialValues.vehicleChoice === 'any',
           }
         : {}),
       ...(initialValues.passengers ? { passengers: initialValues.passengers } : {}),
