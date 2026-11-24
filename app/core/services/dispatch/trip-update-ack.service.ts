@@ -364,18 +364,30 @@ export interface BuildPendingDriverUpdateAckParams {
   after: Partial<Trip>;
   updatedBy: string;
   source?: 'dispatch_edit' | 'guest_manage_ride';
+  requireDriverUpdateAck?: boolean;
   nowMs?: number;
 }
 
 /**
  * Builds a structured `PendingDriverUpdateAck` when an edit modifies driver-relevant
  * operational fields on an active assigned trip that retains its assigned driver.
- * Returns `null` if unassigned, reassigned to a different driver, terminal, or unchanged.
+ * Returns `null` if `requireDriverUpdateAck === false`, unassigned, reassigned, terminal, or unchanged.
  */
 export function buildPendingDriverUpdateAck(
   params: BuildPendingDriverUpdateAckParams
 ): PendingDriverUpdateAck | null {
-  const { before, after, updatedBy, source = 'dispatch_edit', nowMs } = params;
+  const {
+    before,
+    after,
+    updatedBy,
+    source = 'dispatch_edit',
+    requireDriverUpdateAck = true,
+    nowMs,
+  } = params;
+
+  if (requireDriverUpdateAck === false) {
+    return null;
+  }
 
   const afterStatus = String(after.status ?? before.status ?? '');
   if (TERMINAL_TRIP_STATUSES.has(afterStatus) || TERMINAL_TRIP_STATUSES.has(String(before.status || ''))) {
@@ -461,6 +473,40 @@ export function hasUnacknowledgedDriverUpdate(
       !ack.acknowledgedAt &&
       ack.changesSummary.length > 0
   );
+}
+
+/**
+ * Returns `true` when `trip` currently has an active, unacknowledged driver update revision
+ * whose `updatedAt` timestamp has exceeded `unacknowledgedAlertMinutes` (clamped 1..60, default 5).
+ */
+export function isDriverUpdateAckOverdue(
+  trip: Partial<Trip> | null | undefined,
+  unacknowledgedAlertMinutes: number = 5,
+  nowMs: number = Date.now()
+): boolean {
+  if (!trip || !trip.assignedDriverId) return false;
+  if (TERMINAL_TRIP_STATUSES.has(String(trip.status || ''))) return false;
+
+  const meta = (trip.metadata || {}) as Record<string, any>;
+  const rawAck = meta.pendingDriverUpdateAck;
+  const parsedAck = getPendingDriverUpdateAck(trip);
+
+  const isPending =
+    hasUnacknowledgedDriverUpdate(trip) ||
+    Boolean(rawAck && rawAck.requiresAck !== false && !rawAck.acknowledgedAt);
+  if (!isPending) return false;
+
+  const updatedIso = parsedAck?.updatedAt || rawAck?.updatedAt;
+  if (typeof updatedIso !== 'string' || !updatedIso.trim()) return false;
+  const updatedMs = Date.parse(updatedIso);
+  if (!Number.isFinite(updatedMs)) return false;
+
+  const rawThreshold = Number(unacknowledgedAlertMinutes);
+  const clampedMinutes = Number.isFinite(rawThreshold)
+    ? Math.min(60, Math.max(1, Math.round(rawThreshold)))
+    : 5;
+
+  return nowMs - updatedMs >= clampedMinutes * 60_000;
 }
 
 /**

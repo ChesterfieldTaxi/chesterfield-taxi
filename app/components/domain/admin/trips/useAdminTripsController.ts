@@ -104,10 +104,15 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
   const isArchivedTrip = (t: Trip) => Boolean(t.isArchived) || govService.isTripArchived(t.id);
 
   const exceptionByTripId = useMemo(() => {
-    const slaConfig = getAdminConfigService().getCachedSettings().dispatchAutomation;
+    const cached = getAdminConfigService().getCachedSettings();
+    const slaConfig = cached.dispatchAutomation;
+    const unacknowledgedAlertMinutes = cached.driverAppConfig?.unacknowledgedAlertMinutes;
     const map: Record<string, ClassifiedAdminTripException> = {};
     for (const trip of trips) {
-      map[trip.id] = classifyAdminTripExceptions(trip, { slaConfig });
+      map[trip.id] = classifyAdminTripExceptions(trip, {
+        slaConfig,
+        unacknowledgedAlertMinutes,
+      });
     }
     return map;
   }, [trips]);

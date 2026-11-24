@@ -1,12 +1,14 @@
 import React, { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { type AdminUser } from '../core/services/auth/admin-auth.service';
-import { getAdminConfigService } from '../core/services/config/admin-config.service';
+import {
+  getAdminConfigService,
+  normalizeDispatchConsoleConfig,
+} from '../core/services/config/admin-config.service';
 import { getBookingService } from '../core/services/booking';
 import type { AppSettings } from '../core/types/config';
 import type { Trip } from '../core/types/trip';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
-import { COMPANY_CONFIG } from '../config/companyConfig';
 import type { DispatchFormValues } from '../components/domain/dispatch/DispatchBookingEngine';
 import type { DateTimeRange } from '../components/domain/dispatch/CustomDateTimePicker';
 import {
@@ -167,7 +169,8 @@ export default function DispatchRoute() {
   const [selectedTariffFilter, setSelectedTariffFilter] = useState<string>('all');
 
   // Draft Tabs & Mobile Navigation State
-  const maxDrafts = COMPANY_CONFIG.maxDispatchDrafts || 10;
+  const consoleCfg = normalizeDispatchConsoleConfig(settings.dispatchConsoleConfig, settings.enableRealtimeRouting);
+  const maxDrafts = consoleCfg.maxConcurrentDraftTabs;
   const hasHydratedClientTabsRef = useRef(false);
   const [drafts, setDrafts] = useState<DraftTab[]>([{ id: 'new-1', isNew: true }]);
   const [activeDraftId, setActiveDraftId] = useState<string>('new-1');
@@ -304,7 +307,7 @@ export default function DispatchRoute() {
     callSid?: string;
   } | null>(null);
 
-  const [displayLayout, setDisplayLayout] = useDisplayLayout('ct_dispatch_layout', 'table');
+  const [displayLayout, setDisplayLayout] = useDisplayLayout('ct_dispatch_layout', consoleCfg.defaultQueueLayout);
   const [workspaceLayout, setWorkspaceLayout] = useState<'compact' | 'split' | 'popout'>('compact');
   const [activeMobileTab, setActiveMobileTab] = useState<DispatchMobileTab>('queue');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
@@ -728,35 +731,30 @@ export default function DispatchRoute() {
       const paxName =
         `${savedTrip.passenger?.firstName || ''} ${savedTrip.passenger?.lastName || ''}`.trim() ||
         'Passenger';
+      const autoClear = normalizeDispatchConsoleConfig(
+        getAdminConfigService().getCachedSettings().dispatchConsoleConfig
+      ).autoClearFormAfterCreate;
       if (savedTrip.multiCarGroupId && (savedTrip.multiCarTotal || 1) > 1) {
         panelCallbacksRef.current.showDispatchToast(
-          `${isEdit ? 'Split into' : 'Created'} ${savedTrip.multiCarTotal} linked trips (${
-            savedTrip.multiCarGroupId
-          }) — assign each car individually.`,
+          `${isEdit ? 'Split into' : 'Created'} ${savedTrip.multiCarTotal} linked trips (${savedTrip.multiCarGroupId}) — assign each car individually.`,
           'success'
         );
       } else if (isEdit) {
         panelCallbacksRef.current.showDispatchToast(`Trip #${shortTripNo} updated.`, 'success');
       } else {
         panelCallbacksRef.current.showDispatchToast(
-          `Booked Trip #${shortTripNo} (${paxName}) — form cleared for next booking.`,
+          `Booked Trip #${shortTripNo} (${paxName})${autoClear ? ' — form cleared for next booking.' : '.'}`,
           'success'
         );
       }
       if (isEdit) {
-        try {
-          localStorage.removeItem(`chesterfield_dispatch_draft_${draftId}`);
-        } catch {}
-        setDrafts((prev) =>
-          prev.map((item) => (item.id === draftId ? { ...item, trip: savedTrip } : item))
-        );
+        try { localStorage.removeItem(`chesterfield_dispatch_draft_${draftId}`); } catch {}
+        setDrafts((prev) => prev.map((item) => (item.id === draftId ? { ...item, trip: savedTrip } : item)));
       } else {
-        try {
-          localStorage.removeItem(`chesterfield_dispatch_draft_${draftId}`);
-        } catch {}
-        setDrafts((prev) =>
-          prev.map((item) => (item.id === draftId ? { ...item, formValues: undefined } : item))
-        );
+        if (autoClear) {
+          try { localStorage.removeItem(`chesterfield_dispatch_draft_${draftId}`); } catch {}
+          setDrafts((prev) => prev.map((item) => (item.id === draftId ? { ...item, formValues: undefined } : item)));
+        }
         setSelectedQueueTripId(savedTrip.id);
         setSelectedMapTrip(savedTrip);
         setShouldZoomMap(true);

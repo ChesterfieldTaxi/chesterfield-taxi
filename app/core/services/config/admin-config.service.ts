@@ -26,10 +26,17 @@ import type {
   FleetAlertsConfig,
   OversizedBagCategory,
   DispatchAutomationConfig,
+  DispatchConsoleSettingsConfig,
+  StandingOrdersGovernanceConfig,
+  DriverAppPoliciesConfig,
 } from '../../types/config';
 import {
   DEFAULT_OVERSIZED_BAG_CATEGORIES,
   DEFAULT_DISPATCH_AUTOMATION_CONFIG,
+  DEFAULT_DISPATCH_CONSOLE_CONFIG,
+  DEFAULT_STANDING_ORDERS_CONFIG,
+  DEFAULT_DRIVER_APP_POLICIES_CONFIG,
+  DEFAULT_US_HOLIDAY_CALENDAR_DATES,
   DEFAULT_LOCALIZATION_CONFIG,
   DEFAULT_CORPORATE_PORTAL_POLICY,
   DEFAULT_BILLING_SETTINGS_CONFIG,
@@ -38,6 +45,11 @@ import {
   normalizeCorporatePortalPolicy,
   normalizeBillingSettingsConfig,
   normalizeDispatchAutomationConfig,
+  normalizeDispatchConsoleConfig,
+  normalizeStandingOrdersConfig,
+  normalizeDriverAppPoliciesConfig,
+  buildUsFederalHolidaysForYear,
+  mapDriverPolicyNavToPreferredApp,
   canOperatorConfigureLeadWindows,
 } from '../../types/config';
 import type { PricingConfig } from '../pricing/types';
@@ -46,7 +58,7 @@ import { getFirestoreDb, getFirebaseAuth, isFirebaseConfigured } from '../fireba
 import { sanitizePayload } from '../firestore-sanitizer';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { DEFAULT_TARIFF_PROFILES } from '../pricing/tariff.service';
-import { DEFAULT_UNIVERSAL_EXTRAS } from '../pricing/extras.service';
+import { DEFAULT_UNIVERSAL_EXTRAS, getUniversalExtrasService } from '../pricing/extras.service';
 import { DEFAULT_SURCHARGES_CONFIG } from '../pricing/surcharges.service';
 import { DEFAULT_NAMED_PRICING_RULES } from '../pricing/pricing-rules.service';
 import { DEFAULT_BOOKING_RULES_CONFIG } from '../bookingRulesEngine';
@@ -54,7 +66,16 @@ import { DEFAULT_BOOKING_RULES_CONFIG } from '../bookingRulesEngine';
 export {
   DEFAULT_OVERSIZED_BAG_CATEGORIES,
   DEFAULT_DISPATCH_AUTOMATION_CONFIG,
+  DEFAULT_DISPATCH_CONSOLE_CONFIG,
+  DEFAULT_STANDING_ORDERS_CONFIG,
+  DEFAULT_DRIVER_APP_POLICIES_CONFIG,
+  DEFAULT_US_HOLIDAY_CALENDAR_DATES,
   normalizeDispatchAutomationConfig,
+  normalizeDispatchConsoleConfig,
+  normalizeStandingOrdersConfig,
+  normalizeDriverAppPoliciesConfig,
+  buildUsFederalHolidaysForYear,
+  mapDriverPolicyNavToPreferredApp,
   canOperatorConfigureLeadWindows,
 };
 
@@ -514,6 +535,15 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   enableGetAppButtons: COMPANY_CONFIG.enableGetAppButtons ?? false,
   bookingRulesConfig: { ...DEFAULT_BOOKING_RULES_CONFIG },
   dispatchAutomation: { ...DEFAULT_DISPATCH_AUTOMATION_CONFIG },
+  dispatchConsoleConfig: normalizeDispatchConsoleConfig(
+    DEFAULT_DISPATCH_CONSOLE_CONFIG,
+    COMPANY_CONFIG.enableRealtimeRouting ?? false
+  ),
+  standingOrdersConfig: normalizeStandingOrdersConfig(DEFAULT_STANDING_ORDERS_CONFIG),
+  driverAppConfig: normalizeDriverAppPoliciesConfig(
+    DEFAULT_DRIVER_APP_POLICIES_CONFIG,
+    DEFAULT_UNIVERSAL_EXTRAS
+  ),
 };
 
 export const ADMIN_SETTINGS_LOCAL_STORAGE_KEY = 'chesterfield_taxi_app_settings';
@@ -538,6 +568,10 @@ export function sanitizePublicSettings(raw: Record<string, any> = {}): Partial<A
       raw.corporatePortalPolicy ?? DEFAULT_CORPORATE_PORTAL_POLICY
     ),
     bookingRulesConfig: raw.bookingRulesConfig ?? DEFAULT_APP_SETTINGS.bookingRulesConfig,
+    driverAppConfig: normalizeDriverAppPoliciesConfig(
+      raw.driverAppConfig ?? DEFAULT_APP_SETTINGS.driverAppConfig,
+      DEFAULT_UNIVERSAL_EXTRAS
+    ),
     cms: raw.cms,
     enableGetAppButtons: raw.enableGetAppButtons ?? DEFAULT_APP_SETTINGS.enableGetAppButtons,
     constructionMode: raw.constructionMode ?? DEFAULT_APP_SETTINGS.constructionMode,
@@ -700,6 +734,8 @@ export class AdminConfigService implements IAdminConfigService {
         : (DEFAULT_APP_SETTINGS.constructionMode ?? false),
       enableRealtimeRouting: incoming.enableRealtimeRouting !== undefined
         ? incoming.enableRealtimeRouting
+        : incoming.dispatchConsoleConfig?.enableRealtimeRouting !== undefined
+        ? incoming.dispatchConsoleConfig.enableRealtimeRouting
         : (DEFAULT_APP_SETTINGS.enableRealtimeRouting ?? false),
       enableGetAppButtons: incoming.enableGetAppButtons !== undefined
         ? incoming.enableGetAppButtons
@@ -729,6 +765,27 @@ export class AdminConfigService implements IAdminConfigService {
         incoming.dispatchAutomation ||
           this.cachedSettings?.dispatchAutomation ||
           DEFAULT_DISPATCH_AUTOMATION_CONFIG
+      ),
+      dispatchConsoleConfig: normalizeDispatchConsoleConfig(
+        incoming.dispatchConsoleConfig ||
+          this.cachedSettings?.dispatchConsoleConfig ||
+          DEFAULT_DISPATCH_CONSOLE_CONFIG,
+        incoming.enableRealtimeRouting !== undefined
+          ? incoming.enableRealtimeRouting
+          : incoming.dispatchConsoleConfig?.enableRealtimeRouting !== undefined
+          ? incoming.dispatchConsoleConfig.enableRealtimeRouting
+          : (DEFAULT_APP_SETTINGS.enableRealtimeRouting ?? false)
+      ),
+      standingOrdersConfig: normalizeStandingOrdersConfig(
+        incoming.standingOrdersConfig ||
+          this.cachedSettings?.standingOrdersConfig ||
+          DEFAULT_STANDING_ORDERS_CONFIG
+      ),
+      driverAppConfig: normalizeDriverAppPoliciesConfig(
+        incoming.driverAppConfig ||
+          this.cachedSettings?.driverAppConfig ||
+          DEFAULT_DRIVER_APP_POLICIES_CONFIG,
+        getUniversalExtrasService().getCached()
       ),
       updatedAt: incoming.updatedAt,
       updatedBy: incoming.updatedBy,
@@ -917,8 +974,69 @@ export class AdminConfigService implements IAdminConfigService {
         : normalizeDispatchAutomationConfig(
             this.cachedSettings.dispatchAutomation || DEFAULT_DISPATCH_AUTOMATION_CONFIG
           ),
+      enableRealtimeRouting:
+        updates.enableRealtimeRouting !== undefined
+          ? updates.enableRealtimeRouting
+          : updates.dispatchConsoleConfig?.enableRealtimeRouting !== undefined
+          ? updates.dispatchConsoleConfig.enableRealtimeRouting
+          : (this.cachedSettings.enableRealtimeRouting ?? false),
+      dispatchConsoleConfig: normalizeDispatchConsoleConfig(
+        updates.dispatchConsoleConfig
+          ? {
+              ...(this.cachedSettings.dispatchConsoleConfig || DEFAULT_DISPATCH_CONSOLE_CONFIG),
+              ...updates.dispatchConsoleConfig,
+            }
+          : (this.cachedSettings.dispatchConsoleConfig || DEFAULT_DISPATCH_CONSOLE_CONFIG),
+        updates.enableRealtimeRouting !== undefined
+          ? updates.enableRealtimeRouting
+          : updates.dispatchConsoleConfig?.enableRealtimeRouting !== undefined
+          ? updates.dispatchConsoleConfig.enableRealtimeRouting
+          : (this.cachedSettings.enableRealtimeRouting ?? false)
+      ),
+      standingOrdersConfig: updates.standingOrdersConfig
+        ? normalizeStandingOrdersConfig({
+            ...(this.cachedSettings.standingOrdersConfig || DEFAULT_STANDING_ORDERS_CONFIG),
+            ...updates.standingOrdersConfig,
+          })
+        : normalizeStandingOrdersConfig(
+            this.cachedSettings.standingOrdersConfig || DEFAULT_STANDING_ORDERS_CONFIG
+          ),
+      driverAppConfig: updates.driverAppConfig
+        ? normalizeDriverAppPoliciesConfig(
+            {
+              ...(this.cachedSettings.driverAppConfig || DEFAULT_DRIVER_APP_POLICIES_CONFIG),
+              ...updates.driverAppConfig,
+            },
+            getUniversalExtrasService().getCached()
+          )
+        : normalizeDriverAppPoliciesConfig(
+            this.cachedSettings.driverAppConfig || DEFAULT_DRIVER_APP_POLICIES_CONFIG,
+            getUniversalExtrasService().getCached()
+          ),
       updatedAt: new Date().toISOString(),
     };
+
+    // Bidirectional sync: when DriverAppPoliciesConfig updates stop free-wait or excess wait rate,
+    // mirror immediately into UniversalExtrasService so Pricing Extras & Driver HUD stay in lockstep.
+    if (updates.driverAppConfig && merged.driverAppConfig) {
+      try {
+        const extrasSvc = getUniversalExtrasService();
+        const currentExtras = extrasSvc.getCached();
+        const syncedExtras = {
+          ...currentExtras,
+          intermediateStopFreeWaitingMinutes:
+            merged.driverAppConfig.intermediateStopFreeWaitingMinutes,
+          curbWaitingRatePerMinute:
+            merged.driverAppConfig.intermediateStopExcessWaitRatePerMinute,
+          waitingRatePerMinute:
+            merged.driverAppConfig.intermediateStopExcessWaitRatePerMinute,
+        };
+        extrasSvc.setCached(syncedExtras);
+        void extrasSvc.saveExtras(syncedExtras).catch(() => {});
+      } catch {
+        // Non-fatal sync
+      }
+    }
 
     this.cachedSettings = merged;
     this.saveToLocalStorage(merged);

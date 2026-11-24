@@ -11,11 +11,16 @@ import type {
   DriverTimeOff,
 } from '../core/types/driver';
 import type { Trip, TripStatus } from '../core/types/trip';
-import type { VehicleTierConfig } from '../core/types/config';
+import type { DriverAppPoliciesConfig, VehicleTierConfig } from '../core/types/config';
 import type { PhysicalFleetAsset } from '../core/types/fleet';
 import { getBookingService } from '../core/services/booking';
 import { authorizedFetch } from '../core/services/auth/auth-headers';
-import { getAdminConfigService } from '../core/services/config/admin-config.service';
+import {
+  DEFAULT_DRIVER_APP_POLICIES_CONFIG,
+  getAdminConfigService,
+  mapDriverPolicyNavToPreferredApp,
+  normalizeDriverAppPoliciesConfig,
+} from '../core/services/config/admin-config.service';
 import { getFleetService } from '../core/services/fleet/fleet.service';
 import {
   DEFAULT_TARIFF_PROFILES,
@@ -144,13 +149,25 @@ export default function DriverAppRoute() {
   const [lastStepUndo, setLastStepUndo] = useState<LastStepUndoState | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Preferred Navigation App
+  // Preferred Navigation App & Admin Driver App Policies
+  const [driverAppPolicies, setDriverAppPolicies] = useState<DriverAppPoliciesConfig>(
+    DEFAULT_DRIVER_APP_POLICIES_CONFIG
+  );
+  const [hasExplicitLocalNavPref, setHasExplicitLocalNavPref] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(NAV_PREF_KEY);
+      return saved === 'google' || saved === 'apple' || saved === 'waze';
+    }
+    return false;
+  });
   const [preferredNavApp, setPreferredNavApp] = useState<PreferredNavApp>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(NAV_PREF_KEY);
       if (saved === 'google' || saved === 'apple' || saved === 'waze') return saved;
     }
-    return 'google';
+    return mapDriverPolicyNavToPreferredApp(
+      getAdminConfigService().getCachedSettings().driverAppConfig?.defaultNavigationProvider
+    );
   });
 
   // Taximeter state (persisted per tripId in sessionStorage; stationary wait tracked separately)
@@ -274,6 +291,8 @@ export default function DriverAppRoute() {
       if (typeof s.pricing?.defaultDriverCommissionRate === 'number') {
         setGlobalCommissionRate(s.pricing.defaultDriverCommissionRate);
       }
+      const nextPolicies = normalizeDriverAppPoliciesConfig(s.driverAppConfig);
+      setDriverAppPolicies(nextPolicies);
     });
 
     getFleetService()
@@ -531,9 +550,17 @@ export default function DriverAppRoute() {
     onErrorNotice: handleMultiStopError,
   });
 
-  // Phase 34: Screen Wake Lock (automatically enabled whenever driver is On-Duty) & Web Push Alerts
+  // Sync fallback default navigation provider when driver has not chosen a local preference
+  useEffect(() => {
+    if (hasExplicitLocalNavPref) return;
+    setPreferredNavApp(
+      mapDriverPolicyNavToPreferredApp(driverAppPolicies.defaultNavigationProvider)
+    );
+  }, [hasExplicitLocalNavPref, driverAppPolicies.defaultNavigationProvider]);
+
+  // Phase 34: Screen Wake Lock (honors driverAppConfig.enforceScreenWakeLockOnDuty) & Web Push Alerts
   const wakeLock = useWakeLock({
-    enabled: driver?.dutyStatus === 'on_duty',
+    enabled: driver?.dutyStatus === 'on_duty' && driverAppPolicies.enforceScreenWakeLockOnDuty,
   });
 
   const handleNotificationFocus = useCallback((url: string) => {
@@ -578,9 +605,13 @@ export default function DriverAppRoute() {
         seenOfferIdsRef.current.add(offer.id);
         void pushNotificationService.notifyIncomingDriverOffer(offer);
       }
-      soundNotificationService.playDriverOfferAlert();
+      if (driverAppPolicies.enableAudibleOfferChime) {
+        soundNotificationService.playDriverOfferAlert();
+      } else {
+        soundNotificationService.stopDriverOfferAlert();
+      }
     }
-  }, [offeredTrips, driver?.dutyStatus]);
+  }, [offeredTrips, driver?.dutyStatus, driverAppPolicies.enableAudibleOfferChime]);
 
   useEffect(() => {
     return () => {
@@ -1453,6 +1484,7 @@ export default function DriverAppRoute() {
   }, [driver, driverService, scheduleConfig]);
 
   const handleChangeNavApp = useCallback((app: PreferredNavApp) => {
+    setHasExplicitLocalNavPref(true);
     setPreferredNavApp(app);
     if (typeof window !== 'undefined') {
       try {

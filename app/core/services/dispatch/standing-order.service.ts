@@ -39,8 +39,13 @@ import type {
 } from '../../types/trip';
 import { getBookingService } from '../booking';
 import type { IBookingService } from '../booking-service';
+import { getAdminConfigService } from '../config/admin-config.service';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
+import {
+  normalizeStandingOrdersConfig,
+  type StandingOrdersGovernanceConfig,
+} from '../../types/config';
 import type { AutoDispatchDriverInput } from './auto-dispatch-ranking';
 import {
   clearStagedDriver,
@@ -84,6 +89,21 @@ let seriesIdSeq = 0;
 
 function canUseClientFirestore(): boolean {
   return typeof window !== 'undefined' && isFirebaseConfigured();
+}
+
+function resolveEffectiveGovernanceConfig(
+  override?: Partial<StandingOrdersGovernanceConfig> | null
+): StandingOrdersGovernanceConfig {
+  if (override) {
+    return normalizeStandingOrdersConfig(override);
+  }
+  try {
+    return normalizeStandingOrdersConfig(
+      getAdminConfigService().getCachedSettings().standingOrdersConfig
+    );
+  } catch {
+    return normalizeStandingOrdersConfig(undefined);
+  }
 }
 
 function generateStandingOrderId(nowMs: number = Date.now()): string {
@@ -274,6 +294,9 @@ function normalizeStandingOrderSeries(raw: StandingOrderSeries): StandingOrderSe
       repeatWeeksPattern: raw.schedule?.repeatWeeksPattern || 'all',
       ...(raw.schedule?.untilDate ? { untilDate: raw.schedule.untilDate } : {}),
       skipDates: normalizeDateStringList(raw.schedule?.skipDates),
+      ...(raw.schedule?.skipHolidays !== undefined
+        ? { skipHolidays: Boolean(raw.schedule.skipHolidays) }
+        : {}),
     },
     preferredDriverId: raw.preferredDriverId ?? null,
     preferredDriverLabel: raw.preferredDriverLabel ?? null,
@@ -537,7 +560,10 @@ export interface CreateStandingOrderSeriesInput {
     repeatWeeksPattern?: StandingOrderWeeksPattern;
     untilDate?: string;
     skipDates?: string[];
+    skipHolidays?: boolean;
   };
+  skipHolidays?: boolean;
+  standingOrdersConfig?: Partial<StandingOrdersGovernanceConfig> | null;
   vehicleTier: VehicleTier;
   vehicleDisplayName?: string;
   pricingSnapshot: TripPricing;
@@ -563,13 +589,22 @@ export async function createStandingOrderSeries(
   const nowMs = input.nowMs ?? Date.now();
   const nowIso = new Date(nowMs).toISOString();
   const id = input.id?.trim() || generateStandingOrderId(nowMs);
+  const governance = resolveEffectiveGovernanceConfig(input.standingOrdersConfig);
 
   const hasPreferredDriver = Boolean(input.preferredDriverId);
   const preferredDriverMode: PreferredDriverAssignmentMode = hasPreferredDriver
-    ? input.preferredDriverMode === 'send_to_driver'
-      ? 'send_to_driver'
-      : 'stage_hold'
+    ? input.preferredDriverMode === 'send_to_driver' || input.preferredDriverMode === 'stage_hold'
+      ? input.preferredDriverMode
+      : governance.defaultAssignmentMode
     : 'unassigned';
+
+  const effectiveSkipHolidays = input.skipHolidays ?? input.schedule.skipHolidays;
+  const mergedCreateSkipDates = effectiveSkipHolidays
+    ? normalizeDateStringList([
+        ...(input.schedule.skipDates || []),
+        ...governance.holidayCalendarDates.map((h) => h.date),
+      ])
+    : normalizeDateStringList(input.schedule.skipDates);
 
   const series: StandingOrderSeries = normalizeStandingOrderSeries({
     id,
@@ -606,7 +641,10 @@ export async function createStandingOrderSeries(
       repeatDays: Array.isArray(input.schedule.repeatDays) ? [...input.schedule.repeatDays] : [],
       repeatWeeksPattern: input.schedule.repeatWeeksPattern ?? 'all',
       ...(input.schedule.untilDate ? { untilDate: input.schedule.untilDate } : {}),
-      skipDates: normalizeDateStringList(input.schedule.skipDates),
+      skipDates: mergedCreateSkipDates,
+      ...(effectiveSkipHolidays !== undefined
+        ? { skipHolidays: Boolean(effectiveSkipHolidays) }
+        : {}),
     },
     vehicleTier: input.vehicleTier,
     ...(input.vehicleDisplayName ? { vehicleDisplayName: input.vehicleDisplayName } : {}),
@@ -1025,6 +1063,8 @@ export interface ExtendStandingOrderHorizonParams {
   seriesId: string;
   additionalOccurrences?: number;
   extendDays?: number;
+  skipHolidays?: boolean;
+  standingOrdersConfig?: Partial<StandingOrdersGovernanceConfig> | null;
   existingTrips: Trip[];
   bookingService?: IBookingService;
   actorName?: string;
@@ -1075,25 +1115,43 @@ export async function extendStandingOrderHorizon(
       .pop() || formatLocalDate(new Date(nowMs));
 
   const dayAfterBaseStr = addLocalDays(baseDateStr, 1);
+  const governance = resolveEffectiveGovernanceConfig(params.standingOrdersConfig);
+  const maxCap = Math.min(180, Math.max(7, governance.maxHorizonDays));
 
   let effectiveUntilDate = series.schedule.untilDate || undefined;
-  let targetOccurrences = params.additionalOccurrences ?? 5;
+  const resolvedExtendDays =
+    typeof params.extendDays === 'number' && params.extendDays > 0
+      ? Math.min(maxCap, params.extendDays)
+      : params.additionalOccurrences === undefined
+      ? Math.min(maxCap, governance.defaultHorizonDays)
+      : undefined;
 
-  if (typeof params.extendDays === 'number' && params.extendDays > 0) {
-    const horizonWindowEnd = addLocalDays(baseDateStr, params.extendDays);
+  let targetOccurrences = params.additionalOccurrences ?? resolvedExtendDays ?? 5;
+
+  if (typeof resolvedExtendDays === 'number' && resolvedExtendDays > 0) {
+    const horizonWindowEnd = addLocalDays(baseDateStr, resolvedExtendDays);
     effectiveUntilDate =
       effectiveUntilDate && effectiveUntilDate < horizonWindowEnd
         ? effectiveUntilDate
         : horizonWindowEnd;
     if (params.additionalOccurrences === undefined) {
-      targetOccurrences = Math.min(60, Math.max(1, params.extendDays));
+      targetOccurrences = Math.min(maxCap, Math.max(1, resolvedExtendDays));
     }
   }
 
-  targetOccurrences = Math.min(60, Math.max(1, targetOccurrences));
+  targetOccurrences = Math.min(maxCap, Math.max(1, targetOccurrences));
+
+  const effectiveSkipHolidays =
+    params.skipHolidays ?? series.schedule.skipHolidays ?? false;
+  const effectiveSeriesSkipDates = effectiveSkipHolidays
+    ? normalizeDateStringList([
+        ...(series.schedule.skipDates || []),
+        ...governance.holidayCalendarDates.map((h) => h.date),
+      ])
+    : series.schedule.skipDates || [];
 
   const combinedExclusions = Array.from(
-    new Set([...(series.schedule.skipDates || []), ...existingActiveDates])
+    new Set([...effectiveSeriesSkipDates, ...existingActiveDates])
   );
 
   const targetDates = generateRecurringDates(
@@ -1105,7 +1163,7 @@ export async function extendStandingOrderHorizon(
     {
       repeatWeeksPattern: series.schedule.repeatWeeksPattern,
       skipDates: combinedExclusions,
-      maxCap: 60,
+      maxCap,
       includeStartDate: true,
       anchorDateStr: series.schedule.startDate || dayAfterBaseStr,
     }
@@ -1114,7 +1172,7 @@ export async function extendStandingOrderHorizon(
   const scanEndStr =
     targetDates.length > 0 ? targetDates[targetDates.length - 1] : effectiveUntilDate;
 
-  const skippedDates = (series.schedule.skipDates || []).filter((skipDate) => {
+  const skippedDates = effectiveSeriesSkipDates.filter((skipDate) => {
     if (skipDate < dayAfterBaseStr) return false;
     if (scanEndStr && skipDate > scanEndStr) return false;
     return doesDateMatchStandingSchedule(skipDate, series.schedule);
@@ -1269,7 +1327,10 @@ export interface RegisterStandingOrderFromBookingParams {
     repeatWeeksPattern: StandingOrderWeeksPattern;
     untilDate?: string;
     skipDates?: string[];
+    skipHolidays?: boolean;
   };
+  skipHolidays?: boolean;
+  standingOrdersConfig?: Partial<StandingOrdersGovernanceConfig> | null;
   vehicleTier: VehicleTier;
   vehicleDisplayName?: string;
   pricingSnapshot: TripPricing;
@@ -1295,12 +1356,17 @@ export async function registerStandingOrderFromDispatchBooking(
   params: RegisterStandingOrderFromBookingParams
 ): Promise<StandingOrderSeries> {
   const svc = params.bookingService ?? getBookingService();
+  const governance = resolveEffectiveGovernanceConfig(params.standingOrdersConfig);
   const hasSelectedDriver = Boolean(params.driverId && params.driverId !== 'unassigned');
+  const resolvedAssignmentMode =
+    params.driverAssignmentMode === 'send_to_driver' || params.driverAssignmentMode === 'stage_hold'
+      ? params.driverAssignmentMode
+      : governance.defaultAssignmentMode;
   const preferredDriverMode: PreferredDriverAssignmentMode = hasSelectedDriver
-    ? params.driverAssignmentMode === 'send_to_driver'
-      ? 'send_to_driver'
-      : 'stage_hold'
+    ? resolvedAssignmentMode
     : 'unassigned';
+  const effectiveSkipHolidays =
+    params.skipHolidays ?? params.schedule.skipHolidays ?? governance.defaultSkipHolidays;
 
   const allRecurringTrips = params.recurringOccurrences.flatMap((o) => o.trips);
   const allGeneratedTripIds = [
@@ -1316,6 +1382,8 @@ export async function registerStandingOrderFromDispatchBooking(
     passenger: params.passenger,
     route: params.route,
     schedule: params.schedule,
+    skipHolidays: effectiveSkipHolidays,
+    standingOrdersConfig: governance,
     vehicleTier: params.vehicleTier,
     vehicleDisplayName: params.vehicleDisplayName,
     pricingSnapshot: params.pricingSnapshot,

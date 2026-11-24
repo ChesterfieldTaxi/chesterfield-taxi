@@ -320,8 +320,18 @@ export function AdminTripsExceptionsPanel({
                   )}
 
                   {ex?.hasUnacknowledgedDriverAck && (
-                    <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-xs">
-                      <span className="font-extrabold">⏳ Awaiting Driver Ack: </span>
+                    <div
+                      className={`p-2.5 rounded-xl border text-xs ${
+                        ex.isDriverAckOverdue
+                          ? 'bg-rose-50 border-rose-300 text-rose-950'
+                          : 'bg-amber-50 border-amber-300 text-amber-950'
+                      }`}
+                    >
+                      <span className="font-extrabold">
+                        {ex.isDriverAckOverdue
+                          ? '🚨 Overdue Driver Ack: '
+                          : '⏳ Awaiting Driver Ack: '}
+                      </span>
                       <span className="text-[11px]">
                         {ex.driverAckSummary.length > 0
                           ? ex.driverAckSummary.join(' • ')

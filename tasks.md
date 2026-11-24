@@ -982,3 +982,22 @@
 - [x] 60.4 Deterministic Verification Suite (`scripts/test-admin-clients-and-billing-phase60.ts`) & Full Build Gates:
   - [x] 60.4.1 Create `scripts/test-admin-clients-and-billing-phase60.ts` verifying normalizers, PO regex & credit-limit enforcement, Pay Link policy defaults, pure payout math & CSV export, GL entries, monolith line ceilings, zero duplicate gateway credentials in `DriverPayoutsPanel.tsx`, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
   - [x] 60.4.2 Pass `npm run typecheck`, `test-admin-clients-and-billing-phase60.ts`, `test-admin-ia-phase59.ts`, `test-operational-analytics.ts`, and `npm run build` with `0` errors.
+
+## Phase 61 (Wave 5 Phase 3): `Dispatch & Automation` Top-Level Hub + `Drivers & Staff` App Policies & Monolith Decomposition (Live Engine Wiring)
+- [x] 61.0 Baseline Commit & Documentation Sync:
+  - [x] 61.0.1 Commit verified Phase 60 changes cleanly on `main` (`feat(phase-60): split clients/corporate directory from billing/payouts and add multi-role driver, staff & vendor settlements`).
+  - [x] 61.0.2 Document Platform Phase 61 (Wave 5 Phase 3) across `spec.md`, `plan.md`, and `tasks.md`.
+- [x] 61.1 `AppSettings` Schemas & Live Runtime Wiring (`Dispatch Console`, `Standing Orders` & `Driver App Policies`):
+  - [x] 61.1.1 Add `DispatchConsoleSettingsConfig`, `StandingOrdersGovernanceConfig`, `DriverAppPoliciesConfig`, and pure normalizers (`normalizeDispatchConsoleConfig`, `normalizeStandingOrdersConfig`, `normalizeDriverAppPoliciesConfig`) in `app/core/types/config.ts`, and wire persistence + bidirectional sync in `admin-config.service.ts`.
+  - [x] 61.1.2 Wire `conflictConfig` (`conflictGuardEnabled`, `nearbyWindowMinutes`, `tightTurnaroundMinutes`), `autoClearFormAfterCreate`, `defaultQueueLayout`, and `maxConcurrentDraftTabs` into `booking-conflict-checker.service.ts`, `useDispatchBookingSubmission.ts`, and `app/routes/dispatch.tsx` (`< 1,600`L).
+  - [x] 61.1.3 Wire `standingOrdersConfig` (`holidayCalendarDates` when `skipHolidays: true`, `defaultHorizonDays`, `maxHorizonDays`, `defaultAssignmentMode`) into `standing-order.service.ts`, `useDispatchBookingSubmission.ts`, and `StandingOrdersDrawer.tsx`.
+  - [x] 61.1.4 Wire `driverAppConfig` (`requireDriverUpdateAck`, `isDriverUpdateAckOverdue`, `intermediateStopFreeWaitingMinutes`, `intermediateStopExcessWaitRatePerMinute`, `enforceScreenWakeLockOnDuty`, `enableAudibleOfferChime`, `defaultNavigationProvider`) into `trip-update-ack.service.ts`, `admin-trips-exceptions.util.ts`, `useDispatchBookingSubmission.ts`, `useDriverMultiStopProgress.ts`, and `app/routes/driver.tsx` (`< 1,900`L).
+- [x] 61.2 Complete `Dispatch & Automation` Top-Level Hub (`AdminRulesTab.tsx < 350`L):
+  - [x] 61.2.1 Create `BookingIntakeRulesPanel.tsx` (`< 450`L), `BookingRulesSimulatorCard.tsx` (`< 350`L), `DispatchConsoleSettingsPanel.tsx` (`< 400`L), and `StandingOrderDefaultsPanel.tsx` (`< 400`L) under `app/components/domain/admin/rules/`; decompose `AdminRulesTab.tsx` (`< 350`L) and add `enableRealtimeRouting` cross-link in `AdminAdvancedTab.tsx`.
+- [x] 61.3 `Drivers & Staff` Sub-Pages, RBAC Permissions & `Driver App Policies` (`AdminOperatorsTab.tsx < 350`L):
+  - [x] 61.3.1 Expand `SUB_PAGES.operators` (`roster`, `permissions`, `driver-policies`, `onboarding`) in `app/core/utils/admin-nav.util.ts`.
+  - [x] 61.3.2 Create `operator-provisioning.util.ts` (`< 300`L), `OperatorRosterPanel.tsx` (`< 450`L), `OperatorEditorDrawer.tsx` (`< 450`L), `OperatorPermissionsPanel.tsx` (`< 380`L), and `DriverAppPoliciesPanel.tsx` (`< 380`L) under `app/components/domain/admin/operators/`, and decompose `AdminOperatorsTab.tsx` (`< 350`L).
+- [x] 61.4 Deterministic Verification Suite (`scripts/test-admin-automation-and-operators-phase61.ts`) & Full Build Gates:
+  - [x] 61.4.1 Create `scripts/test-admin-automation-and-operators-phase61.ts` testing all normalizers, conflict guard config overrides, holiday skip calendar & standing defaults, `requireDriverUpdateAck` & `isDriverUpdateAckOverdue`, `SUB_PAGES.operators` resolution, monolith line ceilings, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
+  - [x] 61.4.2 Pass `npm run typecheck`, `test-admin-automation-and-operators-phase61.ts`, `test-admin-clients-and-billing-phase60.ts`, `test-admin-ia-phase59.ts`, `test-standing-orders.ts`, `test-staged-driver-planner.ts`, and `npm run build` with `0` errors.
+

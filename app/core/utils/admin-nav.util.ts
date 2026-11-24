@@ -95,6 +95,8 @@ export const SUB_PAGES: Record<string, AdminSubPageItem[]> = {
   ],
   operators: [
     { key: 'roster', label: 'Roster' },
+    { key: 'permissions', label: 'Role & Lead-Window Access' },
+    { key: 'driver-policies', label: 'Driver App Policies' },
     { key: 'onboarding', label: 'Applications' },
   ],
 

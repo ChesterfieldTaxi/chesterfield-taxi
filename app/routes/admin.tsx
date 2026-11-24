@@ -754,7 +754,9 @@ export default function AdminLayout() {
 
             {normalizedTab === 'zones' && <AdminZonesTab initialSubTab={effectiveSub as any} />}
 
-            {normalizedTab === 'operators' && <AdminOperatorsTab initialSubTab={effectiveSub as any} />}
+            {normalizedTab === 'operators' && (
+              <AdminOperatorsTab initialSubTab={effectiveSub as any} settings={settings} />
+            )}
 
             {normalizedTab === 'advanced' && (
               <AdminAdvancedTab

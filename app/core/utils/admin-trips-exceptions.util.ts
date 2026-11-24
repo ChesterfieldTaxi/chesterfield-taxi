@@ -16,7 +16,10 @@ import { evaluateTripSlaUrgency } from '../services/dispatch/sla-monitor.service
 import {
   getPendingDriverUpdateAck,
   hasUnacknowledgedDriverUpdate,
+  isDriverUpdateAckOverdue,
 } from '../services/dispatch/trip-update-ack.service';
+
+export { isDriverUpdateAckOverdue };
 import {
   getPendingGuestChangeRequest,
   hasPendingGuestChangeRequest,
@@ -72,6 +75,7 @@ export interface ClassifiedAdminTripException {
   hasPendingRiderChangeRequest: boolean;
   riderChangeSummary: string | null;
   hasUnacknowledgedDriverAck: boolean;
+  isDriverAckOverdue: boolean;
   driverAckSummary: string[];
   isCancelledDeclinedOrNoShow: boolean;
 }
@@ -80,6 +84,7 @@ export function classifyAdminTripExceptions(
   trip: Trip,
   options?: {
     slaConfig?: Partial<DispatchAutomationConfig> | null;
+    unacknowledgedAlertMinutes?: number;
     nowMs?: number;
   }
 ): ClassifiedAdminTripException {
@@ -157,6 +162,13 @@ export function classifyAdminTripExceptions(
   const hasUnacknowledgedDriverAck = Boolean(
     hasUnacknowledgedDriverUpdate(trip) || (rawAck && !rawAck.acknowledgedAt)
   );
+  const isDriverAckOverdue =
+    hasUnacknowledgedDriverAck &&
+    isDriverUpdateAckOverdue(
+      trip,
+      options?.unacknowledgedAlertMinutes ?? 5,
+      options?.nowMs ?? Date.now()
+    );
   const driverAckSummary: string[] = Array.isArray(parsedAck?.changesSummary)
     ? parsedAck!.changesSummary
     : Array.isArray(rawAck?.changesSummary)
@@ -184,6 +196,7 @@ export function classifyAdminTripExceptions(
     hasPendingRiderChangeRequest,
     riderChangeSummary,
     hasUnacknowledgedDriverAck,
+    isDriverAckOverdue,
     driverAckSummary,
     isCancelledDeclinedOrNoShow,
   };

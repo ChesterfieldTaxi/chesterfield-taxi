@@ -1,0 +1,139 @@
+import React from 'react';
+import { Button } from '../../../ui/Button';
+import { CheckIcon, PlaneIcon, SlidersIcon, SpinnerIcon } from '../../../ui/Icons';
+import type { BookingRulesConfig } from '../../../../core/services/bookingRulesEngine';
+import type { ZoneGeofence } from '../../../../core/types/zone';
+import { ModularTierCard } from './ModularTierCard';
+import { BookingRulesSimulatorCard } from './BookingRulesSimulatorCard';
+
+export interface BookingIntakeRulesPanelProps {
+  config: BookingRulesConfig;
+  zones: ZoneGeofence[];
+  lambertInstructions: string;
+  isSaving: boolean;
+  onChangeConfig: (next: BookingRulesConfig) => void;
+  onChangeLambertInstructions: (next: string) => void;
+  onSave: () => void | Promise<void>;
+}
+
+export function BookingIntakeRulesPanel({
+  config,
+  zones,
+  lambertInstructions,
+  isSaving,
+  onChangeConfig,
+  onChangeLambertInstructions,
+  onSave,
+}: BookingIntakeRulesPanelProps) {
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div className="flex items-center gap-2.5">
+          <span className="p-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-700">
+            <SlidersIcon className="w-5 h-5" />
+          </span>
+          <div>
+            <h2 className="text-xl font-black text-slate-900">Booking Intake Rules</h2>
+            <p className="text-xs text-slate-500 font-medium">
+              Set conditions for Auto-Confirm, Dispatcher Review, and Blocked Bookings.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <Button
+            variant="primary"
+            onClick={onSave}
+            disabled={isSaving}
+            className="w-full sm:w-auto justify-center flex items-center gap-2 px-5 py-2.5 text-xs font-bold shadow-xs cursor-pointer"
+          >
+            {isSaving ? (
+              <SpinnerIcon className="w-4 h-4 animate-spin" />
+            ) : (
+              <CheckIcon className="w-4 h-4" />
+            )}
+            Save Booking Rules
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <ModularTierCard
+          tierKey="tier1"
+          tierNumber={1}
+          title="Tier 1: Auto-Confirm"
+          subtitle="Trips meeting all Tier 1 rules are confirmed automatically without dispatcher review."
+          colorTheme="emerald"
+          config={config.tier1}
+          zones={zones}
+          onChange={(t1) => onChangeConfig({ ...config, tier1: t1 })}
+        />
+
+        <ModularTierCard
+          tierKey="tier2"
+          tierNumber={2}
+          title="Tier 2: Require Dispatcher Review"
+          subtitle="Trips matching any Tier 2 rule are placed in the dispatch review queue."
+          colorTheme="amber"
+          config={config.tier2}
+          zones={zones}
+          onChange={(t2) => onChangeConfig({ ...config, tier2: t2 })}
+        />
+
+        <ModularTierCard
+          tierKey="tier3"
+          tierNumber={3}
+          title="Tier 3: Block Booking"
+          subtitle="Trips matching any Tier 3 rule are automatically blocked and logged."
+          colorTheme="rose"
+          config={config.tier3}
+          zones={zones}
+          onChange={(t3) => onChangeConfig({ ...config, tier3: t3 })}
+        />
+
+        {/* Airport Curbside Pickup Instructions */}
+        <div className="p-5 bg-white border border-blue-200 rounded-2xl shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                <PlaneIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  STL Lambert Airport Curbside Pickup Instructions
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Curbside doors, terminal baggage claim instructions, or driver meetup points shown to passengers in confirmation emails and receipts when pickup is STL Lambert Airport.
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 uppercase tracking-wider self-start sm:self-auto">
+              Airport Rules
+            </span>
+          </div>
+
+          <textarea
+            rows={3}
+            value={lambertInstructions}
+            onChange={(e) => onChangeLambertInstructions(e.target.value)}
+            placeholder="e.g. Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time."
+            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
+          />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-500">
+            <span>Synced automatically with Website → Booking &amp; /track → Airport Rules.</span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isSaving}
+              onClick={onSave}
+              className="text-xs font-bold w-full sm:w-auto justify-center shrink-0"
+            >
+              Save Airport Description
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <BookingRulesSimulatorCard config={config} zones={zones} />
+    </div>
+  );
+}

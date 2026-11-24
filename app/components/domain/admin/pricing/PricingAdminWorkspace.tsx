@@ -281,6 +281,20 @@ export function PricingAdminWorkspace({
       await saveUniversalExtrasConfig(updated);
       setUniversalExtras(updated);
       setDraftExtras(null);
+      const cached = settings || getAdminConfigService().getCachedSettings();
+      const nextDriverApp = {
+        ...(cached.driverAppConfig || {}),
+        ...(typeof updated.intermediateStopFreeWaitingMinutes === 'number'
+          ? { intermediateStopFreeWaitingMinutes: updated.intermediateStopFreeWaitingMinutes }
+          : {}),
+        intermediateStopExcessWaitRatePerMinute:
+          updated.curbWaitingRatePerMinute ?? updated.waitingRatePerMinute ?? 0.5,
+      };
+      if (settings && onSave) {
+        await onSave({ driverAppConfig: nextDriverApp as any });
+      } else {
+        await getAdminConfigService().updateSettings({ driverAppConfig: nextDriverApp as any });
+      }
       await recordAndMirrorAuditEvents(events);
     } catch (e) {
       console.error('Error saving universal extras:', e);

@@ -22,6 +22,10 @@ import {
   type DriverRosterItem,
 } from '../../../core/services/operator.service';
 import { getAdminAuthService } from '../../../core/services/auth/admin-auth.service';
+import {
+  getAdminConfigService,
+  normalizeStandingOrdersConfig,
+} from '../../../core/services/config/admin-config.service';
 import { DriverAssignDropdown } from './queue/DriverAssignDropdown';
 import {
   CarIcon,
@@ -82,8 +86,16 @@ function StandingOrderSeriesCard({
   const [pendingSkipDate, setPendingSkipDate] = useState('');
   const [cancelMatchingOnSkip, setCancelMatchingOnSkip] = useState(true);
   const [draftDriverId, setDraftDriverId] = useState<string>(series.preferredDriverId || '');
+  const defaultGovCfg = useMemo(
+    () => normalizeStandingOrdersConfig(getAdminConfigService().getCachedSettings().standingOrdersConfig),
+    []
+  );
   const [draftDriverMode, setDraftDriverMode] = useState<'stage_hold' | 'send_to_driver'>(
-    series.preferredDriverMode === 'send_to_driver' ? 'send_to_driver' : 'stage_hold'
+    series.preferredDriverMode === 'send_to_driver'
+      ? 'send_to_driver'
+      : series.preferredDriverMode === 'stage_hold'
+      ? 'stage_hold'
+      : defaultGovCfg.defaultAssignmentMode
   );
 
   useEffect(() => {
@@ -585,6 +597,19 @@ function StandingOrderSeriesCard({
           </div>
 
           <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() =>
+                handleExtendHorizon({
+                  extendDays: defaultGovCfg.defaultHorizonDays,
+                  label: `+${defaultGovCfg.defaultHorizonDays} Days (Default)`,
+                })
+              }
+              className="px-2.5 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 border border-emerald-400 text-emerald-950 font-extrabold text-[11px] transition-colors cursor-pointer disabled:opacity-40"
+            >
+              +{defaultGovCfg.defaultHorizonDays}d Default
+            </button>
             <button
               type="button"
               disabled={isBusy}

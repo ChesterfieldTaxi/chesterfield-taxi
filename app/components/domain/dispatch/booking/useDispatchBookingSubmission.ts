@@ -33,7 +33,12 @@ import {
   buildAssociateEntryFromTrip,
 } from '../../../../core/services/booking/multi-car.util';
 import { getAdminAuthService } from '../../../../core/services/auth/admin-auth.service';
-import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
+import {
+  getAdminConfigService,
+  normalizeDispatchConsoleConfig,
+  normalizeStandingOrdersConfig,
+  normalizeDriverAppPoliciesConfig,
+} from '../../../../core/services/config/admin-config.service';
 import { getEmailDispatchService } from '../../../../core/services/email';
 import {
   formatDriverAssignmentLabel,
@@ -1219,6 +1224,37 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isConflictPromptOpen, setIsConflictPromptOpen] = useState(false);
+  const [liveAppSettings, setLiveAppSettings] = useState(() =>
+    getAdminConfigService().getCachedSettings()
+  );
+
+  useEffect(() => {
+    const unsub = getAdminConfigService().subscribeToSettings((s) => {
+      setLiveAppSettings(s);
+    });
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, []);
+
+  const dispatchConsoleConfig = useMemo(
+    () =>
+      normalizeDispatchConsoleConfig(
+        liveAppSettings.dispatchConsoleConfig,
+        liveAppSettings.enableRealtimeRouting
+      ),
+    [liveAppSettings.dispatchConsoleConfig, liveAppSettings.enableRealtimeRouting]
+  );
+
+  const standingOrdersConfig = useMemo(
+    () => normalizeStandingOrdersConfig(liveAppSettings.standingOrdersConfig),
+    [liveAppSettings.standingOrdersConfig]
+  );
+
+  const driverAppConfig = useMemo(
+    () => normalizeDriverAppPoliciesConfig(liveAppSettings.driverAppConfig, universalExtrasConfig),
+    [liveAppSettings.driverAppConfig, universalExtrasConfig]
+  );
 
   const bookingConflictSummary: BookingConflictCheckSummary = useMemo(
     () =>
@@ -1245,6 +1281,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
         allTrips: allTrips || [],
         excludeTripId: isEditMode ? initialTrip?.id : null,
         excludeMultiCarGroupId: isEditMode ? initialTrip?.multiCarGroupId : null,
+        conflictConfig: dispatchConsoleConfig,
       }),
     [
       timingType,
@@ -1270,6 +1307,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
       isEditMode,
       initialTrip?.id,
       initialTrip?.multiCarGroupId,
+      dispatchConsoleConfig,
     ]
   );
 
@@ -2079,6 +2117,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
               after: car1Updates,
               updatedBy: stagingActorName,
               source: 'dispatch_edit',
+              requireDriverUpdateAck: driverAppConfig.requireDriverUpdateAck,
             });
             if (car1Ack) {
               car1Updates.metadata = {
@@ -2354,6 +2393,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
             after: updates,
             updatedBy: stagingActorName,
             source: 'dispatch_edit',
+            requireDriverUpdateAck: driverAppConfig.requireDriverUpdateAck,
           });
           if (pendingAck) {
             updates.metadata = {
@@ -2831,6 +2871,14 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
         }
 
         if (repeat && scheduledDate && scheduledTime) {
+          const effectiveRecurringSkipDates = standingOrdersConfig.defaultSkipHolidays
+            ? Array.from(
+                new Set([
+                  ...repeatSkipDates,
+                  ...standingOrdersConfig.holidayCalendarDates.map((h) => h.date),
+                ])
+              )
+            : repeatSkipDates;
           const extraDates = generateRecurringDates(
             scheduledDate,
             repeatFrequency,
@@ -2839,7 +2887,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
             repeatUntilDate,
             {
               repeatWeeksPattern,
-              skipDates: repeatSkipDates,
+              skipDates: effectiveRecurringSkipDates,
             }
           );
           const recurringOccurrences: Array<{ date: string; trips: Trip[] }> = [];
@@ -2978,7 +3026,10 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                 repeatWeeksPattern,
                 untilDate: repeatUntilDate || undefined,
                 skipDates: repeatSkipDates,
+                skipHolidays: standingOrdersConfig.defaultSkipHolidays,
               },
+              skipHolidays: standingOrdersConfig.defaultSkipHolidays,
+              standingOrdersConfig,
               vehicleTier: String(tier) as VehicleTier,
               vehicleDisplayName: primaryVehicleDisplayName,
               pricingSnapshot: persistedOutboundPricing,
@@ -3121,11 +3172,12 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           } catch {}
         }
 
-        try {
-          localStorage.removeItem(draftStorageKey);
-        } catch {}
-
-        onResetAfterCreate?.();
+        if (dispatchConsoleConfig.autoClearFormAfterCreate) {
+          try {
+            localStorage.removeItem(draftStorageKey);
+          } catch {}
+          onResetAfterCreate?.();
+        }
         onBookingSuccess?.(createdTrip, false);
       }
     } catch (err: any) {

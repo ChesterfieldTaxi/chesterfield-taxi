@@ -40,6 +40,7 @@ export interface StandingOrderSchedule {
   repeatWeeksPattern: StandingOrderWeeksPattern;
   untilDate?: string; // YYYY-MM-DD
   skipDates: string[]; // YYYY-MM-DD[]
+  skipHolidays?: boolean;
 }
 
 export interface StandingOrderSeries {

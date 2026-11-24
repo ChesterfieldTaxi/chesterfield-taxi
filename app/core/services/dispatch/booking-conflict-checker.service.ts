@@ -9,6 +9,10 @@
  */
 
 import type { Trip } from '../../types/trip';
+import {
+  normalizeDispatchConsoleConfig,
+  type DispatchConsoleSettingsConfig,
+} from '../../types/config';
 import type { AutoDispatchDriverInput } from './auto-dispatch-ranking';
 import {
   computeDriverScheduleTimeline,
@@ -72,6 +76,7 @@ export interface EvaluateDispatchBookingConflictsParams {
   allTrips: ReadonlyArray<Trip>;
   excludeTripId?: string | null;
   excludeMultiCarGroupId?: string | null;
+  conflictConfig?: Partial<DispatchConsoleSettingsConfig> | null;
   nowMs?: number;
 }
 
@@ -252,8 +257,22 @@ export function evaluateDispatchBookingConflicts(
     allTrips,
     excludeTripId,
     excludeMultiCarGroupId,
+    conflictConfig,
     nowMs = Date.now(),
   } = params;
+
+  if (conflictConfig?.conflictGuardEnabled === false) {
+    return {
+      hasConflicts: false,
+      hasCriticalConflicts: false,
+      criticalCount: 0,
+      warningCount: 0,
+      conflicts: [],
+      signature: 'disabled',
+    };
+  }
+
+  const resolvedConflictCfg = normalizeDispatchConsoleConfig(conflictConfig);
 
   if (!Array.isArray(allTrips) || allTrips.length === 0) {
     return {
@@ -362,7 +381,7 @@ export function evaluateDispatchBookingConflicts(
           pickupTimeLabel: pickupLabel,
           routeLabel,
         });
-      } else if (pickupDiffMinutes <= 90) {
+      } else if (pickupDiffMinutes <= resolvedConflictCfg.nearbyWindowMinutes) {
         conflicts.push({
           id: `pax-nearby:${leg}:${existing.id}`,
           kind: 'passenger_nearby_booking',
@@ -446,7 +465,7 @@ export function evaluateDispatchBookingConflicts(
     const timeline = computeDriverScheduleTimeline(
       driverId,
       [...activeCandidateTrips, probeTrip],
-      { tightBufferMinutes: 15, nowMs }
+      { tightBufferMinutes: resolvedConflictCfg.tightTurnaroundMinutes, nowMs }
     );
     const probeIdx = timeline.items.findIndex((it) => it.trip.id === probeId);
 

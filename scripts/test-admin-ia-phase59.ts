@@ -151,7 +151,12 @@ function testAdminNavigationAndLegacyRedirects(): void {
   ]);
   assert.deepEqual(SUB_PAGES.vehicles.map((s) => s.key), ['types', 'fleet']);
   assert.deepEqual(SUB_PAGES.zones.map((s) => s.key), ['zones', 'places', 'groups', 'blacklists']);
-  assert.deepEqual(SUB_PAGES.operators.map((s) => s.key), ['roster', 'onboarding']);
+  assert.deepEqual(SUB_PAGES.operators.map((s) => s.key), [
+    'roster',
+    'permissions',
+    'driver-policies',
+    'onboarding',
+  ]);
   assert.deepEqual(SUB_PAGES.website.map((s) => s.key), [
     'themes',
     'form',

@@ -1273,6 +1273,304 @@ export function canOperatorConfigureLeadWindows(
   return false;
 }
 
+export type DispatchQueueLayoutMode = 'auto' | 'table' | 'cards' | 'compact';
+
+export interface DispatchConsoleSettingsConfig {
+  conflictGuardEnabled: boolean; // default true
+  nearbyWindowMinutes: number; // default 90, clamped 15..360
+  tightTurnaroundMinutes: number; // default 15, clamped 5..120
+  autoClearFormAfterCreate: boolean; // default true
+  defaultQueueLayout: DispatchQueueLayoutMode; // default 'auto'
+  maxConcurrentDraftTabs: number; // default 8, clamped 2..20
+  enableRealtimeRouting: boolean; // synced with top-level AppSettings.enableRealtimeRouting
+}
+
+export const DEFAULT_DISPATCH_CONSOLE_CONFIG: DispatchConsoleSettingsConfig = {
+  conflictGuardEnabled: true,
+  nearbyWindowMinutes: 90,
+  tightTurnaroundMinutes: 15,
+  autoClearFormAfterCreate: true,
+  defaultQueueLayout: 'auto',
+  maxConcurrentDraftTabs: 8,
+  enableRealtimeRouting: false,
+};
+
+export function normalizeDispatchConsoleConfig(
+  raw?: Partial<DispatchConsoleSettingsConfig> | null,
+  enableRealtimeRouting?: boolean
+): DispatchConsoleSettingsConfig {
+  const clampInt = (val: unknown, fallback: number, min: number, max: number): number => {
+    const num = typeof val === 'number' ? val : val !== undefined && val !== '' ? Number(val) : NaN;
+    if (!Number.isFinite(num)) return fallback;
+    return Math.min(max, Math.max(min, Math.round(num)));
+  };
+
+  const validLayouts: readonly DispatchQueueLayoutMode[] = ['auto', 'table', 'cards', 'compact'];
+  const defaultQueueLayout: DispatchQueueLayoutMode =
+    raw?.defaultQueueLayout && validLayouts.includes(raw.defaultQueueLayout)
+      ? raw.defaultQueueLayout
+      : DEFAULT_DISPATCH_CONSOLE_CONFIG.defaultQueueLayout;
+
+  const syncedRealtimeRouting =
+    typeof enableRealtimeRouting === 'boolean'
+      ? enableRealtimeRouting
+      : typeof raw?.enableRealtimeRouting === 'boolean'
+      ? raw.enableRealtimeRouting
+      : DEFAULT_DISPATCH_CONSOLE_CONFIG.enableRealtimeRouting;
+
+  return {
+    conflictGuardEnabled:
+      raw?.conflictGuardEnabled !== undefined
+        ? Boolean(raw.conflictGuardEnabled)
+        : DEFAULT_DISPATCH_CONSOLE_CONFIG.conflictGuardEnabled,
+    nearbyWindowMinutes: clampInt(
+      raw?.nearbyWindowMinutes,
+      DEFAULT_DISPATCH_CONSOLE_CONFIG.nearbyWindowMinutes,
+      15,
+      360
+    ),
+    tightTurnaroundMinutes: clampInt(
+      raw?.tightTurnaroundMinutes,
+      DEFAULT_DISPATCH_CONSOLE_CONFIG.tightTurnaroundMinutes,
+      5,
+      120
+    ),
+    autoClearFormAfterCreate:
+      raw?.autoClearFormAfterCreate !== undefined
+        ? Boolean(raw.autoClearFormAfterCreate)
+        : DEFAULT_DISPATCH_CONSOLE_CONFIG.autoClearFormAfterCreate,
+    defaultQueueLayout,
+    maxConcurrentDraftTabs: clampInt(
+      raw?.maxConcurrentDraftTabs,
+      DEFAULT_DISPATCH_CONSOLE_CONFIG.maxConcurrentDraftTabs,
+      2,
+      20
+    ),
+    enableRealtimeRouting: syncedRealtimeRouting,
+  };
+}
+
+export interface HolidayCalendarEntry {
+  date: string; // YYYY-MM-DD
+  name: string;
+}
+
+export type StandingOrderDefaultHorizonDays = 7 | 14 | 30;
+export type StandingOrderDefaultAssignmentMode = 'stage_hold' | 'send_to_driver';
+
+export interface StandingOrdersGovernanceConfig {
+  defaultHorizonDays: StandingOrderDefaultHorizonDays; // default 14
+  maxHorizonDays: number; // default 60, clamped 7..180
+  defaultAssignmentMode: StandingOrderDefaultAssignmentMode; // default 'stage_hold'
+  defaultSkipHolidays: boolean; // default true
+  holidayCalendarDates: HolidayCalendarEntry[];
+}
+
+export function buildUsFederalHolidaysForYear(year: number): HolidayCalendarEntry[] {
+  const safeYear = Number.isFinite(year) && year >= 2020 && year <= 2100 ? Math.floor(year) : 2026;
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+
+  // Memorial Day: last Monday of May
+  const may31Dow = new Date(Date.UTC(safeYear, 4, 31)).getUTCDay();
+  const memorialDay = 31 - ((may31Dow + 6) % 7);
+
+  // Labor Day: 1st Monday of September
+  const sep1Dow = new Date(Date.UTC(safeYear, 8, 1)).getUTCDay();
+  const laborDay = 1 + ((1 - sep1Dow + 7) % 7);
+
+  // Thanksgiving: 4th Thursday of November
+  const nov1Dow = new Date(Date.UTC(safeYear, 10, 1)).getUTCDay();
+  const thanksgivingDay = 1 + ((4 - nov1Dow + 7) % 7) + 21;
+
+  return [
+    { date: `${safeYear}-01-01`, name: "New Year's Day" },
+    { date: `${safeYear}-05-${pad2(memorialDay)}`, name: 'Memorial Day' },
+    { date: `${safeYear}-07-04`, name: 'Independence Day' },
+    { date: `${safeYear}-09-${pad2(laborDay)}`, name: 'Labor Day' },
+    { date: `${safeYear}-11-${pad2(thanksgivingDay)}`, name: 'Thanksgiving Day' },
+    { date: `${safeYear}-12-24`, name: 'Christmas Eve' },
+    { date: `${safeYear}-12-25`, name: 'Christmas Day' },
+  ];
+}
+
+const SEED_HOLIDAY_BASE_YEAR = new Date().getFullYear();
+
+export const DEFAULT_US_HOLIDAY_CALENDAR_DATES: HolidayCalendarEntry[] = [
+  ...buildUsFederalHolidaysForYear(SEED_HOLIDAY_BASE_YEAR),
+  ...buildUsFederalHolidaysForYear(SEED_HOLIDAY_BASE_YEAR + 1),
+];
+
+export const DEFAULT_STANDING_ORDERS_CONFIG: StandingOrdersGovernanceConfig = {
+  defaultHorizonDays: 14,
+  maxHorizonDays: 60,
+  defaultAssignmentMode: 'stage_hold',
+  defaultSkipHolidays: true,
+  holidayCalendarDates: [...DEFAULT_US_HOLIDAY_CALENDAR_DATES],
+};
+
+export function normalizeStandingOrdersConfig(
+  raw?: Partial<StandingOrdersGovernanceConfig> | null
+): StandingOrdersGovernanceConfig {
+  const rawHorizon = Number(raw?.defaultHorizonDays);
+  const defaultHorizonDays: StandingOrderDefaultHorizonDays =
+    rawHorizon === 7 || rawHorizon === 14 || rawHorizon === 30 ? rawHorizon : 14;
+
+  const rawMax =
+    typeof raw?.maxHorizonDays === 'number'
+      ? raw.maxHorizonDays
+      : raw?.maxHorizonDays !== undefined
+      ? Number(raw.maxHorizonDays)
+      : NaN;
+  const maxHorizonDays = Number.isFinite(rawMax)
+    ? Math.min(180, Math.max(7, Math.round(rawMax)))
+    : DEFAULT_STANDING_ORDERS_CONFIG.maxHorizonDays;
+
+  const defaultAssignmentMode: StandingOrderDefaultAssignmentMode =
+    raw?.defaultAssignmentMode === 'send_to_driver' ? 'send_to_driver' : 'stage_hold';
+
+  const defaultSkipHolidays =
+    raw?.defaultSkipHolidays !== undefined
+      ? Boolean(raw.defaultSkipHolidays)
+      : DEFAULT_STANDING_ORDERS_CONFIG.defaultSkipHolidays;
+
+  let holidayCalendarDates: HolidayCalendarEntry[];
+  if (Array.isArray(raw?.holidayCalendarDates)) {
+    const byDate = new Map<string, HolidayCalendarEntry>();
+    for (const item of raw.holidayCalendarDates) {
+      if (!item || typeof item !== 'object') continue;
+      const dateStr = String(item.date || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+      const nameStr = String(item.name || '').trim() || 'Holiday';
+      byDate.set(dateStr, { date: dateStr, name: nameStr });
+    }
+    holidayCalendarDates = Array.from(byDate.values()).sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+  } else {
+    holidayCalendarDates = DEFAULT_US_HOLIDAY_CALENDAR_DATES.map((h) => ({ ...h }));
+  }
+
+  return {
+    defaultHorizonDays,
+    maxHorizonDays,
+    defaultAssignmentMode,
+    defaultSkipHolidays,
+    holidayCalendarDates,
+  };
+}
+
+export type DriverDefaultNavigationProvider = 'google_maps' | 'apple_maps' | 'waze';
+
+export interface DriverAppPoliciesConfig {
+  intermediateStopFreeWaitingMinutes: number; // default 5, clamped 0..30 (synced with UniversalExtrasConfig)
+  intermediateStopExcessWaitRatePerMinute: number; // default 0.50, clamped 0..10 (synced with UniversalExtrasConfig)
+  requireDriverUpdateAck: boolean; // default true
+  unacknowledgedAlertMinutes: number; // default 5, clamped 1..60
+  enforceScreenWakeLockOnDuty: boolean; // default true
+  enableAudibleOfferChime: boolean; // default true
+  defaultNavigationProvider: DriverDefaultNavigationProvider; // default 'google_maps'
+}
+
+export const DEFAULT_DRIVER_APP_POLICIES_CONFIG: DriverAppPoliciesConfig = {
+  intermediateStopFreeWaitingMinutes: 5,
+  intermediateStopExcessWaitRatePerMinute: 0.5,
+  requireDriverUpdateAck: true,
+  unacknowledgedAlertMinutes: 5,
+  enforceScreenWakeLockOnDuty: true,
+  enableAudibleOfferChime: true,
+  defaultNavigationProvider: 'google_maps',
+};
+
+export function normalizeDriverAppPoliciesConfig(
+  raw?: Partial<DriverAppPoliciesConfig> | null,
+  extras?: Partial<UniversalExtrasConfig> | null
+): DriverAppPoliciesConfig {
+  const clampNum = (
+    val: unknown,
+    fallback: number,
+    min: number,
+    max: number,
+    roundInt = false
+  ): number => {
+    const num = typeof val === 'number' ? val : val !== undefined && val !== '' ? Number(val) : NaN;
+    if (!Number.isFinite(num)) return fallback;
+    const clamped = Math.min(max, Math.max(min, num));
+    return roundInt ? Math.round(clamped) : Number(clamped.toFixed(2));
+  };
+
+  const fallbackFreeMins = clampNum(
+    extras?.intermediateStopFreeWaitingMinutes,
+    DEFAULT_DRIVER_APP_POLICIES_CONFIG.intermediateStopFreeWaitingMinutes,
+    0,
+    30,
+    true
+  );
+
+  const fallbackExcessRate = clampNum(
+    extras?.curbWaitingRatePerMinute ?? extras?.waitingRatePerMinute,
+    DEFAULT_DRIVER_APP_POLICIES_CONFIG.intermediateStopExcessWaitRatePerMinute,
+    0,
+    10,
+    false
+  );
+
+  const rawNav = String(raw?.defaultNavigationProvider || '').trim().toLowerCase();
+  let defaultNavigationProvider: DriverDefaultNavigationProvider = 'google_maps';
+  if (rawNav === 'apple_maps' || rawNav === 'apple') {
+    defaultNavigationProvider = 'apple_maps';
+  } else if (rawNav === 'waze') {
+    defaultNavigationProvider = 'waze';
+  } else if (rawNav === 'google_maps' || rawNav === 'google') {
+    defaultNavigationProvider = 'google_maps';
+  }
+
+  return {
+    intermediateStopFreeWaitingMinutes: clampNum(
+      raw?.intermediateStopFreeWaitingMinutes,
+      fallbackFreeMins,
+      0,
+      30,
+      true
+    ),
+    intermediateStopExcessWaitRatePerMinute: clampNum(
+      raw?.intermediateStopExcessWaitRatePerMinute,
+      fallbackExcessRate,
+      0,
+      10,
+      false
+    ),
+    requireDriverUpdateAck:
+      raw?.requireDriverUpdateAck !== undefined
+        ? Boolean(raw.requireDriverUpdateAck)
+        : DEFAULT_DRIVER_APP_POLICIES_CONFIG.requireDriverUpdateAck,
+    unacknowledgedAlertMinutes: clampNum(
+      raw?.unacknowledgedAlertMinutes,
+      DEFAULT_DRIVER_APP_POLICIES_CONFIG.unacknowledgedAlertMinutes,
+      1,
+      60,
+      true
+    ),
+    enforceScreenWakeLockOnDuty:
+      raw?.enforceScreenWakeLockOnDuty !== undefined
+        ? Boolean(raw.enforceScreenWakeLockOnDuty)
+        : DEFAULT_DRIVER_APP_POLICIES_CONFIG.enforceScreenWakeLockOnDuty,
+    enableAudibleOfferChime:
+      raw?.enableAudibleOfferChime !== undefined
+        ? Boolean(raw.enableAudibleOfferChime)
+        : DEFAULT_DRIVER_APP_POLICIES_CONFIG.enableAudibleOfferChime,
+    defaultNavigationProvider,
+  };
+}
+
+export function mapDriverPolicyNavToPreferredApp(
+  provider?: DriverDefaultNavigationProvider | string | null
+): 'google' | 'apple' | 'waze' {
+  const clean = String(provider || '').trim().toLowerCase();
+  if (clean === 'apple_maps' || clean === 'apple') return 'apple';
+  if (clean === 'waze') return 'waze';
+  return 'google';
+}
+
 export interface TelephonyIntegrationConfig {
   provider: 'twilio';
   accountSid: string;
@@ -1329,6 +1627,9 @@ export interface AppSettings {
   tariffGroups?: import('./tariff').TariffGroup[]; // Tariff Groups
   bookingRulesConfig?: import('../services/bookingRulesEngine').BookingRulesConfig;
   dispatchAutomation?: DispatchAutomationConfig;
+  dispatchConsoleConfig?: DispatchConsoleSettingsConfig;
+  standingOrdersConfig?: StandingOrdersGovernanceConfig;
+  driverAppConfig?: DriverAppPoliciesConfig;
   integrations?: IntegrationsConfig;
   constructionMode?: boolean;
   enableRealtimeRouting?: boolean;

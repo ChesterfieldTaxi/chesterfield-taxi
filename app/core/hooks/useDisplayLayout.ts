@@ -22,7 +22,7 @@ export function useDisplayLayout(
   defaultLayout: DisplayLayout = 'table',
   mobileBreakpoint: number = 768
 ): [DisplayLayout, (mode: DisplayLayout) => void] {
-  const [layout, setLayoutState] = useState<DisplayLayout>(defaultLayout);
+  const [layout, setLayoutState] = useState<DisplayLayout>('table');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

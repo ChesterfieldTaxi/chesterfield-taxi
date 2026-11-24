@@ -3,6 +3,10 @@ import type { UniversalExtrasConfig } from '../types/config';
 import type { Trip } from '../types/trip';
 import { getBookingService } from '../services/booking';
 import {
+  getAdminConfigService,
+  normalizeDriverAppPoliciesConfig,
+} from '../services/config/admin-config.service';
+import {
   DEFAULT_UNIVERSAL_EXTRAS,
   getUniversalExtrasService,
 } from '../services/pricing/extras.service';
@@ -45,19 +49,51 @@ export function useDriverMultiStopProgress({
   onSuccessNotice,
   onErrorNotice,
 }: UseDriverMultiStopProgressParams): DriverMultiStopProgressController {
-  const [extrasConfig, setExtrasConfig] = useState<UniversalExtrasConfig>(DEFAULT_UNIVERSAL_EXTRAS);
+  const [baseExtrasConfig, setBaseExtrasConfig] =
+    useState<UniversalExtrasConfig>(DEFAULT_UNIVERSAL_EXTRAS);
+  const [driverAppOverrides, setDriverAppOverrides] = useState(() =>
+    normalizeDriverAppPoliciesConfig(
+      getAdminConfigService().getCachedSettings().driverAppConfig,
+      DEFAULT_UNIVERSAL_EXTRAS
+    )
+  );
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [stopActionLoading, setStopActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     const svc = getUniversalExtrasService();
-    const unsub = svc.subscribeToExtras((cfg) => {
-      setExtrasConfig(cfg);
+    const unsubExtras = svc.subscribeToExtras((cfg) => {
+      setBaseExtrasConfig(cfg);
+    });
+    const unsubSettings = getAdminConfigService().subscribeToSettings((s) => {
+      setDriverAppOverrides(
+        normalizeDriverAppPoliciesConfig(s.driverAppConfig, svc.getCached())
+      );
     });
     return () => {
-      unsub();
+      unsubExtras();
+      if (typeof unsubSettings === 'function') unsubSettings();
     };
   }, []);
+
+  const extrasConfig = useMemo<UniversalExtrasConfig>(
+    () => ({
+      ...baseExtrasConfig,
+      intermediateStopFreeWaitingMinutes:
+        driverAppOverrides.intermediateStopFreeWaitingMinutes ??
+        baseExtrasConfig.intermediateStopFreeWaitingMinutes ??
+        5,
+      curbWaitingRatePerMinute:
+        driverAppOverrides.intermediateStopExcessWaitRatePerMinute ??
+        baseExtrasConfig.curbWaitingRatePerMinute ??
+        0.5,
+      waitingRatePerMinute:
+        driverAppOverrides.intermediateStopExcessWaitRatePerMinute ??
+        baseExtrasConfig.waitingRatePerMinute ??
+        0.5,
+    }),
+    [baseExtrasConfig, driverAppOverrides]
+  );
 
   const activeSummary = useMemo(() => summarizeTripStopProgress(activeTrip), [activeTrip]);
 
