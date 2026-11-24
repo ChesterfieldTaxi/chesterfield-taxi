@@ -17,7 +17,13 @@ import { getEmailDispatchService } from '../../../../core/services/email';
 import { authorizedFetch } from '../../../../core/services/auth/auth-headers';
 import { formatLocalDateStr } from '../../../../core/services/pricing/vehicle-matching';
 
-export type InvoicingSubTab = 'ledger' | 'accounts' | 'accounting-sync' | 'gateways' | 'telephony';
+export type InvoicingSubTab =
+  | 'ledger'
+  | 'accounts'
+  | 'payouts'
+  | 'accounting-sync'
+  | 'gateways'
+  | 'telephony';
 export type CorporateBillingCycleOption = 'net15' | 'net30' | 'net60' | 'immediate';
 export type CorporateAccountFilterMode = 'all' | 'po_enforced' | 'po_disabled';
 export type LedgerPeriodFilter = 'all' | '30d' | '7d' | 'today';

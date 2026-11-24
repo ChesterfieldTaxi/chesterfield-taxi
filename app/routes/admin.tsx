@@ -63,11 +63,6 @@ const AdminWebsiteTab = React.lazy(() =>
     default: m.AdminWebsiteTab,
   }))
 );
-const AdminArchiveTab = React.lazy(() =>
-  import('../components/domain/admin/AdminArchiveTab').then((m) => ({
-    default: m.AdminArchiveTab,
-  }))
-);
 const AdminIntegrationsSubpage = React.lazy(() =>
   import('../components/domain/admin/subpages/AdminIntegrationsSubpage').then((m) => ({
     default: m.AdminIntegrationsSubpage,
@@ -79,6 +74,11 @@ const AdminRulesTab = React.lazy(() =>
   }))
 );
 import {
+  SUB_PAGES as ADMIN_SUB_PAGES,
+  resolveAdminTabAndSub,
+  type AdminTabKey,
+} from '../core/utils/admin-nav.util';
+import {
   CarIcon,
   SpinnerIcon,
   BarChartIcon,
@@ -89,15 +89,26 @@ import {
   MapPinIcon,
   UserCheckIcon,
   SettingsIcon,
+  WrenchIcon,
   RadioIcon,
   MenuIcon,
   ExternalLinkIcon,
-  ArchiveBoxIcon,
   PaletteIcon,
   ZapIcon,
   SlidersIcon,
   XIcon,
 } from '../components/ui/Icons';
+
+export type { AdminTabKey };
+
+export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = {
+  ...ADMIN_SUB_PAGES,
+  dashboard: [
+    { key: 'overview', label: 'Overview' },
+    { key: 'analytics', label: 'Analytics & SLA' },
+    { key: 'telemetry', label: 'System Health' },
+  ],
+};
 
 export function meta() {
   return [
@@ -105,29 +116,6 @@ export function meta() {
     { name: 'description', content: 'Operator management and configuration console' },
   ];
 }
-
-export type AdminTabKey =
-  | 'dashboard'
-  | 'trips'
-  | 'invoicing'
-  | 'financials'
-  | 'integrations'
-  | 'customers'
-  | 'rates'
-  | 'vehicles'
-  | 'zones'
-  | 'operators'
-  | 'archive'
-  | 'advanced'
-  // Legacy tab aliases
-  | 'general'
-  | 'form'
-  | 'pricing'
-  | 'fleet'
-  | 'staff'
-  | 'bookings'
-  | 'layout'
-  | 'website';
 
 interface TabItem {
   key: AdminTabKey;
@@ -142,43 +130,43 @@ const PRIMARY_TABS: TabItem[] = [
     key: 'dashboard',
     label: 'Dashboard',
     icon: BarChartIcon,
-    description: 'Summary cards, revenue charts, system health, and analytics',
+    description: 'Summary cards, SLA & revenue analytics, and system health',
   },
   {
     key: 'trips',
-    label: 'Trips & Rules',
+    label: 'Trips',
     icon: HistoryIcon,
-    description: 'Active dispatch queue, booking rules, trip history, CSV export, and exceptions',
+    description: 'Active dispatch queue, standing orders, rider exceptions, and trip history',
   },
   {
-    key: 'invoicing',
-    label: 'Financials & Invoicing',
-    icon: CreditCardIcon,
-    description: 'Invoices, corporate account billing, statements, and QuickBooks sync',
-  },
-  {
-    key: 'integrations',
-    label: 'Integrations & APIs',
-    icon: ZapIcon,
-    description: 'Payment processors (Stripe & Square), Twilio voice & SMS, and webhooks',
+    key: 'automation',
+    label: 'Dispatch & Automation',
+    icon: RadioIcon,
+    description: 'Auto-Pilot lead windows, booking intake rules, conflict guard, and standing defaults',
   },
   {
     key: 'customers',
-    label: 'Clients',
+    label: 'Clients & Corporate',
     icon: UsersIcon,
-    description: 'Client directory, corporate accounts, and VIP profiles',
+    description: 'Passenger directory, corporate accounts, and VIP profiles',
+  },
+  {
+    key: 'invoicing',
+    label: 'Billing & Payouts',
+    icon: CreditCardIcon,
+    description: 'Invoices, corporate AR billing, driver & staff payouts, and QuickBooks sync',
   },
   {
     key: 'rates',
     label: 'Rates & Pricing',
     icon: DollarSignIcon,
-    description: 'Rates, extras, surcharges, pricing rules, and live fare preview',
+    description: 'Tariffs, extras, surcharges, pricing rules, and pricing audit log',
   },
   {
     key: 'vehicles',
-    label: 'Fleet & Vehicles',
+    label: 'Vehicles',
     icon: CarIcon,
-    description: 'Vehicle types and company car inventory',
+    description: 'Vehicle classes and physical company fleet cars',
   },
   {
     key: 'zones',
@@ -193,111 +181,30 @@ const PRIMARY_TABS: TabItem[] = [
     description: 'Driver and staff roster, permissions, contact info, and applications',
   },
   {
-    key: 'archive',
-    label: 'Archive',
-    icon: ArchiveBoxIcon,
-    description: 'Archived trips, clients, drivers, vehicles, zones, and rates with one-click restore',
+    key: 'website',
+    label: 'Website, Brand & SEO',
+    icon: PaletteIcon,
+    description: 'Themes & branding studio, booking & /track form, local SEO, pages, and sections',
   },
   {
-    key: 'website',
-    label: 'Website',
-    icon: PaletteIcon,
-    description: 'Pages, themes, booking form options, header & footer, and SEO',
+    key: 'integrations',
+    label: 'Comms & Integrations',
+    icon: ZapIcon,
+    description: 'Payment processors (Stripe & Square), Twilio voice & SMS, and webhooks',
   },
   {
     key: 'general',
-    label: 'General & Branding',
+    label: 'General',
     icon: SettingsIcon,
-    description: 'Brand colors, logo, company profile, and local settings',
+    description: 'Company info, operating hours, time format, units, and regional defaults',
   },
   {
     key: 'advanced',
-    label: 'Advanced Settings',
-    icon: SettingsIcon,
-    description: 'Permissions, activity log, and system maintenance',
+    label: 'System & Governance',
+    icon: WrenchIcon,
+    description: 'Access & roles, activity log, universal archive, and system maintenance',
   },
 ];
-
-export const SUB_PAGES: Record<string, Array<{ key: string; label: string }>> = {
-  dashboard: [
-    { key: 'overview', label: 'Overview' },
-    { key: 'telemetry', label: 'System Health' },
-    { key: 'analytics', label: 'Analytics' },
-  ],
-  trips: [
-    { key: 'dispatch', label: 'Active Queue' },
-    { key: 'history', label: 'Trip History' },
-    { key: 'rules', label: 'Booking Rules' },
-    { key: 'archive', label: 'Archived Trips' },
-    { key: 'exceptions', label: 'Exceptions' },
-  ],
-  invoicing: [
-    { key: 'ledger', label: 'Invoices & Ledger' },
-    { key: 'accounts', label: 'Corporate Accounts' },
-    { key: 'accounting-sync', label: 'QuickBooks Sync' },
-  ],
-  financials: [
-    { key: 'ledger', label: 'Invoices & Ledger' },
-    { key: 'accounts', label: 'Corporate Accounts' },
-    { key: 'accounting-sync', label: 'QuickBooks Sync' },
-  ],
-  integrations: [
-    { key: 'gateways', label: 'Payment Processing' },
-    { key: 'telephony', label: 'Phone & SMS' },
-    { key: 'webhooks', label: 'Webhooks & APIs' },
-  ],
-  customers: [
-    { key: 'directory', label: 'Directory' },
-    { key: 'corporate', label: 'Corporate' },
-  ],
-  rates: [
-    { key: 'rates', label: 'Rates' },
-    { key: 'extras', label: 'Extras' },
-    { key: 'surcharges', label: 'Surcharges' },
-    { key: 'rules', label: 'Pricing Rules' },
-  ],
-  vehicles: [
-    { key: 'types', label: 'Vehicle Types' },
-    { key: 'fleet', label: 'Cars' },
-  ],
-  zones: [
-    { key: 'zones', label: 'Geofences' },
-    { key: 'places', label: 'Places' },
-    { key: 'groups', label: 'Groups' },
-    { key: 'blacklists', label: 'Exclusions' },
-  ],
-  operators: [
-    { key: 'roster', label: 'Roster' },
-    { key: 'onboarding', label: 'Applications' },
-  ],
-  general: [
-    { key: 'studio', label: 'Branding' },
-    { key: 'profile', label: 'Business Profile' },
-  ],
-  website: [
-    { key: 'pages', label: 'Pages' },
-    { key: 'themes', label: 'Themes' },
-    { key: 'form', label: 'Booking Form' },
-    { key: 'layout', label: 'Page Sections' },
-    { key: 'navigation', label: 'Header & Footer' },
-    { key: 'seo', label: 'SEO & Analytics' },
-    { key: 'css', label: 'Custom CSS' },
-  ],
-  advanced: [
-    { key: 'security', label: 'Access & Roles' },
-    { key: 'audit', label: 'Activity Log' },
-    { key: 'system', label: 'Maintenance' },
-  ],
-  archive: [
-    { key: 'all', label: 'All' },
-    { key: 'trips', label: 'Trips' },
-    { key: 'customers', label: 'Clients' },
-    { key: 'operators', label: 'Drivers & Staff' },
-    { key: 'vehicles', label: 'Vehicles' },
-    { key: 'zones', label: 'Zones' },
-    { key: 'tariffs', label: 'Rates' },
-  ],
-};
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -333,53 +240,24 @@ export default function AdminLayout() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isSystemMenuOpen]);
 
-  // Active tab derived reactively from location.search with legacy aliasing
+  // Active tab & sub-page derived deterministically via resolveAdminTabAndSub
   const searchParams = new URLSearchParams(location.search);
-  const rawTab = (searchParams.get('tab') as AdminTabKey) || 'dashboard';
-
-  // Normalize legacy tab query parameters
-  let normalizedTab: AdminTabKey = rawTab;
-  let activeSubParam = searchParams.get('sub') || undefined;
-
-  if (rawTab === 'financials') {
-    normalizedTab = 'invoicing';
-  } else if (rawTab === 'pricing') {
-    normalizedTab = 'rates';
-  } else if (rawTab === 'fleet') {
-    normalizedTab = 'vehicles';
-    activeSubParam = 'fleet';
-  } else if (rawTab === 'staff') {
-    normalizedTab = 'operators';
-  } else if (rawTab === 'bookings') {
-    normalizedTab = 'trips';
-  } else if (rawTab === 'form' || rawTab === 'layout' || rawTab === 'website') {
-    normalizedTab = 'website';
-    activeSubParam = undefined;
-  }
-
-  if (normalizedTab === 'advanced' && (activeSubParam === 'website' || activeSubParam === 'form' || activeSubParam === 'customer-form')) {
-    normalizedTab = 'website';
-    activeSubParam = undefined;
-  }
-
-  // Current subpages for the active tab (safely handle empty arrays)
-  const currentSubList = SUB_PAGES[normalizedTab];
-  const effectiveSub =
-    activeSubParam || (currentSubList && currentSubList.length > 0 ? currentSubList[0].key : undefined);
+  const resolvedRoute = resolveAdminTabAndSub(
+    searchParams.get('tab'),
+    searchParams.get('sub'),
+    searchParams.get('entity')
+  );
+  const normalizedTab: AdminTabKey = resolvedRoute.tab;
+  const effectiveSub = resolvedRoute.sub;
+  const resolvedArchiveEntity = resolvedRoute.archiveEntity || 'all';
 
   const handleTabChange = (key: AdminTabKey, sub?: string) => {
-    const params: Record<string, string> = { tab: key };
-    const subList = SUB_PAGES[key];
-    if (sub) {
-      params.sub = sub;
-    } else if (subList && subList.length > 0) {
-      params.sub = subList[0].key;
+    const resolved = resolveAdminTabAndSub(key, sub);
+    const params: Record<string, string> = { tab: resolved.tab, sub: resolved.sub };
+    if (resolved.archiveEntity && resolved.archiveEntity !== 'all') {
+      params.entity = resolved.archiveEntity;
     }
     setSearchParams(params);
-  };
-
-  const handleSubChange = (subKey: string) => {
-    setSearchParams({ tab: normalizedTab, sub: subKey });
   };
 
   // Client-side Firebase Auth Route Guard
@@ -822,12 +700,12 @@ export default function AdminLayout() {
               />
             )}
 
-            {normalizedTab === 'trips' && effectiveSub === 'rules' && (
-              <AdminRulesTab />
+            {normalizedTab === 'trips' && (
+              <AdminTripsSubpage initialSubTab={effectiveSub as any} />
             )}
 
-            {normalizedTab === 'trips' && effectiveSub !== 'rules' && (
-              <AdminTripsSubpage initialSubTab={effectiveSub as any} />
+            {normalizedTab === 'automation' && (
+              <AdminRulesTab initialSection={effectiveSub as any} />
             )}
 
             {normalizedTab === 'invoicing' && (
@@ -884,10 +762,11 @@ export default function AdminLayout() {
                 onSave={handleSaveSettings}
                 isLoading={isSavingConfig || isConfigLoading}
                 initialSubTab={effectiveSub as any}
+                archiveEntity={resolvedArchiveEntity}
               />
             )}
 
-            {/* Website Studio (Top-Level CMS) */}
+            {/* Website, Brand & SEO Studio */}
             {normalizedTab === 'website' && (
               <AdminWebsiteTab
                 settings={settings}
@@ -897,7 +776,7 @@ export default function AdminLayout() {
               />
             )}
 
-            {/* General Settings */}
+            {/* General Settings (Company Info & Units) */}
             {normalizedTab === 'general' && (
               <AdminGeneralTab
                 settings={settings}
@@ -905,10 +784,6 @@ export default function AdminLayout() {
                 isLoading={isSavingConfig || isConfigLoading}
                 initialSubTab={effectiveSub as any}
               />
-            )}
-
-            {normalizedTab === 'archive' && (
-              <AdminArchiveTab initialSubTab={effectiveSub as any} />
             )}
             </Suspense>
           </div>

@@ -1,10 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { AppSettings, BrandingConfig } from '../../../../core/types/config';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
-import { CheckIcon, SparklesIcon, CarIcon, ShieldCheckIcon, PaletteIcon } from '../../../ui/Icons';
+import { Badge } from '../../../ui/Badge';
+import { AlertTriangleIcon, CheckIcon, PaletteIcon, SparklesIcon } from '../../../ui/Icons';
+import { BrandLivePreviewCanvas } from './BrandLivePreviewCanvas';
+import {
+  FONT_OPTIONS,
+  RADIUS_OPTIONS,
+  THEME_PRESETS,
+  hydrateBrandingFromSettings,
+  type ThemePreset,
+} from './theme-presets';
+
+export { THEME_PRESETS, type ThemePreset };
 
 export interface WebsiteThemesTabProps {
   settings: AppSettings;
@@ -12,255 +22,160 @@ export interface WebsiteThemesTabProps {
   isLoading: boolean;
 }
 
-export interface ThemePreset {
-  id: string;
-  name: string;
-  badge?: string;
-  description: string;
-  previewColors: string[];
-  tokens: BrandingConfig;
-}
-
-export const THEME_PRESETS: ThemePreset[] = [
-  {
-    id: 'chesterfield_royal_blue',
-    name: 'Chesterfield Royal (Current Main)',
-    badge: 'Active Default',
-    description: 'Clean high-trust metropolitan car service theme with vibrant royal blue primary, dark slate navbar, and rounded UI accents.',
-    previewColors: ['#2563eb', '#0f172a', '#ffffff', '#3b82f6'],
-    tokens: {
-      primaryColor: '#2563eb',
-      secondaryColor: '#0f172a',
-      headingFont: 'Inter',
-      bodyFont: 'Inter',
-      headingColor: '#0f172a',
-      bodyTextColor: '#334155',
-      mutedTextColor: '#64748b',
-      btnPrimaryBg: '#2563eb',
-      btnPrimaryText: '#ffffff',
-      btnSecondaryBg: '#0f172a',
-      btnSecondaryText: '#ffffff',
-      btnBorderRadius: '8px',
-      navbarBg: '#0f172a',
-      cardBg: '#ffffff',
-    },
-  },
-  {
-    id: 'executive_midnight_gold',
-    name: 'Midnight & Warm Gold',
-    badge: 'Classic Dark',
-    description: 'Warm amber gold accents against a dark midnight background.',
-    previewColors: ['#d97706', '#090d16', '#fef3c7', '#f59e0b'],
-    tokens: {
-      primaryColor: '#d97706',
-      secondaryColor: '#090d16',
-      headingFont: 'Outfit',
-      bodyFont: 'Plus Jakarta Sans',
-      headingColor: '#090d16',
-      bodyTextColor: '#1f2937',
-      mutedTextColor: '#6b7280',
-      btnPrimaryBg: '#d97706',
-      btnPrimaryText: '#ffffff',
-      btnSecondaryBg: '#090d16',
-      btnSecondaryText: '#fef3c7',
-      btnBorderRadius: '6px',
-      navbarBg: '#090d16',
-      cardBg: '#ffffff',
-    },
-  },
-  {
-    id: 'electric_sapphire',
-    name: 'Electric Sapphire & Tech Cyan',
-    badge: 'Modern On-Demand',
-    description: 'High-energy contemporary ride-hail theme featuring brilliant sapphire blues, cyan glow highlights, and modern geometric styling.',
-    previewColors: ['#1d4ed8', '#0f172a', '#06b6d4', '#e0f2fe'],
-    tokens: {
-      primaryColor: '#1d4ed8',
-      secondaryColor: '#0f172a',
-      headingFont: 'Plus Jakarta Sans',
-      bodyFont: 'Inter',
-      headingColor: '#0f172a',
-      bodyTextColor: '#334155',
-      mutedTextColor: '#64748b',
-      btnPrimaryBg: '#1d4ed8',
-      btnPrimaryText: '#ffffff',
-      btnSecondaryBg: '#0f172a',
-      btnSecondaryText: '#38bdf8',
-      btnBorderRadius: '12px',
-      navbarBg: '#0b1329',
-      cardBg: '#ffffff',
-    },
-  },
-  {
-    id: 'emerald_prestige',
-    name: 'Emerald Prestige & Platinum',
-    badge: 'Eco & Premium',
-    description: 'Sophisticated eco-fleet aesthetic with lush deep emerald tones, platinum gray structure, and friendly rounded components.',
-    previewColors: ['#059669', '#064e3b', '#f3f4f6', '#10b981'],
-    tokens: {
-      primaryColor: '#059669',
-      secondaryColor: '#064e3b',
-      headingFont: 'Outfit',
-      bodyFont: 'Inter',
-      headingColor: '#064e3b',
-      bodyTextColor: '#374151',
-      mutedTextColor: '#6b7280',
-      btnPrimaryBg: '#059669',
-      btnPrimaryText: '#ffffff',
-      btnSecondaryBg: '#064e3b',
-      btnSecondaryText: '#ffffff',
-      btnBorderRadius: '10px',
-      navbarBg: '#042f2e',
-      cardBg: '#ffffff',
-    },
-  },
-  {
-    id: 'vintage_metro_amber',
-    name: 'Classic Metro Taxi (Amber & Slate)',
-    badge: 'Classic Taxi',
-    description: 'Traditional American taxi look with warm yellow-amber highlights and bold black typography.',
-    previewColors: ['#f59e0b', '#0f172a', '#18181b', '#fef08a'],
-    tokens: {
-      primaryColor: '#f59e0b',
-      secondaryColor: '#0f172a',
-      headingFont: 'Inter',
-      bodyFont: 'Inter',
-      headingColor: '#0f172a',
-      bodyTextColor: '#27272a',
-      mutedTextColor: '#71717a',
-      btnPrimaryBg: '#f59e0b',
-      btnPrimaryText: '#09090b',
-      btnSecondaryBg: '#0f172a',
-      btnSecondaryText: '#ffffff',
-      btnBorderRadius: '8px',
-      navbarBg: '#0f172a',
-      cardBg: '#ffffff',
-    },
-  },
-  {
-    id: 'monochrome_obsidian',
-    name: 'Monochrome Minimalist',
-    badge: 'High Contrast',
-    description: 'Clean high-contrast layout with sharp corners, black buttons, and slate accents.',
-    previewColors: ['#000000', '#18181b', '#ffffff', '#71717a'],
-    tokens: {
-      primaryColor: '#000000',
-      secondaryColor: '#18181b',
-      headingFont: 'Inter',
-      bodyFont: 'Inter',
-      headingColor: '#000000',
-      bodyTextColor: '#27272a',
-      mutedTextColor: '#71717a',
-      btnPrimaryBg: '#000000',
-      btnPrimaryText: '#ffffff',
-      btnSecondaryBg: '#18181b',
-      btnSecondaryText: '#ffffff',
-      btnBorderRadius: '0px',
-      navbarBg: '#000000',
-      cardBg: '#ffffff',
-    },
-  },
-];
-
-const GOOGLE_FONTS = ['Inter', 'Outfit', 'Plus Jakarta Sans', 'Lato', 'Cinzel', 'Roboto', 'Montserrat', 'Poppins'];
-
 export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesTabProps) {
-  const currentBranding: BrandingConfig = {
-    primaryColor: settings.branding?.primaryColor || COMPANY_CONFIG.primaryColor || '#2563eb',
-    secondaryColor: settings.branding?.secondaryColor || COMPANY_CONFIG.secondaryColor || '#0f172a',
-    headingFont: settings.branding?.headingFont || COMPANY_CONFIG.headingFont || 'Inter',
-    bodyFont: settings.branding?.bodyFont || COMPANY_CONFIG.bodyFont || 'Inter',
-    headingColor: settings.branding?.headingColor || COMPANY_CONFIG.headingColor || '#0f172a',
-    bodyTextColor: settings.branding?.bodyTextColor || COMPANY_CONFIG.bodyTextColor || '#334155',
-    mutedTextColor: settings.branding?.mutedTextColor || COMPANY_CONFIG.mutedTextColor || '#64748b',
-    btnPrimaryBg: settings.branding?.btnPrimaryBg || COMPANY_CONFIG.btnPrimaryBg || '#2563eb',
-    btnPrimaryText: settings.branding?.btnPrimaryText || COMPANY_CONFIG.btnPrimaryText || '#ffffff',
-    btnSecondaryBg: settings.branding?.btnSecondaryBg || COMPANY_CONFIG.btnSecondaryBg || '#0f172a',
-    btnSecondaryText: settings.branding?.btnSecondaryText || COMPANY_CONFIG.btnSecondaryText || '#ffffff',
-    btnBorderRadius: settings.branding?.btnBorderRadius || COMPANY_CONFIG.btnBorderRadius || '8px',
-    navbarBg: settings.branding?.navbarBg || COMPANY_CONFIG.navbarBg || '#0f172a',
-    cardBg: settings.branding?.cardBg || COMPANY_CONFIG.cardBg || '#ffffff',
-  };
-
-  const [branding, setBranding] = useState<BrandingConfig>(currentBranding);
-  const [selectedPresetId, setSelectedPresetId] = useState<string | null>('chesterfield_royal_blue');
+  const [publishedBranding, setPublishedBranding] = useState<BrandingConfig>(() =>
+    hydrateBrandingFromSettings(settings)
+  );
+  const [draftBranding, setDraftBranding] = useState<BrandingConfig>(() =>
+    hydrateBrandingFromSettings(settings)
+  );
+  const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  const handleApplyPreset = (preset: ThemePreset) => {
-    setSelectedPresetId(preset.id);
-    setBranding({ ...preset.tokens });
+  useEffect(() => {
+    const hydrated = hydrateBrandingFromSettings(settings);
+    setPublishedBranding(hydrated);
+    if (!hasUnpublishedChanges) {
+      setDraftBranding(hydrated);
+    }
+  }, [settings.branding]);
+
+  const updateDraft = (updates: Partial<BrandingConfig>) => {
+    setDraftBranding((prev) => ({ ...prev, ...updates }));
+    setHasUnpublishedChanges(true);
   };
 
-  const handleSaveTheme = async () => {
-    await onSave({
-      branding,
-      updatedAt: new Date().toISOString(),
-    });
-    setSaveMessage('Theme and brand colors published!');
-    setTimeout(() => setSaveMessage(null), 3500);
+  const handleApplyPreset = (preset: ThemePreset) => {
+    setDraftBranding((prev) => ({
+      ...preset.tokens,
+      logoUrl: prev.logoUrl || '',
+    }));
+    setHasUnpublishedChanges(true);
   };
+
+  const handleDiscardDraft = () => {
+    setDraftBranding({ ...publishedBranding });
+    setHasUnpublishedChanges(false);
+  };
+
+  const handleResetDefaults = () => {
+    setDraftBranding({
+      ...THEME_PRESETS[0].tokens,
+      logoUrl: draftBranding.logoUrl || '',
+    });
+    setHasUnpublishedChanges(true);
+  };
+
+  const handlePublishBranding = async () => {
+    try {
+      setIsPublishing(true);
+      await onSave({
+        branding: draftBranding,
+        updatedAt: new Date().toISOString(),
+      });
+      setPublishedBranding({ ...draftBranding });
+      setHasUnpublishedChanges(false);
+      setSaveMessage('Brand tokens & theme published site-wide!');
+      setTimeout(() => setSaveMessage(null), 4000);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const colorPickers: Array<{
+    key: keyof BrandingConfig;
+    label: string;
+    syncKey?: keyof BrandingConfig;
+  }> = [
+    { key: 'primaryColor', label: 'Primary Brand', syncKey: 'btnPrimaryBg' },
+    { key: 'secondaryColor', label: 'Secondary / Accent', syncKey: 'btnSecondaryBg' },
+    { key: 'navbarBg', label: 'Navbar Background' },
+    { key: 'cardBg', label: 'Card Surface' },
+    { key: 'btnPrimaryBg', label: 'Primary Button Bg' },
+    { key: 'btnPrimaryText', label: 'Primary Button Text' },
+    { key: 'headingColor', label: 'Heading Text' },
+    { key: 'bodyTextColor', label: 'Body Text' },
+  ];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
-      {/* Header Info */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+    <div className="space-y-6 animate-in fade-in duration-200">
+      {/* Unified Studio Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:px-5 sm:py-4 rounded-2xl border border-slate-200/80 shadow-xs">
         <div className="min-w-0">
-          <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
-            Website Themes &amp; Brand Colors
-          </span>
-          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 mt-0.5">
-            Theme Presets &amp; Custom Colors
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
+              Unified Brand &amp; Theme Studio
+            </span>
+            {hasUnpublishedChanges ? (
+              <Badge variant="warning" size="sm" className="inline-flex items-center gap-1">
+                <AlertTriangleIcon className="w-3 h-3" />
+                <span>Draft Preview</span>
+              </Badge>
+            ) : (
+              <Badge variant="success" size="sm" className="inline-flex items-center gap-1">
+                <CheckIcon className="w-3 h-3" />
+                <span>Synced Site-Wide</span>
+              </Badge>
+            )}
+          </div>
+          <h2 className="text-base sm:text-lg font-extrabold text-slate-900 mt-0.5">
+            Themes, Colors, Typography &amp; Logo
           </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Pick a preset theme or customize brand colors, fonts, and button styles in real time.
-          </p>
         </div>
 
-        <Button
-          type="button"
-          onClick={handleSaveTheme}
-          disabled={isLoading}
-          className="w-full sm:w-auto justify-center shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-sm inline-flex items-center gap-2"
-        >
-          <SparklesIcon className="w-4 h-4" />
-          <span>{isLoading ? 'Publishing Changes...' : 'Save & Publish Theme'}</span>
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          {hasUnpublishedChanges && (
+            <Button type="button" variant="outline" size="sm" onClick={handleDiscardDraft}>
+              Discard Draft
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            isLoading={isPublishing || isLoading}
+            onClick={handlePublishBranding}
+            leftIcon={<SparklesIcon className="w-4 h-4" />}
+          >
+            Publish Site-Wide
+          </Button>
+        </div>
       </div>
 
       {saveMessage && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in">
-          <CheckIcon className="w-4 h-4 text-emerald-600" />
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2">
+          <CheckIcon className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{saveMessage}</span>
         </div>
       )}
 
-      {/* Preset Theme Cards Grid */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+      {/* Curated Presets Grid */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
           <PaletteIcon className="w-4 h-4 text-blue-600 shrink-0" />
-          <span>Theme Presets</span>
-          <span className="text-xs font-semibold text-slate-500 lowercase">({THEME_PRESETS.length} available)</span>
+          <span>Curated Brand Presets ({THEME_PRESETS.length})</span>
         </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {THEME_PRESETS.map((preset) => {
             const isSelected =
-              branding.primaryColor === preset.tokens.primaryColor &&
-              branding.navbarBg === preset.tokens.navbarBg;
-
+              draftBranding.primaryColor === preset.tokens.primaryColor &&
+              draftBranding.navbarBg === preset.tokens.navbarBg &&
+              draftBranding.btnBorderRadius === preset.tokens.btnBorderRadius;
             return (
-              <div
+              <button
                 key={preset.id}
+                type="button"
                 onClick={() => handleApplyPreset(preset)}
-                className={`cursor-pointer p-5 rounded-2xl border transition-all text-left flex flex-col justify-between group ${
+                className={`cursor-pointer p-4 rounded-2xl border transition-all text-left flex flex-col justify-between group ${
                   isSelected
-                    ? 'border-blue-600 bg-blue-50/40 ring-2 ring-blue-600 shadow-md'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-xs'
+                    ? 'border-blue-600 bg-blue-50/40 ring-2 ring-blue-600 shadow-xs'
+                    : 'border-slate-200 bg-white hover:border-slate-300'
                 }`}
               >
                 <div>
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <span className="text-xs font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors min-w-0">
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <span className="text-xs font-extrabold text-slate-900 group-hover:text-blue-600">
                       {preset.name}
                     </span>
                     {preset.badge && (
@@ -269,269 +184,161 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                       </span>
                     )}
                   </div>
-
-                  <p className="text-xs text-slate-500 leading-relaxed mb-4">
-                    {preset.description}
-                  </p>
-
-                  {/* Swatch Previews */}
-                  <div className="flex flex-wrap items-center gap-2 mb-4">
-                    {preset.previewColors.map((hex, idx) => (
-                      <div
-                        key={idx}
-                        className="w-7 h-7 rounded-lg border border-black/10 shadow-xs shrink-0"
+                  <p className="text-[11px] text-slate-500 leading-snug mb-3">{preset.description}</p>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-1.5">
+                    {preset.previewColors.map((hex, i) => (
+                      <span
+                        key={i}
+                        className="w-5 h-5 rounded-md border border-black/10 inline-block"
                         style={{ backgroundColor: hex }}
-                        title={hex}
                       />
                     ))}
-                    <div className="text-[11px] font-mono text-slate-400 sm:ml-2">
-                      {preset.tokens.btnBorderRadius} radius
-                    </div>
                   </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
-                  <span className="text-slate-400 font-medium truncate">Font: {preset.tokens.headingFont}</span>
-                  <span
-                    className={`font-bold inline-flex items-center gap-1 shrink-0 ${
-                      isSelected ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-800'
-                    }`}
-                  >
-                    {isSelected ? (
-                      <>
-                        <CheckIcon className="w-3.5 h-3.5" />
-                        <span>Active Theme</span>
-                      </>
-                    ) : (
-                      'Apply Preset →'
-                    )}
+                  <span className="text-[11px] font-bold text-blue-600">
+                    {isSelected ? '✓ Active' : 'Preview →'}
                   </span>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
       </div>
 
-      {/* Dynamic Branding Studio: Live Token Customizer */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-        {/* Left: Fine-Grained Controls */}
-        <div className="lg:col-span-7 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-          <div className="border-b border-slate-100 pb-4">
-            <h3 className="text-base font-extrabold text-slate-900">
-              Colors, Fonts &amp; Buttons
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Customize individual brand colors, fonts, and button corners.
-            </p>
+      {/* Side-by-Side Granular Token Controls + Live Preview Canvas */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left: Granular Tokens (6 cols) */}
+        <div className="lg:col-span-6 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-5 text-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900">Granular Brand Tokens</h3>
+              <p className="text-[11px] text-slate-500">Typography, corner radius, colors &amp; logo URL</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleResetDefaults}
+              className="text-[11px] font-bold text-slate-500 hover:text-blue-600 cursor-pointer"
+            >
+              Reset Defaults
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Primary Brand Color */}
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-              <label className="text-xs font-bold text-slate-800 block">Primary Brand Color</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={branding.primaryColor || '#2563eb'}
-                  onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value, btnPrimaryBg: e.target.value })}
-                  className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white shrink-0"
-                />
-                <Input
-                  value={branding.primaryColor || '#2563eb'}
-                  onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value, btnPrimaryBg: e.target.value })}
-                  className="font-mono text-xs uppercase min-w-0"
-                />
-              </div>
-              <span className="text-[10px] text-slate-500 block">Used for main buttons, active highlights &amp; icons</span>
-            </div>
-
-            {/* Secondary Color */}
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-              <label className="text-xs font-bold text-slate-800 block">Secondary / Accent Color</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={branding.secondaryColor || '#0f172a'}
-                  onChange={(e) => setBranding({ ...branding, secondaryColor: e.target.value })}
-                  className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white shrink-0"
-                />
-                <Input
-                  value={branding.secondaryColor || '#0f172a'}
-                  onChange={(e) => setBranding({ ...branding, secondaryColor: e.target.value })}
-                  className="font-mono text-xs uppercase min-w-0"
-                />
-              </div>
-              <span className="text-[10px] text-slate-500 block">Used for contrast panels, badges &amp; subheaders</span>
-            </div>
-
-            {/* Navbar Background */}
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-              <label className="text-xs font-bold text-slate-800 block">Header / Navbar Background</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={branding.navbarBg || '#0f172a'}
-                  onChange={(e) => setBranding({ ...branding, navbarBg: e.target.value })}
-                  className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white shrink-0"
-                />
-                <Input
-                  value={branding.navbarBg || '#0f172a'}
-                  onChange={(e) => setBranding({ ...branding, navbarBg: e.target.value })}
-                  className="font-mono text-xs uppercase min-w-0"
-                />
-              </div>
-              <span className="text-[10px] text-slate-500 block">Top navigation bar background tint</span>
-            </div>
-
-            {/* Button Border Radius */}
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-              <label className="text-xs font-bold text-slate-800 block">Button Border Radius</label>
+          {/* Fonts */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Heading Font</label>
               <select
-                value={branding.btnBorderRadius || '8px'}
-                onChange={(e) => setBranding({ ...branding, btnBorderRadius: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
+                value={draftBranding.headingFont || 'Inter'}
+                onChange={(e) => updateDraft({ headingFont: e.target.value })}
+                className="w-full h-9 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-900"
               >
-                <option value="0px">Sharp Square (0px)</option>
-                <option value="4px">Subtle Rounded (4px)</option>
-                <option value="8px">Standard Modern (8px)</option>
-                <option value="12px">Extra Rounded (12px)</option>
-                <option value="9999px">Pill / Stadium (Full)</option>
-              </select>
-              <span className="text-[10px] text-slate-500 block">Global curvature on buttons and interactive tags</span>
-            </div>
-
-            {/* Typography: Heading Font */}
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-              <label className="text-xs font-bold text-slate-800 block">Headline Font Family</label>
-              <select
-                value={branding.headingFont || 'Inter'}
-                onChange={(e) => setBranding({ ...branding, headingFont: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
-              >
-                {GOOGLE_FONTS.map((font) => (
-                  <option key={font} value={font}>
-                    {font}
+                {FONT_OPTIONS.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
                   </option>
                 ))}
               </select>
-              <span className="text-[10px] text-slate-500 block">Applied to H1, H2, and title accents</span>
             </div>
-
-            {/* Typography: Body Font */}
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-              <label className="text-xs font-bold text-slate-800 block">Body Font Family</label>
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Body Font</label>
               <select
-                value={branding.bodyFont || 'Inter'}
-                onChange={(e) => setBranding({ ...branding, bodyFont: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
+                value={draftBranding.bodyFont || 'Inter'}
+                onChange={(e) => updateDraft({ bodyFont: e.target.value })}
+                className="w-full h-9 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-900"
               >
-                {GOOGLE_FONTS.map((font) => (
-                  <option key={font} value={font}>
-                    {font}
+                {FONT_OPTIONS.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
                   </option>
                 ))}
               </select>
-              <span className="text-[10px] text-slate-500 block">Applied to paragraphs, tables &amp; inputs</span>
             </div>
+          </div>
+
+          {/* Button Border Radius */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-bold text-slate-700">Button Corner Radius</span>
+              <span className="font-mono font-bold text-blue-600">{draftBranding.btnBorderRadius}</span>
+            </div>
+            <div className="grid grid-cols-6 gap-1.5">
+              {RADIUS_OPTIONS.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => updateDraft({ btnBorderRadius: opt })}
+                  className={`py-1.5 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                    draftBranding.btnBorderRadius === opt
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {opt === '9999px' ? 'Pill' : opt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Color Tokens Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-100">
+            {colorPickers.map(({ key, label, syncKey }) => {
+              const val = (draftBranding[key] as string) || '#0f172a';
+              return (
+                <div key={key} className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">{label}</label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="color"
+                      value={val}
+                      onChange={(e) =>
+                        updateDraft({
+                          [key]: e.target.value,
+                          ...(syncKey ? { [syncKey]: e.target.value } : {}),
+                        })
+                      }
+                      className="w-8 h-8 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white shrink-0"
+                    />
+                    <Input
+                      value={val}
+                      onChange={(e) =>
+                        updateDraft({
+                          [key]: e.target.value,
+                          ...(syncKey ? { [syncKey]: e.target.value } : {}),
+                        })
+                      }
+                      className="h-8 font-mono text-[11px] uppercase min-w-0 bg-white"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Custom Logo URL */}
+          <div className="pt-1 border-t border-slate-100">
+            <Input
+              label="Custom Brand Logo URL (Optional)"
+              type="url"
+              value={draftBranding.logoUrl || ''}
+              onChange={(e) => updateDraft({ logoUrl: e.target.value })}
+              placeholder="https://example.com/logo.png"
+              helperText="Leave blank to render the default Chesterfield vehicle monogram"
+            />
           </div>
         </div>
 
-        {/* Right: Live Interactive Card Preview */}
-        <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-6">
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
-              Live Preview
-            </span>
-
-            {/* Mock Header */}
-            <div
-              style={{ backgroundColor: branding.navbarBg || '#0f172a' }}
-              className="p-3.5 rounded-xl text-white flex items-center justify-between gap-2 mb-4 shadow-xs"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <div
-                  style={{
-                    backgroundColor: branding.primaryColor || '#2563eb',
-                    borderRadius: branding.btnBorderRadius || '8px',
-                  }}
-                  className="w-7 h-7 flex items-center justify-center text-white text-xs font-bold shrink-0"
-                >
-                  <CarIcon className="w-4 h-4" />
-                </div>
-                <span className="text-xs font-bold truncate">{COMPANY_CONFIG.name}</span>
-              </div>
-              <span
-                style={{
-                  backgroundColor: branding.primaryColor || '#2563eb',
-                  borderRadius: branding.btnBorderRadius || '8px',
-                  color: branding.btnPrimaryText || '#ffffff',
-                }}
-                className="text-[10px] font-bold px-2.5 py-1 shrink-0"
-              >
-                Book Now
-              </span>
-            </div>
-
-            {/* Mock Hero Card */}
-            <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/60 space-y-3">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-900">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
-                <span>24/7 Local Car &amp; Taxi Service</span>
-              </div>
-
-              <h4
-                style={{
-                  color: branding.headingColor || '#0f172a',
-                  fontFamily: branding.headingFont || 'Inter',
-                }}
-                className="text-lg font-black leading-tight"
-              >
-                Dependable Local Taxi &amp; Airport Rides
-              </h4>
-
-              <p
-                style={{
-                  color: branding.bodyTextColor || '#334155',
-                  fontFamily: branding.bodyFont || 'Inter',
-                }}
-                className="text-xs leading-relaxed"
-              >
-                Upfront pricing, professional local drivers, and 24/7 airport service to STL Lambert.
-              </p>
-
-              <div className="pt-2 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  style={{
-                    backgroundColor: branding.btnPrimaryBg || '#2563eb',
-                    color: branding.btnPrimaryText || '#ffffff',
-                    borderRadius: branding.btnBorderRadius || '8px',
-                  }}
-                  className="text-xs font-bold px-4 py-2 shadow-xs"
-                >
-                  Reserve Trip
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    borderRadius: branding.btnBorderRadius || '8px',
-                  }}
-                  className="text-xs font-bold px-3 py-2 border border-slate-300 bg-white text-slate-800"
-                >
-                  Rates &amp; Fleet
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-2">
-              <span>Tokens will sync to <code>root.tsx</code></span>
-              <span className="font-mono text-emerald-600 font-bold inline-flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                Active Sync
-              </span>
-            </div>
-          </div>
+        {/* Right: Sticky Live Preview Canvas (6 cols) */}
+        <div className="lg:col-span-6 lg:sticky lg:top-24">
+          <BrandLivePreviewCanvas
+            draftBranding={draftBranding}
+            companyName={settings.company?.name || COMPANY_CONFIG.name}
+            companyPhone={settings.company?.phone || COMPANY_CONFIG.phone.dispatch}
+            hasUnpublishedChanges={hasUnpublishedChanges}
+            isSaving={isPublishing || isLoading}
+            onDiscardDraft={handleDiscardDraft}
+            onPublishBranding={handlePublishBranding}
+          />
         </div>
       </div>
     </div>

@@ -36,8 +36,9 @@ import {
 } from '../../ui/Icons';
 
 export interface StandingOrdersDrawerProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
+  mode?: 'drawer' | 'embedded';
   trips: Trip[];
   drivers?: ReadonlyArray<AutoDispatchDriverInput | DriverRosterItem>;
   initialSeriesId?: string | null;
@@ -618,10 +619,14 @@ function StandingOrderSeriesCard({
 export function StandingOrdersDrawer({
   isOpen,
   onClose,
+  mode = 'drawer',
   trips,
   drivers: propDrivers,
   initialSeriesId,
 }: StandingOrdersDrawerProps) {
+  const isEmbedded = mode === 'embedded';
+  const effectiveOpen = isEmbedded ? true : Boolean(isOpen);
+
   const [seriesList, setSeriesList] = useState<StandingOrderSeries[]>([]);
   const [fallbackDrivers, setFallbackDrivers] = useState<DriverRosterItem[]>([]);
   const [filterTab, setFilterTab] = useState<SeriesFilterTab>('all');
@@ -630,16 +635,16 @@ export function StandingOrdersDrawer({
   const [toast, setToast] = useState<{ text: string; variant: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!effectiveOpen) return;
     const unsub = subscribeToStandingOrders((updated) => {
       setSeriesList(updated);
     });
     void fetchStandingOrderSeriesList().then((fetched) => setSeriesList(fetched));
     return unsub;
-  }, [isOpen]);
+  }, [effectiveOpen]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!effectiveOpen) return;
     if (propDrivers && propDrivers.length > 0) return;
     const opSvc = getOperatorService();
     setFallbackDrivers(opSvc.getDriverRoster());
@@ -647,23 +652,23 @@ export function StandingOrdersDrawer({
       setFallbackDrivers(roster);
     });
     return unsub;
-  }, [isOpen, propDrivers]);
+  }, [effectiveOpen, propDrivers]);
 
   useEffect(() => {
-    if (isOpen && initialSeriesId) {
+    if (effectiveOpen && initialSeriesId) {
       setFilterTab('all');
       setSearchQuery(initialSeriesId);
     }
-  }, [isOpen, initialSeriesId]);
+  }, [effectiveOpen, initialSeriesId]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (isEmbedded || !effectiveOpen || !onClose) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, onClose]);
+  }, [isEmbedded, effectiveOpen, onClose]);
 
   const resolvedDrivers = useMemo(
     () =>
@@ -680,7 +685,7 @@ export function StandingOrdersDrawer({
     } catch {
       return 'Dispatcher';
     }
-  }, [isOpen]);
+  }, [effectiveOpen]);
 
   const showToast = (text: string, variant: 'success' | 'error' = 'success') => {
     setToast({ text, variant });
@@ -739,40 +744,28 @@ export function StandingOrdersDrawer({
     });
   }, [seriesList, filterTab, searchQuery]);
 
-  if (!isOpen || typeof document === 'undefined') return null;
+  if (!effectiveOpen) return null;
+  if (!isEmbedded && typeof document === 'undefined') return null;
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-slate-900/45 backdrop-blur-[1px] transition-opacity"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Slide-Over Panel */}
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-label="Standing Orders and Recurring Rides Series Manager"
-        className="relative z-10 w-full max-w-2xl bg-slate-50 h-full shadow-2xl border-l border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200"
-      >
-        {/* Top Header */}
-        <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between gap-3 shrink-0 border-b border-slate-800">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center text-base font-bold shrink-0 shadow-xs">
-              🔁
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-extrabold tracking-tight text-white truncate">
-                Standing Orders &amp; Recurring Series
-              </h2>
-              <p className="text-[11px] text-slate-300 truncate">
-                Manage recurring rides, holiday skip dates, staged preferred drivers &amp; rolling horizons
-              </p>
-            </div>
+  const seriesManagerContent = (
+    <>
+      {/* Top Header */}
+      <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between gap-3 shrink-0 border-b border-slate-800">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center text-base font-bold shrink-0 shadow-xs">
+            🔁
           </div>
+          <div className="min-w-0">
+            <h2 className="text-sm sm:text-base font-extrabold tracking-tight text-white truncate">
+              Standing Orders &amp; Recurring Series
+            </h2>
+            <p className="text-[11px] text-slate-300 truncate">
+              Manage recurring rides, holiday skip dates, staged preferred drivers &amp; rolling horizons
+            </p>
+          </div>
+        </div>
 
+        {!isEmbedded && onClose && (
           <button
             type="button"
             onClick={onClose}
@@ -782,7 +775,8 @@ export function StandingOrdersDrawer({
           >
             <XIcon className="w-5 h-5" />
           </button>
-        </div>
+        )}
+      </div>
 
         {/* Summary KPI Pills */}
         <div className="px-5 py-3 bg-white border-b border-slate-200 grid grid-cols-3 gap-2.5 shrink-0">
@@ -936,6 +930,34 @@ export function StandingOrdersDrawer({
             ))
           )}
         </div>
+    </>
+  );
+
+  if (isEmbedded) {
+    return (
+      <div
+        aria-label="Standing Orders and Recurring Rides Series Manager"
+        className="w-full bg-slate-50 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col overflow-hidden"
+      >
+        {seriesManagerContent}
+      </div>
+    );
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div
+        className="fixed inset-0 bg-slate-900/45 backdrop-blur-[1px] transition-opacity"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label="Standing Orders and Recurring Rides Series Manager"
+        className="relative z-10 w-full max-w-2xl bg-slate-50 h-full shadow-2xl border-l border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200"
+      >
+        {seriesManagerContent}
       </aside>
     </div>,
     document.body

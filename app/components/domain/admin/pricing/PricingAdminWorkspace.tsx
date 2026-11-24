@@ -15,6 +15,7 @@ import { SurchargesPanel } from './surcharges/SurchargesPanel';
 import { PricingRulesPanel } from './rules/PricingRulesPanel';
 import { PersistentFareSimulator } from './simulator/PersistentFareSimulator';
 import { PricingAuditDrawer } from './audit/PricingAuditDrawer';
+import { PricingAuditPanel } from './audit/PricingAuditPanel';
 import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
 
 import { getAdminConfigService } from '~/core/services/config/admin-config.service';
@@ -45,7 +46,7 @@ import {
   toConfigAuditEntries,
 } from '~/core/services/pricing/pricing-audit.service';
 
-export type PricingPillarTab = 'rates' | 'extras' | 'surcharges' | 'rules';
+export type PricingPillarTab = 'rates' | 'extras' | 'surcharges' | 'rules' | 'audit';
 
 export interface PricingAdminWorkspaceProps {
   settings?: AppSettings;
@@ -462,10 +463,11 @@ export function PricingAdminWorkspace({
       <div className="bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <p className="text-xs text-slate-600">
           <span className="font-bold text-slate-900 mr-1.5">
-            {activeTab === 'rates' && '1. Rates:'}
-            {activeTab === 'extras' && '2. Extras:'}
+            {activeTab === 'rates' && '1. Tariffs:'}
+            {activeTab === 'extras' && '2. Extras & Wait:'}
             {activeTab === 'surcharges' && '3. Surcharges:'}
             {activeTab === 'rules' && '4. Pricing Rules:'}
+            {activeTab === 'audit' && '5. Pricing Audit Log:'}
           </span>
           {activeTab === 'rates' &&
             'Base fare formulas, per-rate rounding settings, and no-show or cancellation fees.'}
@@ -475,6 +477,8 @@ export function PricingAdminWorkspace({
             'Master On/Off switch and default behavior (All Trips vs Rule-Only) for every surcharge.'}
           {activeTab === 'rules' &&
             'Automatic pricing rules connecting trip conditions to Rates, Surcharges, and Extras.'}
+          {activeTab === 'audit' &&
+            'Full staff-only provenance log across Tariffs, Extras, Surcharges On/Off toggles, and Pricing Rules.'}
         </p>
 
         <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
@@ -487,21 +491,23 @@ export function PricingAdminWorkspace({
               Unsaved Draft Active
             </Badge>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleOpenAuditDrawerAll}
-            className="text-xs border-slate-300 bg-white text-slate-800 hover:bg-slate-50 shadow-2xs shrink-0 cursor-pointer flex-1 sm:flex-none justify-center"
-          >
-            <HistoryIcon className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
-            <span>Audit History</span>
-            {auditEvents.length > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-mono text-[10px] font-bold">
-                {auditEvents.length}
-              </span>
-            )}
-          </Button>
+          {activeTab !== 'audit' && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleOpenAuditDrawerAll}
+              className="text-xs border-slate-300 bg-white text-slate-800 hover:bg-slate-50 shadow-2xs shrink-0 cursor-pointer flex-1 sm:flex-none justify-center"
+            >
+              <HistoryIcon className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+              <span>Audit History</span>
+              {auditEvents.length > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-mono text-[10px] font-bold">
+                  {auditEvents.length}
+                </span>
+              )}
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -566,6 +572,15 @@ export function PricingAdminWorkspace({
             onDeleteRule={handleDeleteRule}
             onDraftChange={setDraftRule}
             isSaving={isLoading}
+          />
+        )}
+
+        {activeTab === 'audit' && (
+          <PricingAuditPanel
+            events={auditEvents}
+            surcharges={surcharges}
+            onUpdateNote={handleUpdateAuditNote}
+            showHeader
           />
         )}
       </div>

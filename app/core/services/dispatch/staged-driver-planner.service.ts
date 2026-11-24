@@ -500,6 +500,8 @@ export async function clearStagedDriver(
   };
 }
 
+export const clearStagedDriverFromTrip = clearStagedDriver;
+
 /**
  * Promotes a staged trip (`plannedDriverId`) into a live driver assignment (`assignedDriverId`)
  * or live offer (`offeredToIds`), freezes `assignedVehicle`, clears staging placeholders,

@@ -194,8 +194,11 @@ export function AdminInvoicingSubpage({
         onCsvImportSuccess={actions.handleCsvImportSuccess}
       />
 
-      {/* ─── Sub-Views: Payment Gateways, Driver Commission/Payouts GL & Twilio Telephony ─── */}
-      {(activeSub === 'gateways' || activeSub === 'telephony' || activeSub === 'accounting-sync') && (
+      {/* ─── Sub-Views: Payment Gateways, Driver & Staff Payouts, Policy/QuickBooks GL & Twilio Telephony ─── */}
+      {(activeSub === 'payouts' ||
+        activeSub === 'gateways' ||
+        activeSub === 'telephony' ||
+        activeSub === 'accounting-sync') && (
         <DriverPayoutsPanel
           activeSub={activeSub}
           isSaving={actions.isSaving}

@@ -1424,3 +1424,20 @@ export interface PassengerAccount {
   - Register `robots.txt` and `sitemap.xml` at top level and `service-areas` + `service-areas/:corridorSlug` inside `layout("routes/layout.tsx", [...])` in `app/routes.ts`.
   - Parse `parseBookRouteQueryInitialValues` in `app/routes/book.tsx` (`< 200`L) `loader` and seed `createInitialCustomerBookingFormState` + `BookingEngineV2.tsx` (`< 1,350`L) deterministically across SSR and hydration (`key={location.search || 'default'}`).
   - Build `app/routes/service-areas._index.tsx` and `app/routes/service-areas.$corridorSlug.tsx` with 2s-bounded `loadPublicSettingsForServer()`, canonical/OG `meta()`, XSS-safe JSON-LD `<script type="application/ld+json">` tags, interactive direction-swap + passenger-count fare calculator, and sitewide crawl links in `Footer.tsx` and `services.tsx`.
+
+## Phase 59 Architecture (Wave 5 Phase 1): Admin IA Overhaul, Focused `General` (`Company Info` + `Time & Units`), Unified `Website, Brand & SEO` Theme Studio, `System & Governance` Archive & `Trips` Parity
+- **Pure Admin Navigation & Legacy URL Aliasing (`app/core/utils/admin-nav.util.ts`)**:
+  - Centralize canonical `AdminTabKey`, `SUB_PAGES`, and `resolveAdminTabAndSub(rawTab, rawSub)` in a pure zero-React utility consumed by `app/routes/admin.tsx` (`< 1,000`L) and `AdminSidebar.tsx` (3-group IA: `Operations`, `Clients, Billing & Fleet`, `Website, Comms & System`).
+  - Keep `route("app/admin/settings", "routes/admin.settings.tsx")` in `app/routes.ts`, replace `admin.settings.tsx` with a `302` redirect to `/app/admin?tab=website&sub=form`, and delete orphaned `AdminLayoutTab.tsx` (plus barrel export in `app/components/domain/admin/index.ts`).
+- **Config Schema Normalization & Focused `General` Decomposition (`< 450`L Ceiling)**:
+  - Add optional fields and pure `normalizeCompanyConfig` / `normalizeLocalizationConfig` / `formatLocalizationPreviewSample` helpers in `app/core/types/config.ts`, and persist `company` + `localization` cleanly in `AdminConfigService` (`admin-config.service.ts`).
+  - Split `AdminGeneralTab.tsx` (`< 200`L) into `app/components/domain/admin/general/CompanyProfilePanel.tsx` (`< 350`L) and `LocalizationAndUnitsPanel.tsx` (`< 350`L).
+- **Unified Brand & Theme Studio (`< 450`L Ceiling)**:
+  - Extract `app/components/domain/admin/website/BrandLivePreviewCanvas.tsx` (`< 400`L) and refactor `WebsiteThemesTab.tsx` (`< 450`L) with all 6 reconciled `THEME_PRESETS`, typography, radius, color tokens, logo URL, and draft-vs-published preview state.
+- **Archive & Pricing Audit Consolidation**:
+  - Update `AdminAdvancedTab.tsx` (`< 850`L) to remove dead `'website'` branch and mount `<AdminArchiveTab initialSubTab={archiveEntity || 'all'} />` for `'archive'`.
+  - Extract `PricingAuditPanel.tsx` (`< 300`L) shared between `PricingAuditDrawer.tsx` and the new `'audit'` pillar tab in `PricingAdminWorkspace.tsx` / `AdminRatesTab.tsx`, and wire `payouts` sub-tab in `AdminInvoicingSubpage.tsx` + `initialSection` in `AdminRulesTab.tsx`.
+- **`Trips` Parity & Subpage Decomposition (`< 450`L Ceiling)**:
+  - Extend `StandingOrdersDrawer.tsx` with `mode?: 'drawer' | 'embedded'`.
+  - Create pure `app/core/utils/admin-trips-exceptions.util.ts` classifying active queue statuses, completable trips, SLA/cascade alerts, Phase 56 `pendingGuestChangeRequest`, Phase 55 `pendingDriverUpdateAck`, and cancelled/declined/no-show exceptions.
+  - Decompose `AdminTripsSubpage.tsx` (`< 450`L) + `app/components/domain/admin/trips/{AdminTripsQueueAndHistoryView,AdminTripsExceptionsPanel,AdminTripDetailsSlideOver}.tsx` (`< 450`L each) with 4-state `DriverAssignDropdown`, Stage/Hold actions (`stageDriverForTrip`, `sendStagedTripToDriver`, `clearStagedDriverFromTrip`), and universal `TripActionDropdown`.

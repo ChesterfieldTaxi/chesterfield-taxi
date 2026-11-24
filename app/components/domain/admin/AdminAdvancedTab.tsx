@@ -13,54 +13,46 @@ import { Input } from '../../ui/Input';
 import { Badge } from '../../ui/Badge';
 import { Alert } from '../../ui/Alert';
 import {
-  ShieldCheckIcon,
   CheckIcon,
   SpinnerIcon,
   LockIcon,
-  ClockIcon,
-  CarIcon,
-  InfoIcon,
-  ShieldIcon,
-  HistoryIcon,
-  SettingsIcon,
-  WrenchIcon,
   DownloadIcon,
 } from '../../ui/Icons';
 import { isFirebaseConfigured } from '../../../core/services/firebase';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { getBookingService } from '../../../core/services/booking';
-import { AdminWebsiteTab } from './website/AdminWebsiteTab';
+import { AdminArchiveTab } from './AdminArchiveTab';
 
-export type AdvancedSubTab = 'website' | 'security' | 'audit' | 'system';
+export type AdvancedSubTab = 'security' | 'audit' | 'archive' | 'system';
 
 export interface AdminAdvancedTabProps {
   settings: AppSettings;
   onSave: (updates: Partial<AppSettings>) => Promise<void>;
   isLoading?: boolean;
   initialSubTab?: string;
+  archiveEntity?: string;
+}
+
+function normalizeAdvancedSubTab(raw?: string): AdvancedSubTab {
+  if (raw === 'security' || raw === 'audit' || raw === 'archive' || raw === 'system') {
+    return raw;
+  }
+  return 'security';
 }
 
 export function AdminAdvancedTab({
   settings,
   onSave,
-  isLoading = false,
-  initialSubTab = 'website',
+  isLoading: _isLoading = false,
+  initialSubTab = 'security',
+  archiveEntity = 'all',
 }: AdminAdvancedTabProps) {
-  const normalizedInitial: AdvancedSubTab =
-    initialSubTab === 'security' ||
-    initialSubTab === 'audit' ||
-    initialSubTab === 'system'
-      ? initialSubTab
-      : 'website';
-
-  const [activeSub, setActiveSub] = useState<AdvancedSubTab>(normalizedInitial);
+  const [activeSub, setActiveSub] = useState<AdvancedSubTab>(() =>
+    normalizeAdvancedSubTab(initialSubTab)
+  );
 
   useEffect(() => {
-    if (initialSubTab === 'security' || initialSubTab === 'audit' || initialSubTab === 'system') {
-      setActiveSub(initialSubTab);
-    } else {
-      setActiveSub('website');
-    }
+    setActiveSub(normalizeAdvancedSubTab(initialSubTab));
   }, [initialSubTab]);
 
   // ─── 1. Security Controls State ───
@@ -455,6 +447,11 @@ export function AdminAdvancedTab({
         </div>
       )}
 
+      {/* ─── SUBPAGE: UNIVERSAL ARCHIVE ─── */}
+      {activeSub === 'archive' && (
+        <AdminArchiveTab initialSubTab={archiveEntity || 'all'} />
+      )}
+
       {/* ═══════════════════════════════════════════════════════════════════════
           SUBPAGE 4: SYSTEM OPS & TELEMETRY
       ═══════════════════════════════════════════════════════════════════════ */}
@@ -817,18 +814,6 @@ export function AdminAdvancedTab({
             </CardContent>
           </Card>
         </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════════════
-          SUBPAGE 5: WEBSITE BUILDER & CMS STUDIO
-      ═══════════════════════════════════════════════════════════════════════ */}
-      {activeSub === 'website' && (
-        <AdminWebsiteTab
-          settings={settings}
-          onSave={onSave}
-          isLoading={isLoading || isSaving}
-          initialSubTab={initialSubTab === 'form' || initialSubTab === 'customer-form' ? 'form' : undefined}
-        />
       )}
     </div>
   );

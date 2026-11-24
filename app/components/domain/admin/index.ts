@@ -7,7 +7,6 @@ export * from './AdminOperatorsTab';
 export * from './AdminAdvancedTab';
 export * from './AdminDashboardTab';
 export * from './website/AdminWebsiteTab';
-export * from './AdminLayoutTab';
 export * from './subpages/AdminTripsSubpage';
 export * from './subpages/AdminInvoicingSubpage';
 export * from './subpages/AdminCustomersSubpage';

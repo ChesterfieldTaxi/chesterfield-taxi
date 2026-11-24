@@ -1,0 +1,187 @@
+import type { AppSettings, BrandingConfig } from '../../../../core/types/config';
+import { COMPANY_CONFIG } from '../../../../config/companyConfig';
+
+export interface ThemePreset {
+  id: string;
+  name: string;
+  badge?: string;
+  description: string;
+  previewColors: string[];
+  tokens: BrandingConfig;
+}
+
+export const THEME_PRESETS: ThemePreset[] = [
+  {
+    id: 'chesterfield_royal_blue',
+    name: 'Chesterfield Royal',
+    badge: 'Active Default',
+    description: 'High-trust metropolitan car service palette with royal blue accents and dark slate navbar.',
+    previewColors: ['#2563eb', '#0f172a', '#ffffff', '#3b82f6'],
+    tokens: {
+      primaryColor: '#2563eb',
+      secondaryColor: '#0f172a',
+      headingFont: 'Inter',
+      bodyFont: 'Inter',
+      headingColor: '#0f172a',
+      bodyTextColor: '#334155',
+      mutedTextColor: '#64748b',
+      btnPrimaryBg: '#2563eb',
+      btnPrimaryText: '#ffffff',
+      btnSecondaryBg: '#0f172a',
+      btnSecondaryText: '#ffffff',
+      btnBorderRadius: '8px',
+      navbarBg: '#0f172a',
+      cardBg: '#ffffff',
+    },
+  },
+  {
+    id: 'vintage_metro_amber',
+    name: 'Classic Metro Taxi (Amber & Slate)',
+    badge: 'Classic Taxi',
+    description: 'Iconic metropolitan taxi identity with vibrant amber highlights and slate navy contrast.',
+    previewColors: ['#f59e0b', '#0f172a', '#18181b', '#fef08a'],
+    tokens: {
+      primaryColor: '#f59e0b',
+      secondaryColor: '#0f172a',
+      headingFont: 'Inter',
+      bodyFont: 'Inter',
+      headingColor: '#0f172a',
+      bodyTextColor: '#27272a',
+      mutedTextColor: '#71717a',
+      btnPrimaryBg: '#f59e0b',
+      btnPrimaryText: '#09090b',
+      btnSecondaryBg: '#0f172a',
+      btnSecondaryText: '#ffffff',
+      btnBorderRadius: '8px',
+      navbarBg: '#0f172a',
+      cardBg: '#ffffff',
+    },
+  },
+  {
+    id: 'executive_midnight_gold',
+    name: 'Midnight & Warm Gold',
+    badge: 'Executive Dark',
+    description: 'Warm amber-gold buttons paired with deep midnight headers and modern Outfit headings.',
+    previewColors: ['#d97706', '#090d16', '#fef3c7', '#f59e0b'],
+    tokens: {
+      primaryColor: '#d97706',
+      secondaryColor: '#090d16',
+      headingFont: 'Outfit',
+      bodyFont: 'Plus Jakarta Sans',
+      headingColor: '#090d16',
+      bodyTextColor: '#1f2937',
+      mutedTextColor: '#6b7280',
+      btnPrimaryBg: '#d97706',
+      btnPrimaryText: '#ffffff',
+      btnSecondaryBg: '#090d16',
+      btnSecondaryText: '#fef3c7',
+      btnBorderRadius: '4px',
+      navbarBg: '#090d16',
+      cardBg: '#ffffff',
+    },
+  },
+  {
+    id: 'electric_sapphire',
+    name: 'Electric Sapphire',
+    badge: 'On-Demand',
+    description: 'Contemporary ride-hail look with electric sapphire blue and rounded 12px geometry.',
+    previewColors: ['#1d4ed8', '#0f172a', '#06b6d4', '#e0f2fe'],
+    tokens: {
+      primaryColor: '#1d4ed8',
+      secondaryColor: '#0f172a',
+      headingFont: 'Plus Jakarta Sans',
+      bodyFont: 'Inter',
+      headingColor: '#0f172a',
+      bodyTextColor: '#334155',
+      mutedTextColor: '#64748b',
+      btnPrimaryBg: '#1d4ed8',
+      btnPrimaryText: '#ffffff',
+      btnSecondaryBg: '#0f172a',
+      btnSecondaryText: '#38bdf8',
+      btnBorderRadius: '12px',
+      navbarBg: '#0b1329',
+      cardBg: '#ffffff',
+    },
+  },
+  {
+    id: 'emerald_prestige',
+    name: 'Emerald Prestige',
+    badge: 'Eco & Hybrid',
+    description: 'Fresh emerald green accents and rounded cards ideal for hybrid and executive fleets.',
+    previewColors: ['#059669', '#064e3b', '#f3f4f6', '#10b981'],
+    tokens: {
+      primaryColor: '#059669',
+      secondaryColor: '#064e3b',
+      headingFont: 'Outfit',
+      bodyFont: 'Inter',
+      headingColor: '#064e3b',
+      bodyTextColor: '#374151',
+      mutedTextColor: '#6b7280',
+      btnPrimaryBg: '#059669',
+      btnPrimaryText: '#ffffff',
+      btnSecondaryBg: '#064e3b',
+      btnSecondaryText: '#ffffff',
+      btnBorderRadius: '12px',
+      navbarBg: '#042f2e',
+      cardBg: '#ffffff',
+    },
+  },
+  {
+    id: 'monochrome_obsidian',
+    name: 'Monochrome Minimalist',
+    badge: 'High Contrast',
+    description: 'Architectural black-and-white contrast with sharp 0px square edges.',
+    previewColors: ['#000000', '#18181b', '#ffffff', '#71717a'],
+    tokens: {
+      primaryColor: '#000000',
+      secondaryColor: '#18181b',
+      headingFont: 'Inter',
+      bodyFont: 'Roboto',
+      headingColor: '#000000',
+      bodyTextColor: '#27272a',
+      mutedTextColor: '#71717a',
+      btnPrimaryBg: '#000000',
+      btnPrimaryText: '#ffffff',
+      btnSecondaryBg: '#18181b',
+      btnSecondaryText: '#ffffff',
+      btnBorderRadius: '0px',
+      navbarBg: '#000000',
+      cardBg: '#ffffff',
+    },
+  },
+];
+
+export const FONT_OPTIONS = [
+  'Inter',
+  'Outfit',
+  'Plus Jakarta Sans',
+  'Lato',
+  'Cinzel',
+  'Playfair Display',
+  'Roboto',
+  'Montserrat',
+  'Poppins',
+  'System UI',
+] as const;
+
+export const RADIUS_OPTIONS = ['0px', '4px', '8px', '12px', '16px', '9999px'] as const;
+
+export function hydrateBrandingFromSettings(settings: AppSettings): BrandingConfig {
+  return {
+    primaryColor: settings.branding?.primaryColor || COMPANY_CONFIG.primaryColor || '#2563eb',
+    secondaryColor: settings.branding?.secondaryColor || COMPANY_CONFIG.secondaryColor || '#0f172a',
+    logoUrl: settings.branding?.logoUrl || '',
+    headingFont: settings.branding?.headingFont || COMPANY_CONFIG.headingFont || 'Inter',
+    bodyFont: settings.branding?.bodyFont || COMPANY_CONFIG.bodyFont || 'Inter',
+    headingColor: settings.branding?.headingColor || COMPANY_CONFIG.headingColor || '#0f172a',
+    bodyTextColor: settings.branding?.bodyTextColor || COMPANY_CONFIG.bodyTextColor || '#334155',
+    mutedTextColor: settings.branding?.mutedTextColor || COMPANY_CONFIG.mutedTextColor || '#64748b',
+    btnPrimaryBg: settings.branding?.btnPrimaryBg || COMPANY_CONFIG.btnPrimaryBg || '#2563eb',
+    btnPrimaryText: settings.branding?.btnPrimaryText || COMPANY_CONFIG.btnPrimaryText || '#ffffff',
+    btnSecondaryBg: settings.branding?.btnSecondaryBg || COMPANY_CONFIG.btnSecondaryBg || '#0f172a',
+    btnSecondaryText: settings.branding?.btnSecondaryText || COMPANY_CONFIG.btnSecondaryText || '#ffffff',
+    btnBorderRadius: settings.branding?.btnBorderRadius || COMPANY_CONFIG.btnBorderRadius || '8px',
+    navbarBg: settings.branding?.navbarBg || COMPANY_CONFIG.navbarBg || '#0f172a',
+    cardBg: settings.branding?.cardBg || COMPANY_CONFIG.cardBg || '#ffffff',
+  };
+}

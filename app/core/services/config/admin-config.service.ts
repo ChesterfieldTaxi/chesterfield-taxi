@@ -30,6 +30,9 @@ import type {
 import {
   DEFAULT_OVERSIZED_BAG_CATEGORIES,
   DEFAULT_DISPATCH_AUTOMATION_CONFIG,
+  DEFAULT_LOCALIZATION_CONFIG,
+  normalizeCompanyConfig,
+  normalizeLocalizationConfig,
   normalizeDispatchAutomationConfig,
   canOperatorConfigureLeadWindows,
 } from '../../types/config';
@@ -297,12 +300,18 @@ export const DEFAULT_CONFIG_AUDIT_TRAIL: ConfigAuditEntry[] = [
 ];
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
-  company: {
+  company: normalizeCompanyConfig({
     name: COMPANY_CONFIG.name,
+    legalEntityName: COMPANY_CONFIG.legalName,
     phone: COMPANY_CONFIG.phone.dispatch,
-    email: COMPANY_CONFIG.email.dispatch,
+    email: COMPANY_CONFIG.email.support || COMPANY_CONFIG.email.dispatch,
+    dispatchEmail: COMPANY_CONFIG.email.dispatch,
     address: COMPANY_CONFIG.address.formatted,
-  },
+    operatingHoursLabel: 'Monday – Sunday: Open 24 Hours',
+    is24x7: true,
+    advanceBookingMaxDays: 90,
+  }),
+  localization: { ...DEFAULT_LOCALIZATION_CONFIG },
   branding: {
     primaryColor: COMPANY_CONFIG.primaryColor || '#2563eb', // Cobalt-600
     secondaryColor: COMPANY_CONFIG.secondaryColor || '#0f172a', // Slate-900
@@ -511,6 +520,7 @@ const LOCAL_STORAGE_KEY = ADMIN_SETTINGS_LOCAL_STORAGE_KEY;
 export function sanitizePublicSettings(raw: Record<string, any> = {}): Partial<AppSettings> {
   const sanitized: Record<string, any> = {
     company: raw.company ?? DEFAULT_APP_SETTINGS.company,
+    localization: raw.localization ?? DEFAULT_APP_SETTINGS.localization,
     branding: raw.branding ?? DEFAULT_APP_SETTINGS.branding,
     vehicles: raw.vehicles ?? DEFAULT_APP_SETTINGS.vehicles,
     pricing: raw.pricing ?? DEFAULT_APP_SETTINGS.pricing,
@@ -597,10 +607,14 @@ export class AdminConfigService implements IAdminConfigService {
     if (!incoming) return { ...DEFAULT_APP_SETTINGS };
 
     return {
-      company: {
+      company: normalizeCompanyConfig({
         ...DEFAULT_APP_SETTINGS.company,
         ...(incoming.company || {}),
-      },
+      }),
+      localization: normalizeLocalizationConfig({
+        ...(DEFAULT_APP_SETTINGS.localization || DEFAULT_LOCALIZATION_CONFIG),
+        ...(incoming.localization || {}),
+      }),
       branding: {
         ...DEFAULT_APP_SETTINGS.branding,
         ...(incoming.branding || {}),
@@ -788,10 +802,14 @@ export class AdminConfigService implements IAdminConfigService {
     const merged: AppSettings = {
       ...this.cachedSettings,
       ...updates,
-      company: {
+      company: normalizeCompanyConfig({
         ...this.cachedSettings.company,
         ...(updates.company || {}),
-      },
+      }),
+      localization: normalizeLocalizationConfig({
+        ...(this.cachedSettings.localization || DEFAULT_LOCALIZATION_CONFIG),
+        ...(updates.localization || {}),
+      }),
       branding: {
         ...this.cachedSettings.branding,
         ...(updates.branding || {}),

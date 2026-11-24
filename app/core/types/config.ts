@@ -13,7 +13,16 @@ export interface CompanyConfig {
   phone: string;
   email: string;
   address: string;
+  legalEntityName?: string; // e.g. 'Chesterfield Taxi LLC'
+  dispatchEmail?: string; // e.g. 'dispatch@chesterfieldtaxi.com'
+  operatingHoursLabel?: string; // e.g. 'Monday – Sunday: Open 24 Hours'
+  is24x7?: boolean; // default true
+  advanceBookingMaxDays?: number; // default 90
 }
+
+export type DistanceUnit = 'mi' | 'km';
+export type SpeedUnit = 'mph' | 'kmh';
+export type TemperatureUnit = 'F' | 'C';
 
 export interface LocalizationConfig {
   currency: string; // e.g. "USD"
@@ -21,6 +30,149 @@ export interface LocalizationConfig {
   timezone: string; // e.g. "America/Chicago"
   timeFormat: '12h' | '24h';
   dateFormat: string; // e.g. "MM/DD/YYYY"
+  distanceUnit?: DistanceUnit; // default 'mi'
+  speedUnit?: SpeedUnit; // default 'mph'
+  temperatureUnit?: TemperatureUnit; // default 'F'
+  defaultServiceRegion?: string; // default 'Chesterfield & St. Louis Metro, MO'
+}
+
+export const DEFAULT_COMPANY_CONFIG_VALUES: Required<CompanyConfig> = {
+  name: 'Chesterfield Taxi',
+  legalEntityName: 'Chesterfield Taxi & Transportation LLC',
+  phone: '(314) 738-0100',
+  email: 'support@chesterfieldtaxi.com',
+  dispatchEmail: 'dispatch@chesterfieldtaxi.com',
+  address: '1814 Woodson Rd, Overland, MO 63114',
+  operatingHoursLabel: 'Monday – Sunday: Open 24 Hours',
+  is24x7: true,
+  advanceBookingMaxDays: 90,
+};
+
+export const DEFAULT_LOCALIZATION_CONFIG: Required<LocalizationConfig> = {
+  currency: 'USD',
+  currencySymbol: '$',
+  timezone: 'America/Chicago',
+  timeFormat: '12h',
+  dateFormat: 'MM/DD/YYYY',
+  distanceUnit: 'mi',
+  speedUnit: 'mph',
+  temperatureUnit: 'F',
+  defaultServiceRegion: 'Chesterfield & St. Louis Metro, MO',
+};
+
+export function normalizeCompanyConfig(
+  raw?: Partial<CompanyConfig> | null
+): Required<CompanyConfig> {
+  const cleanStr = (val: unknown, fallback: string): string => {
+    const trimmed = typeof val === 'string' ? val.trim() : '';
+    return trimmed || fallback;
+  };
+  const name = cleanStr(raw?.name, DEFAULT_COMPANY_CONFIG_VALUES.name);
+  const rawDays = typeof raw?.advanceBookingMaxDays === 'number'
+    ? raw.advanceBookingMaxDays
+    : Number(raw?.advanceBookingMaxDays);
+  const advanceBookingMaxDays = Number.isFinite(rawDays) && rawDays > 0
+    ? Math.min(365, Math.max(1, Math.round(rawDays)))
+    : DEFAULT_COMPANY_CONFIG_VALUES.advanceBookingMaxDays;
+
+  return {
+    name,
+    legalEntityName: cleanStr(
+      raw?.legalEntityName,
+      name === DEFAULT_COMPANY_CONFIG_VALUES.name
+        ? DEFAULT_COMPANY_CONFIG_VALUES.legalEntityName
+        : `${name} LLC`
+    ),
+    phone: cleanStr(raw?.phone, DEFAULT_COMPANY_CONFIG_VALUES.phone),
+    email: cleanStr(raw?.email, DEFAULT_COMPANY_CONFIG_VALUES.email),
+    dispatchEmail: cleanStr(raw?.dispatchEmail, DEFAULT_COMPANY_CONFIG_VALUES.dispatchEmail),
+    address: cleanStr(raw?.address, DEFAULT_COMPANY_CONFIG_VALUES.address),
+    operatingHoursLabel: cleanStr(
+      raw?.operatingHoursLabel,
+      DEFAULT_COMPANY_CONFIG_VALUES.operatingHoursLabel
+    ),
+    is24x7: raw?.is24x7 !== undefined ? Boolean(raw.is24x7) : true,
+    advanceBookingMaxDays,
+  };
+}
+
+export function resolveCurrencySymbol(currency: string): string {
+  const upper = String(currency || 'USD').trim().toUpperCase();
+  if (upper === 'EUR') return '€';
+  if (upper === 'GBP') return '£';
+  return '$';
+}
+
+export function normalizeLocalizationConfig(
+  raw?: Partial<LocalizationConfig> | null
+): Required<LocalizationConfig> {
+  const cleanStr = (val: unknown, fallback: string): string => {
+    const trimmed = typeof val === 'string' ? val.trim() : '';
+    return trimmed || fallback;
+  };
+  const validCurrencies = new Set(['USD', 'CAD', 'EUR', 'GBP']);
+  const rawCurrency = cleanStr(raw?.currency, DEFAULT_LOCALIZATION_CONFIG.currency).toUpperCase();
+  const currency = validCurrencies.has(rawCurrency) ? rawCurrency : 'USD';
+  const currencySymbol =
+    raw?.currencySymbol && ['$', '€', '£'].includes(raw.currencySymbol)
+      ? raw.currencySymbol
+      : resolveCurrencySymbol(currency);
+
+  const validDateFormats = new Set(['MM/DD/YYYY', 'YYYY-MM-DD', 'DD/MM/YYYY']);
+  const dateFormat =
+    raw?.dateFormat && validDateFormats.has(raw.dateFormat)
+      ? raw.dateFormat
+      : DEFAULT_LOCALIZATION_CONFIG.dateFormat;
+
+  return {
+    currency,
+    currencySymbol,
+    timezone: cleanStr(raw?.timezone, DEFAULT_LOCALIZATION_CONFIG.timezone),
+    timeFormat: raw?.timeFormat === '24h' ? '24h' : '12h',
+    dateFormat,
+    distanceUnit: raw?.distanceUnit === 'km' ? 'km' : 'mi',
+    speedUnit: raw?.speedUnit === 'kmh' ? 'kmh' : 'mph',
+    temperatureUnit: raw?.temperatureUnit === 'C' ? 'C' : 'F',
+    defaultServiceRegion: cleanStr(
+      raw?.defaultServiceRegion,
+      DEFAULT_LOCALIZATION_CONFIG.defaultServiceRegion
+    ),
+  };
+}
+
+export interface LocalizationSamplePreview {
+  dateSample: string;
+  timeSample: string;
+  distanceSample: string;
+  speedSample: string;
+  temperatureSample: string;
+  fareSample: string;
+}
+
+export function formatLocalizationPreviewSample(
+  raw?: Partial<LocalizationConfig> | null
+): LocalizationSamplePreview {
+  const loc = normalizeLocalizationConfig(raw);
+  const dateSample =
+    loc.dateFormat === 'YYYY-MM-DD'
+      ? '2026-11-23'
+      : loc.dateFormat === 'DD/MM/YYYY'
+      ? '23/11/2026'
+      : '11/23/2026';
+  const timeSample = loc.timeFormat === '24h' ? '14:30' : '2:30 PM';
+  const distanceSample = loc.distanceUnit === 'km' ? '29.6 km' : '18.4 mi';
+  const speedSample = loc.speedUnit === 'kmh' ? '89 km/h' : '55 mph';
+  const temperatureSample = loc.temperatureUnit === 'C' ? '22°C' : '72°F';
+  const fareSample = `${loc.currencySymbol}45.00 ${loc.currency}`;
+
+  return {
+    dateSample,
+    timeSample,
+    distanceSample,
+    speedSample,
+    temperatureSample,
+    fareSample,
+  };
 }
 
 export interface BrandingConfig {

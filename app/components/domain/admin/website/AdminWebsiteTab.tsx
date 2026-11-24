@@ -42,12 +42,12 @@ const WEBSITE_SUB_TABS: Array<{
   label: string;
   icon: React.ComponentType<{ className?: string }>;
 }> = [
+  { id: 'themes', label: 'Themes & Branding', icon: PaletteIcon },
+  { id: 'form', label: 'Booking & /track', icon: SlidersIcon },
+  { id: 'seo', label: 'Service Areas & SEO', icon: SearchIcon },
   { id: 'pages', label: 'Pages', icon: FileTextIcon },
-  { id: 'themes', label: 'Themes', icon: PaletteIcon },
-  { id: 'form', label: 'Booking Form', icon: SlidersIcon },
   { id: 'layout', label: 'Page Sections', icon: LayersIcon },
   { id: 'navigation', label: 'Header & Footer', icon: CompassIcon },
-  { id: 'seo', label: 'SEO & Analytics', icon: SearchIcon },
   { id: 'css', label: 'Custom CSS', icon: CodeIcon },
 ];
 
@@ -55,10 +55,10 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
   settings,
   onSave,
   isLoading,
-  initialSubTab = 'pages',
+  initialSubTab = 'themes',
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<WebsiteSubTab>(
-    (initialSubTab as WebsiteSubTab) || 'pages'
+    (initialSubTab as WebsiteSubTab) || 'themes'
   );
 
   React.useEffect(() => {

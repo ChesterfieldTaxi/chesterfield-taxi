@@ -47,626 +47,39 @@ import type { ConfigAuditEntry, DispatchAutomationConfig } from '../../../core/t
 import { getZoneService } from '../../../core/services/zones/zone.service';
 import type { ZoneGeofence } from '../../../core/types/zone';
 import { AdminAutoDispatchControlPanel } from './rules/AdminAutoDispatchControlPanel';
+import { ModularTierCard } from './rules/ModularTierCard';
 
-interface ModularTierCardProps {
-  tierKey: 'tier1' | 'tier2' | 'tier3';
-  tierNumber: 1 | 2 | 3;
-  title: string;
-  subtitle: string;
-  colorTheme: 'emerald' | 'amber' | 'rose';
-  config: ModularTierConfig;
-  zones: ZoneGeofence[];
-  onChange: (updated: ModularTierConfig) => void;
+export type AutomationSectionTab =
+  | 'auto-dispatch'
+  | 'intake-rules'
+  | 'console'
+  | 'standing-defaults';
+
+export interface AdminRulesTabProps {
+  initialSection?: AutomationSectionTab | string;
 }
 
-const PAYMENT_OPTIONS: { id: RulePaymentMethod; label: string; hint: string }[] = [
-  { id: 'prepaid', label: 'Prepaid In-App', hint: 'Card or digital wallet charged online' },
-  { id: 'corporate', label: 'Corporate Account', hint: 'Direct invoicing billing contract' },
-  { id: 'card', label: 'Credit Card (In-Car)', hint: 'Swiped/inserted with driver POS' },
-  { id: 'cash', label: 'Cash on Board', hint: 'Direct cash payment to operator' },
-  { id: 'voucher', label: 'Voucher / Invoiced', hint: 'Government or partner vouchers' },
-];
+function normalizeAutomationSection(raw?: string): AutomationSectionTab {
+  if (
+    raw === 'auto-dispatch' ||
+    raw === 'intake-rules' ||
+    raw === 'console' ||
+    raw === 'standing-defaults'
+  ) {
+    return raw;
+  }
+  return 'auto-dispatch';
+}
 
-const VEHICLE_TIER_OPTIONS = [
-  { id: 'standard', label: 'Standard Sedan' },
-  { id: 'premium', label: 'Executive Premium' },
-  { id: 'xl', label: 'XL 6-Passenger SUV' },
-  { id: 'wheelchair', label: 'Wheelchair WAV' },
-];
-
-function ModularTierCard({
-  tierKey,
-  tierNumber,
-  title,
-  subtitle,
-  colorTheme,
-  config,
-  zones,
-  onChange,
-}: ModularTierCardProps) {
-  const themeClasses = {
-    emerald: {
-      border: 'border-emerald-300',
-      badgeBg: 'bg-emerald-600 text-white',
-      headerBg: 'bg-emerald-50/70 border-b border-emerald-200/60',
-      activeText: 'text-emerald-800',
-      accentColor: 'emerald',
-      lightBox: 'bg-emerald-50/40 border-emerald-200/70',
-      pillActive: 'bg-emerald-600 text-white border-emerald-600',
-    },
-    amber: {
-      border: 'border-amber-300',
-      badgeBg: 'bg-amber-600 text-white',
-      headerBg: 'bg-amber-50/70 border-b border-amber-200/60',
-      activeText: 'text-amber-800',
-      accentColor: 'amber',
-      lightBox: 'bg-amber-50/40 border-amber-200/70',
-      pillActive: 'bg-amber-600 text-white border-amber-600',
-    },
-    rose: {
-      border: 'border-rose-300',
-      badgeBg: 'bg-rose-600 text-white',
-      headerBg: 'bg-rose-50/70 border-b border-rose-200/60',
-      activeText: 'text-rose-800',
-      accentColor: 'rose',
-      lightBox: 'bg-rose-50/40 border-rose-200/70',
-      pillActive: 'bg-rose-600 text-white border-rose-600',
-    },
-  }[colorTheme];
-
-  const update = (partial: Partial<ModularTierConfig>) => {
-    onChange({ ...config, ...partial });
-  };
-
-  const togglePaymentMethod = (method: RulePaymentMethod) => {
-    const current = config.paymentMethods || [];
-    if (current.includes(method)) {
-      update({ paymentMethods: current.filter((m) => m !== method) });
-    } else {
-      update({ paymentMethods: [...current, method] });
-    }
-  };
-
-  const toggleZone = (type: 'pickup' | 'dropoff', zoneId: string) => {
-    if (type === 'pickup') {
-      const current = config.pickupZoneIds || [];
-      if (current.includes(zoneId)) {
-        update({ pickupZoneIds: current.filter((id) => id !== zoneId) });
-      } else {
-        update({ pickupZoneIds: [...current, zoneId] });
-      }
-    } else {
-      const current = config.dropoffZoneIds || [];
-      if (current.includes(zoneId)) {
-        update({ dropoffZoneIds: current.filter((id) => id !== zoneId) });
-      } else {
-        update({ dropoffZoneIds: [...current, zoneId] });
-      }
-    }
-  };
-
-  const toggleVehicleTier = (tierId: string) => {
-    const current = config.allowedVehicleTiers || [];
-    if (current.includes(tierId)) {
-      update({ allowedVehicleTiers: current.filter((id) => id !== tierId) });
-    } else {
-      update({ allowedVehicleTiers: [...current, tierId] });
-    }
-  };
-
-  return (
-    <Card className={`border-2 shadow-xs transition-all ${themeClasses.border} overflow-hidden`}>
-      {/* ─── Card Header ─── */}
-      <div className={`p-4 sm:p-5 ${themeClasses.headerBg} flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
-          <span className={`self-start sm:self-auto shrink-0 whitespace-nowrap text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md ${themeClasses.badgeBg}`}>
-            Tier {tierNumber} Controls
-          </span>
-          <div className="min-w-0">
-            <h3 className="text-sm sm:text-base font-black text-slate-900">{title}</h3>
-            <p className="text-xs text-slate-500 font-medium">{subtitle}</p>
-          </div>
-        </div>
-        <label className="flex items-center gap-2 cursor-pointer self-start sm:self-auto shrink-0 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-2xs">
-          <input
-            type="checkbox"
-            checked={config.enabled}
-            onChange={(e) => update({ enabled: e.target.checked })}
-            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
-          />
-          <span className="text-xs font-bold text-slate-800">
-            Enable Tier {tierNumber}
-          </span>
-        </label>
-      </div>
-
-      <CardContent className="p-4 sm:p-6 space-y-6 bg-white">
-        {/* ─── 1. Client Score & Rider Verification ─── */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
-            <UserIcon className="w-4 h-4 text-slate-500" />
-            <span>1. Client Score &amp; Rider Profile</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3.5 sm:p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-700">Client Score Floor (Min)</span>
-                <span className="text-xs font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-800 inline-flex items-center gap-1">
-                  <StarIcon className="w-3 h-3 text-amber-500" />
-                  <span>{config.customerScoreMin}</span>
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={config.customerScoreMin}
-                onChange={(e) => update({ customerScoreMin: parseInt(e.target.value) || 0 })}
-                className="w-full accent-blue-600 cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-slate-400 font-medium mt-1">
-                <span>0 (Any)</span>
-                <span>50</span>
-                <span>100 (VIP only)</span>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-700">Client Score Ceiling (Max)</span>
-                <span className="text-xs font-bold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-800 inline-flex items-center gap-1">
-                  <StarIcon className="w-3 h-3 text-amber-500" />
-                  <span>{config.customerScoreMax}</span>
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={config.customerScoreMax}
-                onChange={(e) => update({ customerScoreMax: parseInt(e.target.value) || 100 })}
-                className="w-full accent-blue-600 cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-slate-400 font-medium mt-1">
-                <span>0</span>
-                <span>Target Band: [{config.customerScoreMin} – {config.customerScoreMax}]</span>
-                <span>100</span>
-              </div>
-            </div>
-
-            <div className="md:col-span-2 pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.allowUnratedGuests}
-                  onChange={(e) => update({ allowUnratedGuests: e.target.checked })}
-                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-xs font-medium text-slate-700">
-                  Apply rule to first-time unrated guest riders (accounts with no score history)
-                </span>
-              </label>
-              <span className="text-[11px] text-slate-400 italic">
-                Active band: {config.customerScoreMin} to {config.customerScoreMax} points
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* ─── 2. Granular Separated Spatial Routing ─── */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
-            <MapPinIcon className="w-4 h-4 text-slate-500" />
-            <span>2. Granular Spatial Routing (Separated Pickup &amp; Dropoff)</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Pickup Location Control */}
-            <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                  Pickup Location Scope
-                </span>
-                <Badge variant="neutral" size="sm" className="font-mono text-[10px] shrink-0">
-                  {config.pickupLocationMode.toUpperCase()}
-                </Badge>
-              </div>
-
-              <select
-                value={config.pickupLocationMode}
-                onChange={(e) => update({ pickupLocationMode: e.target.value as RuleLocationMode })}
-                className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              >
-                <option value="all">Any Location (All Operational Zones)</option>
-                <option value="specific_zones">Specific Monitored / Whitelisted Zones</option>
-                <option value="airports">Airport Terminals &amp; Perimeters Only</option>
-                <option value="prohibited_only">Prohibited Safety Exclusion Geofences</option>
-                <option value="outside_service_area">Outside Service Perimeter / County</option>
-              </select>
-
-              {config.pickupLocationMode === 'specific_zones' && (
-                <div className="space-y-2 pt-2 border-t border-slate-200">
-                  <span className="text-[11px] font-bold text-slate-600 block">Select Target Pickup Zones:</span>
-                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1 bg-white rounded-lg border border-slate-200">
-                    {zones.length === 0 ? (
-                      <span className="text-xs text-slate-400 p-2">No active zones configured</span>
-                    ) : (
-                      zones.map((z) => {
-                        const isSelected = (config.pickupZoneIds || []).includes(z.id);
-                        return (
-                          <button
-                            key={z.id}
-                            type="button"
-                            onClick={() => toggleZone('pickup', z.id)}
-                            className={`text-[11px] font-medium px-2.5 py-1 rounded-md border transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-blue-600 text-white border-blue-600 shadow-2xs font-bold'
-                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {isSelected && '✓ '}
-                            {z.name}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Dropoff Location Control */}
-            <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
-                  Dropoff Location Scope
-                </span>
-                <Badge variant="neutral" size="sm" className="font-mono text-[10px] shrink-0">
-                  {config.dropoffLocationMode.toUpperCase()}
-                </Badge>
-              </div>
-
-              <select
-                value={config.dropoffLocationMode}
-                onChange={(e) => update({ dropoffLocationMode: e.target.value as RuleLocationMode })}
-                className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              >
-                <option value="all">Any Location (All Operational Zones)</option>
-                <option value="specific_zones">Specific Monitored / Whitelisted Zones</option>
-                <option value="airports">Airport Terminals &amp; Perimeters Only</option>
-                <option value="prohibited_only">Prohibited Safety Exclusion Geofences</option>
-                <option value="outside_service_area">Outside Service Perimeter / County</option>
-              </select>
-
-              {config.dropoffLocationMode === 'specific_zones' && (
-                <div className="space-y-2 pt-2 border-t border-slate-200">
-                  <span className="text-[11px] font-bold text-slate-600 block">Select Target Dropoff Zones:</span>
-                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1 bg-white rounded-lg border border-slate-200">
-                    {zones.length === 0 ? (
-                      <span className="text-xs text-slate-400 p-2">No active zones configured</span>
-                    ) : (
-                      zones.map((z) => {
-                        const isSelected = (config.dropoffZoneIds || []).includes(z.id);
-                        return (
-                          <button
-                            key={z.id}
-                            type="button"
-                            onClick={() => toggleZone('dropoff', z.id)}
-                            className={`text-[11px] font-medium px-2.5 py-1 rounded-md border transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-blue-600 text-white border-blue-600 shadow-2xs font-bold'
-                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {isSelected && '✓ '}
-                            {z.name}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ─── 3. Time Schedule & Fare Bounds ─── */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
-            <ClockIcon className="w-4 h-4 text-slate-500" />
-            <span>3. Operating Schedule &amp; Fare Bounds</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
-            {/* Time Schedule */}
-            <div className="space-y-3">
-              <span className="text-xs font-semibold text-slate-700 block">Operating Time Schedule</span>
-              <select
-                value={config.timeMode}
-                onChange={(e) => update({ timeMode: e.target.value as RuleTimeMode })}
-                className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              >
-                <option value="all_hours">24/7 Continuous (All Hours)</option>
-                <option value="custom_window">Custom Operating Hours Window</option>
-                <option value="late_night">Late Night Enforcement Window</option>
-              </select>
-
-              {config.timeMode !== 'all_hours' && (
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Start Hour (24h)</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="23"
-                      value={config.startHour}
-                      onChange={(e) => update({ startHour: parseInt(e.target.value) || 0 })}
-                      className="text-xs h-8 bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">End Hour (24h)</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="23"
-                      value={config.endHour}
-                      onChange={(e) => update({ endHour: parseInt(e.target.value) || 0 })}
-                      className="text-xs h-8 bg-white"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Fare Bounds */}
-            <div className="space-y-3">
-              <span className="text-xs font-semibold text-slate-700 block">Trip Price &amp; Fare Boundaries</span>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Min Price ($)</label>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-2 text-slate-400 text-xs font-bold">$</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={config.minPrice}
-                      onChange={(e) => update({ minPrice: parseFloat(e.target.value) || 0 })}
-                      className="text-xs h-8 pl-6 bg-white"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Max Price ($)</label>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-2 text-slate-400 text-xs font-bold">$</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={config.maxPrice}
-                      onChange={(e) => update({ maxPrice: parseFloat(e.target.value) || 0 })}
-                      className="text-xs h-8 pl-6 bg-white"
-                    />
-                  </div>
-                </div>
-              </div>
-              <span className="text-[10px] text-slate-400 block">
-                Trips outside this fare window trigger rule escalation.
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* ─── 4. Payment Types Matrix ─── */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
-            <DollarSignIcon className="w-4 h-4 text-slate-500" />
-            <span>4. Payment Types Matrix (Select applicable payment methods)</span>
-          </div>
-
-          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {PAYMENT_OPTIONS.map((opt) => {
-                const isSelected = (config.paymentMethods || []).includes(opt.id);
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => togglePaymentMethod(opt.id)}
-                    className={`flex items-start gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-blue-50 border-blue-400 text-blue-900 shadow-2xs font-semibold'
-                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      readOnly
-                      className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 pointer-events-none"
-                    />
-                    <div>
-                      <div className="text-xs font-bold">{opt.label}</div>
-                      <div className="text-[10px] text-slate-500 leading-tight">{opt.hint}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="text-[11px] text-slate-400 italic pt-1">
-              Selected: {(config.paymentMethods || []).map((p) => p.toUpperCase()).join(', ') || 'None selected'}
-            </div>
-          </div>
-        </div>
-
-        {/* ─── 5. Advanced Booking Conditions & Operational Flags ─── */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
-            <SparklesIcon className="w-4 h-4 text-slate-500" />
-            <span>5. Advanced Booking Complexity &amp; Operational Flags</span>
-          </div>
-
-          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <label className="flex items-start gap-2.5 p-2.5 bg-white rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={config.matchReturnBooked}
-                  onChange={(e) => update({ matchReturnBooked: e.target.checked })}
-                  className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                />
-                <div>
-                  <span className="text-xs font-bold text-slate-800 inline-flex items-center gap-1.5">
-                    <RepeatIcon className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Return Trip Booked</span>
-                  </span>
-                  <span className="text-[11px] text-slate-500 block">Apply rule when round-trip reservation is detected</span>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-2.5 p-2.5 bg-white rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={config.matchSeparateContactPerson}
-                  onChange={(e) => update({ matchSeparateContactPerson: e.target.checked })}
-                  className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                />
-                <div>
-                  <span className="text-xs font-bold text-slate-800 inline-flex items-center gap-1.5">
-                    <UserIcon className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Separate Contact Person</span>
-                  </span>
-                  <span className="text-[11px] text-slate-500 block">Apply rule when booker is different from passenger</span>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-2.5 p-2.5 bg-white rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={config.matchIntermediateStops}
-                  onChange={(e) => update({ matchIntermediateStops: e.target.checked })}
-                  className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                />
-                <div>
-                  <span className="text-xs font-bold text-slate-800 inline-flex items-center gap-1.5">
-                    <MapPinIcon className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Multiple / Intermediate Stops</span>
-                  </span>
-                  <span className="text-[11px] text-slate-500 block">Apply rule when trip includes 1+ intermediate waypoints</span>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-2.5 p-2.5 bg-white rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={config.matchMultipleVehicles}
-                  onChange={(e) => update({ matchMultipleVehicles: e.target.checked })}
-                  className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                />
-                <div>
-                  <span className="text-xs font-bold text-slate-800 inline-flex items-center gap-1.5">
-                    <CarIcon className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Multiple Vehicles Requested</span>
-                  </span>
-                  <span className="text-[11px] text-slate-500 block">Apply rule when reservation requests 2 or more cars</span>
-                </div>
-              </label>
-            </div>
-
-            {/* Vehicle Classes & Driver Standards */}
-            <div className="pt-3 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <span className="text-[11px] font-bold text-slate-700 block mb-1.5">Allowed Vehicle Service Classes:</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {VEHICLE_TIER_OPTIONS.map((vt) => {
-                    const isSelected = (config.allowedVehicleTiers || []).includes(vt.id);
-                    return (
-                      <button
-                        key={vt.id}
-                        type="button"
-                        onClick={() => toggleVehicleTier(vt.id)}
-                        className={`text-xs px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-slate-900 text-white border-slate-900 font-bold'
-                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {isSelected && '✓ '}
-                        {vt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                  Min Driver Score for Premium Tiers
-                </label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={config.minDriverScoreForPremium ?? 85}
-                    onChange={(e) => update({ minDriverScoreForPremium: parseInt(e.target.value) || 0 })}
-                    className="text-xs h-8 w-24 bg-white"
-                  />
-                  <span className="text-xs text-slate-500">/ 100 points minimum</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Tier 3 Security Safeguards (Only on Tier 3) */}
-            {tierKey === 'tier3' && (
-              <div className="pt-3 border-t border-rose-200 bg-rose-50/50 p-3 rounded-xl space-y-2">
-                <span className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
-                  <LockIcon className="w-3.5 h-3.5 text-rose-600" />
-                  Enterprise Security &amp; Audit Safeguards
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={config.enforcePassengerBlacklist ?? true}
-                      onChange={(e) => update({ enforcePassengerBlacklist: e.target.checked })}
-                      className="w-3.5 h-3.5 rounded text-rose-600"
-                    />
-                    <span className="font-medium text-slate-800">Block blacklisted passenger accounts</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={config.enforceVehicleGrounding ?? true}
-                      onChange={(e) => update({ enforceVehicleGrounding: e.target.checked })}
-                      className="w-3.5 h-3.5 rounded text-rose-600"
-                    />
-                    <span className="font-medium text-slate-800">Block grounded fleet vehicles</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={config.securityAuditLogging ?? true}
-                      onChange={(e) => update({ securityAuditLogging: e.target.checked })}
-                      className="w-3.5 h-3.5 rounded text-rose-600"
-                    />
-                    <span className="font-medium text-slate-800">Log immutable security audit events</span>
-                  </label>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+export function AdminRulesTab({ initialSection = 'auto-dispatch' }: AdminRulesTabProps = {}) {
+  const [activeSection, setActiveSection] = useState<AutomationSectionTab>(() =>
+    normalizeAutomationSection(initialSection)
   );
-}
 
-export function AdminRulesTab() {
+  useEffect(() => {
+    setActiveSection(normalizeAutomationSection(initialSection));
+  }, [initialSection]);
+
   const [config, setConfig] = useState<BookingRulesConfig>(() => {
     const cached = getAdminConfigService().getCachedSettings();
     const raw = cached.bookingRulesConfig;
@@ -703,6 +116,10 @@ export function AdminRulesTab() {
     return normalizeDispatchAutomationConfig(
       cached.dispatchAutomation || DEFAULT_DISPATCH_AUTOMATION_CONFIG
     );
+  });
+  const [alertDismissMinutes, setAlertDismissMinutes] = useState<number>(() => {
+    const cached = getAdminConfigService().getCachedSettings();
+    return cached.fleetAlertsConfig?.autoDismissMinutes ?? 60;
   });
 
   // ─── Real-Time Interactive Simulator State ───
@@ -752,6 +169,9 @@ export function AdminRulesTab() {
       }
       if (s.dispatchAutomation) {
         setDispatchAutomation(normalizeDispatchAutomationConfig(s.dispatchAutomation));
+      }
+      if (s.fleetAlertsConfig?.autoDismissMinutes !== undefined) {
+        setAlertDismissMinutes(s.fleetAlertsConfig.autoDismissMinutes);
       }
     });
 
@@ -803,6 +223,7 @@ export function AdminRulesTab() {
       await getAdminConfigService().updateSettings({
         bookingRulesConfig: syncConfig,
         dispatchAutomation: normalizedAutomation,
+        fleetAlertsConfig: { autoDismissMinutes: alertDismissMinutes },
         configAuditTrail: [auditEntry, ...(cachedSettings.configAuditTrail || [])].slice(0, 200),
         customerBookingConfig: {
           ...DEFAULT_CUSTOMER_BOOKING_CONFIG,
@@ -879,35 +300,7 @@ export function AdminRulesTab() {
   ]);
 
   return (
-    <div className="space-y-8 max-w-6xl pb-16">
-      {/* ─── Header ─── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-700">
-              <SlidersIcon className="w-5 h-5" />
-            </span>
-            <div>
-              <h2 className="text-xl font-black text-slate-900">Booking Rules</h2>
-              <p className="text-xs text-slate-500 font-medium">
-                Set conditions for Auto-Confirm, Dispatcher Review, and Blocked Bookings.
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <Button
-            variant="primary"
-            onClick={handleSave}
-            disabled={isSaving}
-            className="w-full sm:w-auto justify-center flex items-center gap-2 px-5 py-2.5 text-xs font-bold shadow-xs cursor-pointer"
-          >
-            {isSaving ? <SpinnerIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
-            Save Booking Rules
-          </Button>
-        </div>
-      </div>
-
+    <div className="space-y-6 max-w-6xl pb-16">
       {saveStatus && (
         <div
           className={`p-4 rounded-xl border text-xs font-bold ${
@@ -920,45 +313,8 @@ export function AdminRulesTab() {
         </div>
       )}
 
-      {/* ─── THE 3 IDENTICAL MODULAR TIER CARDS ─── */}
-      <div className="space-y-6">
-        {/* TIER 1: AUTO-CONFIRM */}
-        <ModularTierCard
-          tierKey="tier1"
-          tierNumber={1}
-          title="Tier 1: Auto-Confirm"
-          subtitle="Trips meeting all Tier 1 rules are confirmed automatically without dispatcher review."
-          colorTheme="emerald"
-          config={config.tier1}
-          zones={zones}
-          onChange={(t1) => setConfig({ ...config, tier1: t1 })}
-        />
-
-        {/* TIER 2: REQUIRE REVIEW */}
-        <ModularTierCard
-          tierKey="tier2"
-          tierNumber={2}
-          title="Tier 2: Require Dispatcher Review"
-          subtitle="Trips matching any Tier 2 rule are placed in the dispatch review queue."
-          colorTheme="amber"
-          config={config.tier2}
-          zones={zones}
-          onChange={(t2) => setConfig({ ...config, tier2: t2 })}
-        />
-
-        {/* TIER 3: BLACKLIST & SECURITY BLOCK */}
-        <ModularTierCard
-          tierKey="tier3"
-          tierNumber={3}
-          title="Tier 3: Block Booking"
-          subtitle="Trips matching any Tier 3 rule are automatically blocked and logged."
-          colorTheme="rose"
-          config={config.tier3}
-          zones={zones}
-          onChange={(t3) => setConfig({ ...config, tier3: t3 })}
-        />
-
-        {/* DISPATCH AUTOMATION & PRE-PICKUP LEAD WINDOW CONTROL CENTER */}
+      {/* ─── SECTION 1: AUTO-PILOT & LEAD WINDOWS ─── */}
+      {activeSection === 'auto-dispatch' && (
         <AdminAutoDispatchControlPanel
           config={dispatchAutomation}
           zones={zones}
@@ -966,52 +322,292 @@ export function AdminRulesTab() {
           onChange={setDispatchAutomation}
           onSave={handleSave}
         />
+      )}
 
-        {/* AIRPORT RULES & CURBSIDE PICKUP INSTRUCTIONS CARD */}
-        <div className="p-5 bg-white border border-blue-200 rounded-2xl shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
-                <PlaneIcon className="w-5 h-5" />
-              </div>
+      {/* ─── SECTION 2: CONSOLE & CONFLICT GUARD ─── */}
+      {activeSection === 'console' && (
+        <Card className="border border-slate-200 shadow-xs bg-white">
+          <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  STL Lambert Airport Curbside Pickup Instructions
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Curbside doors, terminal baggage claim instructions, or driver meetup points shown to passengers in confirmation emails and receipts when pickup is STL Lambert Airport.
+                <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
+                  <ShieldCheckIcon className="w-5 h-5 text-blue-600" />
+                  <span>Console SLA Thresholds &amp; Staged Shift Conflict Guard</span>
+                </CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Configure unassigned scheduled pickup SLA alerts, airport buffer lead windows, and tactical alert retention.
                 </p>
               </div>
+              <Button
+                variant="primary"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="text-xs font-bold px-4 py-2"
+              >
+                {isSaving ? <SpinnerIcon className="w-4 h-4 animate-spin mr-1.5" /> : <CheckIcon className="w-4 h-4 mr-1.5" />}
+                Save Console Policy
+              </Button>
             </div>
-            <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 uppercase tracking-wider self-start sm:self-auto">
-              Airport Rules
-            </span>
+          </CardHeader>
+          <CardContent className="p-6 space-y-5 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                <label className="font-bold text-slate-800 block mb-1">SLA Warning Lead (Minutes)</label>
+                <Input
+                  type="number"
+                  min={5}
+                  max={720}
+                  value={dispatchAutomation.slaWarningMinutes}
+                  onChange={(e) =>
+                    setDispatchAutomation((prev) => ({
+                      ...prev,
+                      slaWarningMinutes: parseInt(e.target.value, 10) || 60,
+                    }))
+                  }
+                  className="bg-white h-9 text-xs font-mono"
+                />
+                <span className="text-[10px] text-slate-500 mt-1 block">Amber warning badge threshold</span>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                <label className="font-bold text-slate-800 block mb-1">SLA Critical Lead (Minutes)</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={720}
+                  value={dispatchAutomation.slaCriticalMinutes}
+                  onChange={(e) =>
+                    setDispatchAutomation((prev) => ({
+                      ...prev,
+                      slaCriticalMinutes: parseInt(e.target.value, 10) || 30,
+                    }))
+                  }
+                  className="bg-white h-9 text-xs font-mono"
+                />
+                <span className="text-[10px] text-slate-500 mt-1 block">Critical alert badge threshold</span>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                <label className="font-bold text-slate-800 block mb-1">Airport Extra Buffer (Minutes)</label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={180}
+                  value={dispatchAutomation.airportExtraLeadMinutes}
+                  onChange={(e) =>
+                    setDispatchAutomation((prev) => ({
+                      ...prev,
+                      airportExtraLeadMinutes: parseInt(e.target.value, 10) || 0,
+                    }))
+                  }
+                  className="bg-white h-9 text-xs font-mono"
+                />
+                <span className="text-[10px] text-slate-500 mt-1 block">Added for STL / SUS / CPS pickups</span>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                <label className="font-bold text-slate-800 block mb-1">Tactical Alert Auto-Dismiss</label>
+                <select
+                  value={alertDismissMinutes}
+                  onChange={(e) => setAlertDismissMinutes(parseInt(e.target.value, 10) || 60)}
+                  className="w-full h-9 px-2.5 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-800"
+                >
+                  <option value={15}>15 Minutes</option>
+                  <option value={30}>30 Minutes</option>
+                  <option value={60}>1 Hour (Default)</option>
+                  <option value={120}>2 Hours</option>
+                  <option value={240}>4 Hours</option>
+                  <option value={0}>Never Auto-Dismiss</option>
+                </select>
+                <span className="text-[10px] text-slate-500 mt-1 block">Dispatch console alert TTL</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ─── SECTION 3: STANDING ORDER DEFAULTS ─── */}
+      {activeSection === 'standing-defaults' && (
+        <Card className="border border-slate-200 shadow-xs bg-white">
+          <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
+                  <RepeatIcon className="w-5 h-5 text-emerald-600" />
+                  <span>Standing Order &amp; Staged Preferred Driver Defaults</span>
+                </CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Default pre-pickup auto-release lead windows for staged recurring series and shift holds.
+                </p>
+              </div>
+              <Button
+                variant="primary"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="text-xs font-bold px-4 py-2"
+              >
+                {isSaving ? <SpinnerIcon className="w-4 h-4 animate-spin mr-1.5" /> : <CheckIcon className="w-4 h-4 mr-1.5" />}
+                Save Standing Defaults
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6 space-y-5 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="flex items-start justify-between gap-3 p-4 bg-emerald-50/50 border border-emerald-200 rounded-xl cursor-pointer">
+                <div>
+                  <span className="font-extrabold text-slate-900 block">Auto-Release Staged Preferred Drivers</span>
+                  <span className="text-[11px] text-slate-600 mt-0.5 block">
+                    Automatically send staged recurring/shift trips to their planned driver once inside the lead window.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={dispatchAutomation.autoReleaseStagedDrivers}
+                  onChange={(e) =>
+                    setDispatchAutomation((prev) => ({
+                      ...prev,
+                      autoReleaseStagedDrivers: e.target.checked,
+                    }))
+                  }
+                  className="w-4 h-4 mt-0.5 rounded text-emerald-600"
+                />
+              </label>
+
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <label className="font-extrabold text-slate-900 block mb-1">
+                  Staged Auto-Release Lead Window (Minutes)
+                </label>
+                <Input
+                  type="number"
+                  min={15}
+                  max={240}
+                  value={dispatchAutomation.stagedAutoReleaseLeadMinutes}
+                  onChange={(e) =>
+                    setDispatchAutomation((prev) => ({
+                      ...prev,
+                      stagedAutoReleaseLeadMinutes: parseInt(e.target.value, 10) || 45,
+                    }))
+                  }
+                  className="bg-white h-9 text-xs font-mono"
+                />
+                <span className="text-[10px] text-slate-500 mt-1 block">
+                  Clamped 15–240 minutes prior to scheduled pickup (default 45m).
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ─── SECTION 4: BOOKING INTAKE RULES & 3-TIER SIMULATOR ─── */}
+      {activeSection === 'intake-rules' && (
+        <>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-700">
+                  <SlidersIcon className="w-5 h-5" />
+                </span>
+                <div>
+                  <h2 className="text-xl font-black text-slate-900">Booking Intake Rules</h2>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Set conditions for Auto-Confirm, Dispatcher Review, and Blocked Bookings.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <Button
+                variant="primary"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="w-full sm:w-auto justify-center flex items-center gap-2 px-5 py-2.5 text-xs font-bold shadow-xs cursor-pointer"
+              >
+                {isSaving ? <SpinnerIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
+                Save Booking Rules
+              </Button>
+            </div>
           </div>
 
-          <textarea
-            rows={3}
-            value={lambertInstructions}
-            onChange={(e) => setLambertInstructions(e.target.value)}
-            placeholder="e.g. Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time."
-            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
-          />
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-500">
-            <span>Synced automatically with Website → Booking Form → Airport Rules.</span>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={isSaving}
-              onClick={handleSave}
-              className="text-xs font-bold w-full sm:w-auto justify-center shrink-0"
-            >
-              Save Airport Description
-            </Button>
-          </div>
-        </div>
-      </div>
+          <div className="space-y-6">
+            {/* TIER 1: AUTO-CONFIRM */}
+            <ModularTierCard
+              tierKey="tier1"
+              tierNumber={1}
+              title="Tier 1: Auto-Confirm"
+              subtitle="Trips meeting all Tier 1 rules are confirmed automatically without dispatcher review."
+              colorTheme="emerald"
+              config={config.tier1}
+              zones={zones}
+              onChange={(t1) => setConfig({ ...config, tier1: t1 })}
+            />
 
-      {/* ─── LIVE EVALUATION SANDBOX & SIMULATOR ─── */}
-      <Card className="border-2 border-indigo-200 shadow-md overflow-hidden bg-slate-50/60">
+            {/* TIER 2: REQUIRE REVIEW */}
+            <ModularTierCard
+              tierKey="tier2"
+              tierNumber={2}
+              title="Tier 2: Require Dispatcher Review"
+              subtitle="Trips matching any Tier 2 rule are placed in the dispatch review queue."
+              colorTheme="amber"
+              config={config.tier2}
+              zones={zones}
+              onChange={(t2) => setConfig({ ...config, tier2: t2 })}
+            />
+
+            {/* TIER 3: BLACKLIST & SECURITY BLOCK */}
+            <ModularTierCard
+              tierKey="tier3"
+              tierNumber={3}
+              title="Tier 3: Block Booking"
+              subtitle="Trips matching any Tier 3 rule are automatically blocked and logged."
+              colorTheme="rose"
+              config={config.tier3}
+              zones={zones}
+              onChange={(t3) => setConfig({ ...config, tier3: t3 })}
+            />
+
+            {/* AIRPORT RULES & CURBSIDE PICKUP INSTRUCTIONS CARD */}
+            <div className="p-5 bg-white border border-blue-200 rounded-2xl shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                    <PlaneIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      STL Lambert Airport Curbside Pickup Instructions
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Curbside doors, terminal baggage claim instructions, or driver meetup points shown to passengers in confirmation emails and receipts when pickup is STL Lambert Airport.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 uppercase tracking-wider self-start sm:self-auto">
+                  Airport Rules
+                </span>
+              </div>
+
+              <textarea
+                rows={3}
+                value={lambertInstructions}
+                onChange={(e) => setLambertInstructions(e.target.value)}
+                placeholder="e.g. Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time."
+                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
+              />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-500">
+                <span>Synced automatically with Website → Booking &amp; /track → Airport Rules.</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isSaving}
+                  onClick={handleSave}
+                  className="text-xs font-bold w-full sm:w-auto justify-center shrink-0"
+                >
+                  Save Airport Description
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* ─── LIVE EVALUATION SANDBOX & SIMULATOR ─── */}
+          <Card className="border-2 border-indigo-200 shadow-md overflow-hidden bg-slate-50/60">
         <div className="p-4 sm:p-5 bg-indigo-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="p-2 bg-indigo-800 rounded-xl text-indigo-200 shrink-0">
@@ -1316,6 +912,8 @@ export function AdminRulesTab() {
           </div>
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   );
 }

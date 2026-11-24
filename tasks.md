@@ -942,3 +942,24 @@
 - [x] 58.3 Automated Verification Suite (`scripts/test-local-seo-engine.ts`) & Master Wave 4 Gate:
   - [x] 58.3.1 Create and pass `scripts/test-local-seo-engine.ts` covering all 8 corridors, `computeCorridorFareEstimates`, `/book` prefill round-trip & coordinate validation, XSS-safe JSON-LD serialization, `robots.txt` & `sitemap.xml` SSR loaders + `0.00 kB` client chunks, `404` corridor loader handling, deleted `public/robots.txt` & `public/sitemap.xml`, and monolith/terminology/immutable-file guardrails.
   - [x] 58.3.2 Pass Master Wave 4 Verification Gate (`typecheck`, `build`, `test-local-seo-engine.ts`, `test-operational-analytics.ts`, `test-guest-manage-ride.ts`, `test-assigned-edit-ack-and-driver-dropdown.ts`, `test-standing-orders.ts`, and `test-staged-driver-planner.ts`) with `0` errors.
+
+## Phase 59 (Wave 5 Phase 1): Admin IA Overhaul, Focused `General` (`Company Info` + `Time & Units`), Unified `Website, Brand & SEO` Theme Studio, `System & Governance` Archive & `Trips` Parity
+- [x] 59.1 Documentation & Specification Sync:
+  - [x] 59.1.1 Document Platform Phase 59 (Wave 5 Phase 1) across `spec.md`, `plan.md`, and `tasks.md`.
+- [x] 59.2 Admin Information Architecture, 3-Group Sidebar & 100% Legacy URL Redirects:
+  - [x] 59.2.1 Create `app/core/utils/admin-nav.util.ts` with `SUB_PAGES` and pure `resolveAdminTabAndSub` covering all 13 primary tabs and legacy aliases; update `AdminSidebar.tsx`, `app/routes/admin.tsx` (`< 1,000`L), `AdminRulesTab.tsx` (`initialSection`), and `AdminInvoicingSubpage.tsx` (`payouts`).
+  - [x] 59.2.2 Replace `app/routes/admin.settings.tsx` with `302` SSR loader + `<Navigate>` redirect to `/app/admin?tab=website&sub=form`, update `legacy.redirect.tsx`, and delete `app/components/domain/admin/AdminLayoutTab.tsx`.
+- [x] 59.3 Focused `General` Hub (`Company Info & Hours` + `Time, Units & Regional`):
+  - [x] 59.3.1 Extend `CompanyConfig` and `LocalizationConfig` in `app/core/types/config.ts` with pure normalization/preview helpers and wire persistence in `admin-config.service.ts`.
+  - [x] 59.3.2 Decompose `AdminGeneralTab.tsx` (`< 200`L) into `CompanyProfilePanel.tsx` (`< 350`L) and `LocalizationAndUnitsPanel.tsx` (`< 350`L).
+- [x] 59.4 Unified Brand & Theme Studio (`Website, Brand & SEO -> Themes & Branding`):
+  - [x] 59.4.1 Create `BrandLivePreviewCanvas.tsx` (`< 400`L), refactor `WebsiteThemesTab.tsx` (`< 450`L) reconciling all 6 `THEME_PRESETS` + granular tokens + draft preview, and align `AdminWebsiteTab.tsx`.
+- [x] 59.5 `System & Governance` Archive Consolidation & `Rates` Pricing Audit Promotion:
+  - [x] 59.5.1 Remove dead `'website'` branch in `AdminAdvancedTab.tsx` (`< 850`L) and mount `AdminArchiveTab` for `'archive'`.
+  - [x] 59.5.2 Extract `PricingAuditPanel.tsx` (`< 450`L) and promote `'audit'` (`Pricing Audit Log`) in `PricingAdminWorkspace.tsx` and `AdminRatesTab.tsx`.
+- [x] 59.6 `Trips` Subpage Decomposition, Embedded `Standing Orders`, Phase 55/56 Exceptions & Control Parity:
+  - [x] 59.6.1 Add `mode?: 'drawer' | 'embedded'` to `StandingOrdersDrawer.tsx` and export `clearStagedDriverFromTrip` from `staged-driver-planner.service.ts`.
+  - [x] 59.6.2 Create pure `admin-trips-exceptions.util.ts` and decompose `AdminTripsSubpage.tsx` (`< 450`L) + `app/components/domain/admin/trips/*` (`< 450`L each) with 4-state `DriverAssignDropdown`, Stage/Hold controls, universal `TripActionDropdown`, and `Exceptions & Rider Edits` panel.
+- [x] 59.7 Automated Verification Suite (`scripts/test-admin-ia-phase59.ts`) & Full Build Gates:
+  - [x] 59.7.1 Create `scripts/test-admin-ia-phase59.ts` testing `resolveAdminTabAndSub`, `CompanyConfig` & `LocalizationConfig` normalization, exception classification, deleted `AdminLayoutTab.tsx`, monolith line ceilings, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
+  - [x] 59.7.2 Pass full verification pipeline (`typecheck`, `test-admin-ia-phase59.ts`, `test-local-corridor-seo.ts`, `test-operational-analytics.ts`, `test-guest-manage-ride.ts`, `test-standing-orders.ts`, and `npm run build`) with `0` errors.

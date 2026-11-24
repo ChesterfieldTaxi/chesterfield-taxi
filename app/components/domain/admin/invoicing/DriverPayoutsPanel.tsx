@@ -744,17 +744,104 @@ export function DriverPayoutsPanel({
         </div>
       )}
 
-      {/* ─── Sub-View: Accounting Sync & General Ledger ─── */}
-      {activeSub === 'accounting-sync' && (
+      {/* ─── Sub-View: Driver & Staff Payouts (Commission Policy + Payout Disbursement Ledger) ─── */}
+      {activeSub === 'payouts' && (
+        <div className="space-y-5">
+          <Card className="border border-slate-200/90 shadow-xs">
+            <CardHeader className="pb-3 border-b border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base font-bold text-slate-900">
+                    Driver &amp; Staff Payout Policies
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500">
+                    Default driver fare commission split (tips &amp; tolls pass 100% to driver) and automated receipt delivery.
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  disabled={isSaving}
+                  onClick={onSaveBillingPolicies}
+                  leftIcon={<CheckIcon className="w-3.5 h-3.5" />}
+                  className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shrink-0"
+                >
+                  {isSaving ? 'Saving...' : 'Save Payout Policy'}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-emerald-950 text-xs">Default Driver Commission Split</p>
+                    <p className="text-[11px] text-emerald-800">
+                      Driver keeps {driverCommissionPercent}% / Company {Math.max(0, 100 - driverCommissionPercent)}% (tolls &amp; tips 100% driver).
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <input
+                      type="number"
+                      min="10"
+                      max="99"
+                      value={driverCommissionPercent}
+                      onChange={(e) => setDriverCommissionPercent(Number(e.target.value))}
+                      className="w-16 px-2 py-1 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-bold text-emerald-900"
+                    />
+                    <span className="text-xs font-bold text-emerald-900">%</span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-slate-900 text-xs">Payout Period Filter</p>
+                    <p className="text-[11px] text-slate-500">
+                      Filter driver disbursements, tips collected, and platform commissions below.
+                    </p>
+                  </div>
+                  <select
+                    value={ledgerFilter}
+                    onChange={(e) => setLedgerFilter(e.target.value as LedgerPeriodFilter)}
+                    className="text-xs font-semibold border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-slate-800 shrink-0"
+                  >
+                    <option value="all">All Periods</option>
+                    <option value="30d">Last 30 Days</option>
+                    <option value="7d">Last 7 Days</option>
+                    <option value="today">Today</option>
+                  </select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ─── Sub-View: Accounting Sync / Payouts General Ledger Table ─── */}
+      {(activeSub === 'accounting-sync' || activeSub === 'payouts') && (() => {
+        const displayEntries =
+          activeSub === 'payouts'
+            ? filteredLedgerEntries.filter(
+                (e) =>
+                  e.type === 'driver_payout' ||
+                  e.type === 'tip_collected' ||
+                  e.type === 'platform_commission'
+              )
+            : filteredLedgerEntries;
+        return (
         <div className="space-y-4">
           <Card className="border border-slate-200/90 shadow-xs">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 gap-3">
               <div>
                 <CardTitle className="text-base font-bold text-slate-900">
-                  QuickBooks &amp; General Ledger Transactions
+                  {activeSub === 'payouts'
+                    ? 'Driver & Staff Payout Disbursements Ledger'
+                    : 'QuickBooks & General Ledger Transactions'}
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Double-entry journal records for fares, tips, platform commission fees, driver disbursements, and tolls
+                  {activeSub === 'payouts'
+                    ? 'Driver earnings disbursements, passenger tips collected, and retained platform commission splits'
+                    : 'Double-entry journal records for fares, tips, platform commission fees, driver disbursements, and tolls'}
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -774,12 +861,12 @@ export function DriverPayoutsPanel({
             <CardContent className="p-0 md:p-6 md:pt-2 space-y-4">
               {/* Mobile General Ledger Cards (< md) */}
               <div className="md:hidden divide-y divide-slate-100">
-                {filteredLedgerEntries.length === 0 ? (
+                {displayEntries.length === 0 ? (
                   <div className="py-10 px-4 text-center text-slate-400 text-xs font-medium">
                     No ledger transactions recorded for the selected period.
                   </div>
                 ) : (
-                  filteredLedgerEntries.map((entry) => {
+                  displayEntries.map((entry) => {
                     const isCredit = entry.type === 'fare_revenue' || entry.type === 'platform_commission';
                     return (
                       <div key={entry.id} className="p-3.5 space-y-1.5">
@@ -842,7 +929,7 @@ export function DriverPayoutsPanel({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredLedgerEntries.map((entry) => {
+                    {displayEntries.map((entry) => {
                       const isCredit = entry.type === 'fare_revenue' || entry.type === 'platform_commission';
                       return (
                         <tr key={entry.id} className="hover:bg-slate-50/70 transition-colors">
@@ -878,7 +965,7 @@ export function DriverPayoutsPanel({
                         </tr>
                       );
                     })}
-                    {filteredLedgerEntries.length === 0 && (
+                    {displayEntries.length === 0 && (
                       <tr>
                         <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
                           No ledger transactions recorded for the selected period.
@@ -891,7 +978,8 @@ export function DriverPayoutsPanel({
             </CardContent>
           </Card>
         </div>
-      )}
+        );
+      })()}
     </>
   );
 }

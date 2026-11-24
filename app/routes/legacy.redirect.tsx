@@ -24,7 +24,7 @@ function computeTargetUrl(pathname: string, search: string): string {
     return `/app/admin${search}`;
   }
   if (pathname === '/admin/settings') {
-    return `/app/admin/settings${search}`;
+    return '/app/admin?tab=website&sub=form';
   }
   return `/app${search}`;
 }

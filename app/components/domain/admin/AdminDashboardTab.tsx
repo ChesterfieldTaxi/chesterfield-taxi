@@ -33,19 +33,10 @@ import {
   SystemHealthTelemetryPanel,
 } from './analytics';
 
-export type DashboardSubTab = 'overview' | 'telemetry' | 'analytics';
+import type { AdminTabKey } from '../../../core/utils/admin-nav.util';
 
-export type AdminTabKey =
-  | 'dashboard'
-  | 'trips'
-  | 'invoicing'
-  | 'customers'
-  | 'general'
-  | 'rates'
-  | 'vehicles'
-  | 'zones'
-  | 'operators'
-  | 'advanced';
+export type DashboardSubTab = 'overview' | 'telemetry' | 'analytics';
+export type { AdminTabKey };
 
 export interface AdminDashboardTabProps {
   settings: AppSettings;
