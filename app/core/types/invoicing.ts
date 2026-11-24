@@ -13,6 +13,8 @@ export type LedgerEntryType =
   | 'invoice_settlement'
   | 'tip_collected'
   | 'driver_payout'
+  | 'staff_payout'
+  | 'vendor_payout'
   | 'platform_commission'
   | 'toll_reimbursement'
   | 'cancellation_fee'

@@ -191,6 +191,8 @@ function resolveOffsetAccountCode(entry: FinancialLedgerEntry): string {
         ? '4020-PlatformCommission'
         : '1010-OperatingCash';
     case 'driver_payout':
+    case 'staff_payout':
+    case 'vendor_payout':
       return '1010-OperatingCash';
     case 'tip_collected':
       return '1010-OperatingCash';
@@ -225,9 +227,12 @@ export function buildQuickBooksIifJournal(
     const safeDesc = (e.description || '').replace(/[\t\r\n]+/g, ' ').trim();
     const isDebitPrimary =
       e.type === 'driver_payout' ||
+      e.type === 'staff_payout' ||
+      e.type === 'vendor_payout' ||
       e.type === 'refund' ||
       e.type === 'invoice_settlement' ||
-      e.accountCode.startsWith('1');
+      e.accountCode.startsWith('1') ||
+      e.accountCode.startsWith('5');
     const trnsAmount = isDebitPrimary ? e.amount.toFixed(2) : (-Math.abs(e.amount)).toFixed(2);
     const splAmount = isDebitPrimary ? (-Math.abs(e.amount)).toFixed(2) : Math.abs(e.amount).toFixed(2);
     const offsetAcct = resolveOffsetAccountCode(e);

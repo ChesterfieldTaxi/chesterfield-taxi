@@ -11,11 +11,13 @@ import {
   type CorporateDashboardSummary,
 } from '../core/services/corporate-portal.service';
 import { getPayLinkService } from '../core/services/payments/pay-link.service';
-import type {
-  CorporateAccountConfig,
-  CorporateAuthorizedRider,
-  CorporateSavedLocation,
-  InvoiceRecord,
+import {
+  normalizeCorporatePortalPolicy,
+  type CorporateAccountConfig,
+  type CorporateAuthorizedRider,
+  type CorporatePortalGovernanceConfig,
+  type CorporateSavedLocation,
+  type InvoiceRecord,
 } from '../core/types/config';
 import type { PrintableInvoiceData } from '../core/types/invoicing';
 import type { Trip } from '../core/types/trip';
@@ -254,6 +256,19 @@ export default function CorporatePortalRoute() {
     () => getAdminConfigService().getCachedSettings().company,
     []
   );
+  const [portalPolicy, setPortalPolicy] = useState<CorporatePortalGovernanceConfig>(() =>
+    normalizeCorporatePortalPolicy(getAdminConfigService().getCachedSettings().corporatePortalPolicy)
+  );
+
+  useEffect(() => {
+    const configSvc = getAdminConfigService();
+    return configSvc.subscribeToSettings((nextSettings) => {
+      setPortalPolicy(normalizeCorporatePortalPolicy(nextSettings.corporatePortalPolicy));
+    });
+  }, []);
+
+  const canManageRiders = isAdminSuperuser || portalPolicy.allowSelfManageRiders;
+  const canManageLocations = isAdminSuperuser || portalPolicy.allowSelfManageSavedLocations;
 
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
     setFeedbackBanner({ type, message });
@@ -373,11 +388,15 @@ export default function CorporatePortalRoute() {
       discountPercent: acc.discountPercent,
       currentPoNumber: acc.currentPoNumber,
       poRequired: acc.poRequired,
+      poFormatRegex: portalPolicy.poFormatRegex,
+      creditLimit: acc.creditLimit,
+      currentExposure: summary.totalExposure,
+      creditLimitEnforcement: portalPolicy.creditLimitEnforcement,
       costCenter: selectedCostCenter || undefined,
       bookerName: currentUser?.displayName || acc.billingContactName || undefined,
       bookerEmail: currentUser?.email || acc.billingContactEmail || undefined,
     };
-  }, [summary?.account, selectedCostCenter, currentUser]);
+  }, [summary?.account, summary?.totalExposure, portalPolicy, selectedCostCenter, currentUser]);
 
   // Quick-fill Location Shortcuts (Saved Company Places + STL/SUS Airport defaults)
   const quickLocations = useMemo<CorporateSavedLocation[]>(() => {
@@ -1628,6 +1647,33 @@ export default function CorporatePortalRoute() {
                   </CardContent>
                 </Card>
 
+                {/* Credit Limit Policy Banner when over limit */}
+                {summary.isOverLimit && (
+                  <div
+                    className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-start gap-2.5 ${
+                      portalPolicy.creditLimitEnforcement === 'hard_block'
+                        ? 'bg-rose-50 border-rose-200 text-rose-900'
+                        : 'bg-amber-50 border-amber-200 text-amber-900'
+                    }`}
+                  >
+                    <AlertTriangleIcon className="w-4 h-4 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-extrabold">
+                        {portalPolicy.creditLimitEnforcement === 'hard_block'
+                          ? 'Credit Limit Reached — Direct-Bill Checkout Blocked'
+                          : 'Credit Limit Advisory Warning'}
+                      </div>
+                      <p className="text-[11px] mt-0.5">
+                        Current account exposure (${summary.totalExposure.toFixed(2)}) exceeds your $
+                        {summary.creditLimit.toLocaleString()} credit limit.{' '}
+                        {portalPolicy.creditLimitEnforcement === 'hard_block'
+                          ? 'Please settle an open statement in Statements & Billing or pay by card to book.'
+                          : 'Bookings remain permitted under Soft Warning policy; please review open statements.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Embedded Pre-Bound BookingEngineV2 */}
                 <BookingEngineV2
                   embeddedInApp
@@ -1766,61 +1812,68 @@ export default function CorporatePortalRoute() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="p-4 space-y-4 text-xs">
-                      <form onSubmit={handleAddRider} className="space-y-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <input
-                            type="text"
-                            required
-                            value={newRiderName}
-                            onChange={(e) => setNewRiderName(e.target.value)}
-                            placeholder="Full Name *"
-                            className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                          />
-                          <input
-                            type="tel"
-                            value={newRiderPhone}
-                            onChange={(e) => setNewRiderPhone(formatUsPhone(e.target.value))}
-                            placeholder="Mobile Phone"
-                            className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <input
-                            type="email"
-                            value={newRiderEmail}
-                            onChange={(e) => setNewRiderEmail(e.target.value)}
-                            placeholder="Work Email"
-                            className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                          />
-                          <input
-                            type="text"
-                            value={newRiderDept}
-                            onChange={(e) => setNewRiderDept(e.target.value)}
-                            placeholder="Department / Cost Center"
-                            className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                          />
-                        </div>
-                        <div className="flex items-center justify-between pt-1">
-                          <label className="inline-flex items-center gap-2 cursor-pointer">
+                      {canManageRiders ? (
+                        <form onSubmit={handleAddRider} className="space-y-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <input
-                              type="checkbox"
-                              checked={newRiderVip}
-                              onChange={(e) => setNewRiderVip(e.target.checked)}
-                              className="w-4 h-4 rounded border-slate-300 text-indigo-600"
+                              type="text"
+                              required
+                              value={newRiderName}
+                              onChange={(e) => setNewRiderName(e.target.value)}
+                              placeholder="Full Name *"
+                              className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
                             />
-                            <span className="font-semibold text-slate-700">Executive / VIP Priority</span>
-                          </label>
-                          <Button
-                            type="submit"
-                            size="sm"
-                            variant="primary"
-                            disabled={isSavingSettings}
-                            className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
-                          >
-                            + Add Rider
-                          </Button>
+                            <input
+                              type="tel"
+                              value={newRiderPhone}
+                              onChange={(e) => setNewRiderPhone(formatUsPhone(e.target.value))}
+                              placeholder="Mobile Phone"
+                              className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                            />
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <input
+                              type="email"
+                              value={newRiderEmail}
+                              onChange={(e) => setNewRiderEmail(e.target.value)}
+                              placeholder="Work Email"
+                              className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                            />
+                            <input
+                              type="text"
+                              value={newRiderDept}
+                              onChange={(e) => setNewRiderDept(e.target.value)}
+                              placeholder="Department / Cost Center"
+                              className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between pt-1">
+                            <label className="inline-flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={newRiderVip}
+                                onChange={(e) => setNewRiderVip(e.target.checked)}
+                                className="w-4 h-4 rounded border-slate-300 text-indigo-600"
+                              />
+                              <span className="font-semibold text-slate-700">Executive / VIP Priority</span>
+                            </label>
+                            <Button
+                              type="submit"
+                              size="sm"
+                              variant="primary"
+                              disabled={isSavingSettings}
+                              className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
+                            >
+                              + Add Rider
+                            </Button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-center gap-2">
+                          <LockIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>Authorized rider list is managed by Chesterfield Corporate Administration.</span>
                         </div>
-                      </form>
+                      )}
 
                       <div className="divide-y divide-slate-100">
                         {(account.authorizedRiders || []).map((r) => (
@@ -1843,14 +1896,16 @@ export default function CorporatePortalRoute() {
                                 {[r.email, r.phone].filter(Boolean).join(' • ') || 'No contact info'}
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveRider(r.id)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
-                              title="Remove rider"
-                            >
-                              <TrashIcon className="w-3.5 h-3.5" />
-                            </button>
+                            {canManageRiders && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveRider(r.id)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                title="Remove rider"
+                              >
+                                <TrashIcon className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         ))}
                         {(!account.authorizedRiders || account.authorizedRiders.length === 0) && (
@@ -1875,41 +1930,48 @@ export default function CorporatePortalRoute() {
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="p-4 space-y-3 text-xs">
-                        <form onSubmit={handleAddSavedPlace} className="space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                          <input
-                            type="text"
-                            required
-                            value={newPlaceLabel}
-                            onChange={(e) => setNewPlaceLabel(e.target.value)}
-                            placeholder="Label (e.g. St. Louis HQ West Lobby) *"
-                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                          />
-                          <DispatchLocationInput
-                            value={newPlaceAddress}
-                            onChange={(val) => setNewPlaceAddress(val)}
-                            onPlaceSelected={(details) => setNewPlaceAddress(details.address)}
-                            placeholder="Street Address *"
-                            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                          />
-                          <div className="flex items-center gap-2">
+                        {canManageLocations ? (
+                          <form onSubmit={handleAddSavedPlace} className="space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
                             <input
                               type="text"
-                              value={newPlaceNotes}
-                              onChange={(e) => setNewPlaceNotes(e.target.value)}
-                              placeholder="Pickup / Gate / Security Instructions"
-                              className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                              required
+                              value={newPlaceLabel}
+                              onChange={(e) => setNewPlaceLabel(e.target.value)}
+                              placeholder="Label (e.g. St. Louis HQ West Lobby) *"
+                              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
                             />
-                            <Button
-                              type="submit"
-                              size="sm"
-                              variant="primary"
-                              disabled={isSavingSettings}
-                              className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0 cursor-pointer"
-                            >
-                              + Save Place
-                            </Button>
+                            <DispatchLocationInput
+                              value={newPlaceAddress}
+                              onChange={(val) => setNewPlaceAddress(val)}
+                              onPlaceSelected={(details) => setNewPlaceAddress(details.address)}
+                              placeholder="Street Address *"
+                              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                            />
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={newPlaceNotes}
+                                onChange={(e) => setNewPlaceNotes(e.target.value)}
+                                placeholder="Pickup / Gate / Security Instructions"
+                                className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                              />
+                              <Button
+                                type="submit"
+                                size="sm"
+                                variant="primary"
+                                disabled={isSavingSettings}
+                                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0 cursor-pointer"
+                              >
+                                + Save Place
+                              </Button>
+                            </div>
+                          </form>
+                        ) : (
+                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-center gap-2">
+                            <LockIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>Saved company pickup/dropoff locations are managed by Chesterfield Corporate Administration.</span>
                           </div>
-                        </form>
+                        )}
 
                         <div className="divide-y divide-slate-100">
                           {(account.savedCompanyLocations || []).map((loc) => (
@@ -1921,14 +1983,16 @@ export default function CorporatePortalRoute() {
                                   <div className="text-[10px] text-indigo-700 mt-0.5">{loc.notes}</div>
                                 )}
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveSavedPlace(loc.id)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
-                                title="Remove location"
-                              >
-                                <TrashIcon className="w-3.5 h-3.5" />
-                              </button>
+                              {canManageLocations && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveSavedPlace(loc.id)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                  title="Remove location"
+                                >
+                                  <TrashIcon className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>

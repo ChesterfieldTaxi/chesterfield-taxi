@@ -5,7 +5,6 @@ import {
   BuildingIcon,
   PlusIcon,
   DownloadIcon,
-  BarChartIcon,
 } from '../../../ui/Icons';
 import {
   useAdminInvoicingActions,
@@ -13,6 +12,7 @@ import {
   InvoiceBuilderModal,
   CorporateAccountsPanel,
   DriverPayoutsPanel,
+  BillingPolicyAndQuickBooksPanel,
   type InvoicingSubTab,
   type AdminInvoicingSubpageProps,
 } from '../invoicing';
@@ -41,86 +41,36 @@ export function AdminInvoicingSubpage({
 
   return (
     <div className="space-y-5">
-      {/* ─── Clean Sub-Tab Utility Bar (Only when Accounts or Accounting Sync needs top actions) ─── */}
-      {(activeSub === 'accounts' || activeSub === 'accounting-sync') && (
+      {/* ─── Clean Sub-Tab Utility Bar for Corporate Billing ─── */}
+      {activeSub === 'accounts' && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-white p-3 sm:px-4 sm:py-2.5 rounded-2xl border border-slate-200/90 shadow-xs">
           <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
-            {activeSub === 'accounts' && (
-              <>
-                <BuildingIcon className="w-4 h-4 text-blue-600 shrink-0" />
-                <span>Corporate Direct Billing ({actions.corporateAccounts.length} clients)</span>
-              </>
-            )}
-            {activeSub === 'accounting-sync' && (
-              <>
-                <BarChartIcon className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>QuickBooks &amp; General Ledger Export</span>
-              </>
-            )}
+            <BuildingIcon className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>Corporate Financial &amp; Credit Terms ({actions.corporateAccounts.length} clients)</span>
           </div>
 
-          {activeSub === 'accounts' && (
-            <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => actions.setIsCsvModalOpen(true)}
-                leftIcon={<DownloadIcon className="w-4 h-4 text-slate-600" />}
-                className="text-xs font-semibold justify-center"
-              >
-                Import CSV
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                onClick={() => actions.setIsNewAccountModalOpen(true)}
-                leftIcon={<PlusIcon className="w-4 h-4" />}
-                className="text-xs font-bold justify-center"
-              >
-                Add Client
-              </Button>
-            </div>
-          )}
-
-          {activeSub === 'accounting-sync' && (
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={actions.isExporting}
-                onClick={() => actions.handleExport('quickbooks_csv')}
-                leftIcon={<DownloadIcon className="w-3.5 h-3.5" />}
-                className="text-xs font-semibold justify-center"
-              >
-                QuickBooks CSV
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={actions.isExporting}
-                onClick={() => actions.handleExport('quickbooks_iif')}
-                leftIcon={<DownloadIcon className="w-3.5 h-3.5" />}
-                className="text-xs font-semibold justify-center"
-              >
-                QuickBooks IIF
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                disabled={actions.isExporting}
-                onClick={() => actions.handleExport('general_ledger_json')}
-                leftIcon={<DownloadIcon className="w-3.5 h-3.5" />}
-                className="col-span-2 sm:col-span-1 text-xs font-bold justify-center"
-              >
-                Export GL JSON
-              </Button>
-            </div>
-          )}
+          <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => actions.setIsCsvModalOpen(true)}
+              leftIcon={<DownloadIcon className="w-4 h-4 text-slate-600" />}
+              className="text-xs font-semibold justify-center"
+            >
+              Import CSV
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => actions.setIsNewAccountModalOpen(true)}
+              leftIcon={<PlusIcon className="w-4 h-4" />}
+              className="text-xs font-bold justify-center"
+            >
+              Add Client
+            </Button>
+          </div>
         </div>
       )}
 
@@ -135,7 +85,7 @@ export function AdminInvoicingSubpage({
         </Alert>
       )}
 
-      {/* ─── Sub-View: Invoicing & Accounts Receivable Ledger + KPI Summary ─── */}
+      {/* ─── 1. Invoices & AR Ledger ─── */}
       {activeSub === 'ledger' && (
         <InvoiceLedgerTable
           invoices={actions.invoices}
@@ -166,98 +116,69 @@ export function AdminInvoicingSubpage({
         />
       )}
 
-      {/* ─── Sub-View: Corporate Accounts + PO Anti-Fraud & CSV Import Modals ─── */}
+      {/* ─── 2. Corporate Billing (Financial & Credit Terms) ─── */}
       <CorporateAccountsPanel
         activeSub={activeSub}
-        settings={settings}
         corporateAccounts={actions.corporateAccounts}
+        invoices={actions.invoices}
+        unbilledTransactions={actions.unbilledTransactions}
+        creditLimitEnforcement={actions.portalPolicy.creditLimitEnforcement}
         isSaving={actions.isSaving}
-        copiedPoId={actions.copiedPoId}
         accountSearchTerm={actions.accountSearchTerm}
         setAccountSearchTerm={actions.setAccountSearchTerm}
-        accountFilter={actions.accountFilter}
-        setAccountFilter={actions.setAccountFilter}
         accountPage={actions.accountPage}
         setAccountPage={actions.setAccountPage}
-        selectedPoAccount={actions.selectedPoAccount}
-        setSelectedPoAccount={actions.setSelectedPoAccount}
-        isRegeneratePoOpen={actions.isRegeneratePoOpen}
-        setIsRegeneratePoOpen={actions.setIsRegeneratePoOpen}
-        isPoHistoryOpen={actions.isPoHistoryOpen}
-        setIsPoHistoryOpen={actions.setIsPoHistoryOpen}
         isCsvModalOpen={actions.isCsvModalOpen}
         setIsCsvModalOpen={actions.setIsCsvModalOpen}
-        onCopyPo={actions.handleCopyPo}
-        onTogglePoRequired={actions.handleTogglePoRequired}
+        onUpdateCreditLimitEnforcement={actions.handleUpdateCreditLimitEnforcement}
+        onUpdateFinancialTerms={actions.handleUpdateCorporateFinancialTerms}
         onRunBatchInvoicing={actions.handleRunBatchInvoicing}
-        onPoRegenerateSuccess={actions.handlePoRegenerateSuccess}
         onCsvImportSuccess={actions.handleCsvImportSuccess}
       />
 
-      {/* ─── Sub-Views: Payment Gateways, Driver & Staff Payouts, Policy/QuickBooks GL & Twilio Telephony ─── */}
-      {(activeSub === 'payouts' ||
-        activeSub === 'gateways' ||
-        activeSub === 'telephony' ||
-        activeSub === 'accounting-sync') && (
+      {/* ─── 3. Driver, Staff & Other Payouts ─── */}
+      {activeSub === 'payouts' && (
         <DriverPayoutsPanel
-          activeSub={activeSub}
           isSaving={actions.isSaving}
+          billingDraft={actions.billingDraft}
+          setBillingDraft={actions.setBillingDraft}
+          onSaveBillingPolicies={actions.handleSaveBillingPolicies}
+          activePayeeTab={actions.activePayeeTab}
+          setActivePayeeTab={actions.setActivePayeeTab}
+          payoutPeriod={actions.payoutPeriod}
+          setPayoutPeriod={actions.setPayoutPeriod}
+          driverRollups={actions.driverRollups}
+          driverCommissionOverrides={actions.driverCommissionOverrides}
+          setDriverCommissionOverrides={actions.setDriverCommissionOverrides}
+          staffPreviews={actions.staffPreviews}
+          staffHoursMap={actions.staffHoursMap}
+          setStaffHoursMap={actions.setStaffHoursMap}
+          customPayees={actions.customPayees}
+          otherPayeeInputs={actions.otherPayeeInputs}
+          setOtherPayeeInputs={actions.setOtherPayeeInputs}
+          payoutSettlements={actions.payoutSettlements}
+          onSaveCustomPayee={actions.handleSaveCustomPayee}
+          onDeleteCustomPayee={actions.handleDeleteCustomPayee}
+          onRecordSettlement={actions.handleRecordSettlement}
+          onUpdateSettlementStatus={actions.handleUpdateSettlementStatus}
+          onExportPayoutsCsv={actions.handleExportPayoutsCsv}
+        />
+      )}
+
+      {/* ─── 4. Policy & QuickBooks ─── */}
+      {activeSub === 'accounting-sync' && (
+        <BillingPolicyAndQuickBooksPanel
+          isSaving={actions.isSaving}
+          isExporting={actions.isExporting}
+          billingDraft={actions.billingDraft}
+          setBillingDraft={actions.setBillingDraft}
+          onSaveBillingPolicies={actions.handleSaveBillingPolicies}
           ledgerFilter={actions.ledgerFilter}
           setLedgerFilter={actions.setLedgerFilter}
+          ledgerTypeFilter={actions.ledgerTypeFilter}
+          setLedgerTypeFilter={actions.setLedgerTypeFilter}
           filteredLedgerEntries={actions.filteredLedgerEntries}
-          stripeMode={actions.stripeMode}
-          setStripeMode={actions.setStripeMode}
-          stripePk={actions.stripePk}
-          setStripePk={actions.setStripePk}
-          stripeSk={actions.stripeSk}
-          setStripeSk={actions.setStripeSk}
-          stripeWebhookSecret={actions.stripeWebhookSecret}
-          setStripeWebhookSecret={actions.setStripeWebhookSecret}
-          stripeStatus={actions.stripeStatus}
-          stripeStatusMsg={actions.stripeStatusMsg}
-          squareAppId={actions.squareAppId}
-          setSquareAppId={actions.setSquareAppId}
-          squareToken={actions.squareToken}
-          setSquareToken={actions.setSquareToken}
-          squareLocId={actions.squareLocId}
-          setSquareLocId={actions.setSquareLocId}
-          squareStatus={actions.squareStatus}
-          squareStatusMsg={actions.squareStatusMsg}
-          stripeTerminalEnabled={actions.stripeTerminalEnabled}
-          setStripeTerminalEnabled={actions.setStripeTerminalEnabled}
-          passCardSurcharge={actions.passCardSurcharge}
-          setPassCardSurcharge={actions.setPassCardSurcharge}
-          surchargePercent={actions.surchargePercent}
-          setSurchargePercent={actions.setSurchargePercent}
-          autoEmailReceipts={actions.autoEmailReceipts}
-          setAutoEmailReceipts={actions.setAutoEmailReceipts}
-          driverCommissionPercent={actions.driverCommissionPercent}
-          setDriverCommissionPercent={actions.setDriverCommissionPercent}
-          onTestStripe={actions.handleTestStripe}
-          onTestSquare={actions.handleTestSquare}
-          onSaveApiCredentials={actions.handleSaveApiCredentials}
-          onSaveBillingPolicies={actions.handleSaveBillingPolicies}
-          twilioSid={actions.twilioSid}
-          setTwilioSid={actions.setTwilioSid}
-          twilioToken={actions.twilioToken}
-          setTwilioToken={actions.setTwilioToken}
-          twilioPhone={actions.twilioPhone}
-          setTwilioPhone={actions.setTwilioPhone}
-          twilioStatus={actions.twilioStatus}
-          twilioStatusMsg={actions.twilioStatusMsg}
-          testCallPhone={actions.testCallPhone}
-          setTestCallPhone={actions.setTestCallPhone}
-          testCallStatus={actions.testCallStatus}
-          testCallMsg={actions.testCallMsg}
-          testSmsPhone={actions.testSmsPhone}
-          setTestSmsPhone={actions.setTestSmsPhone}
-          testSmsBody={actions.testSmsBody}
-          setTestSmsBody={actions.setTestSmsBody}
-          testSmsStatus={actions.testSmsStatus}
-          testSmsMsg={actions.testSmsMsg}
-          onTestTwilioCreds={actions.handleTestTwilioCreds}
-          onPlaceTestCall={actions.handlePlaceTestCall}
-          onSendTestSms={actions.handleSendTestSms}
+          onExportLedger={actions.handleExport}
         />
       )}
 

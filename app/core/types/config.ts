@@ -667,6 +667,58 @@ export interface InvoiceRecord {
   notes?: string;
 }
 
+export type CreditLimitEnforcementMode = 'soft_warning' | 'hard_block';
+
+export interface CorporatePortalGovernanceConfig {
+  allowSelfManageRiders: boolean; // default true
+  allowSelfManageSavedLocations: boolean; // default true
+  defaultRequirePoForNewAccounts: boolean; // default true
+  poFormatRegex?: string; // optional regex e.g. '^PO-[0-9]{4,10}$' validated when non-empty
+  creditLimitEnforcement: CreditLimitEnforcementMode; // default 'soft_warning'
+}
+
+export const DEFAULT_CORPORATE_PORTAL_POLICY: CorporatePortalGovernanceConfig = {
+  allowSelfManageRiders: true,
+  allowSelfManageSavedLocations: true,
+  defaultRequirePoForNewAccounts: true,
+  poFormatRegex: '',
+  creditLimitEnforcement: 'soft_warning',
+};
+
+export function normalizeCorporatePortalPolicy(
+  raw?: Partial<CorporatePortalGovernanceConfig> | null
+): CorporatePortalGovernanceConfig {
+  let cleanRegex = '';
+  if (typeof raw?.poFormatRegex === 'string' && raw.poFormatRegex.trim()) {
+    const candidate = raw.poFormatRegex.trim();
+    try {
+      // Validate compilable RegExp so malformed saved expressions never crash runtime
+      new RegExp(candidate);
+      cleanRegex = candidate;
+    } catch {
+      cleanRegex = '';
+    }
+  }
+
+  return {
+    allowSelfManageRiders:
+      raw?.allowSelfManageRiders !== undefined
+        ? Boolean(raw.allowSelfManageRiders)
+        : DEFAULT_CORPORATE_PORTAL_POLICY.allowSelfManageRiders,
+    allowSelfManageSavedLocations:
+      raw?.allowSelfManageSavedLocations !== undefined
+        ? Boolean(raw.allowSelfManageSavedLocations)
+        : DEFAULT_CORPORATE_PORTAL_POLICY.allowSelfManageSavedLocations,
+    defaultRequirePoForNewAccounts:
+      raw?.defaultRequirePoForNewAccounts !== undefined
+        ? Boolean(raw.defaultRequirePoForNewAccounts)
+        : DEFAULT_CORPORATE_PORTAL_POLICY.defaultRequirePoForNewAccounts,
+    ...(cleanRegex ? { poFormatRegex: cleanRegex } : {}),
+    creditLimitEnforcement:
+      raw?.creditLimitEnforcement === 'hard_block' ? 'hard_block' : 'soft_warning',
+  };
+}
+
 export interface BillingSettingsConfig {
   autoEmailReceipts?: boolean;
   stripeTerminalEnabled?: boolean;
@@ -678,6 +730,184 @@ export interface BillingSettingsConfig {
   remittanceAccountLast4?: string;
   usdotNumber?: string;
   taxId?: string;
+  // Phase 60: 1-Tap Pay Link & Multi-Role Payout Policies
+  payLinkExpiryHours?: number; // default 72, clamped 1..720
+  payLinkAllowTipOnTrips?: boolean; // default true
+  payLinkAllowTipOnInvoices?: boolean; // default false
+  autoSendPayLinkReceiptSms?: boolean; // default true
+  driverDefaultCommissionPercent?: number; // default 75, clamped 0..100
+  staffDispatcherHourlyRate?: number; // default 24
+  staffPerBookingBonusAmount?: number; // default 0
+}
+
+export type NormalizedBillingSettingsConfig = Required<
+  Pick<
+    BillingSettingsConfig,
+    | 'autoEmailReceipts'
+    | 'stripeTerminalEnabled'
+    | 'passCardSurcharge'
+    | 'surchargePercent'
+    | 'payLinkExpiryHours'
+    | 'payLinkAllowTipOnTrips'
+    | 'payLinkAllowTipOnInvoices'
+    | 'autoSendPayLinkReceiptSms'
+    | 'driverDefaultCommissionPercent'
+    | 'staffDispatcherHourlyRate'
+    | 'staffPerBookingBonusAmount'
+  >
+> &
+  BillingSettingsConfig;
+
+export const DEFAULT_BILLING_SETTINGS_CONFIG: NormalizedBillingSettingsConfig = {
+  autoEmailReceipts: true,
+  stripeTerminalEnabled: true,
+  passCardSurcharge: false,
+  surchargePercent: 3.0,
+  payLinkExpiryHours: 72,
+  payLinkAllowTipOnTrips: true,
+  payLinkAllowTipOnInvoices: false,
+  autoSendPayLinkReceiptSms: true,
+  driverDefaultCommissionPercent: 75,
+  staffDispatcherHourlyRate: 24,
+  staffPerBookingBonusAmount: 0,
+};
+
+export function normalizeBillingSettingsConfig(
+  raw?: Partial<BillingSettingsConfig> | null
+): NormalizedBillingSettingsConfig {
+  const clampNumber = (
+    val: unknown,
+    fallback: number,
+    min: number,
+    max: number,
+    roundInt = false
+  ): number => {
+    const num = typeof val === 'number' ? val : val !== undefined && val !== '' ? Number(val) : NaN;
+    if (!Number.isFinite(num)) return fallback;
+    const clamped = Math.min(max, Math.max(min, num));
+    return roundInt ? Math.round(clamped) : Number(clamped.toFixed(2));
+  };
+
+  const optStr = (val: unknown): string | undefined => {
+    if (typeof val !== 'string') return undefined;
+    const trimmed = val.trim();
+    return trimmed ? trimmed : undefined;
+  };
+
+  const normalized: NormalizedBillingSettingsConfig = {
+    autoEmailReceipts:
+      raw?.autoEmailReceipts !== undefined
+        ? Boolean(raw.autoEmailReceipts)
+        : DEFAULT_BILLING_SETTINGS_CONFIG.autoEmailReceipts,
+    stripeTerminalEnabled:
+      raw?.stripeTerminalEnabled !== undefined
+        ? Boolean(raw.stripeTerminalEnabled)
+        : DEFAULT_BILLING_SETTINGS_CONFIG.stripeTerminalEnabled,
+    passCardSurcharge:
+      raw?.passCardSurcharge !== undefined
+        ? Boolean(raw.passCardSurcharge)
+        : DEFAULT_BILLING_SETTINGS_CONFIG.passCardSurcharge,
+    surchargePercent: clampNumber(
+      raw?.surchargePercent,
+      DEFAULT_BILLING_SETTINGS_CONFIG.surchargePercent,
+      0,
+      15
+    ),
+    payLinkExpiryHours: clampNumber(
+      raw?.payLinkExpiryHours,
+      DEFAULT_BILLING_SETTINGS_CONFIG.payLinkExpiryHours,
+      1,
+      720,
+      true
+    ),
+    payLinkAllowTipOnTrips:
+      raw?.payLinkAllowTipOnTrips !== undefined
+        ? Boolean(raw.payLinkAllowTipOnTrips)
+        : DEFAULT_BILLING_SETTINGS_CONFIG.payLinkAllowTipOnTrips,
+    payLinkAllowTipOnInvoices:
+      raw?.payLinkAllowTipOnInvoices !== undefined
+        ? Boolean(raw.payLinkAllowTipOnInvoices)
+        : DEFAULT_BILLING_SETTINGS_CONFIG.payLinkAllowTipOnInvoices,
+    autoSendPayLinkReceiptSms:
+      raw?.autoSendPayLinkReceiptSms !== undefined
+        ? Boolean(raw.autoSendPayLinkReceiptSms)
+        : DEFAULT_BILLING_SETTINGS_CONFIG.autoSendPayLinkReceiptSms,
+    driverDefaultCommissionPercent: clampNumber(
+      raw?.driverDefaultCommissionPercent,
+      DEFAULT_BILLING_SETTINGS_CONFIG.driverDefaultCommissionPercent,
+      0,
+      100
+    ),
+    staffDispatcherHourlyRate: clampNumber(
+      raw?.staffDispatcherHourlyRate,
+      DEFAULT_BILLING_SETTINGS_CONFIG.staffDispatcherHourlyRate,
+      0,
+      1000
+    ),
+    staffPerBookingBonusAmount: clampNumber(
+      raw?.staffPerBookingBonusAmount,
+      DEFAULT_BILLING_SETTINGS_CONFIG.staffPerBookingBonusAmount,
+      0,
+      1000
+    ),
+  };
+
+  const bankName = optStr(raw?.remittanceBankName);
+  const acctName = optStr(raw?.remittanceAccountName);
+  const routing = optStr(raw?.remittanceRoutingNumber);
+  const last4 = optStr(raw?.remittanceAccountLast4);
+  const usdot = optStr(raw?.usdotNumber);
+  const taxId = optStr(raw?.taxId);
+
+  if (bankName) normalized.remittanceBankName = bankName;
+  if (acctName) normalized.remittanceAccountName = acctName;
+  if (routing) normalized.remittanceRoutingNumber = routing;
+  if (last4) normalized.remittanceAccountLast4 = last4.slice(-4);
+  if (usdot) normalized.usdotNumber = usdot;
+  if (taxId) normalized.taxId = taxId;
+
+  return normalized;
+}
+
+export type PayoutPayeeType = 'driver' | 'staff' | 'other';
+export type CustomPayeeCategory = 'affiliate' | 'contractor' | 'vendor' | 'concierge';
+export type CustomPayeeRateType = 'flat' | 'percent' | 'hourly';
+export type PayoutSettlementStatus = 'pending' | 'approved' | 'paid';
+export type PayoutPaymentMethod = 'ach' | 'check' | 'cash' | 'zelle' | 'payroll';
+
+export interface PayoutPayeeRecord {
+  id: string;
+  name: string;
+  category: CustomPayeeCategory;
+  email?: string;
+  phone?: string;
+  defaultRateType: CustomPayeeRateType;
+  defaultRateValue: number;
+  notes?: string;
+  isActive: boolean;
+}
+
+export interface PayoutSettlementRecord {
+  id: string;
+  payeeType: PayoutPayeeType;
+  payeeId: string;
+  payeeName: string;
+  payeeRoleLabel: string;
+  periodStart: string;
+  periodEnd: string;
+  tripCount?: number;
+  hoursWorked?: number;
+  grossAmount: number;
+  tipsOrBonusAmount: number;
+  deductionsOrPlatformFee: number;
+  adjustmentsAmount: number;
+  netPayoutAmount: number;
+  status: PayoutSettlementStatus;
+  paymentMethod: PayoutPaymentMethod;
+  referenceNumber?: string;
+  paidAt?: string;
+  notes?: string;
+  createdAt: string;
 }
 
 export interface SecurityControlsConfig {
@@ -1087,8 +1317,11 @@ export interface AppSettings {
   publicFormVersion?: 'v1' | 'v2';
   customerBookingConfig?: CustomerBookingConfig;
   corporateAccounts?: CorporateAccountConfig[];
+  corporatePortalPolicy?: CorporatePortalGovernanceConfig;
   invoices?: InvoiceRecord[];
   billingSettings?: BillingSettingsConfig;
+  customPayees?: PayoutPayeeRecord[];
+  payoutSettlements?: PayoutSettlementRecord[];
   securityControls?: SecurityControlsConfig;
   configAuditTrail?: ConfigAuditEntry[];
   fleetAlertsConfig?: FleetAlertsConfig;

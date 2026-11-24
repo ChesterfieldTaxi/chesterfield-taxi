@@ -1,6 +1,12 @@
 import { useCallback, useMemo } from 'react';
-import type { CorporateAccountConfig } from '../../types/config';
 import {
+  normalizeCorporatePortalPolicy,
+  type CorporateAccountConfig,
+  type CreditLimitEnforcementMode,
+} from '../../types/config';
+import { getAdminConfigService } from '../../services/config/admin-config.service';
+import {
+  evaluateCorporateCreditLimit,
   getCorporateAccountService,
   type PoValidationResult,
 } from '../../services/corporate-account.service';
@@ -104,9 +110,17 @@ export async function validateDispatchCorporateSubmission(params: {
   billingPo: string;
   allowPoOverride: boolean;
   projectedFare: number;
+  poFormatRegex?: string;
+  creditLimitEnforcement?: CreditLimitEnforcementMode;
+  openBalanceOverride?: number;
 }): Promise<
-  | { valid: true; selectedCorp: CorporateAccountConfig | null }
-  | { valid: false; error: string }
+  | {
+      valid: true;
+      selectedCorp: CorporateAccountConfig | null;
+      warning?: string;
+      isOverCreditLimit?: boolean;
+    }
+  | { valid: false; error: string; isOverCreditLimit?: boolean }
 > {
   const {
     corporateAccountList,
@@ -114,6 +128,9 @@ export async function validateDispatchCorporateSubmission(params: {
     billingPo,
     allowPoOverride,
     projectedFare,
+    poFormatRegex,
+    creditLimitEnforcement,
+    openBalanceOverride,
   } = params;
 
   const selectedCorp = findMatchingCorporateAccount(
@@ -131,9 +148,17 @@ export async function validateDispatchCorporateSubmission(params: {
     };
   }
 
+  const portalPolicy = normalizeCorporatePortalPolicy(
+    getAdminConfigService().getCachedSettings().corporatePortalPolicy
+  );
+
   const poCheck = getCorporateAccountService().validateCorporatePo(
     selectedCorp,
-    billingPo
+    billingPo,
+    {
+      poFormatRegex:
+        poFormatRegex !== undefined ? poFormatRegex : portalPolicy.poFormatRegex,
+    }
   );
 
   if (poCheck.status === 'expired_revoked') {
@@ -154,6 +179,13 @@ export async function validateDispatchCorporateSubmission(params: {
     };
   }
 
+  if (poCheck.formatError && !allowPoOverride) {
+    return {
+      valid: false,
+      error: poCheck.message,
+    };
+  }
+
   if (selectedCorp.poRequired && poCheck.status === 'mismatch' && !allowPoOverride) {
     return {
       valid: false,
@@ -166,17 +198,36 @@ export async function validateDispatchCorporateSubmission(params: {
   if (selectedCorp.creditLimit > 0) {
     try {
       const invService = getInvoicingService();
-      const openBalance = invService.getCorporateAccountBalance
-        ? await invService.getCorporateAccountBalance(selectedCorp.id)
-        : 0;
-      if (openBalance + projectedFare > selectedCorp.creditLimit) {
+      const openBalance =
+        openBalanceOverride !== undefined
+          ? openBalanceOverride
+          : invService.getCorporateAccountBalance
+          ? await invService.getCorporateAccountBalance(selectedCorp.id)
+          : 0;
+      const effectiveEnforcement =
+        creditLimitEnforcement ?? portalPolicy.creditLimitEnforcement;
+      const creditEval = evaluateCorporateCreditLimit({
+        creditLimit: selectedCorp.creditLimit,
+        currentBalance: openBalance,
+        projectedFare,
+        enforcement: effectiveEnforcement,
+        companyName: selectedCorp.companyName,
+      });
+
+      if (!creditEval.allowed) {
         return {
           valid: false,
-          error: `CREDIT LIMIT EXCEEDED: "${selectedCorp.companyName}" open AR ($${openBalance.toFixed(
-            2
-          )}) + this booking ($${projectedFare.toFixed(
-            2
-          )}) exceeds the $${selectedCorp.creditLimit.toLocaleString()} limit.`,
+          error: creditEval.error || 'Corporate credit limit exceeded.',
+          isOverCreditLimit: true,
+        };
+      }
+
+      if (creditEval.isOverLimit) {
+        return {
+          valid: true,
+          selectedCorp,
+          warning: creditEval.warning,
+          isOverCreditLimit: true,
         };
       }
     } catch {

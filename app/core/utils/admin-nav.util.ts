@@ -67,13 +67,13 @@ export const SUB_PAGES: Record<string, AdminSubPageItem[]> = {
   invoicing: [
     { key: 'ledger', label: 'Invoices & AR Ledger' },
     { key: 'accounts', label: 'Corporate Billing' },
-    { key: 'payouts', label: 'Driver & Staff Payouts' },
+    { key: 'payouts', label: 'Driver, Staff & Other Payouts' },
     { key: 'accounting-sync', label: 'Policy & QuickBooks' },
   ],
   financials: [
     { key: 'ledger', label: 'Invoices & AR Ledger' },
     { key: 'accounts', label: 'Corporate Billing' },
-    { key: 'payouts', label: 'Driver & Staff Payouts' },
+    { key: 'payouts', label: 'Driver, Staff & Other Payouts' },
     { key: 'accounting-sync', label: 'Policy & QuickBooks' },
   ],
   rates: [

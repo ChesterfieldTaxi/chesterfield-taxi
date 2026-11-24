@@ -9,7 +9,11 @@ import type {
   TripLocation,
   TripPricing,
 } from '../../types';
-import type { CustomerBookingConfig, VehicleTierConfig } from '../../types/config';
+import type {
+  CreditLimitEnforcementMode,
+  CustomerBookingConfig,
+  VehicleTierConfig,
+} from '../../types/config';
 import type { FlightTelemetrySnapshot } from '../../types/flight';
 import { parseFlightIdent, type AirportDetectionResult } from '../../config/airports';
 import { getBookingService } from '../../services/booking';
@@ -36,6 +40,10 @@ import {
   type SpecialRequestKey,
   type VehicleCapacityInfo,
 } from './booking-form.utils';
+import {
+  evaluateCorporateCreditLimit,
+  validatePoFormatRegex,
+} from '../../services/corporate-account.service';
 import { useCorporatePoVerification } from './useCorporatePoVerification';
 
 export interface CorporatePortalBookingContext {
@@ -46,6 +54,10 @@ export interface CorporatePortalBookingContext {
   discountPercent?: number;
   currentPoNumber?: string;
   poRequired?: boolean;
+  poFormatRegex?: string;
+  creditLimit?: number;
+  currentExposure?: number;
+  creditLimitEnforcement?: CreditLimitEnforcementMode;
   costCenter?: string;
   bookerName?: string;
   bookerEmail?: string;
@@ -1237,6 +1249,33 @@ export function useCustomerBookingSubmission({
             ) {
               throw new Error(
                 `PO "${form.billingPo}" does not match the active PO (${corporatePortalContext.currentPoNumber}) for ${corporatePortalContext.companyName}.`
+              );
+            }
+          }
+          if (corporatePortalContext.poFormatRegex && form.billingPo.trim()) {
+            const fmtCheck = validatePoFormatRegex(
+              form.billingPo.trim(),
+              corporatePortalContext.poFormatRegex
+            );
+            if (!fmtCheck.valid) {
+              throw new Error(fmtCheck.error || 'Invalid PO format.');
+            }
+          }
+          if (corporatePortalContext.creditLimit && corporatePortalContext.creditLimit > 0) {
+            const totalProjected = form.returnTrip
+              ? effectivePricing.totalFare + returnEffectivePricing.totalFare
+              : effectivePricing.totalFare;
+            const creditCheck = evaluateCorporateCreditLimit({
+              creditLimit: corporatePortalContext.creditLimit,
+              currentBalance: corporatePortalContext.currentExposure ?? 0,
+              projectedFare: totalProjected,
+              enforcement: corporatePortalContext.creditLimitEnforcement,
+              companyName: corporatePortalContext.companyName,
+            });
+            if (!creditCheck.allowed) {
+              throw new Error(
+                creditCheck.error ||
+                  `Account credit limit ($${corporatePortalContext.creditLimit.toLocaleString()}) exceeded.`
               );
             }
           }

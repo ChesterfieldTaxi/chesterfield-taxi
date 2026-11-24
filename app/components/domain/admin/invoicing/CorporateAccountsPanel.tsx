@@ -1,95 +1,84 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import type {
-  AppSettings,
   CorporateAccountConfig,
+  CreditLimitEnforcementMode,
+  InvoiceRecord,
 } from '../../../../core/types/config';
-import { getAdminAuthService } from '../../../../core/services/auth/admin-auth.service';
-import { COMPANY_CONFIG } from '../../../../config/companyConfig';
+import type { CorporateUnbilledTransaction } from '../../../../core/types/invoicing';
+import { computeCorporateCreditMetrics } from '../../../../core/services/corporate-portal.service';
 import {
   ACCOUNTS_PER_PAGE,
-  type CorporateAccountFilterMode,
+  type CorporateBillingCycleOption,
   type InvoicingSubTab,
 } from './useAdminInvoicingActions';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
 import {
+  AlertTriangleIcon,
   CheckIcon,
+  ExternalLinkIcon,
   ShieldCheckIcon,
-  CopyIcon,
-  RefreshCwIcon,
   XIcon,
 } from '../../../ui/Icons';
-import {
-  RegeneratePoModal,
-  PoHistoryModal,
-  CorporateCsvImportModal,
-} from '../corporate/CorporateAccountModals';
+import { CorporateCsvImportModal } from '../corporate/CorporateAccountModals';
 
 export interface CorporateAccountsPanelProps {
   activeSub: InvoicingSubTab;
-  settings: AppSettings;
   corporateAccounts: CorporateAccountConfig[];
+  invoices: InvoiceRecord[];
+  unbilledTransactions: CorporateUnbilledTransaction[];
+  creditLimitEnforcement: CreditLimitEnforcementMode;
   isSaving: boolean;
-  copiedPoId: string | null;
   accountSearchTerm: string;
   setAccountSearchTerm: React.Dispatch<React.SetStateAction<string>>;
-  accountFilter: CorporateAccountFilterMode;
-  setAccountFilter: React.Dispatch<React.SetStateAction<CorporateAccountFilterMode>>;
   accountPage: number;
   setAccountPage: React.Dispatch<React.SetStateAction<number>>;
-  selectedPoAccount: CorporateAccountConfig | null;
-  setSelectedPoAccount: React.Dispatch<React.SetStateAction<CorporateAccountConfig | null>>;
-  isRegeneratePoOpen: boolean;
-  setIsRegeneratePoOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  isPoHistoryOpen: boolean;
-  setIsPoHistoryOpen: React.Dispatch<React.SetStateAction<boolean>>;
   isCsvModalOpen: boolean;
   setIsCsvModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  onCopyPo: (po: string, id: string) => void;
-  onTogglePoRequired: (account: CorporateAccountConfig) => Promise<void>;
+  onUpdateCreditLimitEnforcement: (mode: CreditLimitEnforcementMode) => Promise<void>;
+  onUpdateFinancialTerms: (
+    accountId: string,
+    patch: { creditLimit: number; billingCycle: CorporateBillingCycleOption; discountPercent: number }
+  ) => Promise<void>;
   onRunBatchInvoicing: (corp: CorporateAccountConfig) => Promise<void>;
-  onPoRegenerateSuccess: (updatedAccount: CorporateAccountConfig, newPo: string) => Promise<void>;
   onCsvImportSuccess: (importedAccounts: CorporateAccountConfig[]) => Promise<void>;
 }
 
 export function CorporateAccountsPanel({
-  activeSub,
-  settings,
-  corporateAccounts,
-  isSaving,
-  copiedPoId,
-  accountSearchTerm,
-  setAccountSearchTerm,
-  accountFilter,
-  setAccountFilter,
-  accountPage,
-  setAccountPage,
-  selectedPoAccount,
-  setSelectedPoAccount,
-  isRegeneratePoOpen,
-  setIsRegeneratePoOpen,
-  isPoHistoryOpen,
-  setIsPoHistoryOpen,
-  isCsvModalOpen,
-  setIsCsvModalOpen,
-  onCopyPo,
-  onTogglePoRequired,
-  onRunBatchInvoicing,
-  onPoRegenerateSuccess,
-  onCsvImportSuccess,
+  activeSub, corporateAccounts, invoices, unbilledTransactions, creditLimitEnforcement, isSaving,
+  accountSearchTerm, setAccountSearchTerm, accountPage, setAccountPage, isCsvModalOpen, setIsCsvModalOpen,
+  onUpdateCreditLimitEnforcement, onUpdateFinancialTerms, onRunBatchInvoicing, onCsvImportSuccess,
 }: CorporateAccountsPanelProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusedAccountId = (searchParams.get('accountId') || '').trim();
+
+  const [editingTermsId, setEditingTermsId] = useState<string | null>(null);
+  const [termsDraft, setTermsDraft] = useState<{
+    creditLimit: number;
+    billingCycle: CorporateBillingCycleOption;
+    discountPercent: number;
+  }>({ creditLimit: 5000, billingCycle: 'net30', discountPercent: 0 });
+
+  if (activeSub !== 'accounts') return null;
+
+  const clearAccountFocus = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('accountId');
+    setSearchParams(next, { replace: true });
+  };
+
   const filteredCorporateAccounts = corporateAccounts.filter((acc) => {
-    if (accountFilter === 'po_enforced' && !acc.poRequired) return false;
-    if (accountFilter === 'po_disabled' && acc.poRequired) return false;
+    if (focusedAccountId && acc.id !== focusedAccountId && acc.accountNumber !== focusedAccountId) {
+      return false;
+    }
     if (!accountSearchTerm.trim()) return true;
     const q = accountSearchTerm.toLowerCase();
     return (
       acc.companyName.toLowerCase().includes(q) ||
       acc.accountNumber.toLowerCase().includes(q) ||
-      (acc.currentPoNumber && acc.currentPoNumber.toLowerCase().includes(q)) ||
-      (acc.billingContactEmail && acc.billingContactEmail.toLowerCase().includes(q)) ||
-      (acc.billingAddress && acc.billingAddress.toLowerCase().includes(q))
+      Boolean(acc.billingContactEmail && acc.billingContactEmail.toLowerCase().includes(q))
     );
   });
 
@@ -102,328 +91,329 @@ export function CorporateAccountsPanel({
     accountPage * ACCOUNTS_PER_PAGE
   );
 
+  const computeAccountMetrics = (acc: CorporateAccountConfig) => {
+    const openInvoiceBalance = invoices
+      .filter(
+        (inv) =>
+          (inv.corporateAccountId === acc.id || inv.accountNumber === acc.accountNumber) &&
+          (inv.status === 'issued' || inv.status === 'overdue')
+      )
+      .reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+
+    const unbilledSpend = unbilledTransactions
+      .filter(
+        (tx) =>
+          (tx.corporateAccountId === acc.id || tx.corporateAccountName === acc.companyName) &&
+          (tx.status === 'unbilled' || tx.status === 'pending_invoice')
+      )
+      .reduce((sum, tx) => sum + Number(tx.totalAmount || 0), 0);
+
+    return computeCorporateCreditMetrics({
+      openInvoiceBalance,
+      unbilledSpend,
+      creditLimit: acc.creditLimit,
+    });
+  };
+
   return (
-    <>
-      {activeSub === 'accounts' && (
-        <div className="space-y-4">
-          {/* Search & Filter Bar */}
-          <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3">
-            <div className="relative w-full md:w-96">
-              <input
-                type="text"
-                placeholder={`Search ${corporateAccounts.length} accounts by company, account #, PO...`}
-                value={accountSearchTerm}
-                onChange={(e) => {
-                  setAccountSearchTerm(e.target.value);
+    <div className="space-y-4">
+      {/* ─── Global Credit Limit Enforcement & Search Bar ─── */}
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-1 min-w-0">
+          <div className="relative w-full sm:w-72">
+            <input
+              type="text"
+              placeholder={`Search ${corporateAccounts.length} accounts by company or #...`}
+              value={accountSearchTerm}
+              onChange={(e) => {
+                setAccountSearchTerm(e.target.value);
+                setAccountPage(1);
+              }}
+              className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:border-blue-500"
+            />
+            {accountSearchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountSearchTerm('');
                   setAccountPage(1);
                 }}
-                className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
-              {accountSearchTerm && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAccountSearchTerm('');
-                    setAccountPage(1);
-                  }}
-                  aria-label="Clear account search"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <XIcon className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
+                aria-label="Clear search"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <XIcon className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
-            <div className="w-full md:w-auto">
-              <div className="grid grid-cols-3 sm:inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAccountFilter('all');
-                    setAccountPage(1);
-                  }}
-                  className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-colors text-center whitespace-nowrap cursor-pointer ${
-                    accountFilter === 'all'
-                      ? 'bg-white text-slate-900 shadow-xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  All ({corporateAccounts.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAccountFilter('po_enforced');
-                    setAccountPage(1);
-                  }}
-                  className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-colors text-center whitespace-nowrap cursor-pointer ${
-                    accountFilter === 'po_enforced'
-                      ? 'bg-white text-slate-900 shadow-xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  PO Enforced ({corporateAccounts.filter((a) => a.poRequired).length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAccountFilter('po_disabled');
-                    setAccountPage(1);
-                  }}
-                  className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-colors text-center whitespace-nowrap cursor-pointer ${
-                    accountFilter === 'po_disabled'
-                      ? 'bg-white text-slate-900 shadow-xs font-bold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  PO Optional ({corporateAccounts.filter((a) => !a.poRequired).length})
-                </button>
-              </div>
+          {focusedAccountId && (
+            <button
+              type="button"
+              onClick={clearAccountFocus}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold cursor-pointer shrink-0"
+            >
+              <span>Filtered: {focusedAccountId}</span>
+              <XIcon className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Credit Limit Enforcement Toggle + Cross-Link */}
+        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5">
+          <div className="flex items-center gap-2 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs">
+            <ShieldCheckIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            <span className="font-bold text-slate-700">Credit Limit Policy:</span>
+            <div className="inline-flex bg-white p-0.5 rounded-lg border border-slate-200">
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={() => onUpdateCreditLimitEnforcement('soft_warning')}
+                className={`px-2 py-1 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
+                  creditLimitEnforcement === 'soft_warning'
+                    ? 'bg-amber-100 text-amber-900'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Soft Warning
+              </button>
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={() => onUpdateCreditLimitEnforcement('hard_block')}
+                className={`px-2 py-1 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
+                  creditLimitEnforcement === 'hard_block'
+                    ? 'bg-rose-600 text-white'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Hard Block
+              </button>
             </div>
           </div>
 
-          {/* Corporate Accounts Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paginatedAccounts.map((acc) => (
-              <Card
-                key={acc.id}
-                className="border border-slate-200/90 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <CardTitle className="text-sm font-black text-slate-900 line-clamp-1">
-                          {acc.companyName}
-                        </CardTitle>
-                        <CardDescription className="text-xs font-mono font-bold text-blue-600">
-                          {acc.accountNumber}
-                        </CardDescription>
-                      </div>
-                      <Badge
-                        variant={acc.isActive ? 'success' : 'default'}
-                        size="sm"
-                        className="text-[10px]"
-                      >
-                        {acc.isActive ? 'Active' : 'Paused'}
-                      </Badge>
+          <Link
+            to="/app/admin?tab=customers&sub=corporate"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 hover:text-blue-700 transition-colors"
+          >
+            <span>Directory &amp; Portal Logins &rarr;</span>
+            <ExternalLinkIcon className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      </div>
+
+      {/* ─── Corporate Financial & Credit Terms Cards ─── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {paginatedAccounts.map((acc) => {
+          const metrics = computeAccountMetrics(acc);
+          const isEditing = editingTermsId === acc.id;
+          const barWidth = Math.min(100, Math.max(0, metrics.creditUtilizationPercent));
+          const barColor =
+            metrics.utilizationLevel === 'critical'
+              ? 'bg-rose-500'
+              : metrics.utilizationLevel === 'warning'
+              ? 'bg-amber-500'
+              : 'bg-emerald-500';
+
+          return (
+            <Card
+              key={acc.id}
+              className={`border shadow-xs transition-all flex flex-col justify-between ${
+                focusedAccountId && (acc.id === focusedAccountId || acc.accountNumber === focusedAccountId)
+                  ? 'border-blue-500 ring-2 ring-blue-500/15'
+                  : 'border-slate-200/90 hover:border-slate-300'
+              }`}
+            >
+              <div>
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <CardTitle className="text-sm font-black text-slate-900 line-clamp-1">
+                        {acc.companyName}
+                      </CardTitle>
+                      <CardDescription className="text-xs font-mono font-bold text-blue-600">
+                        {acc.accountNumber} · {acc.billingCycle.toUpperCase()}
+                      </CardDescription>
                     </div>
-                  </CardHeader>
+                    <Badge
+                      variant={acc.isActive ? 'success' : 'default'}
+                      size="sm"
+                      className="text-[10px]"
+                    >
+                      {acc.isActive ? 'Active' : 'Paused'}
+                    </Badge>
+                  </div>
+                </CardHeader>
 
-                  <CardContent className="space-y-2.5 text-xs">
-                    {/* Active PO Authorization & Fraud Prevention Container */}
-                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                          <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-600" />
-                          Authorized PO Number
+                <CardContent className="space-y-3 text-xs">
+                  {/* Credit Utilization Progress Bar */}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-slate-700">Credit Exposure</span>
+                      <span className="font-mono font-black text-slate-900">
+                        ${metrics.totalExposure.toFixed(2)} / ${acc.creditLimit.toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${barColor}`}
+                        style={{ width: `${barWidth}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-500">
+                      <span>Unbilled: ${metrics.unbilledSpend.toFixed(2)}</span>
+                      <span>Open Inv: ${metrics.openInvoiceBalance.toFixed(2)}</span>
+                      <span className="font-bold text-slate-700">
+                        {metrics.creditUtilizationPercent}%
+                      </span>
+                    </div>
+
+                    {metrics.isOverLimit && (
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-rose-700 pt-0.5">
+                        <AlertTriangleIcon className="w-3 h-3 shrink-0" />
+                        <span>
+                          Over credit limit ({creditLimitEnforcement === 'hard_block' ? 'Blocked' : 'Warned'})
                         </span>
-                        <Badge
-                          variant={acc.poRequired ? 'success' : 'default'}
-                          size="sm"
-                          className="text-[9px]"
-                        >
-                          {acc.poRequired ? 'PO Enforced' : 'PO Optional'}
-                        </Badge>
                       </div>
+                    )}
+                  </div>
 
-                      <div className="flex items-center justify-between bg-white px-2 py-1.5 rounded-lg border border-slate-200">
-                        <span className="font-mono font-bold text-slate-900 text-xs">
-                          {acc.currentPoNumber || 'None'}
-                        </span>
-                        {acc.currentPoNumber && (
-                          <button
-                            type="button"
-                            onClick={() => onCopyPo(acc.currentPoNumber!, acc.id)}
-                            className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 cursor-pointer"
+                  {/* Financial Terms View vs Inline Editor */}
+                  {isEditing ? (
+                    <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-200 space-y-2.5">
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Terms</label>
+                          <select
+                            value={termsDraft.billingCycle}
+                            onChange={(e) => setTermsDraft((d) => ({ ...d, billingCycle: e.target.value as CorporateBillingCycleOption }))}
+                            className="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
                           >
-                            {copiedPoId === acc.id ? (
-                              <>
-                                <CheckIcon className="w-3 h-3 text-emerald-600" />
-                                <span className="text-emerald-600 font-bold">Copied</span>
-                              </>
-                            ) : (
-                              <>
-                                <CopyIcon className="w-3 h-3" />
-                                <span>Copy</span>
-                              </>
-                            )}
-                          </button>
-                        )}
+                            <option value="immediate">Immediate</option>
+                            <option value="net15">Net 15</option>
+                            <option value="net30">Net 30</option>
+                            <option value="net60">Net 60</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Limit ($)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={termsDraft.creditLimit}
+                            onChange={(e) => setTermsDraft((d) => ({ ...d, creditLimit: Number(e.target.value) || 0 }))}
+                            className="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Disc (%)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={termsDraft.discountPercent}
+                            onChange={(e) => setTermsDraft((d) => ({ ...d, discountPercent: Number(e.target.value) || 0 }))}
+                            className="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                          />
+                        </div>
                       </div>
-
-                      {/* PO Action Buttons */}
-                      <div className="flex items-center gap-1.5 pt-0.5">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedPoAccount(acc);
-                            setIsRegeneratePoOpen(true);
-                          }}
-                          className="text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200 flex-1 py-1 h-auto cursor-pointer"
-                        >
-                          <RefreshCwIcon className="w-3 h-3 mr-1" />
-                          Regenerate PO
+                      <div className="flex justify-end gap-1.5">
+                        <Button type="button" size="sm" variant="outline" onClick={() => setEditingTermsId(null)} className="text-[10px] py-1 h-auto">
+                          Cancel
                         </Button>
-
                         <Button
+                          type="button"
                           size="sm"
-                          variant="ghost"
-                          onClick={() => onTogglePoRequired(acc)}
+                          variant="primary"
                           disabled={isSaving}
-                          className="text-[10px] text-slate-600 hover:text-slate-900 py-1 h-auto px-2 cursor-pointer"
+                          onClick={async () => {
+                            await onUpdateFinancialTerms(acc.id, termsDraft);
+                            setEditingTermsId(null);
+                          }}
+                          leftIcon={<CheckIcon className="w-3 h-3" />}
+                          className="text-[10px] py-1 h-auto font-bold"
                         >
-                          {acc.poRequired ? 'Disable PO' : 'Enforce PO'}
+                          Save Terms
                         </Button>
-
-                        {acc.poNumberHistory && acc.poNumberHistory.length > 0 && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setSelectedPoAccount(acc);
-                              setIsPoHistoryOpen(true);
-                            }}
-                            className="text-[10px] text-blue-600 hover:text-blue-800 py-1 h-auto px-2 cursor-pointer"
-                          >
-                            History ({acc.poNumberHistory.length})
-                          </Button>
-                        )}
                       </div>
                     </div>
-
-                    {/* Financial Terms */}
-                    <div className="grid grid-cols-3 gap-2 py-1 border-b border-slate-100 text-[11px]">
+                  ) : (
+                    <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200/80 text-[11px]">
                       <div>
-                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Terms</span>
+                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Cycle</span>
                         <span className="font-bold text-slate-800 uppercase">{acc.billingCycle}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Limit</span>
+                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Credit Limit</span>
                         <span className="font-bold text-slate-800">${acc.creditLimit.toLocaleString()}</span>
                       </div>
                       <div>
                         <span className="text-slate-400 block text-[9px] uppercase font-bold">Discount</span>
                         <span className="font-bold text-emerald-600">{acc.discountPercent}% Off</span>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingTermsId(acc.id);
+                          setTermsDraft({
+                            creditLimit: acc.creditLimit,
+                            billingCycle: acc.billingCycle,
+                            discountPercent: acc.discountPercent,
+                          });
+                        }}
+                        className="text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                      >
+                        Edit
+                      </button>
                     </div>
-
-                    {/* Contact & Address */}
-                    <div className="text-[11px] text-slate-500 space-y-0.5">
-                      <p className="font-semibold text-slate-700 truncate">
-                        Contact: {acc.billingContactName || 'Accounts Payable'}
-                      </p>
-                      {acc.billingContactEmail && (
-                        <p className="truncate text-blue-600">{acc.billingContactEmail}</p>
-                      )}
-                      {acc.billingContactPhone && (
-                        <p className="text-slate-600">Tel: {acc.billingContactPhone}</p>
-                      )}
-                      {acc.billingAddress && (
-                        <p className="text-slate-400 truncate text-[10px]">{acc.billingAddress}</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </div>
-
-                <div className="p-4 pt-0">
-                  <div className="pt-2 border-t border-slate-100">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onRunBatchInvoicing(acc)}
-                      disabled={isSaving}
-                      className="text-[11px] font-bold text-blue-600 border-blue-200 hover:bg-blue-50 w-full cursor-pointer"
-                    >
-                      Run Direct Batch Statement
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-
-            {filteredCorporateAccounts.length === 0 && (
-              <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-slate-200">
-                <p className="text-slate-400 font-medium text-xs">
-                  No corporate accounts found matching &ldquo;{accountSearchTerm}&rdquo;.
-                </p>
+                  )}
+                </CardContent>
               </div>
-            )}
+
+              <div className="p-4 pt-0 space-y-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onRunBatchInvoicing(acc)}
+                  disabled={isSaving}
+                  className="text-[11px] font-bold text-blue-600 border-blue-200 hover:bg-blue-50 w-full cursor-pointer"
+                >
+                  Run Direct Batch Statement
+                </Button>
+              </div>
+            </Card>
+          );
+        })}
+
+        {filteredCorporateAccounts.length === 0 && (
+          <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-slate-200">
+            <p className="text-slate-400 font-medium text-xs">
+              No corporate billing accounts matched your filter.
+            </p>
           </div>
+        )}
+      </div>
 
-          {/* Pagination Controls */}
-          {totalAccountPages > 1 && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white px-4 py-3 rounded-2xl border border-slate-200/90 text-xs">
-              <span className="text-slate-500 font-medium text-center sm:text-left">
-                Showing {((accountPage - 1) * ACCOUNTS_PER_PAGE) + 1}–
-                {Math.min(accountPage * ACCOUNTS_PER_PAGE, filteredCorporateAccounts.length)} of{' '}
-                {filteredCorporateAccounts.length} corporate accounts
-              </span>
-              <div className="flex items-center justify-center sm:justify-end gap-1.5">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setAccountPage((p) => Math.max(p - 1, 1))}
-                  disabled={accountPage === 1}
-                  className="text-xs px-2.5 py-1 cursor-pointer"
-                >
-                  Previous
-                </Button>
-                <span className="text-xs font-bold text-slate-700 px-2">
-                  {accountPage} / {totalAccountPages}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setAccountPage((p) => Math.min(p + 1, totalAccountPages))}
-                  disabled={accountPage === totalAccountPages}
-                  className="text-xs px-2.5 py-1 cursor-pointer"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
+      {totalAccountPages > 1 && (
+        <div className="flex items-center justify-between bg-white px-4 py-3 rounded-2xl border border-slate-200/90 text-xs">
+          <span className="text-slate-500">Page {accountPage} of {totalAccountPages}</span>
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" variant="outline" onClick={() => setAccountPage((p) => Math.max(p - 1, 1))} disabled={accountPage === 1}>
+              Previous
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setAccountPage((p) => Math.min(p + 1, totalAccountPages))} disabled={accountPage === totalAccountPages}>
+              Next
+            </Button>
+          </div>
         </div>
       )}
 
-      {/* ─── Regenerate PO Modal ─── */}
-      {selectedPoAccount && (
-        <RegeneratePoModal
-          account={selectedPoAccount}
-          isOpen={isRegeneratePoOpen}
-          onClose={() => {
-            setIsRegeneratePoOpen(false);
-            setSelectedPoAccount(null);
-          }}
-          onSuccess={onPoRegenerateSuccess}
-          operatorEmail={
-            getAdminAuthService().getCurrentUser()?.email ||
-            settings.company?.email ||
-            COMPANY_CONFIG.email.dispatch
-          }
-        />
-      )}
-
-      {/* ─── PO History Modal ─── */}
-      {selectedPoAccount && (
-        <PoHistoryModal
-          account={selectedPoAccount}
-          isOpen={isPoHistoryOpen}
-          onClose={() => {
-            setIsPoHistoryOpen(false);
-            setSelectedPoAccount(null);
-          }}
-        />
-      )}
-
-      {/* ─── Corporate CSV Import Modal ─── */}
       <CorporateCsvImportModal
         isOpen={isCsvModalOpen}
         onClose={() => setIsCsvModalOpen(false)}
         onImportSuccess={onCsvImportSuccess}
       />
-    </>
+    </div>
   );
 }

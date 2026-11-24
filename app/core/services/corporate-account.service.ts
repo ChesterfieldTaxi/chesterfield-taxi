@@ -8,7 +8,12 @@
  * - Firestore syncing for corporate accounts
  */
 
-import type { CorporateAccountConfig, PoHistoryRecord } from '../types/config';
+import {
+  normalizeCorporatePortalPolicy,
+  type CorporateAccountConfig,
+  type CreditLimitEnforcementMode,
+  type PoHistoryRecord,
+} from '../types/config';
 import { getAdminConfigService } from './config/admin-config.service';
 import { isFirebaseConfigured, getFirestoreDb } from './firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
@@ -26,7 +31,112 @@ export interface PoValidationResult {
   valid: boolean;
   status: 'valid' | 'expired_revoked' | 'mismatch' | 'not_required';
   message: string;
+  formatError?: boolean;
   revokedRecord?: PoHistoryRecord;
+}
+
+export interface CreditLimitEvaluationResult {
+  allowed: boolean;
+  isOverLimit: boolean;
+  enforcement: CreditLimitEnforcementMode;
+  projectedTotalExposure: number;
+  overageAmount: number;
+  warning?: string;
+  error?: string;
+}
+
+/**
+ * Pure helper validating a candidate PO string against an optional `poFormatRegex`.
+ * Empty or invalid regexes safely no-op (`{ valid: true }`).
+ */
+export function validatePoFormatRegex(
+  candidatePo?: string,
+  poFormatRegex?: string
+): { valid: boolean; error?: string } {
+  const regexStr = typeof poFormatRegex === 'string' ? poFormatRegex.trim() : '';
+  if (!regexStr) return { valid: true };
+
+  const rawPo = typeof candidatePo === 'string' ? candidatePo.trim() : '';
+  if (!rawPo) {
+    return {
+      valid: false,
+      error: `PO number must match required format (${regexStr}).`,
+    };
+  }
+
+  let compiled: RegExp;
+  try {
+    compiled = new RegExp(regexStr);
+  } catch {
+    return { valid: true };
+  }
+
+  if (compiled.test(rawPo) || compiled.test(rawPo.toUpperCase())) {
+    return { valid: true };
+  }
+
+  return {
+    valid: false,
+    error: `PO "${rawPo}" does not match required PO format (${regexStr}).`,
+  };
+}
+
+/**
+ * Pure deterministic evaluator for corporate credit-limit enforcement:
+ * - `'soft_warning'` (default): returns `allowed: true` with a warning banner string when over limit.
+ * - `'hard_block'`: returns `allowed: false` with a blocking `error` string when over limit.
+ */
+export function evaluateCorporateCreditLimit(params: {
+  creditLimit: number;
+  currentBalance: number;
+  projectedFare: number;
+  enforcement?: CreditLimitEnforcementMode;
+  companyName?: string;
+}): CreditLimitEvaluationResult {
+  const enforcement: CreditLimitEnforcementMode =
+    params.enforcement === 'hard_block' ? 'hard_block' : 'soft_warning';
+  const creditLimit = Math.max(0, Number(params.creditLimit || 0));
+  const currentBalance = Math.max(0, Number((params.currentBalance || 0).toFixed(2)));
+  const projectedFare = Math.max(0, Number((params.projectedFare || 0).toFixed(2)));
+  const projectedTotalExposure = Number((currentBalance + projectedFare).toFixed(2));
+
+  if (creditLimit <= 0 || projectedTotalExposure <= creditLimit) {
+    return {
+      allowed: true,
+      isOverLimit: false,
+      enforcement,
+      projectedTotalExposure,
+      overageAmount: 0,
+    };
+  }
+
+  const overageAmount = Number((projectedTotalExposure - creditLimit).toFixed(2));
+  const companyLabel = params.companyName?.trim() || 'Corporate account';
+  const detail = `"${companyLabel}" open AR ($${currentBalance.toFixed(
+    2
+  )}) + this booking ($${projectedFare.toFixed(
+    2
+  )}) exceeds the $${creditLimit.toLocaleString()} credit limit by $${overageAmount.toFixed(2)}.`;
+
+  if (enforcement === 'hard_block') {
+    return {
+      allowed: false,
+      isOverLimit: true,
+      enforcement,
+      projectedTotalExposure,
+      overageAmount,
+      error: `CREDIT LIMIT EXCEEDED: ${detail}`,
+    };
+  }
+
+  return {
+    allowed: true,
+    isOverLimit: true,
+    enforcement,
+    projectedTotalExposure,
+    overageAmount,
+    warning: `CREDIT LIMIT WARNING: ${detail}`,
+  };
 }
 
 /**
@@ -274,14 +384,36 @@ export class CorporateAccountService {
   }
 
   /**
-   * Validates a candidate PO against an account's current PO and historical rotated POs.
-   * If a rotated PO is detected, flags as potential fraud / expired PO.
+   * Validates a candidate PO against an account's current PO, optional global `poFormatRegex`,
+   * and historical rotated POs. If a rotated PO is detected, flags as potential fraud / expired PO.
    */
   public validateCorporatePo(
     account: CorporateAccountConfig,
-    candidatePo?: string
+    candidatePo?: string,
+    options?: { poFormatRegex?: string }
   ): PoValidationResult {
+    const resolvedRegex =
+      options?.poFormatRegex !== undefined
+        ? options.poFormatRegex
+        : normalizeCorporatePortalPolicy(
+            getAdminConfigService().getCachedSettings().corporatePortalPolicy
+          ).poFormatRegex;
+
+    const rawTrimmed = (candidatePo || '').trim();
+    const trimmedCandidate = rawTrimmed.toUpperCase();
+
     if (!account.poRequired) {
+      if (rawTrimmed && resolvedRegex) {
+        const fmt = validatePoFormatRegex(rawTrimmed, resolvedRegex);
+        if (!fmt.valid) {
+          return {
+            valid: false,
+            status: 'mismatch',
+            formatError: true,
+            message: fmt.error || 'Invalid PO format.',
+          };
+        }
+      }
       return {
         valid: true,
         status: 'not_required',
@@ -289,7 +421,6 @@ export class CorporateAccountService {
       };
     }
 
-    const trimmedCandidate = (candidatePo || '').trim().toUpperCase();
     if (!trimmedCandidate) {
       return {
         valid: false,
@@ -298,18 +429,7 @@ export class CorporateAccountService {
       };
     }
 
-    const currentPoClean = (account.currentPoNumber || '').trim().toUpperCase();
-
-    // Check against active PO
-    if (currentPoClean && trimmedCandidate === currentPoClean) {
-      return {
-        valid: true,
-        status: 'valid',
-        message: 'Corporate PO authorization verified.',
-      };
-    }
-
-    // Check against rotated / revoked PO history (anti-fraud check)
+    // Check against rotated / revoked PO history first (anti-fraud check)
     const history = account.poNumberHistory || [];
     const matchedRevoked = history.find(
       (h) => h.poNumber.trim().toUpperCase() === trimmedCandidate
@@ -322,6 +442,40 @@ export class CorporateAccountService {
         status: 'expired_revoked',
         message: `FRAUD ALERT: PO "${candidatePo}" was revoked/rotated on ${rotatedDate}. Please contact corporate accounting for the new active PO number.`,
         revokedRecord: matchedRevoked,
+      };
+    }
+
+    // Check optional global PO format regex when configured
+    if (resolvedRegex) {
+      const fmtCheck = validatePoFormatRegex(rawTrimmed, resolvedRegex);
+      if (!fmtCheck.valid) {
+        return {
+          valid: false,
+          status: 'mismatch',
+          formatError: true,
+          message:
+            fmtCheck.error ||
+            `Invalid PO format for ${account.companyName}. Expected pattern: ${resolvedRegex}.`,
+        };
+      }
+    }
+
+    const currentPoClean = (account.currentPoNumber || '').trim().toUpperCase();
+
+    // Check against active PO (or accept regex-verified PO if account uses open per-trip POs without a fixed currentPoNumber)
+    if (currentPoClean && trimmedCandidate === currentPoClean) {
+      return {
+        valid: true,
+        status: 'valid',
+        message: 'Corporate PO authorization verified.',
+      };
+    }
+
+    if (!currentPoClean && resolvedRegex) {
+      return {
+        valid: true,
+        status: 'valid',
+        message: 'Corporate PO format verified.',
       };
     }
 

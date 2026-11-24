@@ -8,7 +8,11 @@
  */
 
 import { doc, setDoc } from 'firebase/firestore';
-import type { InvoiceRecord } from '../../types/config';
+import {
+  normalizeBillingSettingsConfig,
+  type BillingSettingsConfig,
+  type InvoiceRecord,
+} from '../../types/config';
 import type { Trip } from '../../types/trip';
 import {
   isValidPayToken,
@@ -16,6 +20,7 @@ import {
   type PayLinkProjection,
 } from '../../utils/pay-token.util';
 import { authorizedFetch } from '../auth/auth-headers';
+import { getAdminConfigService } from '../config/admin-config.service';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
 
@@ -25,6 +30,8 @@ export interface CreatePayLinkOptions {
   sendEmail?: boolean;
   recipientEmail?: string;
   expiresInHours?: number;
+  allowTip?: boolean;
+  billingSettings?: Partial<BillingSettingsConfig> | null;
 }
 
 export interface CreatePayLinkResult {
@@ -149,6 +156,9 @@ class PayLinkService {
     options?: CreatePayLinkOptions
   ): Promise<CreatePayLinkResult> {
     try {
+      const policy = normalizeBillingSettingsConfig(
+        options?.billingSettings ?? getAdminConfigService().getCachedSettings().billingSettings
+      );
       const resp = await authorizedFetch('/api/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -156,7 +166,8 @@ class PayLinkService {
           action: 'create_link',
           targetType: 'trip',
           targetId: trip.id,
-          expiresInHours: options?.expiresInHours,
+          expiresInHours: options?.expiresInHours ?? policy.payLinkExpiryHours,
+          allowTip: options?.allowTip ?? policy.payLinkAllowTipOnTrips,
           sendSms: options?.sendSms,
           recipientPhone: options?.recipientPhone || trip.passenger?.phone,
           sendEmail: options?.sendEmail,
@@ -207,6 +218,9 @@ class PayLinkService {
     options?: CreatePayLinkOptions
   ): Promise<CreatePayLinkResult> {
     try {
+      const policy = normalizeBillingSettingsConfig(
+        options?.billingSettings ?? getAdminConfigService().getCachedSettings().billingSettings
+      );
       const resp = await authorizedFetch('/api/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -214,7 +228,8 @@ class PayLinkService {
           action: 'create_link',
           targetType: 'invoice',
           targetId: invoice.id,
-          expiresInHours: options?.expiresInHours ?? 720,
+          expiresInHours: options?.expiresInHours ?? policy.payLinkExpiryHours,
+          allowTip: options?.allowTip ?? policy.payLinkAllowTipOnInvoices,
           sendSms: options?.sendSms,
           recipientPhone: options?.recipientPhone,
           sendEmail: options?.sendEmail,

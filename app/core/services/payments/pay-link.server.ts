@@ -17,7 +17,7 @@
  */
 
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
-import type { InvoiceRecord } from '../../types/config';
+import type { BillingSettingsConfig, InvoiceRecord } from '../../types/config';
 import type { Trip } from '../../types/trip';
 import {
   buildInvoicePayLinkProjection,
@@ -355,6 +355,8 @@ export interface CreatePayLinkServerInput {
   targetType: PayLinkTargetType;
   targetId: string;
   expiresInHours?: number;
+  allowTip?: boolean;
+  billingSettings?: Partial<BillingSettingsConfig> | null;
   sendSms?: boolean;
   recipientPhone?: string;
   sendEmail?: boolean;
@@ -489,6 +491,8 @@ export async function createOrReusePayLinkServer(input: CreatePayLinkServerInput
 
     freshProjection = buildTripPayLinkProjection(loadedTrip, {
       expiresInHours: input.expiresInHours,
+      allowTip: input.allowTip,
+      billingSettings: input.billingSettings,
       nowMs,
     });
   } else {
@@ -530,6 +534,8 @@ export async function createOrReusePayLinkServer(input: CreatePayLinkServerInput
 
     freshProjection = buildInvoicePayLinkProjection(loadedInvoice, {
       expiresInHours: input.expiresInHours,
+      allowTip: input.allowTip,
+      billingSettings: input.billingSettings,
       nowMs,
     });
   }
@@ -1102,6 +1108,10 @@ export async function handlePayApiPost(
       targetType: body.targetType === 'invoice' ? 'invoice' : 'trip',
       targetId: String(body.targetId || ''),
       expiresInHours: body.expiresInHours !== undefined ? Number(body.expiresInHours) : undefined,
+      allowTip:
+        typeof body.allowTip === 'boolean' && (auth.isDispatcher || !enforceAuth)
+          ? body.allowTip
+          : undefined,
       sendSms: Boolean(body.sendSms),
       recipientPhone: typeof body.recipientPhone === 'string' ? body.recipientPhone : undefined,
       sendEmail: Boolean(body.sendEmail),

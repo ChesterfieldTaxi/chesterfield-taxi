@@ -31,8 +31,12 @@ import {
   DEFAULT_OVERSIZED_BAG_CATEGORIES,
   DEFAULT_DISPATCH_AUTOMATION_CONFIG,
   DEFAULT_LOCALIZATION_CONFIG,
+  DEFAULT_CORPORATE_PORTAL_POLICY,
+  DEFAULT_BILLING_SETTINGS_CONFIG,
   normalizeCompanyConfig,
   normalizeLocalizationConfig,
+  normalizeCorporatePortalPolicy,
+  normalizeBillingSettingsConfig,
   normalizeDispatchAutomationConfig,
   canOperatorConfigureLeadWindows,
 } from '../../types/config';
@@ -485,7 +489,11 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   publicFormVersion: COMPANY_CONFIG.publicFormVersion || 'v2',
   customerBookingConfig: { ...DEFAULT_CUSTOMER_BOOKING_CONFIG },
   corporateAccounts: [...DEFAULT_CORPORATE_ACCOUNTS],
+  corporatePortalPolicy: { ...DEFAULT_CORPORATE_PORTAL_POLICY },
   invoices: [...DEFAULT_INVOICES],
+  billingSettings: { ...DEFAULT_BILLING_SETTINGS_CONFIG },
+  customPayees: [],
+  payoutSettlements: [],
   securityControls: { ...DEFAULT_SECURITY_CONTROLS },
   configAuditTrail: [...DEFAULT_CONFIG_AUDIT_TRAIL],
   tariffs: [...DEFAULT_TARIFF_PROFILES],
@@ -526,6 +534,9 @@ export function sanitizePublicSettings(raw: Record<string, any> = {}): Partial<A
     pricing: raw.pricing ?? DEFAULT_APP_SETTINGS.pricing,
     tariffs: raw.tariffs ?? DEFAULT_APP_SETTINGS.tariffs,
     customerBookingConfig: raw.customerBookingConfig ?? DEFAULT_APP_SETTINGS.customerBookingConfig,
+    corporatePortalPolicy: normalizeCorporatePortalPolicy(
+      raw.corporatePortalPolicy ?? DEFAULT_CORPORATE_PORTAL_POLICY
+    ),
     bookingRulesConfig: raw.bookingRulesConfig ?? DEFAULT_APP_SETTINGS.bookingRulesConfig,
     cms: raw.cms,
     enableGetAppButtons: raw.enableGetAppButtons ?? DEFAULT_APP_SETTINGS.enableGetAppButtons,
@@ -640,9 +651,24 @@ export class AdminConfigService implements IAdminConfigService {
       corporateAccounts: incoming.corporateAccounts && incoming.corporateAccounts.length > 0
         ? incoming.corporateAccounts
         : DEFAULT_APP_SETTINGS.corporateAccounts,
+      corporatePortalPolicy: normalizeCorporatePortalPolicy(
+        incoming.corporatePortalPolicy ??
+          this.cachedSettings?.corporatePortalPolicy ??
+          DEFAULT_CORPORATE_PORTAL_POLICY
+      ),
       invoices: incoming.invoices && incoming.invoices.length > 0
         ? incoming.invoices
         : DEFAULT_APP_SETTINGS.invoices,
+      billingSettings: normalizeBillingSettingsConfig({
+        ...(DEFAULT_APP_SETTINGS.billingSettings || DEFAULT_BILLING_SETTINGS_CONFIG),
+        ...(incoming.billingSettings || {}),
+      }),
+      customPayees: Array.isArray(incoming.customPayees)
+        ? incoming.customPayees
+        : (this.cachedSettings?.customPayees || []),
+      payoutSettlements: Array.isArray(incoming.payoutSettlements)
+        ? incoming.payoutSettlements
+        : (this.cachedSettings?.payoutSettlements || []),
       securityControls: {
         ...DEFAULT_SECURITY_CONTROLS,
         ...(incoming.securityControls || {}),
@@ -825,7 +851,31 @@ export class AdminConfigService implements IAdminConfigService {
           }
         : (this.cachedSettings.customerBookingConfig || DEFAULT_CUSTOMER_BOOKING_CONFIG),
       corporateAccounts: updates.corporateAccounts || this.cachedSettings.corporateAccounts,
+      corporatePortalPolicy: updates.corporatePortalPolicy
+        ? normalizeCorporatePortalPolicy({
+            ...(this.cachedSettings.corporatePortalPolicy || DEFAULT_CORPORATE_PORTAL_POLICY),
+            ...updates.corporatePortalPolicy,
+          })
+        : normalizeCorporatePortalPolicy(
+            this.cachedSettings.corporatePortalPolicy || DEFAULT_CORPORATE_PORTAL_POLICY
+          ),
       invoices: updates.invoices || this.cachedSettings.invoices,
+      billingSettings: updates.billingSettings
+        ? normalizeBillingSettingsConfig({
+            ...(this.cachedSettings.billingSettings || DEFAULT_BILLING_SETTINGS_CONFIG),
+            ...updates.billingSettings,
+          })
+        : normalizeBillingSettingsConfig(
+            this.cachedSettings.billingSettings || DEFAULT_BILLING_SETTINGS_CONFIG
+          ),
+      customPayees:
+        updates.customPayees !== undefined
+          ? updates.customPayees
+          : (this.cachedSettings.customPayees || []),
+      payoutSettlements:
+        updates.payoutSettlements !== undefined
+          ? updates.payoutSettlements
+          : (this.cachedSettings.payoutSettlements || []),
       securityControls: updates.securityControls
         ? {
             ...(this.cachedSettings.securityControls || DEFAULT_SECURITY_CONTROLS),

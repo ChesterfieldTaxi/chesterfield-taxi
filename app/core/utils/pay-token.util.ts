@@ -12,7 +12,11 @@
  *   can be safely shared across server routes, domain services, and client bundles.
  */
 
-import type { InvoiceRecord } from '../types/config';
+import {
+  normalizeBillingSettingsConfig,
+  type BillingSettingsConfig,
+  type InvoiceRecord,
+} from '../types/config';
 import type { Trip } from '../types/trip';
 import { sanitizePublicAddressDisplay } from './tracking-token.util';
 
@@ -208,6 +212,44 @@ export function sanitizePayLinkLineItem(item: {
 }
 
 /**
+ * Resolves clamped Pay Link expiry hours (`1..720`, default `72`) and `allowTip` policy
+ * from `BillingSettingsConfig` with optional per-call overrides.
+ */
+export function resolvePayLinkPolicyDefaults(
+  targetType: PayLinkTargetType,
+  billingSettings?: Partial<BillingSettingsConfig> | null,
+  overrides?: {
+    expiresInHours?: number;
+    allowTip?: boolean;
+    nowMs?: number;
+  }
+): {
+  expiresInHours: number;
+  allowTip: boolean;
+  expiresAt: string;
+} {
+  const nowMs = overrides?.nowMs ?? Date.now();
+  const normalized = normalizeBillingSettingsConfig(billingSettings);
+  const rawHours =
+    overrides?.expiresInHours !== undefined && Number.isFinite(Number(overrides.expiresInHours))
+      ? Number(overrides.expiresInHours)
+      : normalized.payLinkExpiryHours;
+  const expiresInHours = Math.min(720, Math.max(1, Math.round(rawHours)));
+  const defaultAllowTip =
+    targetType === 'invoice'
+      ? normalized.payLinkAllowTipOnInvoices
+      : normalized.payLinkAllowTipOnTrips;
+  const allowTip =
+    overrides?.allowTip !== undefined ? Boolean(overrides.allowTip) : defaultAllowTip;
+
+  return {
+    expiresInHours,
+    allowTip,
+    expiresAt: new Date(nowMs + expiresInHours * 3_600_000).toISOString(),
+  };
+}
+
+/**
  * Builds a Zero-PII `PayLinkProjection` for an individual Trip.
  */
 export function buildTripPayLinkProjection(
@@ -215,13 +257,19 @@ export function buildTripPayLinkProjection(
   options?: {
     payToken?: string;
     expiresInHours?: number;
+    allowTip?: boolean;
+    billingSettings?: Partial<BillingSettingsConfig> | null;
     nowMs?: number;
   }
 ): PayLinkProjection {
   const nowMs = options?.nowMs ?? Date.now();
   const nowIso = new Date(nowMs).toISOString();
-  const hours = Math.min(2160, Math.max(1, Number(options?.expiresInHours ?? 72)));
-  const expiresAt = new Date(nowMs + hours * 3_600_000).toISOString();
+  const policy = resolvePayLinkPolicyDefaults('trip', options?.billingSettings, {
+    expiresInHours: options?.expiresInHours,
+    allowTip: options?.allowTip,
+    nowMs,
+  });
+  const expiresAt = policy.expiresAt;
   const payToken =
     options?.payToken && isValidPayToken(options.payToken)
       ? options.payToken.trim()
@@ -315,7 +363,7 @@ export function buildTripPayLinkProjection(
       ? Number((trip.payment?.amount || computedBase + existingTip).toFixed(2))
       : undefined,
     currency: (trip.pricing?.currency || 'USD').toUpperCase(),
-    allowTip: true,
+    allowTip: policy.allowTip,
     status: isAlreadyPaid ? 'paid' : 'open',
     expiresAt,
     paidAt: isAlreadyPaid ? trip.payment?.paidAt || nowIso : undefined,
@@ -340,13 +388,19 @@ export function buildInvoicePayLinkProjection(
   options?: {
     payToken?: string;
     expiresInHours?: number;
+    allowTip?: boolean;
+    billingSettings?: Partial<BillingSettingsConfig> | null;
     nowMs?: number;
   }
 ): PayLinkProjection {
   const nowMs = options?.nowMs ?? Date.now();
   const nowIso = new Date(nowMs).toISOString();
-  const hours = Math.min(2160, Math.max(1, Number(options?.expiresInHours ?? 720))); // 30 days default for B2B
-  const expiresAt = new Date(nowMs + hours * 3_600_000).toISOString();
+  const policy = resolvePayLinkPolicyDefaults('invoice', options?.billingSettings, {
+    expiresInHours: options?.expiresInHours,
+    allowTip: options?.allowTip,
+    nowMs,
+  });
+  const expiresAt = policy.expiresAt;
   const payToken =
     options?.payToken && isValidPayToken(options.payToken)
       ? options.payToken.trim()
@@ -405,7 +459,7 @@ export function buildInvoicePayLinkProjection(
     baseAmount,
     totalPaidAmount: isPaid ? baseAmount : undefined,
     currency: 'USD',
-    allowTip: false,
+    allowTip: policy.allowTip,
     status: isPaid ? 'paid' : 'open',
     expiresAt,
     paidAt: isPaid ? invoice.paidAt || (invoice.paidDate ? `${invoice.paidDate}T12:00:00.000Z` : nowIso) : undefined,

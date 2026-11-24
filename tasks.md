@@ -963,3 +963,22 @@
 - [x] 59.7 Automated Verification Suite (`scripts/test-admin-ia-phase59.ts`) & Full Build Gates:
   - [x] 59.7.1 Create `scripts/test-admin-ia-phase59.ts` testing `resolveAdminTabAndSub`, `CompanyConfig` & `LocalizationConfig` normalization, exception classification, deleted `AdminLayoutTab.tsx`, monolith line ceilings, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
   - [x] 59.7.2 Pass full verification pipeline (`typecheck`, `test-admin-ia-phase59.ts`, `test-local-corridor-seo.ts`, `test-operational-analytics.ts`, `test-guest-manage-ride.ts`, `test-standing-orders.ts`, and `npm run build`) with `0` errors.
+
+## Phase 60 (Wave 5 Phase 2): Dedicated `Clients & Corporate` Directory Split + `Billing & Payouts` Overhaul (Accounts, Drivers, Staff & Other Payees)
+- [x] 60.0 Baseline Commit & Documentation Sync:
+  - [x] 60.0.1 Commit verified Phase 59 changes cleanly on `main` (`feat(phase-59): overhaul admin IA, focused general company/units hub, unified brand studio, archive consolidation, and trips parity`).
+  - [x] 60.0.2 Document Platform Phase 60 (Wave 5 Phase 2) across `spec.md`, `plan.md`, and `tasks.md`.
+- [x] 60.1 Schema Extensions, Policy Wiring & Pure Payout Domain Service:
+  - [x] 60.1.1 Add `CorporatePortalGovernanceConfig`, extended `BillingSettingsConfig`, `PayoutPayeeRecord`, `PayoutSettlementRecord`, `normalizeCorporatePortalPolicy`, and `normalizeBillingSettingsConfig` in `app/core/types/config.ts`, and wire persistence in `admin-config.service.ts`.
+  - [x] 60.1.2 Extend `LedgerEntryType` (`'staff_payout' | 'vendor_payout'`) in `app/core/types/invoicing.ts` & `invoicing.service.ts`; wire `poFormatRegex` & `creditLimitEnforcement` in `corporate-account.service.ts`, `useCorporatePoVerification.ts`, `useCustomerBookingSubmission.ts`, and `app/routes/corporate.tsx`; wire `BillingSettingsConfig` Pay Link defaults in `pay-token.util.ts`, `pay-link.service.ts`, and `pay-link.server.ts`.
+  - [x] 60.1.3 Create pure `app/core/services/payouts.service.ts` (`computeDriverEarningsRollup`, `computeStaffPayoutPreview`, `computeOtherPayeeSettlement`, `buildPayoutLedgerEntry`, `exportPayoutsCsv`).
+- [x] 60.2 Dedicated `Clients & Corporate` Directory Split (`AdminCustomersSubpage.tsx < 450`L):
+  - [x] 60.2.1 Create `PassengerDirectoryPanel.tsx` and `CustomerProfileDrawer.tsx` (`< 450`L each) under `app/components/domain/admin/customers/` preserving `?phone=`/`?id=` deep-links, VIP/archive filters, blacklist governance, scores, and `"View Invoices →"` links.
+  - [x] 60.2.2 Create `CorporateGovernanceCard.tsx`, `CorporateDirectoryPanel.tsx`, `CorporateAccountDirectoryDrawer.tsx`, and `CorporatePortalManagersModal.tsx` (`< 450`L each) focused strictly on directory, PO security, portal governance, and `"Billing & Credit →"` deep-links; refactor `AdminCustomersSubpage.tsx` (`< 300`L).
+- [x] 60.3 Dedicated `Billing & Payouts` Overhaul (`AdminInvoicingSubpage.tsx < 400`L):
+  - [x] 60.3.1 Refactor `useAdminInvoicingActions.ts` (`< 650`L) stripping duplicate Stripe/Square/Twilio state/handlers and wiring multi-role payouts, GL posting, Corporate financial terms updates, and Pay Link policies.
+  - [x] 60.3.2 Refactor `CorporateAccountsPanel.tsx` (`< 450`L) for financial & credit terms (`?accountId=` deep-link focus, credit utilization bar, `Soft Warning` vs `Hard Block`, batch invoicing, CSV import, `"Directory & Portal Logins →"` link).
+  - [x] 60.3.3 Refactor `DriverPayoutsPanel.tsx` (`< 450`L) + `PayoutSettlementModal.tsx` (`< 400`L) with 3-pill Payee Switcher (`Drivers`, `Staff & Dispatchers`, `Other Payees`), settlement history, and CSV export; create `BillingPolicyAndQuickBooksPanel.tsx` (`< 400`L) and wire `AdminInvoicingSubpage.tsx` (`< 400`L).
+- [x] 60.4 Deterministic Verification Suite (`scripts/test-admin-clients-and-billing-phase60.ts`) & Full Build Gates:
+  - [x] 60.4.1 Create `scripts/test-admin-clients-and-billing-phase60.ts` verifying normalizers, PO regex & credit-limit enforcement, Pay Link policy defaults, pure payout math & CSV export, GL entries, monolith line ceilings, zero duplicate gateway credentials in `DriverPayoutsPanel.tsx`, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
+  - [x] 60.4.2 Pass `npm run typecheck`, `test-admin-clients-and-billing-phase60.ts`, `test-admin-ia-phase59.ts`, `test-operational-analytics.ts`, and `npm run build` with `0` errors.
