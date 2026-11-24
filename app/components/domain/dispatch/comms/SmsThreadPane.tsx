@@ -16,6 +16,7 @@ import type {
 } from '../../../../core/services/workspace-bus.service';
 import type { CommsChannel } from '../../../../core/types/comms';
 import { formatDisplayPhone } from '../../../../core/utils/phone';
+import { Select } from '../../../ui/Select';
 import {
   AlertTriangleIcon,
   ChatBubbleLeftRightIcon,
@@ -1498,7 +1499,8 @@ export function NewSmsMessageModal({
               <div className="flex items-center gap-1.5 flex-wrap bg-slate-50/90 p-1.5 rounded-xl border border-slate-200/80">
                 <div className="flex items-center gap-1 min-w-[155px] flex-1 sm:flex-none">
                   <SparklesIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <select
+                  <Select
+                    size="xs"
                     value={selectedTemplateId}
                     onChange={(e) => {
                       const chosenId = e.target.value;
@@ -1509,7 +1511,6 @@ export function NewSmsMessageModal({
                         setSelectedTemplateId('');
                       }
                     }}
-                    className="w-full text-[11px] font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 cursor-pointer focus:outline-none focus:border-blue-500"
                     aria-label="Insert canned dispatch SMS template"
                   >
                     <option value="">+ Canned SMS Template...</option>
@@ -1518,7 +1519,7 @@ export function NewSmsMessageModal({
                         {chip.shortLabel}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 {hasMatchedTrip && onInsertTrackingLink && (

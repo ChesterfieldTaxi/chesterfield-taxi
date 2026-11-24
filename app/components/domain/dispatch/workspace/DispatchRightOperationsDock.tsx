@@ -22,6 +22,7 @@ import {
   FlagIcon,
   ClockIcon,
 } from '../../../ui/Icons';
+import { Select } from '../../../ui/Select';
 
 const CommsHub = React.lazy(() =>
   import('../CommsHub').then((m) => ({ default: m.CommsHub }))
@@ -377,7 +378,8 @@ export function DispatchRightOperationsDock({
                 )}
               </div>
 
-              <select
+              <Select
+                size="xs"
                 value=""
                 onChange={(e) => {
                   const val = e.target.value;
@@ -388,7 +390,6 @@ export function DispatchRightOperationsDock({
                     onMsgTextChange(val);
                   }
                 }}
-                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-700 font-medium focus:ring-1 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="">Select a tactical preset to insert...</option>
                 {tacticalPresets.map((preset, i) => (
@@ -399,7 +400,7 @@ export function DispatchRightOperationsDock({
                 {user?.role === 'admin' && (
                   <option value="__add_custom__">+ Create New Preset (Admin)...</option>
                 )}
-              </select>
+              </Select>
 
               {isAddingPreset && (
                 <div className="flex items-center gap-1.5 mt-1.5 p-1.5 bg-blue-50 border border-blue-200 rounded-xl">
@@ -443,13 +444,13 @@ export function DispatchRightOperationsDock({
             >
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <span className="block text-[10px] font-bold text-slate-500 uppercase">
+                  <span className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
                     Send To
                   </span>
-                  <select
+                  <Select
+                    size="xs"
                     value={msgRecipient}
                     onChange={(e) => onMsgRecipientChange(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 cursor-pointer"
                   >
                     <option value="All Drivers">All Drivers</option>
                     {drivers.map((d) => (
@@ -457,20 +458,20 @@ export function DispatchRightOperationsDock({
                         {d.formattedLabel || formatDriverAssignmentLabel(d)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
-                  <span className="block text-[10px] font-bold text-slate-500 uppercase">
+                  <span className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
                     Priority
                   </span>
-                  <select
+                  <Select
+                    size="xs"
                     value={msgPriority}
                     onChange={(e) => onMsgPriorityChange(e.target.value as 'normal' | 'urgent')}
-                    className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 cursor-pointer"
                   >
                     <option value="normal">Normal</option>
                     <option value="urgent">Urgent</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 
@@ -536,10 +537,13 @@ export function DispatchRightOperationsDock({
                   <ClockIcon className="w-3 h-3 shrink-0" />
                   <span>Retention:</span>
                 </span>
-                <select
+                <Select
+                  size="xs"
+                  fullWidth={false}
+                  searchable={false}
                   value={alertDismissMinutes}
                   onChange={(e) => onUpdateAlertDismissMinutes(parseInt(e.target.value, 10))}
-                  className="font-bold text-slate-800 bg-white border border-slate-300 rounded px-1.5 py-0.5 cursor-pointer shadow-2xs focus:outline-hidden"
+                  triggerClassName="h-6 px-2 text-[10px] font-bold"
                   title="Admin-configured alert auto-dismiss window"
                 >
                   <option value={15}>15m</option>
@@ -550,7 +554,7 @@ export function DispatchRightOperationsDock({
                   <option value={720}>12h</option>
                   <option value={1440}>24h</option>
                   <option value={0}>Never</option>
-                </select>
+                </Select>
               </div>
             </div>
 

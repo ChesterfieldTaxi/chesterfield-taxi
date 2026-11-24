@@ -18,6 +18,7 @@ import {
   WheelchairIcon,
   XIcon,
 } from '../../../ui/Icons';
+import { Select } from '../../../ui/Select';
 import type { CommsSheetDragProps } from './comms-types';
 
 export interface CommsContactModalProps {
@@ -195,7 +196,8 @@ export function CommsContactModal({
                 <span className="text-[10px] text-slate-400">Default dispatch &amp; SMS target</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <select
+                <Select
+                  size="sm"
                   value={contactEditForm.primaryPhoneType || 'mobile'}
                   onChange={(e) =>
                     setContactEditForm((prev) => ({
@@ -203,13 +205,13 @@ export function CommsContactModal({
                       primaryPhoneType: e.target.value as PhoneType,
                     }))
                   }
-                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 font-semibold text-slate-700 focus:bg-white focus:outline-blue-500 cursor-pointer text-xs"
+                  triggerClassName="bg-slate-50"
                 >
                   <option value="mobile">Mobile (SMS)</option>
                   <option value="home">Home Landline</option>
                   <option value="work">Work / Office</option>
                   <option value="other">Other Phone</option>
-                </select>
+                </Select>
 
                 <div className="sm:col-span-2">
                   <input
@@ -236,18 +238,21 @@ export function CommsContactModal({
                     key={phoneItem.id || idx}
                     className="bg-white p-2.5 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
                   >
-                    <select
-                      value={phoneItem.type || 'mobile'}
-                      onChange={(e) =>
-                        onUpdatePhone(idx, { type: e.target.value as PhoneType })
-                      }
-                      className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 font-semibold text-slate-700 focus:bg-white focus:outline-blue-500 cursor-pointer text-xs sm:w-32 shrink-0"
-                    >
-                      <option value="mobile">Mobile</option>
-                      <option value="home">Home</option>
-                      <option value="work">Work</option>
-                      <option value="other">Other</option>
-                    </select>
+                    <div className="sm:w-32 shrink-0">
+                      <Select
+                        size="sm"
+                        value={phoneItem.type || 'mobile'}
+                        onChange={(e) =>
+                          onUpdatePhone(idx, { type: e.target.value as PhoneType })
+                        }
+                        triggerClassName="bg-slate-50"
+                      >
+                        <option value="mobile">Mobile</option>
+                        <option value="home">Home</option>
+                        <option value="work">Work</option>
+                        <option value="other">Other</option>
+                      </Select>
+                    </div>
 
                     <input
                       type="tel"
@@ -574,7 +579,8 @@ export function CommsContactModal({
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
                   Preferred Vehicle Tier
                 </label>
-                <select
+                <Select
+                  size="sm"
                   value={contactEditForm.preferredVehicleTier || 'standard'}
                   onChange={(e) =>
                     setContactEditForm((prev) => ({
@@ -582,14 +588,13 @@ export function CommsContactModal({
                       preferredVehicleTier: e.target.value as any,
                     }))
                   }
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-blue-500 cursor-pointer font-medium"
                 >
                   <option value="standard">Standard Sedan (Town Car)</option>
                   <option value="executive">Executive Black Car (Lincoln Continental / Mercedes)</option>
                   <option value="suv">Luxury SUV (Cadillac Escalade / Suburban)</option>
                   <option value="van">Passenger Van (High-Capacity)</option>
                   <option value="wheelchair">WAV Wheelchair Accessible Vehicle (Hydraulic Ramp)</option>
-                </select>
+                </Select>
               </div>
 
               <div>

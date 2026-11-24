@@ -23,6 +23,7 @@ import {
   type DispatchEmailRecord,
 } from '../../../../core/types/dispatch-email';
 import type { Trip } from '../../../../core/types/trip';
+import { Select } from '../../../ui/Select';
 import {
   BuildingIcon,
   CheckIcon,
@@ -666,14 +667,14 @@ export function EmailComposerPane({
             <div className="flex items-center gap-1.5 flex-wrap bg-slate-50/90 p-1.5 rounded-xl border border-slate-200/80">
               <div className="flex items-center gap-1 min-w-[155px] flex-1 sm:flex-none">
                 <SparklesIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <select
+                <Select
+                  size="xs"
                   value={selectedTemplateId}
                   onChange={(e) => {
                     const val = e.target.value as CannedDispatchTemplateId;
                     setSelectedTemplateId(val);
                     if (val) void handleApplyTemplate(val);
                   }}
-                  className="w-full text-[11px] font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 cursor-pointer focus:outline-none focus:border-blue-500"
                   aria-label="Insert canned dispatch email template"
                 >
                   <option value="">+ Canned Dispatch Template...</option>
@@ -682,14 +683,16 @@ export function EmailComposerPane({
                       {tpl.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               {matchedTrips.length > 0 && (
-                <select
+                <Select
+                  size="xs"
+                  fullWidth={false}
                   value={selectedTripId}
                   onChange={(e) => setSelectedTripId(e.target.value)}
-                  className="text-[11px] font-mono font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 cursor-pointer max-w-[150px]"
+                  triggerClassName="max-w-[160px] font-mono"
                   title="Linked customer trip for Tracking & Pay links"
                 >
                   {matchedTrips.map((t) => (
@@ -697,7 +700,7 @@ export function EmailComposerPane({
                       {t.id} ({t.status})
                     </option>
                   ))}
-                </select>
+                </Select>
               )}
 
               <button

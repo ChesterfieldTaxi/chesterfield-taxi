@@ -13,6 +13,7 @@ import {
   UserIcon,
   VolumeXIcon,
 } from '../../../ui/Icons';
+import { Select } from '../../../ui/Select';
 
 export interface CustomerPassengerNotesSectionProps {
   form: CustomerBookingFormState;
@@ -293,17 +294,18 @@ export function CustomerPassengerNotesSection({
               </div>
             </div>
 
-            <select
+            <Select
               value={form.contactRole}
               onChange={(e) => setForm((prev) => ({ ...prev, contactRole: e.target.value }))}
-              className="w-full px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-base sm:text-sm text-slate-800"
+              size="md"
+              triggerClassName="border-blue-200 text-slate-800"
             >
               {DEFAULT_BOOKER_ROLES.map((role) => (
                 <option key={role} value={role}>
                   {role}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         )}
       </div>

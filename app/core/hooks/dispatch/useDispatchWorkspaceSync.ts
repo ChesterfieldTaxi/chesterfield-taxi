@@ -289,6 +289,7 @@ export function useDispatchWorkspaceSync({
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       const target = e.target as Node;
+      if (target instanceof Element && target.closest('[data-ui-select-portal="true"]')) return;
       if (tabOverflowRef.current && !tabOverflowRef.current.contains(target)) {
         setIsTabOverflowOpen(false);
       }

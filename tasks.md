@@ -1038,5 +1038,23 @@
   - [x] 63.4.1 Create `scripts/test-map-overlays-and-queue-polish-phase63.ts` verifying map preferences, vehicle-type multi-select matching, private aviation badge suppression, `"Zones"` rename, portalized Date/Time pickers, 2-line queue rows, monolith line ceilings, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
   - [x] 63.4.2 Pass `npm run typecheck`, `test-map-overlays-and-queue-polish-phase63.ts`, `test-flight-status.ts`, `test-comms-multichannel-ui.ts`, `test-admin-website-and-integrations-phase62.ts`, `test-admin-ia-phase59.ts`, and `npm run build` with `0` errors.
 
+## Phase 64 (Wave 5 Phase 6): Dispatch Layout Resize Persistence + `DriverAssignDropdown`-Style Portal `Select`, Unified UI Primitives & Customer / Dispatch / Portal Rollout
+- [x] 64.0 Baseline Commit & Documentation Sync:
+  - [x] 64.0.1 Commit verified Phase 63 changes cleanly on `main` (`feat(phase-63): custom dispatch map overlays, multi-select vehicle filter, zones rename, portal time picker, and 2-line queue polish`).
+  - [x] 64.0.2 Document Platform Phase 64 (Wave 5 Phase 6) across `spec.md`, `plan.md`, and `tasks.md`.
+- [x] 64.1 Fix Dispatch Split-Pane, Active Dock & `FloatingWindow` Layout Persistence:
+  - [x] 64.1.1 Refactor `useDispatchPanelResize.ts` (`< 260`L) with pure `parseStoredDispatchPanelLayout` & `serializeDispatchPanelLayout` (`sidebarWidth: 320..680`, `queueHeight: 150..1200`, `operationsWidth: 320..760`), removing mount-overwrite `useEffect`, clamping dynamically to viewport on screen, and persisting `activeDockTab` in `ct_dispatch_active_dock_tab` (`dispatch.tsx < 1,600`L).
+  - [x] 64.1.2 Persist `FloatingWindow.tsx` (`< 530`L) `{ x, y, width, height }` per `id` under `ct_floating_win_${id}` on drag/resize end and hydrate clamped within viewport when `isOpen` becomes `true` on desktop (`>= 768px`).
+- [x] 64.2 Portal-Anchored `Select` & Unified Royal Blue Primitives (`Select.tsx`, `Switch.tsx`, `Checkbox.tsx`, `SegmentedControl.tsx`):
+  - [x] 64.2.1 Replace native `<select>` in `app/components/ui/Select.tsx` (`< 430`L) with `createPortal(..., document.body)` (`position: fixed`, `z-[99999]`), fixed open width, viewport clamping + upward flip, `<option>`/`<optgroup>` child parser, search input (`>= 8` options or `searchable`), `xs`/`sm`/`md` sizes, `default`/`subtle`/`dark` variants, keyboard navigation, and `onValueChange` + `onChange` compatibility.
+  - [x] 64.2.2 Update `Switch.tsx` & `Checkbox.tsx` default active accent to Royal Blue (`tone?: 'blue' | 'indigo' | 'emerald' | 'amber' | 'rose'`, `size?: 'sm' | 'md'`), create `SegmentedControl.tsx` (`< 120`L), and export from `app/components/ui/index.ts`.
+- [x] 64.3 Roll Out Portal `Select` Across All 22 Non-Admin `.tsx` Surfaces (`0` Native `<select>` Outside Admin):
+  - [x] 64.3.1 Migrate Customer Booking (`FlightAssistanceCard.tsx`, `CustomerPassengerNotesSection.tsx`, `FieldRenderer.tsx`) & Corporate/Public/Passenger routes (`corporate.tsx`, `app.tsx`, `apply.tsx`, `contact.tsx`).
+  - [x] 64.3.2 Migrate all 15 Dispatch Console surfaces (`AppSuiteLauncher.tsx`, `DispatchPassengerCrmSection.tsx`, `DispatchPaymentAssignmentSection.tsx`, `DispatchReturnRepeatSection.tsx`, `DispatchRoutingTimingSection.tsx`, `comms-ContactModal.tsx`, `CommsFilterToolbar.tsx`, `SmsThreadPane.tsx`, `CustomDateTimePicker.tsx`, `DispatchDriverRosterPane.tsx`, `EmailComposerPane.tsx`, `DispatchTripQueueSheets.tsx`, `TripQueueToolbar.tsx`, `DispatchDesktopTopHeader.tsx`, `DispatchRightOperationsDock.tsx`).
+- [x] 64.4 Deterministic Verification Suite (`scripts/test-design-system-and-dispatch-persistence-phase64.ts`) & Full Build Gates:
+  - [x] 64.4.1 Create `scripts/test-design-system-and-dispatch-persistence-phase64.ts` testing layout persistence (`780px` & `920px` queue heights, zero mount-overwrite effect), `FloatingWindow` clamping, `Select` portal/child extraction, zero native `<select` outside `app/components/domain/admin/**`, monolith line ceilings, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
+  - [x] 64.4.2 Pass `npm run typecheck`, `test-design-system-and-dispatch-persistence-phase64.ts`, `test-map-overlays-and-queue-polish-phase63.ts`, `test-admin-website-and-integrations-phase62.ts`, `test-comms-multichannel-ui.ts`, and `npm run build` with `0` errors.
+
+
 
 

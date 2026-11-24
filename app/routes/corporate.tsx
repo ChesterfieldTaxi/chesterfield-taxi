@@ -33,6 +33,7 @@ import { RoleViewSwitcher } from '../components/domain/common/RoleViewSwitcher';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { Select } from '../components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
 import {
   AlertTriangleIcon,
@@ -873,8 +874,11 @@ export default function CorporatePortalRoute() {
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-400 hidden lg:inline">
                   Admin Preview:
                 </span>
-                <select
+                <Select
                   aria-label="Admin Corporate Account Preview Selector"
+                  variant="dark"
+                  size="xs"
+                  fullWidth={false}
                   value={selectedAccountId}
                   onChange={(e) => {
                     const nextId = e.target.value;
@@ -885,14 +889,14 @@ export default function CorporatePortalRoute() {
                     nextParams.set('accountId', nextId);
                     setSearchParams(nextParams, { replace: true });
                   }}
-                  className="bg-transparent text-xs font-bold text-white focus:outline-hidden max-w-[160px] sm:max-w-[230px] truncate cursor-pointer"
+                  triggerClassName="max-w-[160px] sm:max-w-[230px] border-transparent bg-transparent hover:bg-slate-800/70"
                 >
                   {adminAccountsList.map((acc) => (
-                    <option key={acc.id} value={acc.id} className="bg-slate-900 text-white">
+                    <option key={acc.id} value={acc.id}>
                       {acc.companyName} ({acc.accountNumber})
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             )}
 
@@ -1543,25 +1547,27 @@ export default function CorporatePortalRoute() {
                           1. Select Authorized Employee or Guest Traveler
                         </label>
                         <div className="flex items-center gap-2">
-                          <select
-                            value={selectedRiderId}
-                            onChange={(e) => {
-                              const id = e.target.value;
-                              const found =
-                                (account.authorizedRiders || []).find((r) => r.id === id) || null;
-                              handleSelectAuthorizedRider(found);
-                            }}
-                            className="flex-1 h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-hidden focus:border-indigo-500"
-                          >
-                            <option value="">-- Custom Guest / Enter Traveler Manually --</option>
-                            {(account.authorizedRiders || []).map((rider) => (
-                              <option key={rider.id} value={rider.id}>
-                                {rider.name}
-                                {rider.department ? ` (${rider.department})` : ''}
-                                {rider.isVip ? ' ★ VIP' : ''}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="flex-1 min-w-0">
+                            <Select
+                              size="md"
+                              value={selectedRiderId}
+                              onChange={(e) => {
+                                const id = e.target.value;
+                                const found =
+                                  (account.authorizedRiders || []).find((r) => r.id === id) || null;
+                                handleSelectAuthorizedRider(found);
+                              }}
+                            >
+                              <option value="">-- Custom Guest / Enter Traveler Manually --</option>
+                              {(account.authorizedRiders || []).map((rider) => (
+                                <option key={rider.id} value={rider.id}>
+                                  {rider.name}
+                                  {rider.department ? ` (${rider.department})` : ''}
+                                  {rider.isVip ? ' ★ VIP' : ''}
+                                </option>
+                              ))}
+                            </Select>
+                          </div>
                           {selectedRiderId && (
                             <Button
                               type="button"
@@ -1581,14 +1587,14 @@ export default function CorporatePortalRoute() {
                         <label className="font-bold text-slate-700 block mb-1.5">
                           2. Department / Cost Center Allocation
                         </label>
-                        <select
+                        <Select
+                          size="md"
                           value={selectedCostCenter}
                           onChange={(e) => {
                             const val = e.target.value;
                             setSelectedCostCenter(val);
                             setBookingInitialValues((prev) => ({ ...prev, costCenter: val }));
                           }}
-                          className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:outline-hidden focus:border-indigo-500"
                         >
                           <option value="">General Corporate Account</option>
                           {(account.costCenters || []).map((cc) => (
@@ -1596,7 +1602,7 @@ export default function CorporatePortalRoute() {
                               {cc}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       </div>
                     </div>
 

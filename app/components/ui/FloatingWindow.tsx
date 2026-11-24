@@ -9,6 +9,68 @@ interface OpenFloatingWindowEntry {
 
 const openFloatingWindowStack: OpenFloatingWindowEntry[] = [];
 
+export const FLOATING_WINDOW_STORAGE_PREFIX = 'ct_floating_win_';
+
+export interface StoredFloatingWindowGeometry {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export function getFloatingWindowStorageKey(id: string): string {
+  return `${FLOATING_WINDOW_STORAGE_PREFIX}${id || 'floating_window'}`;
+}
+
+export function clampFloatingWindowGeometry(
+  raw: Partial<StoredFloatingWindowGeometry>,
+  viewport: { width: number; height: number },
+  minBounds: { minWidth?: number; minHeight?: number } = {}
+): StoredFloatingWindowGeometry {
+  const minW = Math.max(200, minBounds.minWidth ?? 360);
+  const minH = Math.max(160, minBounds.minHeight ?? 280);
+  const maxW = Math.max(minW, viewport.width - 24);
+  const maxH = Math.max(minH, viewport.height - 24);
+  const rawW = typeof raw.width === 'number' && Number.isFinite(raw.width) && raw.width > 0 ? raw.width : 580;
+  const rawH = typeof raw.height === 'number' && Number.isFinite(raw.height) && raw.height > 0 ? raw.height : 620;
+  const width = Math.round(Math.min(maxW, Math.max(Math.min(minW, viewport.width - 24), rawW)));
+  const height = Math.round(Math.min(maxH, Math.max(Math.min(minH, viewport.height - 24), rawH)));
+  const defaultX = Math.max(12, Math.round((viewport.width - width) / 2));
+  const defaultY = Math.max(12, Math.round((viewport.height - height) / 2));
+  const rawX = typeof raw.x === 'number' && Number.isFinite(raw.x) ? raw.x : defaultX;
+  const rawY = typeof raw.y === 'number' && Number.isFinite(raw.y) ? raw.y : defaultY;
+  const x = Math.round(Math.max(12, Math.min(rawX, Math.max(12, viewport.width - width - 12))));
+  const y = Math.round(Math.max(12, Math.min(rawY, Math.max(12, viewport.height - height - 12))));
+  return { x, y, width, height };
+}
+
+export function parseStoredFloatingWindowGeometry(
+  rawJson: string | null | undefined,
+  viewport: { width: number; height: number },
+  minBounds: { minWidth?: number; minHeight?: number } = {}
+): StoredFloatingWindowGeometry | null {
+  if (!rawJson) return null;
+  try {
+    const parsed = JSON.parse(rawJson);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const hasCoords = Number.isFinite(parsed.x) && Number.isFinite(parsed.y);
+    const hasSize = Number.isFinite(parsed.width) && Number.isFinite(parsed.height);
+    if (!hasCoords && !hasSize) return null;
+    return clampFloatingWindowGeometry(parsed, viewport, minBounds);
+  } catch {
+    return null;
+  }
+}
+
+export function serializeFloatingWindowGeometry(geom: StoredFloatingWindowGeometry): string {
+  return JSON.stringify({
+    x: Math.round(geom.x),
+    y: Math.round(geom.y),
+    width: Math.round(geom.width),
+    height: Math.round(geom.height),
+  });
+}
+
 export interface FloatingWindowProps {
   id?: string;
   isOpen: boolean;
@@ -103,21 +165,56 @@ export function FloatingWindow({
   });
 
   const windowRef = useRef<HTMLDivElement>(null);
+  const positionRef = useRef(position);
+  positionRef.current = position;
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({ mouseX: 0, mouseY: 0, startX: 0, startY: 0 });
   const isResizingRef = useRef(false);
   const resizeStartRef = useRef<{ mouseX: number; mouseY: number; startW: number; startH: number }>({ mouseX: 0, mouseY: 0, startW: 0, startH: 0 });
 
-  // Reset position when opened if needed
+  const persistGeometry = useCallback(
+    (nextPos: { x: number; y: number }, nextSize: { width: number; height: number }) => {
+      if (typeof window === 'undefined' || window.innerWidth < 768) return;
+      try {
+        localStorage.setItem(
+          getFloatingWindowStorageKey(id),
+          serializeFloatingWindowGeometry({
+            x: nextPos.x,
+            y: nextPos.y,
+            width: nextSize.width,
+            height: nextSize.height,
+          })
+        );
+      } catch {}
+    },
+    [id]
+  );
+
+  // Hydrate persisted size & position (clamped to viewport) when opened on desktop
   useEffect(() => {
-    if (isOpen) {
-      if (!initialPosition) {
-        setPosition(getDefaultPosition());
-      }
-      setIsMinimized(false);
-      setIsMaximized(false);
+    if (!isOpen) return;
+    setIsMinimized(false);
+    setIsMaximized(false);
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      try {
+        const stored = parseStoredFloatingWindowGeometry(
+          localStorage.getItem(getFloatingWindowStorageKey(id)),
+          { width: window.innerWidth, height: window.innerHeight },
+          { minWidth, minHeight }
+        );
+        if (stored) {
+          setPosition({ x: stored.x, y: stored.y });
+          setSize({ width: stored.width, height: stored.height });
+          return;
+        }
+      } catch {}
     }
-  }, [isOpen, initialPosition, getDefaultPosition]);
+    if (!initialPosition) {
+      setPosition(getDefaultPosition());
+    }
+  }, [isOpen, id, minWidth, minHeight, initialPosition, getDefaultPosition]);
 
   // Escape key handler (closes only the topmost open FloatingWindow)
   useEffect(() => {
@@ -171,24 +268,31 @@ export function FloatingWindow({
 
     setActiveZ((z) => Math.max(z, 50));
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
+    const handleMouseMove = (moveEvent: MouseEvent | PointerEvent) => {
       if (!isDraggingRef.current) return;
       const deltaX = moveEvent.clientX - dragStartRef.current.mouseX;
       const deltaY = moveEvent.clientY - dragStartRef.current.mouseY;
-
       const newX = Math.max(10, Math.min(window.innerWidth - 120, dragStartRef.current.startX + deltaX));
       const newY = Math.max(10, Math.min(window.innerHeight - 50, dragStartRef.current.startY + deltaY));
-
-      setPosition({ x: newX, y: newY });
+      const nextPos = { x: newX, y: newY };
+      positionRef.current = nextPos;
+      setPosition(nextPos);
     };
 
     const handleMouseUp = () => {
-      isDraggingRef.current = false;
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        persistGeometry(positionRef.current, sizeRef.current);
+      }
+      window.removeEventListener('pointermove', handleMouseMove);
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('pointerup', handleMouseUp);
       window.removeEventListener('mouseup', handleMouseUp);
     };
 
+    window.addEventListener('pointermove', handleMouseMove);
     window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('pointerup', handleMouseUp);
     window.addEventListener('mouseup', handleMouseUp);
   };
 
@@ -206,24 +310,31 @@ export function FloatingWindow({
       startH: size.height,
     };
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
+    const handleMouseMove = (moveEvent: MouseEvent | PointerEvent) => {
       if (!isResizingRef.current) return;
       const deltaX = moveEvent.clientX - resizeStartRef.current.mouseX;
       const deltaY = moveEvent.clientY - resizeStartRef.current.mouseY;
-
-      const newW = Math.max(minWidth, Math.min(window.innerWidth - position.x - 16, resizeStartRef.current.startW + deltaX));
-      const newH = Math.max(minHeight, Math.min(window.innerHeight - position.y - 16, resizeStartRef.current.startH + deltaY));
-
-      setSize({ width: newW, height: newH });
+      const newW = Math.max(minWidth, Math.min(window.innerWidth - positionRef.current.x - 16, resizeStartRef.current.startW + deltaX));
+      const newH = Math.max(minHeight, Math.min(window.innerHeight - positionRef.current.y - 16, resizeStartRef.current.startH + deltaY));
+      const nextSize = { width: newW, height: newH };
+      sizeRef.current = nextSize;
+      setSize(nextSize);
     };
 
     const handleMouseUp = () => {
-      isResizingRef.current = false;
+      if (isResizingRef.current) {
+        isResizingRef.current = false;
+        persistGeometry(positionRef.current, sizeRef.current);
+      }
+      window.removeEventListener('pointermove', handleMouseMove);
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('pointerup', handleMouseUp);
       window.removeEventListener('mouseup', handleMouseUp);
     };
 
+    window.addEventListener('pointermove', handleMouseMove);
     window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('pointerup', handleMouseUp);
     window.addEventListener('mouseup', handleMouseUp);
   };
 
@@ -264,51 +375,24 @@ export function FloatingWindow({
           style={mobileSheetDrag.sheetStyle}
           className={`w-full max-h-[92dvh] flex flex-col bg-white rounded-t-3xl shadow-2xl border-t border-slate-200/90 overflow-hidden select-text animate-in slide-in-from-bottom duration-200 ${className}`}
         >
-          {/* Mobile Sheet Header with Drag-Down-to-Close Handle */}
-          <div
-            {...mobileSheetDrag.dragHandlers}
-            className="bg-slate-900 text-white px-4 pt-2 pb-3 shrink-0 select-none touch-none"
-          >
+          <div {...mobileSheetDrag.dragHandlers} className="bg-slate-900 text-white px-4 pt-2 pb-3 shrink-0 select-none touch-none">
             <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5" aria-hidden="true" />
             <div className="flex items-start justify-between gap-2.5">
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 {icon && <span className="text-blue-400 shrink-0">{icon}</span>}
                 <div className="min-w-0 flex-1">
-                  <div className="font-extrabold text-sm text-white truncate flex items-center gap-2">
-                    <span className="truncate">{title}</span>
-                  </div>
+                  <div className="font-extrabold text-sm text-white truncate flex items-center gap-2"><span className="truncate">{title}</span></div>
                   {subtitle && <div className="text-[11px] text-slate-400 truncate mt-0.5">{subtitle}</div>}
                 </div>
               </div>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-9 h-9 rounded-full bg-slate-800/90 text-slate-300 hover:text-white active:scale-95 flex items-center justify-center transition-all cursor-pointer shrink-0"
-                title="Close"
-                aria-label="Close modal"
-              >
+              <button type="button" onClick={onClose} className="w-9 h-9 rounded-full bg-slate-800/90 text-slate-300 hover:text-white active:scale-95 flex items-center justify-center transition-all cursor-pointer shrink-0" title="Close" aria-label="Close modal">
                 <XIcon className="w-4 h-4" />
               </button>
             </div>
-            {headerExtra && (
-              <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center flex-wrap gap-1.5">
-                {headerExtra}
-              </div>
-            )}
+            {headerExtra && <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center flex-wrap gap-1.5">{headerExtra}</div>}
           </div>
-
-          {/* Mobile Scrollable Body */}
-          <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-slate-50/50 flex flex-col">
-            {children}
-          </div>
-
-          {/* Mobile Sticky Footer with Safe-Area Bottom Padding */}
-          {footer && (
-            <div className="shrink-0 bg-white border-t border-slate-200 pb-[env(safe-area-inset-bottom)]">
-              {footer}
-            </div>
-          )}
+          <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-slate-50/50 flex flex-col">{children}</div>
+          {footer && <div className="shrink-0 bg-white border-t border-slate-200 pb-[env(safe-area-inset-bottom)]">{footer}</div>}
         </div>
       </div>
     );
@@ -317,65 +401,27 @@ export function FloatingWindow({
   // MINIMIZED FLOATING PILL AT BOTTOM OF SCREEN (Desktop)
   if (isMinimized) {
     return (
-      <div
-        className="fixed bottom-4 right-4 z-50 pointer-events-auto animate-in slide-in-from-bottom-2 duration-150"
-        style={{ zIndex: activeZ }}
-      >
-        <div
-          onClick={() => setIsMinimized(false)}
-          className="flex items-center gap-2.5 px-3.5 py-2 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700 cursor-pointer hover:bg-slate-800 transition-all select-none"
-        >
+      <div className="fixed bottom-4 right-4 z-50 pointer-events-auto animate-in slide-in-from-bottom-2 duration-150" style={{ zIndex: activeZ }}>
+        <div onClick={() => setIsMinimized(false)} className="flex items-center gap-2.5 px-3.5 py-2 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700 cursor-pointer hover:bg-slate-800 transition-all select-none">
           {icon && <span className="text-blue-400">{icon}</span>}
           <span className="font-extrabold text-xs max-w-[200px] truncate">{title}</span>
           <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-slate-700">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsMinimized(false);
-              }}
-              title="Expand Window"
-              className="text-slate-400 hover:text-white p-0.5 rounded cursor-pointer"
-            >
-              ⤢
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              title="Close"
-              className="text-slate-400 hover:text-rose-400 p-0.5 rounded cursor-pointer"
-            >
-              <XIcon className="w-3.5 h-3.5" />
-            </button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); setIsMinimized(false); }} title="Expand Window" className="text-slate-400 hover:text-white p-0.5 rounded cursor-pointer">⤢</button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onClose(); }} title="Close" className="text-slate-400 hover:text-rose-400 p-0.5 rounded cursor-pointer"><XIcon className="w-3.5 h-3.5" /></button>
           </div>
         </div>
       </div>
     );
   }
 
-  const clampedWidth =
-    typeof window !== 'undefined' ? Math.min(size.width, window.innerWidth - 32) : size.width;
-  const clampedHeight =
-    typeof window !== 'undefined' ? Math.min(size.height, window.innerHeight - 32) : size.height;
-  const clampedX =
-    typeof window !== 'undefined'
-      ? Math.max(12, Math.min(position.x, window.innerWidth - clampedWidth - 12))
-      : position.x;
-  const clampedY =
-    typeof window !== 'undefined'
-      ? Math.max(12, Math.min(position.y, window.innerHeight - 80))
-      : position.y;
+  const clampedWidth = typeof window !== 'undefined' ? Math.min(size.width, window.innerWidth - 32) : size.width;
+  const clampedHeight = typeof window !== 'undefined' ? Math.min(size.height, window.innerHeight - 32) : size.height;
+  const clampedX = typeof window !== 'undefined' ? Math.max(12, Math.min(position.x, window.innerWidth - clampedWidth - 12)) : position.x;
+  const clampedY = typeof window !== 'undefined' ? Math.max(12, Math.min(position.y, window.innerHeight - 80)) : position.y;
 
   return (
     <div
-      className={`fixed inset-0 select-none ${
-        hasBackdrop
-          ? 'z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 pointer-events-auto'
-          : 'pointer-events-none'
-      }`}
+      className={`fixed inset-0 select-none ${hasBackdrop ? 'z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 pointer-events-auto' : 'pointer-events-none'}`}
       style={{ zIndex: activeZ }}
     >
       <div
@@ -383,93 +429,42 @@ export function FloatingWindow({
         onMouseDown={() => setActiveZ((z) => Math.max(z, 50))}
         style={
           hasBackdrop
-            ? {
-                width: clampedWidth,
-                maxHeight: autoHeight && !isMaximized ? '85vh' : undefined,
-              }
-            : {
-                position: 'fixed',
-                left: `${clampedX}px`,
-                top: `${clampedY}px`,
-                width: `${clampedWidth}px`,
-                height: autoHeight && !isMaximized ? 'auto' : `${clampedHeight}px`,
-                maxHeight: autoHeight && !isMaximized ? '85vh' : undefined,
-              }
+            ? { width: clampedWidth, maxHeight: autoHeight && !isMaximized ? '85vh' : undefined }
+            : { position: 'fixed', left: `${clampedX}px`, top: `${clampedY}px`, width: `${clampedWidth}px`, height: autoHeight && !isMaximized ? 'auto' : `${clampedHeight}px`, maxHeight: autoHeight && !isMaximized ? '85vh' : undefined }
         }
         className={`pointer-events-auto flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden transform transition-[box-shadow] select-text duration-100 ${className}`}
       >
-        {/* TITLE BAR (Draggable handle) */}
         <div
           onMouseDown={handleMouseDownHeader}
-          className={`px-4 py-2.5 bg-slate-900 text-white flex items-center justify-between gap-3 shrink-0 select-none ${
-            isDraggable && !isMaximized ? 'cursor-grab active:cursor-grabbing' : ''
-          }`}
+          className={`px-4 py-2.5 bg-slate-900 text-white flex items-center justify-between gap-3 shrink-0 select-none ${isDraggable && !isMaximized ? 'cursor-grab active:cursor-grabbing' : ''}`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
             {icon && <span className="text-blue-400 shrink-0">{icon}</span>}
             <div className="min-w-0">
-              <div className="font-extrabold text-xs text-white truncate flex items-center gap-2">
-                <span>{title}</span>
-              </div>
+              <div className="font-extrabold text-xs text-white truncate flex items-center gap-2"><span>{title}</span></div>
               {subtitle && <div className="text-[10px] text-slate-400 truncate">{subtitle}</div>}
             </div>
           </div>
-
-          {/* Window action controls */}
           <div className="flex items-center gap-1 shrink-0">
             {headerExtra}
-
             {isMinimizable && (
-              <button
-                type="button"
-                onClick={() => setIsMinimized(true)}
-                className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer text-xs font-mono"
-                title="Minimize"
-              >
-                —
-              </button>
+              <button type="button" onClick={() => setIsMinimized(true)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer text-xs font-mono" title="Minimize">—</button>
             )}
-
             {isMaximizable && (
-              <button
-                type="button"
-                onClick={toggleMaximize}
-                className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer text-xs"
-                title={isMaximized ? 'Restore' : 'Maximize'}
-              >
-                {isMaximized ? '❐' : '□'}
-              </button>
+              <button type="button" onClick={toggleMaximize} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer text-xs" title={isMaximized ? 'Restore' : 'Maximize'}>{isMaximized ? '❐' : '□'}</button>
             )}
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Close"
-            >
+            <button type="button" onClick={onClose} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer" title="Close">
               <XIcon className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {/* WINDOW BODY */}
-        <div className="flex-1 overflow-y-auto min-h-0 bg-slate-50/50 flex flex-col">
-          {children}
-        </div>
-
-        {/* OPTIONAL WINDOW FOOTER */}
+        <div className="flex-1 overflow-y-auto min-h-0 bg-slate-50/50 flex flex-col">{children}</div>
         {footer && <div className="shrink-0 bg-white border-t border-slate-200">{footer}</div>}
 
-        {/* CORNER RESIZE GRIP */}
         {isResizable && !isMaximized && (
-          <div
-            onMouseDown={handleMouseDownResize}
-            className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize flex items-end justify-end p-0.5 select-none text-slate-300 hover:text-slate-600 transition-colors"
-            title="Drag to resize"
-          >
-            <svg viewBox="0 0 10 10" className="w-2.5 h-2.5 fill-current">
-              <polygon points="10,0 10,10 0,10" />
-            </svg>
+          <div onMouseDown={handleMouseDownResize} className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize flex items-end justify-end p-0.5 select-none text-slate-300 hover:text-slate-600 transition-colors" title="Drag to resize">
+            <svg viewBox="0 0 10 10" className="w-2.5 h-2.5 fill-current"><polygon points="10,0 10,10 0,10" /></svg>
           </div>
         )}
       </div>

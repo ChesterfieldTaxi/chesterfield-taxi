@@ -31,6 +31,7 @@ import {
   CopyIcon,
   ShieldCheckIcon,
 } from '../../../ui/Icons';
+import { Select } from '../../../ui/Select';
 
 export interface DispatchTripQueueSheetsProps {
   trips: Trip[];
@@ -178,10 +179,12 @@ export function DispatchTripQueueSheets({
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
                   Driver Operator
                 </label>
-                <select
+                <Select
+                  size="md"
+                  searchable
+                  searchPlaceholder="Search driver, cab #, status..."
                   value={batchAssignDriverId}
                   onChange={(e) => onBatchAssignDriverIdChange(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select a driver...</option>
                   <option value="unassigned">
@@ -199,7 +202,7 @@ export function DispatchTripQueueSheets({
                       {getMapStatusLabel(drv.mapStatus, drv.activeTripStatus)}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 

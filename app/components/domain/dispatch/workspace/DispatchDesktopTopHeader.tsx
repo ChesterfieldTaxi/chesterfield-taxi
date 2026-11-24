@@ -33,6 +33,7 @@ import {
   BoltIcon,
   LockIcon,
 } from '../../../ui/Icons';
+import { Select } from '../../../ui/Select';
 
 const AppSuiteLauncher = React.lazy(() =>
   import('../AppSuiteLauncher').then((m) => ({
@@ -539,10 +540,14 @@ export function DispatchDesktopTopHeader({
                   <div className="flex items-center gap-1">
                     <ClockIcon className="w-3 h-3 text-slate-400 shrink-0" />
                     <span>Auto-dismiss:</span>
-                    <select
+                    <Select
+                      size="xs"
+                      variant="subtle"
+                      fullWidth={false}
+                      searchable={false}
                       value={alertDismissMinutes}
                       onChange={(e) => onUpdateAlertDismissMinutes(parseInt(e.target.value, 10))}
-                      className="font-bold text-slate-800 bg-transparent border-none cursor-pointer focus:outline-hidden"
+                      triggerClassName="h-5 px-1.5 text-[10px] font-bold"
                       title="Admin-configured alert auto-dismiss window"
                     >
                       <option value={15}>15m</option>
@@ -553,7 +558,7 @@ export function DispatchDesktopTopHeader({
                       <option value={720}>12h</option>
                       <option value={1440}>24h</option>
                       <option value={0}>Never</option>
-                    </select>
+                    </Select>
                   </div>
                   <div className="flex items-center gap-2">
                     {unreadAlertsCount > 0 && (

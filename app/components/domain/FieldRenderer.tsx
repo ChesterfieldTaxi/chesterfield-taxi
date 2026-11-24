@@ -122,6 +122,8 @@ export function FieldRenderer({
               field.options?.map((opt) => ({
                 value: opt.value as string | number,
                 label: opt.label,
+                subtitle: opt.description,
+                badge: opt.badge,
                 disabled: opt.disabled,
               })) ?? []
             }

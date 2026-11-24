@@ -187,13 +187,8 @@ export default function DispatchRoute() {
   }, []);
 
   // Operational Right Dock, Audio, Wake Lock & Push Notifications
-  const [activeDockTab, setActiveDockTab] = useState<DesktopDockTab>('none');
-  const [commsInitialTab, setCommsInitialTab] = useState<
-    'all' | 'phone' | 'messages' | 'voicemail'
-  >('all');
-  const [commsActiveTab, setCommsActiveTab] = useState<
-    'all' | 'phone' | 'messages' | 'voicemail'
-  >('all');
+  const [commsInitialTab, setCommsInitialTab] = useState<'all' | 'phone' | 'messages' | 'voicemail'>('all');
+  const [commsActiveTab, setCommsActiveTab] = useState<'all' | 'phone' | 'messages' | 'voicemail'>('all');
   const [showAlertsDropdown, setShowAlertsDropdown] = useState(false);
   const alertsDropdownRef = useRef<HTMLDivElement>(null);
   const operationsContainerRef = useRef<HTMLDivElement>(null);
@@ -260,6 +255,8 @@ export default function DispatchRoute() {
     setQueueHeight,
     operationsWidth,
     setOperationsWidth,
+    activeDockTab,
+    setActiveDockTab,
     activeResizeHandle,
     isDesktop,
     handleSidebarMouseDown,

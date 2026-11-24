@@ -14,6 +14,7 @@ import { DispatchLocationInput } from '../DispatchLocationInput';
 import { FlightTelemetryCheckPanel } from '../../booking/FlightAssistanceCard';
 import { ModernDatePicker, ModernTimePicker } from '../../../ui/ModernDateTimePicker';
 import { LockIcon, PlaneIcon, PlaneLandingIcon, PlusIcon } from '../../../ui/Icons';
+import { Select } from '../../../ui/Select';
 
 export interface DispatchRoutingTimingSectionProps {
   isEditMode: boolean;
@@ -391,7 +392,10 @@ export function DispatchRoutingTimingSection({
                           <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
                             Airline
                           </span>
-                          <select
+                          <Select
+                            size="xs"
+                            searchable
+                            searchPlaceholder="Search airline or IATA code..."
                             value={airline}
                             onChange={(e) => {
                               const v = e.target.value;
@@ -404,7 +408,7 @@ export function DispatchRoutingTimingSection({
                                 setOutboundFlightTelemetry(null);
                               }
                             }}
-                            className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs text-slate-800"
+                            triggerClassName="border-blue-200"
                           >
                             <option value="">Select Airline</option>
                             {MAJOR_AIRLINES.map((al) => (
@@ -412,7 +416,7 @@ export function DispatchRoutingTimingSection({
                                 {al.name} ({al.code})
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         </div>
                         <div>
                           <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">

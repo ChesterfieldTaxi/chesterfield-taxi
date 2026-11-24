@@ -74,11 +74,7 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
   variant = 'desktop',
 }: MapLayersAndVehiclesToolbarProps) {
   const [openMenu, setOpenMenu] = useState<OpenPopoverKind>(null);
-  const [coords, setCoords] = useState<{ top: number; left: number; width: number }>({
-    top: 48,
-    left: 16,
-    width: 268,
-  });
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const vehiclesBtnRef = useRef<HTMLButtonElement>(null);
   const layersBtnRef = useRef<HTMLButtonElement>(null);
@@ -97,10 +93,10 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
 
   const selectedVehicleCount = preferences.selectedVehicleTypes.length;
 
-  const updatePopoverPosition = useCallback((kind: OpenPopoverKind) => {
-    if (!kind || typeof window === 'undefined') return;
+  const computePopoverCoords = useCallback((kind: OpenPopoverKind) => {
+    if (!kind || typeof window === 'undefined') return null;
     const btn = kind === 'vehicles' ? vehiclesBtnRef.current : layersBtnRef.current;
-    if (!btn) return;
+    if (!btn) return null;
     const rect = btn.getBoundingClientRect();
     const popoverWidth = Math.min(kind === 'layers' ? 276 : 260, window.innerWidth - 16);
     const estimatedHeight = popoverRef.current?.offsetHeight || (kind === 'layers' ? 330 : 280);
@@ -113,8 +109,16 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
         ? Math.max(8, rect.top - estimatedHeight - 6)
         : rect.bottom + 6;
 
-    setCoords({ top, left, width: popoverWidth });
+    return { top, left, width: popoverWidth };
   }, []);
+
+  const updatePopoverPosition = useCallback(
+    (kind: OpenPopoverKind) => {
+      const next = computePopoverCoords(kind);
+      if (next) setCoords(next);
+    },
+    [computePopoverCoords]
+  );
 
   useEffect(() => {
     if (!openMenu || typeof window === 'undefined') return;
@@ -160,7 +164,14 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
   }, [openMenu, updatePopoverPosition]);
 
   const toggleMenu = (kind: Exclude<OpenPopoverKind, null>) => {
-    setOpenMenu((prev) => (prev === kind ? null : kind));
+    if (openMenu === kind) {
+      setOpenMenu(null);
+      setCoords(null);
+      return;
+    }
+    const initialCoords = computePopoverCoords(kind);
+    if (initialCoords) setCoords(initialCoords);
+    setOpenMenu(kind);
   };
 
   const buttonBaseClass =
@@ -219,6 +230,7 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
       </button>
 
       {openMenu &&
+        coords !== null &&
         typeof document !== 'undefined' &&
         createPortal(
           <div

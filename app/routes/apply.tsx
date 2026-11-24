@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Alert } from '../components/ui/Alert';
+import { Select } from '../components/ui/Select';
 import { CarIcon, UserIcon, MailIcon, PhoneIcon } from '../components/ui/Icons';
 import { collection, addDoc, getFirestore } from 'firebase/firestore';
 import { getFirebaseApp } from '../core/services/firebase';
@@ -113,19 +114,18 @@ export default function Apply() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="block text-sm font-semibold text-slate-700">Position Applying For *</label>
-                  <select
+                  <Select
                     name="role"
                     required
                     value={formData.role}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="driver">Driver (Company Car)</option>
                     <option value="owner_operator">Driver (Own Vehicle)</option>
                     <option value="dispatcher">Dispatcher</option>
                     <option value="accountant">Billing &amp; Office Staff</option>
                     <option value="field_supervisor">Supervisor</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div className="space-y-1.5">
@@ -181,17 +181,16 @@ export default function Apply() {
 
                 <div className="space-y-1.5">
                   <label className="block text-sm font-semibold text-slate-700">Years of Experience</label>
-                  <select
+                  <Select
                     name="experienceYears"
                     value={formData.experienceYears}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="0-1">Less than 1 year</option>
                     <option value="1-3">1 to 3 years</option>
                     <option value="3-5">3 to 5 years</option>
                     <option value="5+">5+ years</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div className="space-y-1.5 md:col-span-2">

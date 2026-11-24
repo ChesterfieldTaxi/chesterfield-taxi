@@ -1,5 +1,6 @@
 import type React from 'react';
 import { SearchIcon } from '../../../ui/Icons';
+import { Select } from '../../../ui/Select';
 import type { ContactFilter } from './comms-types';
 
 export interface CommsFilterToolbarProps {
@@ -64,28 +65,32 @@ export function CommsFilterToolbar({
         </button>
 
         {showChannelFilter && channelOptions.length > 0 && (
-          <select
+          <Select
+            size="xs"
+            fullWidth={false}
             value={channelFilter}
             onChange={(e) => onChangeChannelFilter && onChangeChannelFilter(e.target.value)}
-            className="px-2 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer flex-1 sm:flex-none min-w-[110px]"
+            triggerClassName="min-w-[110px]"
           >
             {channelOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
-          </select>
+          </Select>
         )}
 
-        <select
+        <Select
+          size="xs"
+          fullWidth={false}
           value={contactFilter}
           onChange={(e) => onChangeContactFilter(e.target.value as ContactFilter)}
-          className="px-2 py-1 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-700 cursor-pointer flex-1 sm:flex-none min-w-[110px]"
+          triggerClassName="min-w-[110px]"
         >
           <option value="all">All contacts</option>
           <option value="passengers">Passengers &amp; VIPs</option>
           <option value="drivers">Active Drivers</option>
-        </select>
+        </Select>
       </div>
 
       {/* Search input */}

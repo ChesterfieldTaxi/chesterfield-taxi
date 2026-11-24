@@ -10,6 +10,7 @@ import {
   type BookingAdditionalPassenger as AdditionalPassenger,
 } from '../../../../core/hooks/booking';
 import { MailIcon, MapPinIcon, PhoneIcon, PlusIcon, UserIcon } from '../../../ui/Icons';
+import { Select } from '../../../ui/Select';
 
 export interface DispatchPassengerCrmSectionProps {
   passengerName: string;
@@ -431,10 +432,11 @@ export function DispatchPassengerCrmSection({
                   className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs focus:ring-1 focus:ring-blue-500"
                 />
               </div>
-              <select
+              <Select
+                size="xs"
                 value={contactRole}
                 onChange={(e) => setContactRole(e.target.value)}
-                className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs text-slate-700"
+                triggerClassName="border-blue-200 text-slate-700"
               >
                 <option value="Hotel Front Desk / Concierge">Hotel Front Desk / Concierge</option>
                 <option value="Medical Facility / Patient Coordinator">Medical Coordinator</option>
@@ -443,7 +445,7 @@ export function DispatchPassengerCrmSection({
                 </option>
                 <option value="Family Member / Caregiver">Family Member / Caregiver</option>
                 <option value="Other">Other</option>
-              </select>
+              </Select>
             </div>
           )}
         </div>

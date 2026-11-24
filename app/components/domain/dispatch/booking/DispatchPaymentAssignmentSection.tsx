@@ -17,6 +17,7 @@ import {
   LockIcon,
   ShieldCheckIcon,
 } from '../../../ui/Icons';
+import { Select } from '../../../ui/Select';
 
 export interface DispatchPaymentAssignmentSectionProps {
   paymentMethod: 'cash' | 'card' | 'account';
@@ -260,13 +261,14 @@ export function DispatchPaymentAssignmentSection({
                       </span>
                     )}
                   </div>
-                  <select
+                  <Select
+                    size="sm"
                     value={corporateAccount}
                     onChange={(e) => {
                       const val = e.target.value;
                       setCorporateAccount(val);
                     }}
-                    className="w-full px-2 py-1.5 bg-white border border-amber-300 rounded text-xs text-slate-800 font-medium"
+                    triggerClassName="border-amber-300"
                   >
                     {corporateAccountList.length > 0
                       ? corporateAccountList.map((acc) => (
@@ -280,7 +282,7 @@ export function DispatchPaymentAssignmentSection({
                             {acc}
                           </option>
                         ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-1.5">
@@ -380,15 +382,16 @@ export function DispatchPaymentAssignmentSection({
                   <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
                     Invoicing Terms
                   </span>
-                  <select
+                  <Select
+                    size="sm"
                     value={invoicingTerms}
                     onChange={(e) => setInvoicingTerms(e.target.value)}
-                    className="w-full px-2 py-1 bg-white border border-amber-300 rounded text-xs text-slate-800"
+                    triggerClassName="border-amber-300"
                   >
                     <option value="Net 30 Direct Bill">Net 30 Direct Bill</option>
                     <option value="Semi-Monthly Invoice">Semi-Monthly Invoice</option>
                     <option value="Monthly Statement">Monthly Statement</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
             );
@@ -406,14 +409,14 @@ export function DispatchPaymentAssignmentSection({
                 </span>
               )}
             </div>
-            <select
+            <Select
+              size="sm"
               value={selectedRuleId}
               onChange={(e) => {
                 setSelectedRuleId(e.target.value);
                 const matched = availableNamedRules.find((r) => r.id === e.target.value);
                 setTariff(matched ? matched.name : 'Standard');
               }}
-              className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500 font-medium"
             >
               <option value="">Auto (Dynamic Rules Matrix)</option>
               {availableNamedRules.map((r) => (
@@ -429,28 +432,30 @@ export function DispatchPaymentAssignmentSection({
                   )
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <span className="block text-[10px] text-slate-500 font-semibold mb-0.5">
               Discount (% / $)
             </span>
             <div className="flex items-center gap-1">
-              <select
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
-                className="flex-1 px-1.5 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="None">
-                  {matchedCorporateAccount?.discountPercent
-                    ? `Corp (${matchedCorporateAccount.discountPercent}%)`
-                    : 'None'}
-                </option>
-                <option value="5%">5% Off</option>
-                <option value="10%">10% Off</option>
-                <option value="15%">15% Off</option>
-                <option value="20%">20% Off</option>
-              </select>
+              <div className="flex-1 min-w-0">
+                <Select
+                  size="sm"
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                >
+                  <option value="None">
+                    {matchedCorporateAccount?.discountPercent
+                      ? `Corp (${matchedCorporateAccount.discountPercent}%)`
+                      : 'None'}
+                  </option>
+                  <option value="5%">5% Off</option>
+                  <option value="10%">10% Off</option>
+                  <option value="15%">15% Off</option>
+                  <option value="20%">20% Off</option>
+                </Select>
+              </div>
               <div className="relative w-16 shrink-0">
                 <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
                   -$
@@ -516,17 +521,17 @@ export function DispatchPaymentAssignmentSection({
         <div className="grid grid-cols-2 gap-2">
           <div>
             <span className="block text-[10px] text-slate-500 font-semibold mb-0.5">Company</span>
-            <select
+            <Select
+              size="sm"
               value={company}
               onChange={(e) => setCompany(e.target.value)}
-              className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500"
             >
               {DEFAULT_COMPANIES.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
             <span className="block text-[10px] text-slate-500 font-semibold mb-0.5">Driver</span>

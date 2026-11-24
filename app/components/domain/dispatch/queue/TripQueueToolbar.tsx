@@ -12,6 +12,7 @@ import { formatDriverAssignmentLabel } from '../../../../core/services/operator.
 import { CustomDateTimePicker, type DateTimeRange } from '../CustomDateTimePicker';
 import { canTripTriggerAutoOffer } from '../DispatchCascadeSlaBadges';
 import { Badge } from '../../../ui/Badge';
+import { Select } from '../../../ui/Select';
 import {
   MagnifyingGlassIcon,
   CalendarIcon,
@@ -373,18 +374,21 @@ export function TripQueueToolbar({
                 {activeFilterKeys.includes('driver') && (
                   <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
                     <span className="font-semibold text-slate-500 text-[11px]">Driver:</span>
-                    <select
+                    <Select
+                      size="xs"
+                      variant="subtle"
+                      fullWidth={false}
                       value={selectedDriverFilter}
                       onChange={(e) => onSelectedDriverFilterChange(e.target.value)}
-                      className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                      triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
                     >
-                      <option value="all">All Drivers ▾</option>
+                      <option value="all">All Drivers</option>
                       {drivers.map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.formattedLabel || formatDriverAssignmentLabel(d)}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                     <button
                       type="button"
                       onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'driver'))}
@@ -446,18 +450,21 @@ export function TripQueueToolbar({
                 {activeFilterKeys.includes('vehicle') && (
                   <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
                     <span className="font-semibold text-slate-500 text-[11px]">Vehicle:</span>
-                    <select
+                    <Select
+                      size="xs"
+                      variant="subtle"
+                      fullWidth={false}
                       value={selectedVehicleFilter}
                       onChange={(e) => onSelectedVehicleFilterChange(e.target.value)}
-                      className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                      triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
                     >
-                      <option value="all">All Vehicles ▾</option>
+                      <option value="all">All Vehicles</option>
                       {settings.vehicles.map((v) => (
                         <option key={v.id} value={v.id}>
                           {v.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                     <button
                       type="button"
                       onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'vehicle'))}
@@ -472,15 +479,18 @@ export function TripQueueToolbar({
                 {activeFilterKeys.includes('company') && (
                   <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
                     <span className="font-semibold text-slate-500 text-[11px]">Company:</span>
-                    <select
+                    <Select
+                      size="xs"
+                      variant="subtle"
+                      fullWidth={false}
                       value={selectedCompanyFilter}
                       onChange={(e) => onSelectedCompanyFilterChange(e.target.value)}
-                      className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                      triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
                     >
-                      <option value="all">All Companies ▾</option>
+                      <option value="all">All Companies</option>
                       <option value="Chesterfield">Chesterfield Corporate</option>
                       <option value="Medical">Medical Express</option>
-                    </select>
+                    </Select>
                     <button
                       type="button"
                       onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'company'))}
@@ -495,16 +505,19 @@ export function TripQueueToolbar({
                 {activeFilterKeys.includes('payment_type') && (
                   <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
                     <span className="font-semibold text-slate-500 text-[11px]">Payment:</span>
-                    <select
+                    <Select
+                      size="xs"
+                      variant="subtle"
+                      fullWidth={false}
                       value={selectedPaymentFilter}
                       onChange={(e) => onSelectedPaymentFilterChange(e.target.value)}
-                      className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                      triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
                     >
-                      <option value="all">All Methods ▾</option>
+                      <option value="all">All Methods</option>
                       <option value="card">Credit Card</option>
                       <option value="cash">Cash (In Car)</option>
                       <option value="account">Corporate Account</option>
-                    </select>
+                    </Select>
                     <button
                       type="button"
                       onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'payment_type'))}
@@ -519,15 +532,18 @@ export function TripQueueToolbar({
                 {activeFilterKeys.includes('tariff') && (
                   <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
                     <span className="font-semibold text-slate-500 text-[11px]">Tariff:</span>
-                    <select
+                    <Select
+                      size="xs"
+                      variant="subtle"
+                      fullWidth={false}
                       value={selectedTariffFilter}
                       onChange={(e) => onSelectedTariffFilterChange(e.target.value)}
-                      className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                      triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
                     >
-                      <option value="all">Standard Tariff ▾</option>
+                      <option value="all">Standard Tariff</option>
                       <option value="surge">Surge Rate</option>
                       <option value="airport">Flat Airport Rate</option>
-                    </select>
+                    </Select>
                     <button
                       type="button"
                       onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'tariff'))}
@@ -823,10 +839,13 @@ export function TripQueueToolbar({
           {activeFilterKeys.includes('driver') && (
             <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
               <span className="font-semibold text-slate-500 text-[11px]">Driver:</span>
-              <select
+              <Select
+                size="xs"
+                variant="subtle"
+                fullWidth={false}
                 value={selectedDriverFilter}
                 onChange={(e) => onSelectedDriverFilterChange(e.target.value)}
-                className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
               >
                 <option value="all">All</option>
                 {drivers.map((d) => (
@@ -834,7 +853,7 @@ export function TripQueueToolbar({
                     {d.formattedLabel || formatDriverAssignmentLabel(d)}
                   </option>
                 ))}
-              </select>
+              </Select>
               <button
                 type="button"
                 onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'driver'))}
@@ -890,10 +909,13 @@ export function TripQueueToolbar({
           {activeFilterKeys.includes('vehicle') && (
             <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
               <span className="font-semibold text-slate-500 text-[11px]">Veh:</span>
-              <select
+              <Select
+                size="xs"
+                variant="subtle"
+                fullWidth={false}
                 value={selectedVehicleFilter}
                 onChange={(e) => onSelectedVehicleFilterChange(e.target.value)}
-                className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
               >
                 <option value="all">All</option>
                 {settings.vehicles.map((v) => (
@@ -901,7 +923,7 @@ export function TripQueueToolbar({
                     {v.name}
                   </option>
                 ))}
-              </select>
+              </Select>
               <button
                 type="button"
                 onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'vehicle'))}
@@ -915,15 +937,18 @@ export function TripQueueToolbar({
           {activeFilterKeys.includes('company') && (
             <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
               <span className="font-semibold text-slate-500 text-[11px]">Co:</span>
-              <select
+              <Select
+                size="xs"
+                variant="subtle"
+                fullWidth={false}
                 value={selectedCompanyFilter}
                 onChange={(e) => onSelectedCompanyFilterChange(e.target.value)}
-                className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
               >
                 <option value="all">All</option>
                 <option value="Chesterfield">Chesterfield</option>
                 <option value="Medical">Medical</option>
-              </select>
+              </Select>
               <button
                 type="button"
                 onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'company'))}
@@ -937,16 +962,19 @@ export function TripQueueToolbar({
           {activeFilterKeys.includes('payment_type') && (
             <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
               <span className="font-semibold text-slate-500 text-[11px]">Pay:</span>
-              <select
+              <Select
+                size="xs"
+                variant="subtle"
+                fullWidth={false}
                 value={selectedPaymentFilter}
                 onChange={(e) => onSelectedPaymentFilterChange(e.target.value)}
-                className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
               >
                 <option value="all">All</option>
                 <option value="card">Card</option>
                 <option value="cash">Cash</option>
                 <option value="account">Account</option>
-              </select>
+              </Select>
               <button
                 type="button"
                 onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'payment_type'))}
@@ -960,15 +988,18 @@ export function TripQueueToolbar({
           {activeFilterKeys.includes('tariff') && (
             <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
               <span className="font-semibold text-slate-500 text-[11px]">Tariff:</span>
-              <select
+              <Select
+                size="xs"
+                variant="subtle"
+                fullWidth={false}
                 value={selectedTariffFilter}
                 onChange={(e) => onSelectedTariffFilterChange(e.target.value)}
-                className="text-[11px] font-bold text-slate-800 bg-transparent focus:outline-hidden cursor-pointer"
+                triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
               >
                 <option value="all">All</option>
                 <option value="surge">Surge</option>
                 <option value="airport">Airport</option>
-              </select>
+              </Select>
               <button
                 type="button"
                 onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'tariff'))}

@@ -42,6 +42,7 @@ import {
   PencilIcon,
   TrashIcon,
 } from '../components/ui/Icons';
+import { Select } from '../components/ui/Select';
 import { BookingEngineV2, type BookingEngineV2InitialValues } from '../components/domain/BookingEngineV2';
 import { PriceBreakdownPanel } from '../components/domain/booking/PriceBreakdownPanel';
 import { DispatchLocationInput } from '../components/domain/dispatch/DispatchLocationInput';
@@ -1346,10 +1347,10 @@ export default function PassengerAppRoute() {
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Preferred Vehicle
                 </label>
-                <select
+                <Select
+                  size="sm"
                   value={profileVehicleTier}
                   onChange={(e) => setProfileVehicleTier(e.target.value as VehicleTier)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {adminVehicles.length > 0 ? (
                     <>
@@ -1368,7 +1369,7 @@ export default function PassengerAppRoute() {
                       <option value="xl">XL Minivan / SUV</option>
                     </>
                   )}
-                </select>
+                </Select>
               </div>
 
               {/* Permanent Driver Notes */}
@@ -1603,10 +1604,10 @@ export default function PassengerAppRoute() {
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Category
                 </label>
-                <select
+                <Select
+                  size="sm"
                   value={placeCategory}
                   onChange={(e) => setPlaceCategory(e.target.value as SavedPlaceCategory)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="home">Home</option>
                   <option value="work">Work / Office</option>
@@ -1614,7 +1615,7 @@ export default function PassengerAppRoute() {
                   <option value="medical">Hospital / Medical</option>
                   <option value="favorite">Favorite / Social</option>
                   <option value="other">Other Address</option>
-                </select>
+                </Select>
               </div>
 
               <div>

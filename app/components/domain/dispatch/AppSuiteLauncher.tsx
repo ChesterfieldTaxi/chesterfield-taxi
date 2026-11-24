@@ -8,6 +8,7 @@ import {
   SearchIcon,
   TrashIcon,
 } from '../../ui/Icons';
+import { Select } from '../../ui/Select';
 import {
   dispatchAppSuiteService,
   type DispatchNote,
@@ -104,7 +105,9 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
   // Close when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (launcherRef.current && !launcherRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (target instanceof Element && target.closest('[data-ui-select-portal="true"]')) return;
+      if (launcherRef.current && !launcherRef.current.contains(target)) {
         setIsOpen(false);
       }
     }
@@ -540,16 +543,18 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                     className="w-full text-xs px-2 py-1.5 rounded-lg border border-amber-300 bg-white"
                   />
                   <div className="flex items-center justify-between gap-2">
-                    <select
+                    <Select
+                      size="xs"
+                      fullWidth={false}
                       value={newDocCategory}
                       onChange={(e) => setNewDocCategory(e.target.value as any)}
-                      className="text-xs bg-white border border-amber-300 rounded-lg px-2 py-1"
+                      triggerClassName="border-amber-300"
                     >
                       <option value="sop">SOP Manual</option>
                       <option value="permit">Permit</option>
                       <option value="tariff">Tariff Card</option>
                       <option value="policy">Company Policy</option>
-                    </select>
+                    </Select>
                     <button
                       type="submit"
                       className="px-3 py-1 bg-amber-700 hover:bg-amber-600 text-white font-bold rounded-lg"
@@ -624,16 +629,18 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                       className="flex-1 text-xs px-2 py-1.5 rounded-lg border border-blue-300 bg-white"
                       required
                     />
-                    <select
+                    <Select
+                      size="xs"
+                      fullWidth={false}
                       value={newCalCategory}
                       onChange={(e) => setNewCalCategory(e.target.value as any)}
-                      className="text-xs bg-white border border-blue-300 rounded-lg px-2 py-1.5"
+                      triggerClassName="border-blue-300"
                     >
                       <option value="airport">Airport</option>
                       <option value="flight">Flight</option>
                       <option value="medical">Medical</option>
                       <option value="driver">Driver Shift</option>
-                    </select>
+                    </Select>
                   </div>
                   <button
                     type="submit"
@@ -816,15 +823,17 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                   className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white"
                   required
                 />
-                <select
+                <Select
+                  size="xs"
+                  fullWidth={false}
                   value={newTaskPriority}
                   onChange={(e) => setNewTaskPriority(e.target.value as any)}
-                  className="text-xs px-1.5 py-1 rounded-lg border border-slate-300 bg-slate-50 font-bold"
+                  triggerClassName="border-slate-300 bg-slate-50"
                 >
                   <option value="high">High</option>
                   <option value="med">Med</option>
                   <option value="low">Low</option>
-                </select>
+                </Select>
                 <button
                   type="submit"
                   className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer shadow-2xs"

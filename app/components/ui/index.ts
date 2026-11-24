@@ -11,3 +11,4 @@ export * from './Counter';
 export * from './Badge';
 export * from './Alert';
 export * from './FloatingWindow';
+export * from './SegmentedControl';

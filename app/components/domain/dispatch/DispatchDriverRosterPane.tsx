@@ -22,6 +22,7 @@ import {
   CalendarIcon,
   PlusIcon,
 } from '../../ui/Icons';
+import { Select } from '../../ui/Select';
 
 export type DriverStatusFilter = 'all' | 'available' | 'en_route' | 'busy' | 'break' | 'offline';
 
@@ -530,7 +531,9 @@ export function DispatchDriverRosterPane({
                     )}
                   </div>
 
-                  <select
+                  <Select
+                    size="xs"
+                    fullWidth={false}
                     value={driver.dutyStatus}
                     disabled={Boolean(driver.activeTrip)}
                     onChange={async (e) => {
@@ -545,13 +548,12 @@ export function DispatchDriverRosterPane({
                         onShowToast('Failed to update driver status.', 'error');
                       }
                     }}
-                    className="px-2 py-1 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-[11px] rounded-lg border border-slate-200 cursor-pointer disabled:opacity-50"
                     title={driver.activeTrip ? 'Driver has an active trip in progress' : 'Change driver duty status'}
                   >
                     <option value="on_duty">Available</option>
                     <option value="on_break">On Break</option>
                     <option value="off_duty">Offline</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
             );

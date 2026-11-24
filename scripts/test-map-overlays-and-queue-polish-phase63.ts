@@ -511,6 +511,15 @@ function testPortalDateTimePickerAndTwoLineQueue(): void {
   assert.ok(toolbarSrc.includes('createPortal'), 'MapLayersAndVehiclesToolbar.tsx must use createPortal');
   assert.ok(toolbarSrc.includes('z-[99999]'), 'MapLayersAndVehiclesToolbar.tsx must use z-[99999]');
   assert.equal(
+    toolbarSrc.includes('left: 16'),
+    false,
+    'MapLayersAndVehiclesToolbar.tsx must initialize coords to null (not left: 16) so popover never flies in from far left'
+  );
+  assert.ok(
+    toolbarSrc.includes('coords !== null'),
+    'MapLayersAndVehiclesToolbar.tsx must guard portal mount on coords !== null'
+  );
+  assert.equal(
     toolbarSrc.includes('activeOverlayCount > 0 &&'),
     false,
     'MapLayersAndVehiclesToolbar.tsx must always render All Off (disabled when 0) so popover height never jumps'

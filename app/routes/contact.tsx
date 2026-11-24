@@ -14,6 +14,7 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
+import { Select } from '../components/ui/Select';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
 import { isFirebaseConfigured, getFirebaseApp } from '../core/services/firebase';
@@ -347,17 +348,16 @@ export default function ContactRoute() {
                       <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                         How Can We Help?
                       </label>
-                      <select
+                      <Select
                         value={formData.inquiryType}
                         onChange={(e) => setFormData({ ...formData, inquiryType: e.target.value })}
-                        className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="general">General Question</option>
                         <option value="airport">Airport Pickup / Dropoff</option>
                         <option value="corporate">Corporate Account</option>
                         <option value="lost_found">Lost &amp; Found Item</option>
                         <option value="group">Event / Multiple Vehicles</option>
-                      </select>
+                      </Select>
                     </div>
                   </div>
 

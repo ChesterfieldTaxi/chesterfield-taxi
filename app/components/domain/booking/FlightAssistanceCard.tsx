@@ -8,6 +8,7 @@ import {
   RefreshCwIcon,
   SpinnerIcon,
 } from '../../ui/Icons';
+import { Select } from '../../ui/Select';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
 import { normalizeFlightTrackingPolicy } from '../../../core/types/config';
 import {
@@ -596,10 +597,13 @@ export function FlightAssistanceCard({
                   <label className="block text-[11px] text-slate-700 font-semibold mb-1">
                     Airline {detection.isDropoffAirport ? '(Terminal Door)' : ''}
                   </label>
-                  <select
+                  <Select
+                    searchable
+                    searchPlaceholder="Search airline or IATA code..."
                     value={airline}
-                    onChange={(e) => handleAirlineSelect(e.target.value)}
-                    className={`w-full px-3 py-2 bg-white border ${inputBorder} rounded-lg text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/25`}
+                    onValueChange={(val) => handleAirlineSelect(val)}
+                    size="md"
+                    triggerClassName={`border ${inputBorder} rounded-lg`}
                   >
                     <option value="">Select Airline</option>
                     {MAJOR_AIRLINES.map((al) => (
@@ -607,7 +611,7 @@ export function FlightAssistanceCard({
                         {al.name} ({al.code})
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div>

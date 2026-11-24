@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Select } from '../../ui/Select';
 
 export interface DateTimeRange {
   startDate: string; // YYYY-MM-DD
@@ -120,6 +121,9 @@ export function CustomDateTimePicker({
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
+      if (target instanceof Element && target.closest('[data-ui-select-portal="true"]')) {
+        return;
+      }
       if (desktopContainerRef.current && desktopContainerRef.current.contains(target)) {
         return;
       }
@@ -557,65 +561,77 @@ export function CustomDateTimePicker({
             {/* Start time */}
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] font-bold text-slate-500">Start time:</span>
-              <select
+              <Select
+                size="xs"
+                fullWidth={false}
+                searchable={false}
                 value={startTime.hour}
                 onChange={(e) => setStartTime({ ...startTime, hour: e.target.value })}
-                className="h-7 px-1.5 rounded-lg border border-slate-300 text-xs font-semibold bg-white"
               >
                 {hoursList.map((h) => (
                   <option key={h} value={h}>{h}</option>
                 ))}
-              </select>
+              </Select>
               <span>:</span>
-              <select
+              <Select
+                size="xs"
+                fullWidth={false}
+                searchable={false}
                 value={startTime.minute}
                 onChange={(e) => setStartTime({ ...startTime, minute: e.target.value })}
-                className="h-7 px-1.5 rounded-lg border border-slate-300 text-xs font-semibold bg-white"
               >
                 {minutesList.map((m) => (
                   <option key={m} value={m}>{m}</option>
                 ))}
-              </select>
-              <select
+              </Select>
+              <Select
+                size="xs"
+                fullWidth={false}
+                searchable={false}
                 value={startTime.period}
                 onChange={(e) => setStartTime({ ...startTime, period: e.target.value as any })}
-                className="h-7 px-1.5 rounded-lg border border-slate-300 text-xs font-bold bg-white"
               >
                 <option value="AM">AM</option>
                 <option value="PM">PM</option>
-              </select>
+              </Select>
             </div>
 
             {/* End time */}
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] font-bold text-slate-500">End time:</span>
-              <select
+              <Select
+                size="xs"
+                fullWidth={false}
+                searchable={false}
                 value={endTime.hour}
                 onChange={(e) => setEndTime({ ...endTime, hour: e.target.value })}
-                className="h-7 px-1.5 rounded-lg border border-slate-300 text-xs font-semibold bg-white"
               >
                 {hoursList.map((h) => (
                   <option key={h} value={h}>{h}</option>
                 ))}
-              </select>
+              </Select>
               <span>:</span>
-              <select
+              <Select
+                size="xs"
+                fullWidth={false}
+                searchable={false}
                 value={endTime.minute}
                 onChange={(e) => setEndTime({ ...endTime, minute: e.target.value })}
-                className="h-7 px-1.5 rounded-lg border border-slate-300 text-xs font-semibold bg-white"
               >
                 {minutesList.map((m) => (
                   <option key={m} value={m}>{m}</option>
                 ))}
-              </select>
-              <select
+              </Select>
+              <Select
+                size="xs"
+                fullWidth={false}
+                searchable={false}
                 value={endTime.period}
                 onChange={(e) => setEndTime({ ...endTime, period: e.target.value as any })}
-                className="h-7 px-1.5 rounded-lg border border-slate-300 text-xs font-bold bg-white"
               >
                 <option value="AM">AM</option>
                 <option value="PM">PM</option>
-              </select>
+              </Select>
             </div>
           </div>
 
