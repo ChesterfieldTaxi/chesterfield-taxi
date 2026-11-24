@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import type { CorporateAccountConfig, PoHistoryRecord } from '../../../../core/types/config';
 import { getCorporateAccountService } from '../../../../core/services/corporate-account.service';
+import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
+import {
+  isValidCorporateBookingPin,
+  normalizeCorporateBookingPin,
+} from '../../../../core/services/corporate-caller-auth.util';
 import { Button } from '../../../ui/Button';
 import { Badge } from '../../../ui/Badge';
 import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
@@ -542,6 +547,159 @@ export function CorporateCsvImportModal({
             )}
           </section>
         )}
+      </div>
+    </AdminSlideOverDrawer>
+  );
+}
+
+// ============================================================================
+// 4. VERBAL BOOKING PIN MODAL (4–8 ALPHANUMERIC CALLER AUTH PIN)
+// ============================================================================
+
+interface CorporateBookingPinModalProps {
+  account: CorporateAccountConfig;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (updatedAccount: CorporateAccountConfig) => void;
+  operatorEmail?: string;
+}
+
+export function CorporateBookingPinModal({
+  account,
+  isOpen,
+  onClose,
+  onSuccess,
+  operatorEmail,
+}: CorporateBookingPinModalProps) {
+  const [bookingPinDraft, setBookingPinDraft] = useState(() =>
+    normalizeCorporateBookingPin(account.bookingPin)
+  );
+  const [isSavingPin, setIsSavingPin] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const generateRandomPin = () => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let out = '';
+    for (let i = 0; i < 6; i++) {
+      out += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+    setBookingPinDraft(out);
+    setPinError(null);
+  };
+
+  const handleSaveBookingPin = async (clearPin = false) => {
+    const cleaned = clearPin ? '' : normalizeCorporateBookingPin(bookingPinDraft);
+    if (cleaned && !isValidCorporateBookingPin(cleaned)) {
+      setPinError('Verbal Booking PIN must be 4–8 alphanumeric characters (A–Z, 0–9).');
+      return;
+    }
+
+    try {
+      setIsSavingPin(true);
+      setPinError(null);
+      const configService = getAdminConfigService();
+      const settings = await configService.getSettings();
+      const accounts = [...(settings.corporateAccounts || [])];
+      const idx = accounts.findIndex(
+        (a) => a.id === account.id || a.accountNumber === account.accountNumber
+      );
+      const nowIso = new Date().toISOString();
+      const updatedAccount: CorporateAccountConfig = {
+        ...(idx >= 0 ? accounts[idx] : account),
+        bookingPin: cleaned || undefined,
+        updatedAt: nowIso,
+      };
+      if (idx >= 0) accounts[idx] = updatedAccount;
+      else accounts.push(updatedAccount);
+
+      await configService.updateSettings({
+        corporateAccounts: accounts,
+        updatedBy: operatorEmail || 'admin@chesterfieldtaxi.com',
+      });
+      await getCorporateAccountService().syncAccountToFirestore(updatedAccount);
+      onSuccess(updatedAccount);
+      onClose();
+    } catch (err: any) {
+      setPinError(err?.message || 'Failed to save Verbal Booking PIN.');
+    } finally {
+      setIsSavingPin(false);
+    }
+  };
+
+  return (
+    <AdminSlideOverDrawer
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Verbal Booking PIN"
+      subtitle={`${account.companyName} (${account.accountNumber})`}
+      size="md"
+      footer={
+        <>
+          <Button type="button" variant="outline" size="md" onClick={onClose} disabled={isSavingPin}>
+            Cancel
+          </Button>
+          {account.bookingPin && (
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={() => void handleSaveBookingPin(true)}
+              disabled={isSavingPin}
+              className="text-rose-700 border-rose-200 hover:bg-rose-50 font-bold"
+            >
+              Remove PIN
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            onClick={() => void handleSaveBookingPin(false)}
+            disabled={isSavingPin}
+            leftIcon={<ShieldCheckIcon className="w-4 h-4" />}
+            className="font-bold"
+          >
+            {isSavingPin ? 'Saving...' : 'Save Booking PIN'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4 text-xs">
+        {pinError && (
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-semibold">
+            {pinError}
+          </div>
+        )}
+        <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-3">
+          <p className="text-slate-600 leading-relaxed">
+            Configure an optional <strong>4–8 alphanumeric Verbal Booking PIN</strong> that dispatchers can verify when callers book rides under this corporate account.
+          </p>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="font-bold text-slate-700">Verbal Booking PIN (4–8 chars)</label>
+              <button
+                type="button"
+                onClick={generateRandomPin}
+                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+              >
+                Generate 6-Char PIN
+              </button>
+            </div>
+            <input
+              type="text"
+              maxLength={8}
+              value={bookingPinDraft}
+              onChange={(e) => {
+                setBookingPinDraft(normalizeCorporateBookingPin(e.target.value));
+                if (pinError) setPinError(null);
+              }}
+              placeholder="e.g. BAYR26"
+              className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold tracking-widest uppercase text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            />
+          </div>
+        </section>
       </div>
     </AdminSlideOverDrawer>
   );

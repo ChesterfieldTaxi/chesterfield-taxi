@@ -5,6 +5,7 @@ import {
   getContactService,
   normalizePhone,
 } from '../../../../core/services/customer/contact.service';
+import { getWorkspaceBus } from '../../../../core/services/workspace-bus.service';
 import {
   findMatchingCorporateAccount,
   type BookingAdditionalPassenger as AdditionalPassenger,
@@ -199,18 +200,37 @@ export function DispatchPassengerCrmSection({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1.5">
+      <div className="flex items-center justify-between mb-1.5 gap-1.5">
         <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide">
           Passengers
         </label>
-        <button
-          type="button"
-          onClick={onAddPassenger}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 transition-all shadow-2xs active:scale-95"
-        >
-          <PlusIcon className="w-3.5 h-3.5 text-blue-600" />
-          <span>Add passenger</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            disabled={!phone.trim() && !email.trim() && !passengerName.trim()}
+            onClick={() =>
+              getWorkspaceBus().publish('OPEN_CLIENT_PROFILE', {
+                phone: phone.trim() || undefined,
+                email: email.trim() || undefined,
+                name: passengerName.trim() || undefined,
+                source: 'passenger_crm',
+              })
+            }
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 font-bold text-xs border border-slate-200 hover:border-indigo-200 transition-all shadow-2xs disabled:opacity-45 disabled:pointer-events-none cursor-pointer"
+            title="Open Client Profile & Past Trips window"
+          >
+            <UserIcon className="w-3.5 h-3.5" />
+            <span>Client Profile</span>
+          </button>
+          <button
+            type="button"
+            onClick={onAddPassenger}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 transition-all shadow-2xs active:scale-95"
+          >
+            <PlusIcon className="w-3.5 h-3.5 text-blue-600" />
+            <span>Add passenger</span>
+          </button>
+        </div>
       </div>
 
       <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm space-y-2 relative">

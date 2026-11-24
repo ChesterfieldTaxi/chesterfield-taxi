@@ -18,6 +18,8 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseApp, isFirebaseConfigured } from './firebase';
 import type { UserRole } from './auth/admin-auth.service';
+import type { GeoPoint } from '../types/trip';
+import type { DriverScheduleConfig } from '../types/driver';
 
 /**
  * Standardizes driver username generation: firstname + lastname_initial + cabnumber (e.g. michaelj400)
@@ -105,6 +107,9 @@ export interface OperatorUser {
   hireDate?: string;
   emergencyContact?: string;
   adminNotes?: string;
+  homeAddress?: string;
+  homeCoordinates?: GeoPoint;
+  schedule?: DriverScheduleConfig;
 }
 
 export interface DriverRosterItem {
@@ -127,6 +132,9 @@ export interface DriverRosterItem {
   driverLicense?: string;
   email?: string;
   isOperator?: boolean;
+  homeAddress?: string;
+  homeCoordinates?: GeoPoint;
+  schedule?: DriverScheduleConfig;
 }
 
 export const DEFAULT_OPERATORS: OperatorUser[] = [
@@ -169,6 +177,8 @@ export const DEFAULT_OPERATORS: OperatorUser[] = [
     status: 'active',
     createdAt: '2026-09-18T15:56:03.337Z',
     driverScore: 98,
+    homeAddress: '14323 Olive Blvd, Chesterfield, MO 63017',
+    homeCoordinates: { lat: 38.6742, lng: -90.5112 },
   },
   {
     uid: 'ClUoGzOahXcnsIuNZ3kmP1wJ4aC3',
@@ -185,6 +195,8 @@ export const DEFAULT_OPERATORS: OperatorUser[] = [
     status: 'active',
     createdAt: '2026-09-18T15:56:48.271Z',
     driverScore: 98,
+    homeAddress: '11911 Olive Blvd, Creve Coeur, MO 63141',
+    homeCoordinates: { lat: 38.6716, lng: -90.4426 },
   },
   {
     uid: 'xo56ECpoXcT83x6GRyzjzHqA0mc2',
@@ -201,6 +213,8 @@ export const DEFAULT_OPERATORS: OperatorUser[] = [
     status: 'active',
     createdAt: '2026-09-18T15:58:13.900Z',
     driverScore: 98,
+    homeAddress: '12555 Manchester Rd, Des Peres, MO 63131',
+    homeCoordinates: { lat: 38.6012, lng: -90.4478 },
   },
 ];
 
@@ -385,6 +399,9 @@ export class OperatorService {
             hireDate: data.hireDate || '',
             emergencyContact: data.emergencyContact || '',
             adminNotes: data.adminNotes || '',
+            homeAddress: data.homeAddress || undefined,
+            homeCoordinates: data.homeCoordinates || undefined,
+            schedule: data.schedule || undefined,
           });
         }
       });
@@ -468,6 +485,9 @@ export class OperatorService {
         driverLicense: op.driverLicense,
         email: op.email,
         isOperator: true,
+        homeAddress: op.homeAddress,
+        homeCoordinates: op.homeCoordinates,
+        schedule: op.schedule,
       };
     });
 
@@ -551,6 +571,9 @@ export class OperatorService {
                 hireDate: data.hireDate || '',
                 emergencyContact: data.emergencyContact || '',
                 adminNotes: data.adminNotes || '',
+                homeAddress: data.homeAddress || undefined,
+                homeCoordinates: data.homeCoordinates || undefined,
+                schedule: data.schedule || undefined,
               });
             }
           });
@@ -585,6 +608,7 @@ export class OperatorService {
     const displayName = operator.displayName || (firstName ? `${firstName} ${lastName}`.trim() : '');
     const assignedUnit = operator.assignedUnit ? operator.assignedUnit.replace(/^Cab\s*#?/i, 'Car #') : (cabNumber ? `Car #${cabNumber}` : '');
 
+    const normalizedHomeAddress = String(operator.homeAddress || '').trim() || undefined;
     const completeOperator: OperatorUser = {
       ...operator,
       firstName,
@@ -593,6 +617,8 @@ export class OperatorService {
       username,
       displayName,
       assignedUnit,
+      homeAddress: normalizedHomeAddress,
+      homeCoordinates: normalizedHomeAddress ? operator.homeCoordinates || undefined : undefined,
     };
 
     if (isFirebaseConfigured()) {
@@ -601,7 +627,16 @@ export class OperatorService {
         const sanitized = Object.fromEntries(
           Object.entries(completeOperator).filter(([, v]) => v !== undefined)
         );
-        await setDoc(doc(db, 'users', completeOperator.uid), sanitized, { merge: true });
+        // Explicit null clears a removed Driver Home Address on `{ merge: true }` writes
+        // (only when the caller supplied the field, so partial saves never wipe it).
+        const homePatch =
+          'homeAddress' in operator
+            ? {
+                homeAddress: completeOperator.homeAddress ?? null,
+                homeCoordinates: completeOperator.homeCoordinates ?? null,
+              }
+            : {};
+        await setDoc(doc(db, 'users', completeOperator.uid), { ...sanitized, ...homePatch }, { merge: true });
       } catch (err) {
         console.warn('[OperatorService] Firestore save error:', err);
       }

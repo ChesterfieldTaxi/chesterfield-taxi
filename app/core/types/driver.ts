@@ -5,7 +5,7 @@
  * and live Taximeter Extra Fee adjustments.
  */
 
-import type { DriverTelemetryPing } from './trip';
+import type { DriverTelemetryPing, GeoPoint } from './trip';
 
 export type DriverDutyStatus = 'on_duty' | 'off_duty' | 'on_break';
 
@@ -67,6 +67,8 @@ export interface DriverProfile {
   /** Live GPS telemetry written continuously while on_duty or on_break */
   currentLocation?: DriverTelemetryPing;
   locationUpdatedAt?: string;
+  homeAddress?: string;
+  homeCoordinates?: GeoPoint;
   schedule?: DriverScheduleConfig;
   
   /** Universal Governance & Scoring (Phase 29) */

@@ -290,13 +290,7 @@ function LiveFleetMapComponent({
     }
 
     return { visibleWithGps: withGps, awaitingGpsDrivers: noGps, counts: c };
-  }, [
-    fleet,
-    statusFilter,
-    mapPreferences.selectedVehicleTypes,
-    adminSettings.fleet,
-    adminSettings.vehicles,
-  ]);
+  }, [fleet, statusFilter, mapPreferences.selectedVehicleTypes, adminSettings.fleet, adminSettings.vehicles]);
 
   // Pooled zero-flicker marker synchronization (runs once mapReady === true)
   useEffect(() => {
@@ -411,18 +405,11 @@ function LiveFleetMapComponent({
   clearSelectedWaypointRef.current = clearSelectedWaypoint;
 
   const {
-    selectedOverlay,
-    availableDriversInSelectedZone,
-    appliedEndpointFeedback,
-    clearSelectedOverlay,
-    handleSetPlaceEndpoint,
+    selectedOverlay, availableDriversInSelectedZone, appliedEndpointFeedback, clearSelectedOverlay, handleSetPlaceEndpoint,
   } = useLiveMapCustomOverlays({
-    mapReady,
-    mapInstanceRef,
-    preferences: mapPreferences,
-    fleet,
-    companyInfo: adminSettings.company,
-    onPopulateBooking,
+    mapReady, mapInstanceRef, preferences: mapPreferences, fleet,
+    fleetCars: adminSettings.fleet, vehicleTiers: adminSettings.vehicles,
+    companyInfo: adminSettings.company, onPopulateBooking,
   });
   clearSelectedOverlayRef.current = clearSelectedOverlay;
 
@@ -1162,12 +1149,13 @@ function LiveFleetMapComponent({
         </div>
       )}
 
-      {/* ─── CUSTOM OVERLAY INFO CARD (ZONE / PLACE / EXCLUSION) ─── */}
+      {/* ─── CUSTOM OVERLAY INFO CARD (ZONE / PLACE / DRIVER HOME / EXCLUSION) ─── */}
       <MapCustomOverlayInfoCard
         selectedOverlay={selectedOverlay}
         availableDriversInZone={availableDriversInSelectedZone}
         appliedEndpointFeedback={appliedEndpointFeedback}
         onSetPlaceEndpoint={handleSetPlaceEndpoint}
+        onOpenDriverQueue={onOpenDriverQueue}
         onClose={clearSelectedOverlay}
       />
 

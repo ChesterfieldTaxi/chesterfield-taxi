@@ -1,5 +1,6 @@
 import React from 'react';
-import { CheckIcon, MapPinIcon, XIcon } from '../../../ui/Icons';
+import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
+import { CarIcon, CheckIcon, ClockIcon, MapPinIcon, XIcon } from '../../../ui/Icons';
 import type {
   MapOverlayPlaceItem,
   SelectedCustomOverlayItem,
@@ -10,6 +11,7 @@ export interface MapCustomOverlayInfoCardProps {
   availableDriversInZone: number;
   appliedEndpointFeedback: 'pickup' | 'dropoff' | null;
   onSetPlaceEndpoint: (place: MapOverlayPlaceItem, endpoint: 'pickup' | 'dropoff') => void;
+  onOpenDriverQueue?: (driver: LiveFleetDriver) => void;
   onClose: () => void;
 }
 
@@ -18,6 +20,7 @@ export const MapCustomOverlayInfoCard = React.memo(function MapCustomOverlayInfo
   availableDriversInZone,
   appliedEndpointFeedback,
   onSetPlaceEndpoint,
+  onOpenDriverQueue,
   onClose,
 }: MapCustomOverlayInfoCardProps) {
   if (!selectedOverlay) return null;
@@ -164,6 +167,59 @@ export const MapCustomOverlayInfoCard = React.memo(function MapCustomOverlayInfo
             )}
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (selectedOverlay.kind === 'driver_home') {
+    const { driverHome } = selectedOverlay;
+    return (
+      <div className="absolute top-15 left-2.5 right-2.5 sm:left-3 sm:right-auto sm:w-80 z-30 bg-white/98 backdrop-blur-md rounded-2xl border border-slate-200 shadow-2xl p-3 space-y-2.5 text-xs animate-in fade-in zoom-in-95 duration-150 select-text">
+        <div className="flex items-start justify-between gap-2">
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-teal-700 text-white text-[10px] font-black">
+                HOME · {driverHome.cabLabel}
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold">
+                <CarIcon className="w-3 h-3 text-slate-500 shrink-0" />
+                <span>{driverHome.vehicleClassLabel}</span>
+              </span>
+            </div>
+            <div className="font-extrabold text-slate-900 text-sm leading-snug truncate pt-0.5">
+              {driverHome.driverName}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer shrink-0"
+            aria-label="Close driver home info"
+          >
+            <XIcon className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="space-y-1.5 text-[11px] text-slate-600">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+            <ClockIcon className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+            <span>Shift: {driverHome.shiftScheduleSummary}</span>
+          </div>
+          <div className="flex items-start gap-1.5 leading-snug">
+            <MapPinIcon className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+            <span className="break-words">{driverHome.homeAddress}</span>
+          </div>
+        </div>
+
+        {onOpenDriverQueue && (
+          <button
+            type="button"
+            onClick={() => onOpenDriverQueue(driverHome.driver)}
+            className="w-full py-1.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] shadow-2xs transition-colors cursor-pointer"
+          >
+            Open Driver Queue
+          </button>
+        )}
       </div>
     );
   }

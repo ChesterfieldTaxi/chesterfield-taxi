@@ -1129,3 +1129,22 @@
 
 
 
+## Phase 69 (Wave 6 Phase 4): Redesigned Corporate `Account` 4-Signal Caller Verification, Incoming-Call `ClientProfileWindow`, `Driver Homes` Map Layer, Compact Flight Code Display (`WN` / `YYZ`), Darker `Completed`/`Cancelled` Badges & Sidebar-Docked `Clear` Prompt + `FloatingWindow` Portal Fix
+- [x] 69.0 Baseline Commit & Spec-Driven Documentation:
+  - [x] 69.0.1 Stage and commit clean Phase 68 baseline on `main` (`feat(phase-68): add derived Late pickup status, localhost maintenance bypass + /book anti-spam shield, inline STL airport autocomplete, HQ map pin, and /track + CollapsibleSection polish`).
+  - [x] 69.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 69 scope and checklist.
+- [x] 69.1 Redesigned Corporate `Account` 4-Signal Caller Verification (No Billing Cycle Selector):
+  - [x] 69.1.1 Add optional `bookingPin?: string` (4–8 alphanumeric Verbal Booking PIN) to `CorporateAccountConfig` (`config.ts`) and expose Admin editing in `CorporateAccountModals.tsx` / `CorporateAccountsPanel.tsx`.
+  - [x] 69.1.2 Create `app/core/services/corporate-caller-auth.util.ts` (`< 240`L) exporting `searchCorporateAccounts` & `evaluateCorporateCallerVerification`, and `DispatchCorporateAccountCard.tsx` (`< 320`L) wired into `DispatchPaymentAssignmentSection.tsx` with searchable Account #/Company `<Select>`, removed `Invoicing Terms` selector (silent `billingCycle` inheritance), and 4-signal caller verification.
+- [x] 69.2 Incoming-Call `ClientProfileWindow` (`FloatingWindow`):
+  - [x] 69.2.1 Create `client-trip-history.util.ts` (`< 180`L) & `ClientProfileWindow.tsx` (`< 380`L) inside `<FloatingWindow id="client_profile" initialSize={{ width: 540, height: 520 }}>` with CRM badges, `10`+`10` past trip pagination, and 1-click `Load into New Tab`.
+  - [x] 69.2.2 Wire incoming/answered call auto-open (`TelephonyService` / `WorkspaceBus` `'OPEN_CLIENT_PROFILE'` deduplicated per `callSid`/session) plus 1-click `"Client Profile"` buttons in `DispatchPassengerCrmSection.tsx` and `CommsHub.tsx` (`< 900`L).
+- [x] 69.3 Driver Home Addresses & `Layers ▾ -> Driver Homes`:
+  - [x] 69.3.1 Add `homeAddress?: string` & `homeCoordinates?: GeoPoint` to `DriverProfile` (`driver.ts`), `OperatorUser` (`operator.service.ts`), and `LiveFleetDriver` (`useDispatchFleet.ts`), with `<LocationAutocomplete />` `"Driver Home Address"` in `OperatorEditorDrawer.tsx`.
+  - [x] 69.3.2 Add `showDriverHomesOverlay: boolean` (`false` default) to `useDispatchMapPreferences.ts` & `MapLayersAndVehiclesToolbar.tsx`, create `driver-homes-overlay.util.ts` (`< 240`L), and render `HOME` / `#Cab` pins + click info card with `"Open Driver Queue"` in `useLiveMapCustomOverlays.ts` (`< 430`L) & `MapCustomOverlayInfoCard.tsx`.
+- [x] 69.4 Compact Flight Codes (`WN` / `YYZ`), Darker Terminal Statuses, Sidebar `Clear` Prompt & `FloatingWindow` Portal:
+  - [x] 69.4.1 Add `selectedLabel?: string` (`data-selected-label`) to `Select.tsx` and wire `selectedLabel: al.code` across Airline `<Select>`s (`FlightAssistanceCard.tsx`, `DispatchRoutingTimingSection.tsx`, `DispatchReturnRepeatSection.tsx`); update `AirportCityCombobox.tsx` (`< 280`L) to display/commit compact IATA codes when unfocused/selected while preserving `airport-catalog.ts` exports.
+  - [x] 69.4.2 Update `completed` (`bg-emerald-700 text-white border-emerald-800`) and `cancelled` (`bg-rose-800 text-white border-rose-900`) badge classes in `DispatchStatusBadge.tsx`.
+  - [x] 69.4.3 Replace `<ConfirmationModal />` in `DispatchBookingFooterBar.tsx` with a sidebar-docked confirmation card (`w-full`, `z-30`), portal `FloatingWindow.tsx` via `createPortal(..., document.body)` (`zIndex >= 200`), and add `PlacesService.findPlaceFromQuery` fallback in `hq-place-marker.util.ts`.
+- [x] 69.5 Verification Suite (`scripts/test-corporate-auth-client-window-and-driver-homes-phase69.ts < 400`L) & Build Gate:
+  - [x] 69.5.1 Create `scripts/test-corporate-auth-client-window-and-driver-homes-phase69.ts` (`< 400`L) and pass `npm run typecheck`, Phases 63–69 verification suites, and `npm run build` with exit code `0`.

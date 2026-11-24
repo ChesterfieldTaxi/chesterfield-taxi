@@ -18,8 +18,13 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getOperatorService, type DriverRosterItem } from '../services/operator.service';
 import { getDriverService } from '../services/driver.service';
 import { getWorkspaceBus, type WorkspaceMessage } from '../services/workspace-bus.service';
-import type { DriverDutyStatus, DriverProfile, LiveDriverMapStatus } from '../types/driver';
-import type { DriverTelemetryPing, Trip } from '../types/trip';
+import type {
+  DriverDutyStatus,
+  DriverProfile,
+  DriverScheduleConfig,
+  LiveDriverMapStatus,
+} from '../types/driver';
+import type { DriverTelemetryPing, GeoPoint, Trip } from '../types/trip';
 
 export type GpsFreshness = 'live' | 'stale' | 'none';
 
@@ -32,6 +37,9 @@ export interface LiveFleetDriver extends DriverRosterItem {
   telemetry: DriverTelemetryPing | null;
   gpsFreshness: GpsFreshness;
   lastSeenSeconds: number | null;
+  homeAddress?: string;
+  homeCoordinates?: GeoPoint;
+  schedule?: DriverScheduleConfig;
 }
 
 const STALE_GPS_THRESHOLD_SECONDS = 180; // 3 minutes
@@ -309,6 +317,9 @@ export function useDispatchFleet(trips: Trip[]) {
         telemetry,
         gpsFreshness,
         lastSeenSeconds,
+        homeAddress: profile?.homeAddress || drv.homeAddress,
+        homeCoordinates: profile?.homeCoordinates || drv.homeCoordinates,
+        schedule: profile?.schedule || drv.schedule,
       };
     });
   }, [baseRoster, driverProfiles, busTelemetry, busDutyOverrides, trips, clockTick]);

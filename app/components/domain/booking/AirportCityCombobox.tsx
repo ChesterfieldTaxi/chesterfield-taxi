@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  extractAirportIataCode, formatAirportCodeCity, resolveAirportDisplayValue,
-  searchAirportCatalog, type AirportCatalogEntry,
+  extractAirportIataCode,
+  resolveAirportDisplayValue,
+  searchAirportCatalog,
+  type AirportCatalogEntry,
 } from '../../../core/config/airport-catalog';
 import { CheckIcon, ChevronDownIcon } from '../../ui/Icons';
 
@@ -24,10 +26,22 @@ interface PopoverCoords {
   openUpward: boolean;
 }
 
+/**
+ * Live autocomplete query: unfiltered default list until the user actually types (1-4 chars included),
+ * so "y" / "yyz" / "ord" filter immediately instead of freezing on the default list.
+ */
+export function resolveAirportComboboxFilterQuery(
+  value: string,
+  isFocused: boolean,
+  isDirtySinceFocus: boolean
+): string {
+  return !isFocused || !isDirtySinceFocus ? '' : String(value || '').trim();
+}
+
 export function AirportCityCombobox({
   value,
   onChange,
-  placeholder = 'e.g. YYZ Toronto, ORD, ATL',
+  placeholder = 'e.g. YYZ, ORD, ATL',
   size = 'md',
   preferPrivateFbo = false,
   borderClassName = 'border-blue-200',
@@ -36,6 +50,7 @@ export function AirportCityCombobox({
 }: AirportCityComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [isDirtySinceFocus, setIsDirtySinceFocus] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [coords, setCoords] = useState<PopoverCoords | null>(null);
 
@@ -43,14 +58,14 @@ export function AirportCityCombobox({
   const inputRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  const effectiveInputValue = isFocused ? value : resolveAirportDisplayValue(value);
   const selectedIata = useMemo(() => extractAirportIataCode(value), [value]);
-  const filterQuery = useMemo(() => {
-    const trimmed = String(value || '').trim();
-    const resolved = resolveAirportDisplayValue(trimmed);
-    if (!isFocused || !trimmed || (resolved && trimmed === resolved)) return '';
-    return trimmed;
-  }, [value, isFocused]);
+  const fullHoverTitle = useMemo(() => resolveAirportDisplayValue(value), [value]);
+  const effectiveInputValue = isFocused ? value : extractAirportIataCode(value) || value;
+
+  const filterQuery = useMemo(
+    () => resolveAirportComboboxFilterQuery(value, isFocused, isDirtySinceFocus),
+    [value, isFocused, isDirtySinceFocus]
+  );
 
   const matches = useMemo(
     () => searchAirportCatalog(filterQuery, 30, { preferPrivateFbo }),
@@ -116,17 +131,21 @@ export function AirportCityCombobox({
   }, [isOpen, computeCoords, closeDropdown]);
 
   const handleSelectEntry = (entry: AirportCatalogEntry) => {
-    onChange(formatAirportCodeCity(entry));
+    setIsDirtySinceFocus(false);
+    onChange(entry.iata);
     closeDropdown();
   };
 
   const handleBlur = () => {
     setIsFocused(false);
+    setIsDirtySinceFocus(false);
     closeDropdown();
     const trimmed = String(value || '').trim();
-    if (/^[A-Za-z0-9]{3,4}$/.test(trimmed)) {
-      const normalized = resolveAirportDisplayValue(trimmed);
-      if (normalized && normalized !== value) onChange(normalized);
+    if (!trimmed) return;
+    const compactCode = extractAirportIataCode(trimmed);
+    const resolvedDisplay = resolveAirportDisplayValue(trimmed);
+    if (compactCode && (/^[A-Za-z0-9]{3,4}$/.test(trimmed) || resolvedDisplay !== trimmed)) {
+      if (compactCode !== value) onChange(compactCode);
     }
   };
 
@@ -167,12 +186,13 @@ export function AirportCityCombobox({
           aria-label={ariaLabel}
           disabled={disabled}
           value={effectiveInputValue}
+          title={fullHoverTitle || undefined}
           placeholder={placeholder}
-          onFocus={() => { setIsFocused(true); openDropdown(); }}
+          onFocus={() => { setIsFocused(true); setIsDirtySinceFocus(false); openDropdown(); }}
           onBlur={handleBlur}
-          onChange={(e) => { onChange(e.target.value); setActiveIndex(0); if (!isOpen) openDropdown(); }}
+          onChange={(e) => { setIsDirtySinceFocus(true); onChange(e.target.value); setActiveIndex(0); if (!isOpen) openDropdown(); }}
           onKeyDown={handleKeyDown}
-          className={`w-full bg-white border ${borderClassName} ${sizeClass} font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/25 disabled:opacity-50`}
+          className={`w-full bg-white border ${borderClassName} ${sizeClass} font-mono font-bold text-slate-900 placeholder:font-sans placeholder:text-slate-400 placeholder:font-normal transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/25 disabled:opacity-50`}
         />
         <span className="absolute inset-y-0 right-1.5 flex items-center gap-0.5">
           {value && !disabled && (
@@ -180,7 +200,7 @@ export function AirportCityCombobox({
               type="button"
               tabIndex={-1}
               title="Clear airport"
-              onMouseDown={(e) => { e.preventDefault(); onChange(''); setActiveIndex(0); inputRef.current?.focus(); }}
+              onMouseDown={(e) => { e.preventDefault(); setIsDirtySinceFocus(false); onChange(''); setActiveIndex(0); inputRef.current?.focus(); }}
               className="text-slate-400 hover:text-slate-700 px-1 py-0.5 text-[11px] font-bold leading-none cursor-pointer"
             >
               ✕

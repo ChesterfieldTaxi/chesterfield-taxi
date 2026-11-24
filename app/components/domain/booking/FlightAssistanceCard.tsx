@@ -607,17 +607,18 @@ export function FlightAssistanceCard({
                     searchable
                     searchPlaceholder="Search airline or IATA code..."
                     value={airline}
+                    options={[
+                      { value: '', label: 'Select Airline' },
+                      ...MAJOR_AIRLINES.map((al) => ({
+                        value: al.name,
+                        label: `${al.name} (${al.code})`,
+                        selectedLabel: al.code,
+                      })),
+                    ]}
                     onValueChange={(val) => handleAirlineSelect(val)}
                     size="md"
                     triggerClassName={`border ${inputBorder} rounded-lg`}
-                  >
-                    <option value="">Select Airline</option>
-                    {MAJOR_AIRLINES.map((al) => (
-                      <option key={al.code} value={al.name}>
-                        {al.name} ({al.code})
-                      </option>
-                    ))}
-                  </Select>
+                  />
                 </div>
 
                 <div>

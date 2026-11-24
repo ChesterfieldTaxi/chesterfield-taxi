@@ -26,6 +26,7 @@ import type {
 import type { FlightTelemetrySnapshot } from '../../../../core/types/flight';
 import { parseFlightIdent, type AirportDetectionResult } from '../../../../core/config/airports';
 import { getBookingService } from '../../../../core/services/booking';
+import { formatInheritedCorporateBillingTerms } from '../../../../core/services/corporate-caller-auth.util';
 import {
   generateMultiCarGroupId,
   distributeAcrossCars,
@@ -1001,6 +1002,7 @@ export interface UseDispatchBookingSubmissionParams {
   matchedCorporateAccount: CorporateAccountConfig | null;
   billingPo: string;
   allowPoOverride: boolean;
+  enteredBookingPin?: string;
   authorizedBy: string;
   invoicingTerms: string;
   sendEmailConfirmation: boolean;
@@ -1140,6 +1142,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     matchedCorporateAccount,
     billingPo,
     allowPoOverride,
+    enteredBookingPin,
     authorizedBy,
     invoicingTerms,
     sendEmailConfirmation,
@@ -1707,6 +1710,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
         billingPo,
         allowPoOverride,
         projectedFare,
+        enteredBookingPin,
       });
       if (!corpValidation.valid) {
         setSubmitError(corpValidation.error);
@@ -1885,7 +1889,10 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
               corporateAccount,
               billingPo,
               authorizedBy,
-              invoicingTerms,
+              invoicingTerms: formatInheritedCorporateBillingTerms(
+                matchedCorporateAccount?.billingCycle
+              ),
+              billingCycle: matchedCorporateAccount?.billingCycle || 'net30',
               poOverrideAuthorized: allowPoOverride || undefined,
             }
           : undefined,

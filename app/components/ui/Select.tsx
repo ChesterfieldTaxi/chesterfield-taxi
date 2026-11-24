@@ -5,6 +5,7 @@ import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from './Icons';
 export interface SelectOption {
   value: string | number;
   label: string;
+  selectedLabel?: string;
   subtitle?: string;
   badge?: string;
   dotClass?: string;
@@ -54,9 +55,15 @@ export function extractSelectOptionsFromChildren(children: React.ReactNode, grou
     } else if (child.type === 'option') {
       const label = flattenOptionText(child.props.children).trim();
       const rawVal = child.props.value !== undefined ? child.props.value : label;
+      const rawSelectedLabel = child.props['data-selected-label'];
+      const selectedLabel =
+        typeof rawSelectedLabel === 'string' && rawSelectedLabel.trim()
+          ? rawSelectedLabel.trim()
+          : undefined;
       extracted.push({
         value: typeof rawVal === 'number' ? rawVal : String(rawVal ?? ''),
         label: label || String(rawVal ?? ''),
+        ...(selectedLabel ? { selectedLabel } : {}),
         disabled: Boolean(child.props.disabled),
         group: groupLabel,
       });
@@ -73,7 +80,7 @@ export function filterSelectOptions(options: ReadonlyArray<SelectOption>, query:
   const q = query.trim().toLowerCase();
   if (!q) return [...options];
   return options.filter((opt) =>
-    [opt.label, String(opt.value), opt.subtitle || '', opt.badge || '', opt.group || '']
+    [opt.label, opt.selectedLabel || '', String(opt.value), opt.subtitle || '', opt.badge || '', opt.group || '']
       .join(' ')
       .toLowerCase()
       .includes(q)
@@ -277,7 +284,8 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       : 'bg-white border-slate-200 text-slate-900 hover:border-slate-300 shadow-2xs focus:border-blue-500 focus:ring-blue-500/20';
 
     const hasFieldChrome = Boolean(label || error || helperText);
-    const displayLabel = selectedOption ? selectedOption.label : placeholder || 'Select...';
+    const displayLabel = selectedOption ? selectedOption.selectedLabel || selectedOption.label : placeholder || 'Select...';
+    const effectiveTitle = title ?? (selectedOption ? selectedOption.label : undefined);
     const isPlaceholderShown = !selectedOption && Boolean(placeholder);
 
     return (
@@ -291,7 +299,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
         )}
 
         <button
-          ref={setMergedTriggerRef} id={selectId} type="button" disabled={disabled} title={title}
+          ref={setMergedTriggerRef} id={selectId} type="button" disabled={disabled} title={effectiveTitle}
           aria-haspopup="listbox" aria-expanded={isOpen} aria-label={ariaLabel || label}
           aria-invalid={Boolean(error)} aria-describedby={error ? errorId : helperText ? helperId : undefined}
           onClick={(e) => { e.stopPropagation(); if (!disabled) { if (isOpen) closeMenu(false); else openMenu(); } }}

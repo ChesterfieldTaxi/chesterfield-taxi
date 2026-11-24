@@ -131,8 +131,8 @@ function testPureIconStatusPills(): void {
     { status: 'en_route', colorToken: 'bg-indigo-100', tooltip: 'En Route to pickup', label: 'En Route' },
     { status: 'arrived', colorToken: 'bg-orange-100', tooltip: 'Arrived at pickup', label: 'Arrived' },
     { status: 'in_progress', colorToken: 'bg-emerald-100', tooltip: 'In Progress — Passenger on board', label: 'In Progress' },
-    { status: 'completed', colorToken: 'bg-emerald-100/90', tooltip: 'Completed', label: 'Completed' },
-    { status: 'cancelled', colorToken: 'bg-rose-100', tooltip: 'Cancelled', label: 'Cancelled' },
+    { status: 'completed', colorToken: 'bg-emerald-700', tooltip: 'Completed', label: 'Completed' },
+    { status: 'cancelled', colorToken: 'bg-rose-800', tooltip: 'Cancelled', label: 'Cancelled' },
     { status: 'declined', colorToken: 'bg-slate-200', tooltip: 'Declined', label: 'Declined' },
   ];
 

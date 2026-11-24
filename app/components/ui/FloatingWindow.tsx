@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { XIcon } from './Icons';
 import { useBottomSheetDragToClose } from '../../core/hooks/useBottomSheetDragToClose';
 
@@ -118,7 +119,7 @@ export function FloatingWindow({
   isMaximizable = true,
   closeOnEsc = true,
   className = '',
-  zIndex = 45,
+  zIndex = 200,
 }: FloatingWindowProps) {
   // Compute default center position
   const getDefaultPosition = useCallback(() => {
@@ -134,7 +135,7 @@ export function FloatingWindow({
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [preMaxState, setPreMaxState] = useState<{ position: { x: number; y: number }; size: { width: number; height: number } } | null>(null);
-  const [activeZ, setActiveZ] = useState(zIndex);
+  const [activeZ, setActiveZ] = useState(() => Math.max(zIndex, 200));
   const activeZRef = useRef(activeZ);
   activeZRef.current = activeZ;
   const instanceIdRef = useRef<symbol | null>(null);
@@ -143,7 +144,7 @@ export function FloatingWindow({
   }
 
   useEffect(() => {
-    setActiveZ(zIndex);
+    setActiveZ(Math.max(zIndex, 200));
   }, [zIndex]);
   const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() =>
     typeof window !== 'undefined' ? window.innerWidth < 768 : false
@@ -359,14 +360,21 @@ export function FloatingWindow({
     }
   };
 
-  if (!isOpen) return null;
+    if (!isOpen) return null;
+
+  const portalIfClient = (node: React.ReactElement): React.ReactElement =>
+    typeof document !== 'undefined' && document.body
+      ? (createPortal(node, document.body) as unknown as React.ReactElement)
+      : node;
+
+  const effectiveZ = Math.max(activeZ, 200);
 
   // MOBILE BOTTOM SHEET PRESENTATION (< 768px): native edge-to-edge sheet with dimmed backdrop & safe-area footer
   if (isMobileViewport) {
-    return (
+    return portalIfClient(
       <div
         className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-end justify-center p-0 pointer-events-auto select-none animate-in fade-in duration-150"
-        style={{ zIndex: Math.max(activeZ, 120) }}
+        style={{ zIndex: effectiveZ }}
         onClick={onClose}
       >
         <div
@@ -400,8 +408,8 @@ export function FloatingWindow({
 
   // MINIMIZED FLOATING PILL AT BOTTOM OF SCREEN (Desktop)
   if (isMinimized) {
-    return (
-      <div className="fixed bottom-4 right-4 z-50 pointer-events-auto animate-in slide-in-from-bottom-2 duration-150" style={{ zIndex: activeZ }}>
+    return portalIfClient(
+      <div className="fixed bottom-4 right-4 z-50 pointer-events-auto animate-in slide-in-from-bottom-2 duration-150" style={{ zIndex: effectiveZ }}>
         <div onClick={() => setIsMinimized(false)} className="flex items-center gap-2.5 px-3.5 py-2 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700 cursor-pointer hover:bg-slate-800 transition-all select-none">
           {icon && <span className="text-blue-400">{icon}</span>}
           <span className="font-extrabold text-xs max-w-[200px] truncate">{title}</span>
@@ -419,14 +427,14 @@ export function FloatingWindow({
   const clampedX = typeof window !== 'undefined' ? Math.max(12, Math.min(position.x, window.innerWidth - clampedWidth - 12)) : position.x;
   const clampedY = typeof window !== 'undefined' ? Math.max(12, Math.min(position.y, window.innerHeight - 80)) : position.y;
 
-  return (
+  return portalIfClient(
     <div
       className={`fixed inset-0 select-none ${hasBackdrop ? 'z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 pointer-events-auto' : 'pointer-events-none'}`}
-      style={{ zIndex: activeZ }}
+      style={{ zIndex: effectiveZ }}
     >
       <div
         ref={windowRef}
-        onMouseDown={() => setActiveZ((z) => Math.max(z, 50))}
+        onMouseDown={() => setActiveZ((z) => Math.max(z, 210))}
         style={
           hasBackdrop
             ? { width: clampedWidth, maxHeight: autoHeight && !isMaximized ? '85vh' : undefined }

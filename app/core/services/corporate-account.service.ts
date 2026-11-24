@@ -16,7 +16,7 @@ import {
 } from '../types/config';
 import { getAdminConfigService } from './config/admin-config.service';
 import { isFirebaseConfigured, getFirestoreDb } from './firebase';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { sanitizePayload } from './firestore-sanitizer';
 
 export interface CsvImportOptions {
@@ -659,7 +659,12 @@ export class CorporateAccountService {
     try {
       const db = getFirestoreDb();
       const docRef = doc(db, 'corporateAccounts', account.id);
-      await setDoc(docRef, sanitizePayload(account), { merge: true });
+      // `deleteField()` strips a removed Verbal Booking PIN from /corporateAccounts/{id} on merge writes
+      await setDoc(
+        docRef,
+        { ...sanitizePayload(account), bookingPin: account.bookingPin ? account.bookingPin : deleteField() },
+        { merge: true }
+      );
 
       const acctHash = await hashCorporateLookupValue(account.accountNumber);
       if (acctHash) {

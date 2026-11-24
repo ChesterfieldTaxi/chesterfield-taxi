@@ -19,6 +19,7 @@ import { getWorkspaceBus } from '../core/services/workspace-bus.service';
 import { soundNotificationService } from '../core/services/sound-notification.service';
 import type { DriverRosterItem } from '../core/services/operator.service';
 import { DriverQueueWindow } from '../components/domain/dispatch/DriverQueueWindow';
+import { ClientProfileWindow } from '../components/domain/dispatch/ClientProfileWindow';
 import type { DispatchUniversalTripActions } from '../components/domain/dispatch/TripActionDropdown';
 import { DispatchStagedPlannerModals } from '../components/domain/dispatch/StagedDriverConflictModal';
 import { useDispatchFleet, type LiveFleetDriver } from '../core/hooks/useDispatchFleet';
@@ -599,22 +600,9 @@ export default function DispatchRoute() {
         nowMs: clockNowMs,
       }),
     [
-      trips,
-      statusFilter,
-      pillFilter,
-      dateTimeRange,
-      filterStartDate,
-      filterEndDate,
-      activeFilterKeys,
-      selectedDriverFilter,
-      selectedVehicleFilter,
-      selectedTariffFilter,
-      selectedCompanyFilter,
-      selectedPaymentFilter,
-      searchTerm,
-      slaUrgentOnlyFilter,
-      slaSummary,
-      clockNowMs,
+      trips, statusFilter, pillFilter, dateTimeRange, filterStartDate, filterEndDate,
+      activeFilterKeys, selectedDriverFilter, selectedVehicleFilter, selectedTariffFilter,
+      selectedCompanyFilter, selectedPaymentFilter, searchTerm, slaUrgentOnlyFilter, slaSummary, clockNowMs,
     ]
   );
 
@@ -885,17 +873,9 @@ export default function DispatchRoute() {
       stagedPlanner,
     }),
     [
-      handleOpenReviewModal,
-      stableEditTripFromWorkspace,
-      handleOpenDriverModal,
-      stableCloneTripFromWorkspace,
-      stableFocusTripOnMapFromWorkspace,
-      stagedPlanner,
-      handleCancelAutoOffer,
-      stableOpenDriverPickerFromWorkspace,
-      handleOpenCompleteTripModal,
-      handlePromptCancelTrip,
-      handleReactivateTrip,
+      handleOpenReviewModal, stableEditTripFromWorkspace, handleOpenDriverModal, stableCloneTripFromWorkspace,
+      stableFocusTripOnMapFromWorkspace, stagedPlanner, handleCancelAutoOffer, stableOpenDriverPickerFromWorkspace,
+      handleOpenCompleteTripModal, handlePromptCancelTrip, handleReactivateTrip,
     ]
   );
 
@@ -1424,6 +1404,21 @@ export default function DispatchRoute() {
         confirmVariant={confirmModalConfig.confirmVariant || 'primary'}
         onConfirm={confirmModalConfig.onConfirm}
         onCancel={() => setConfirmModalConfig((prev) => ({ ...prev, isOpen: false }))}
+      />
+
+      {/* Incoming-Call & CRM Client Profile Floating Window */}
+      <ClientProfileWindow
+        trips={trips}
+        vehicles={settings.vehicles}
+        drivers={drivers}
+        fleetCars={settings.fleet}
+        nowMs={clockNowMs}
+        onLoadTripIntoNewTab={(vals) => handleCloneBookingToNewDraft(vals)}
+        onOpenTripDetails={(t) => handleOpenReviewModal(t, 'details')}
+        onCallClient={(ph, nm) => {
+          void handleStartCall(ph, nm);
+          setActiveDockTab('phone');
+        }}
       />
 
       {/* Universal Modeless Driver Queue Window */}

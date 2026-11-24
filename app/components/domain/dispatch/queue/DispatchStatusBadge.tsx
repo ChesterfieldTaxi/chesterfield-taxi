@@ -30,8 +30,8 @@ const STATUS_META_BY_KEY: Record<string, DispatchStatusMeta> = {
   en_route: { key: 'en_route', label: 'En Route', tooltip: 'En Route to pickup', pillClass: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
   arrived: { key: 'arrived', label: 'Arrived', tooltip: 'Arrived at pickup', pillClass: 'bg-orange-100 text-orange-900 border-orange-300' },
   in_progress: { key: 'in_progress', label: 'In Progress', tooltip: 'In Progress — Passenger on board', pillClass: 'bg-emerald-100 text-emerald-900 border-emerald-400' },
-  completed: { key: 'completed', label: 'Completed', tooltip: 'Completed', pillClass: 'bg-emerald-100/90 text-emerald-900 border-emerald-400' },
-  cancelled: { key: 'cancelled', label: 'Cancelled', tooltip: 'Cancelled', pillClass: 'bg-rose-100 text-rose-800 border-rose-300' },
+  completed: { key: 'completed', label: 'Completed', tooltip: 'Completed', pillClass: 'bg-emerald-700 text-white border-emerald-800' },
+  cancelled: { key: 'cancelled', label: 'Cancelled', tooltip: 'Cancelled', pillClass: 'bg-rose-800 text-white border-rose-900' },
   declined: { key: 'declined', label: 'Declined', tooltip: 'Declined', pillClass: 'bg-slate-200 text-slate-700 border-slate-300' },
 };
 

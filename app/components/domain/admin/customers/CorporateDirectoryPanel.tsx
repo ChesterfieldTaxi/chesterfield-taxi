@@ -18,7 +18,11 @@ import {
   UsersIcon,
   XIcon,
 } from '../../../ui/Icons';
-import { RegeneratePoModal, PoHistoryModal } from '../corporate/CorporateAccountModals';
+import {
+  RegeneratePoModal,
+  PoHistoryModal,
+  CorporateBookingPinModal,
+} from '../corporate/CorporateAccountModals';
 import { CorporateGovernanceCard } from './CorporateGovernanceCard';
 
 const CORP_PAGE_SIZE = 30;
@@ -51,6 +55,7 @@ export function CorporateDirectoryPanel({
   const [selectedPoAccount, setSelectedPoAccount] = useState<CorporateAccountConfig | null>(null);
   const [isRegeneratePoOpen, setIsRegeneratePoOpen] = useState(false);
   const [isPoHistoryOpen, setIsPoHistoryOpen] = useState(false);
+  const [isBookingPinOpen, setIsBookingPinOpen] = useState(false);
 
   const handleCopyPo = (po: string, id: string) => {
     navigator.clipboard?.writeText(po);
@@ -261,6 +266,20 @@ export function CorporateDirectoryPanel({
                         </Button>
                       )}
 
+                      {onSave && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setSelectedPoAccount(corp);
+                            setIsBookingPinOpen(true);
+                          }}
+                          className="text-[10px] text-indigo-700 hover:text-indigo-900 py-1 h-auto px-2 cursor-pointer"
+                        >
+                          {corp.bookingPin ? `PIN (${corp.bookingPin.length})` : 'Set PIN'}
+                        </Button>
+                      )}
+
                       {corp.poNumberHistory && corp.poNumberHistory.length > 0 && (
                         <Button
                           size="sm"
@@ -412,6 +431,19 @@ export function CorporateDirectoryPanel({
             setIsPoHistoryOpen(false);
             setSelectedPoAccount(null);
           }}
+        />
+      )}
+
+      {selectedPoAccount && (
+        <CorporateBookingPinModal
+          account={selectedPoAccount}
+          isOpen={isBookingPinOpen}
+          onClose={() => {
+            setIsBookingPinOpen(false);
+            setSelectedPoAccount(null);
+          }}
+          onSuccess={(updated) => void onPoRegenerateSuccess(updated)}
+          operatorEmail="admin@chesterfieldtaxi.com"
         />
       )}
     </div>

@@ -9,6 +9,10 @@ import {
   getCorporateAccountService,
   validatePoFormatRegex,
 } from '../../../../core/services/corporate-account.service';
+import {
+  isValidCorporateBookingPin,
+  normalizeCorporateBookingPin,
+} from '../../../../core/services/corporate-caller-auth.util';
 import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
@@ -63,6 +67,12 @@ export function CorporateAccountDirectoryDrawer({
       }
     }
 
+    const cleanPin = normalizeCorporateBookingPin(editingCorp.bookingPin);
+    if (cleanPin && !isValidCorporateBookingPin(cleanPin)) {
+      setFormError('Verbal Booking PIN must be 4–8 alphanumeric characters (A–Z, 0–9).');
+      return;
+    }
+
     setFormError(null);
     setIsSaving(true);
     try {
@@ -84,6 +94,7 @@ export function CorporateAccountDirectoryDrawer({
         billingAddress: editingCorp.billingAddress?.trim() || undefined,
         taxId: editingCorp.taxId?.trim() || undefined,
         currentPoNumber: poNum,
+        bookingPin: cleanPin || undefined,
         updatedAt: new Date().toISOString(),
       };
       await onSaveCorporateAccount(cleanRecord);
@@ -246,17 +257,37 @@ export function CorporateAccountDirectoryDrawer({
             </h3>
           </div>
 
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">
-              Active PO Number {portalPolicy.poFormatRegex ? `(Pattern: ${portalPolicy.poFormatRegex})` : ''}
-            </label>
-            <input
-              type="text"
-              value={editingCorp.currentPoNumber || ''}
-              onChange={(e) => setEditingCorp({ ...editingCorp, currentPoNumber: e.target.value })}
-              placeholder="PO-XXXXXX"
-              className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">
+                Active PO Number {portalPolicy.poFormatRegex ? `(Pattern: ${portalPolicy.poFormatRegex})` : ''}
+              </label>
+              <input
+                type="text"
+                value={editingCorp.currentPoNumber || ''}
+                onChange={(e) => setEditingCorp({ ...editingCorp, currentPoNumber: e.target.value })}
+                placeholder="PO-XXXXXX"
+                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold"
+              />
+            </div>
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">
+                Verbal Booking PIN (4–8 Alphanumeric, Optional)
+              </label>
+              <input
+                type="text"
+                maxLength={8}
+                value={editingCorp.bookingPin || ''}
+                onChange={(e) =>
+                  setEditingCorp({
+                    ...editingCorp,
+                    bookingPin: normalizeCorporateBookingPin(e.target.value),
+                  })
+                }
+                placeholder="e.g. BAYR26"
+                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold uppercase tracking-wider"
+              />
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-6 pt-1">

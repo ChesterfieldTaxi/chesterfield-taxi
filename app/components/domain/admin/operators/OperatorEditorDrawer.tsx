@@ -17,6 +17,7 @@ import {
   UserIcon,
 } from '../../../ui/Icons';
 import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
+import { LocationAutocomplete } from '../../LocationAutocomplete';
 import { ROLE_META, type EditFormState } from './operator-provisioning.util';
 import { RoleIcon } from './OperatorRosterPanel';
 
@@ -185,6 +186,26 @@ export function OperatorEditorDrawer({
                   <input type="range" min={0} max={100} value={editForm.driverScore} onChange={(e) => onChangeForm({ ...editForm, driverScore: Number(e.target.value) })} className="w-full accent-blue-600 mt-2 cursor-pointer" />
                 </div>
               </div>
+              <LocationAutocomplete
+                label="Driver Home Address"
+                placeholder="Search driver's home base address..."
+                value={editForm.homeAddress || ''}
+                onChange={(val) =>
+                  onChangeForm({
+                    ...editForm,
+                    homeAddress: val,
+                    homeCoordinates: val.trim() ? editForm.homeCoordinates : undefined,
+                  })
+                }
+                onPlaceSelected={(place) =>
+                  onChangeForm({
+                    ...editForm,
+                    homeAddress: place.address,
+                    homeCoordinates: place.coordinates,
+                  })
+                }
+                helperText="Used for optional Dispatch Map 'Driver Homes' layer"
+              />
             </section>
           )}
 

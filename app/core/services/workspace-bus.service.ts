@@ -171,6 +171,13 @@ export interface WorkspaceEventMap {
     placeId?: string;
     updatedAt: number;
   };
+  OPEN_CLIENT_PROFILE: {
+    phone?: string;
+    email?: string;
+    name?: string;
+    callSid?: string;
+    source?: 'incoming_call' | 'answered_call' | 'outbound_call' | 'passenger_crm' | 'comms_hub';
+  };
 }
 
 export type WorkspaceEventType = keyof WorkspaceEventMap;

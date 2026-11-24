@@ -5,8 +5,8 @@ import type {
   DispatchVehicleOption,
 } from '../../../../core/hooks/booking';
 import { PriceBreakdownPanel } from '../../booking/PriceBreakdownPanel';
-import { ConfirmationModal } from '../../../ui/ConfirmationModal';
 import {
+  AlertTriangleIcon,
   ChevronDownIcon,
   CopyIcon,
   MailIcon,
@@ -115,6 +115,54 @@ export function DispatchBookingFooterBar({
         </div>
       )}
 
+      {/* Sidebar-Docked Clear Confirmation Card (Anchored Above Sticky Footer) */}
+      {isClearModalOpen && (
+        <div
+          role="alertdialog"
+          aria-label="Clear Booking Form"
+          className="w-full z-30 border-t border-rose-200 bg-rose-50/95 backdrop-blur-md px-3 py-2.5 shrink-0 shadow-[0_-6px_16px_rgba(15,23,42,0.08)] space-y-2 animate-in fade-in slide-in-from-bottom-1 duration-150"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2 min-w-0">
+              <AlertTriangleIcon className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <div className="text-xs font-extrabold text-rose-950">Clear Booking Form?</div>
+                <p className="text-[11px] text-rose-800 leading-snug">
+                  All unsaved inputs in this booking tab will be reset to default values.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsClearModalOpen(false)}
+              className="p-0.5 rounded text-rose-400 hover:text-rose-700 cursor-pointer shrink-0"
+              aria-label="Cancel clear form"
+            >
+              <XIcon className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              type="button"
+              onClick={() => setIsClearModalOpen(false)}
+              className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold text-[11px] cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onClear();
+                setIsClearModalOpen(false);
+              }}
+              className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[11px] shadow-2xs cursor-pointer"
+            >
+              Clear Form
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Sticky Action Bar (Pinned Bottom) */}
       <div className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 py-2.5 lg:py-2 flex items-center justify-between shrink-0 shadow-[0_-4px_12px_rgba(15,23,42,0.06)] z-20 gap-2">
         <div className="flex flex-col min-w-0">
@@ -200,7 +248,6 @@ export function DispatchBookingFooterBar({
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {!isEditMode && (
             <>
-              {/* Mobile compact Email Confirm toggle pill */}
               <button
                 type="button"
                 onClick={() => setSendEmailConfirmation((v) => !v)}
@@ -219,7 +266,6 @@ export function DispatchBookingFooterBar({
                 <MailIcon className="w-4 h-4" />
               </button>
 
-              {/* Desktop Email Confirm checkbox */}
               <label
                 className="hidden sm:flex items-center gap-1 text-[10.5px] font-semibold text-slate-600 cursor-pointer select-none px-1.5 py-1 rounded-lg hover:bg-slate-100"
                 title={
@@ -282,20 +328,6 @@ export function DispatchBookingFooterBar({
           </button>
         </div>
       </div>
-
-      <ConfirmationModal
-        isOpen={isClearModalOpen}
-        title="Clear Booking Form"
-        message="Are you sure you want to clear this booking form? All unsaved inputs will be reset to default values."
-        confirmText="Clear Form"
-        cancelText="Cancel"
-        confirmVariant="danger"
-        onConfirm={() => {
-          onClear();
-          setIsClearModalOpen(false);
-        }}
-        onCancel={() => setIsClearModalOpen(false)}
-      />
     </>
   );
 }

@@ -8,6 +8,7 @@ import {
   ClockIcon,
   ExternalLinkIcon,
   PhoneIcon,
+  UserIcon,
   XIcon,
 } from '../../ui/Icons';
 import { CommsContactModal } from './comms/comms-ContactModal';
@@ -114,13 +115,8 @@ function CommsHubComponent({
     if (activeTab === 'messages') return sync.messageConversations;
     return sync.filteredAllInteractions;
   }, [
-    activeTab,
-    softphone.callsSubTab,
-    sync.filteredAllInteractions,
-    sync.filteredHistoryCalls,
-    sync.filteredMissedCalls,
-    sync.filteredVoicemails,
-    sync.messageConversations,
+    activeTab, softphone.callsSubTab, sync.filteredAllInteractions,
+    sync.filteredHistoryCalls, sync.filteredMissedCalls, sync.filteredVoicemails, sync.messageConversations,
   ]);
 
   // 4. Contextual Row Long-Press Action Sheet & Multi-Select Triage Controls
@@ -252,17 +248,9 @@ function CommsHubComponent({
     window.addEventListener('keydown', handleCommsHotkeys, true);
     return () => window.removeEventListener('keydown', handleCommsHotkeys, true);
   }, [
-    isVisible,
-    triage.commsActionSheetEvent,
-    messaging.isNewMessageModalOpen,
-    messaging.isContactEditOpen,
-    softphone.showAgentSetupModal,
-    softphone.isEditingOperatorPhone,
-    messaging.selectedContactPhone,
-    triage.selectedItemIds.size,
-    messaging.newMsgBody,
-    messaging.noteDraftText,
-    messaging.smsReplyText,
+    isVisible, triage.commsActionSheetEvent, messaging.isNewMessageModalOpen, messaging.isContactEditOpen,
+    softphone.showAgentSetupModal, softphone.isEditingOperatorPhone, messaging.selectedContactPhone,
+    triage.selectedItemIds.size, messaging.newMsgBody, messaging.noteDraftText, messaging.smsReplyText,
   ]);
 
   const sharedLogProps = {
@@ -411,6 +399,19 @@ function CommsHubComponent({
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() =>
+                getWorkspaceBus().publish('OPEN_CLIENT_PROFILE', {
+                  phone: softphone.incomingCallInfo?.from,
+                  name: softphone.callerCrmContext?.contactName,
+                  source: 'comms_hub',
+                })
+              }
+              className="px-2.5 py-1.5 rounded-xl bg-emerald-800/70 hover:bg-emerald-800 text-white text-xs font-bold cursor-pointer transition-colors"
+            >
+              Client Profile
+            </button>
+            <button
+              type="button"
               onClick={softphone.handleRejectIncomingCall}
               className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold cursor-pointer transition-colors shadow-xs"
             >
@@ -554,7 +555,36 @@ function CommsHubComponent({
 
         {/* VIEW 2: UNIFIED CONTACT CONVERSATION THREAD */}
         {messaging.selectedContactPhone && messaging.activeContactSummary && (
-          <SmsThreadPane mode="thread" {...sharedSmsThreadProps} />
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="px-2.5 py-1 bg-indigo-50/80 border-b border-indigo-100 flex items-center justify-between shrink-0">
+              <span className="text-[10.5px] font-bold text-indigo-900 truncate">
+                {messaging.activeContactRecord?.name || messaging.activeContactSummary.contactName}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  getWorkspaceBus().publish('OPEN_CLIENT_PROFILE', {
+                    phone:
+                      messaging.activeContactRecord?.phone ||
+                      messaging.activeContactSummary?.mobilePhone ||
+                      messaging.activeContactSummary?.contactPhone,
+                    email:
+                      messaging.activeContactRecord?.email ||
+                      messaging.activeContactSummary?.contactEmail,
+                    name:
+                      messaging.activeContactRecord?.name ||
+                      messaging.activeContactSummary?.contactName,
+                    source: 'comms_hub',
+                  })
+                }
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white hover:bg-indigo-100 text-indigo-700 font-bold text-[10.5px] border border-indigo-200 cursor-pointer shrink-0"
+              >
+                <UserIcon className="w-3 h-3" />
+                <span>Client Profile</span>
+              </button>
+            </div>
+            <SmsThreadPane mode="thread" {...sharedSmsThreadProps} />
+          </div>
         )}
 
         {/* VIEW 3: FULL DTMF NUMERIC DIALPAD & SOFTPHONE / CALL HISTORY */}

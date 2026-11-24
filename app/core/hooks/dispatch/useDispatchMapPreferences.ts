@@ -17,6 +17,8 @@ export interface DispatchMapPreferences {
   showPlacesOverlay: boolean;
   /** Render blacklisted / safety exclusion circles on the Dispatch map (default: false). */
   showExclusionsOverlay: boolean;
+  /** Render active non-archived Driver Home base pins on the Dispatch map (default: false). */
+  showDriverHomesOverlay: boolean;
   /** Multi-select vehicle type filter keys; empty array `[]` means all vehicle types shown (default: []). */
   selectedVehicleTypes: string[];
 }
@@ -26,6 +28,7 @@ export interface DispatchMapAdminOverlayDefaults {
   defaultShowTrafficOverlay?: boolean;
   defaultShowPlacesOverlay?: boolean;
   defaultShowExclusionsOverlay?: boolean;
+  defaultShowDriverHomesOverlay?: boolean;
 }
 
 export const DEFAULT_DISPATCH_MAP_PREFERENCES: DispatchMapPreferences = Object.freeze({
@@ -36,6 +39,7 @@ export const DEFAULT_DISPATCH_MAP_PREFERENCES: DispatchMapPreferences = Object.f
   showTrafficOverlay: false,
   showPlacesOverlay: false,
   showExclusionsOverlay: false,
+  showDriverHomesOverlay: false,
   selectedVehicleTypes: [],
 });
 
@@ -73,6 +77,10 @@ function buildFallbackPreferences(
     showExclusionsOverlay: Boolean(
       adminDefaults?.defaultShowExclusionsOverlay ??
         DEFAULT_DISPATCH_MAP_PREFERENCES.showExclusionsOverlay
+    ),
+    showDriverHomesOverlay: Boolean(
+      adminDefaults?.defaultShowDriverHomesOverlay ??
+        DEFAULT_DISPATCH_MAP_PREFERENCES.showDriverHomesOverlay
     ),
     selectedVehicleTypes: [],
   };
@@ -126,6 +134,10 @@ export function parseDispatchMapPreferences(
         typeof obj.showExclusionsOverlay === 'boolean'
           ? obj.showExclusionsOverlay
           : fallback.showExclusionsOverlay,
+      showDriverHomesOverlay:
+        typeof obj.showDriverHomesOverlay === 'boolean'
+          ? obj.showDriverHomesOverlay
+          : fallback.showDriverHomesOverlay,
       selectedVehicleTypes: normalizeVehicleTypeArray(obj.selectedVehicleTypes),
     };
   } catch {
@@ -157,6 +169,9 @@ export function serializeDispatchMapPreferences(prefs: Partial<DispatchMapPrefer
     showExclusionsOverlay: Boolean(
       prefs.showExclusionsOverlay ?? DEFAULT_DISPATCH_MAP_PREFERENCES.showExclusionsOverlay
     ),
+    showDriverHomesOverlay: Boolean(
+      prefs.showDriverHomesOverlay ?? DEFAULT_DISPATCH_MAP_PREFERENCES.showDriverHomesOverlay
+    ),
     selectedVehicleTypes: normalizeVehicleTypeArray(prefs.selectedVehicleTypes),
   });
 }
@@ -170,6 +185,7 @@ function arePreferencesEqual(a: DispatchMapPreferences, b: DispatchMapPreference
     a.showTrafficOverlay !== b.showTrafficOverlay ||
     a.showPlacesOverlay !== b.showPlacesOverlay ||
     a.showExclusionsOverlay !== b.showExclusionsOverlay ||
+    a.showDriverHomesOverlay !== b.showDriverHomesOverlay ||
     a.selectedVehicleTypes.length !== b.selectedVehicleTypes.length
   ) {
     return false;

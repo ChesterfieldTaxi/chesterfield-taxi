@@ -3,7 +3,11 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { DispatchMapPreferences } from '../../../../core/hooks/dispatch/useDispatchMapPreferences';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
-import type { CompanyInfoConfig } from '../../../../core/types/config';
+import type {
+  CompanyInfoConfig,
+  FleetCarConfig,
+  VehicleTierConfig,
+} from '../../../../core/types/config';
 import { getZoneService, isCoordinateInZone } from '../../../../core/services/zones/zone.service';
 import {
   getSpecialPlacesService,
@@ -11,6 +15,13 @@ import {
 } from '../../../../core/services/places/special-places.service';
 import { getWorkspaceBus } from '../../../../core/services/workspace-bus.service';
 import type { BlacklistedLocation, ZoneGeofence } from '../../../../core/types/zone';
+import {
+  buildDriverHomePinDataUrl,
+  buildDriverHomesOverlayItems,
+  formatDriverShiftScheduleSummary,
+  useDriverHomesMapLayer,
+  type DriverHomeOverlayItem,
+} from './driver-homes-overlay.util';
 import {
   DEFAULT_HEADQUARTERS_FALLBACK_COORDS,
   buildHeadquartersPinDataUrl,
@@ -27,12 +38,16 @@ import {
 
 export {
   DEFAULT_HEADQUARTERS_FALLBACK_COORDS,
+  buildDriverHomePinDataUrl,
+  buildDriverHomesOverlayItems,
   buildHeadquartersPinDataUrl,
   buildPlaceMarkerDataUrl,
   buildStarredPlacesOverlayItems,
+  formatDriverShiftScheduleSummary,
   resolveHeadquartersCoordinates,
   resolveHeadquartersOverlayPlace,
   type CustomPlaceMarkerCategory,
+  type DriverHomeOverlayItem,
   type MapOverlayPlaceItem,
 };
 
@@ -41,7 +56,8 @@ const MILES_TO_METERS = 1609.344;
 export type SelectedCustomOverlayItem =
   | { kind: 'zone'; zone: ZoneGeofence }
   | { kind: 'place'; place: MapOverlayPlaceItem }
-  | { kind: 'exclusion'; exclusion: BlacklistedLocation };
+  | { kind: 'exclusion'; exclusion: BlacklistedLocation }
+  | { kind: 'driver_home'; driverHome: DriverHomeOverlayItem };
 
 export interface PopulateBookingEndpointPayload {
   pickupAddress?: string;
@@ -55,6 +71,8 @@ export interface UseLiveMapCustomOverlaysParams {
   mapInstanceRef: React.RefObject<google.maps.Map | null>;
   preferences: DispatchMapPreferences;
   fleet: LiveFleetDriver[];
+  fleetCars?: FleetCarConfig[] | null;
+  vehicleTiers?: VehicleTierConfig[] | null;
   companyInfo?: Partial<CompanyInfoConfig> | null;
   onPopulateBooking?: (payload: PopulateBookingEndpointPayload) => void;
 }
@@ -64,6 +82,8 @@ export function useLiveMapCustomOverlays({
   mapInstanceRef,
   preferences,
   fleet,
+  fleetCars,
+  vehicleTiers,
   companyInfo,
   onPopulateBooking,
 }: UseLiveMapCustomOverlaysParams) {
@@ -97,6 +117,29 @@ export function useLiveMapCustomOverlays({
     companyInfoOverride: companyInfo,
     onSelectPlace: handleSelectHqPlace,
     onSyncPlaceIfSelected: handleSyncHqPlace,
+  });
+
+  const handleSelectDriverHome = useCallback((driverHome: DriverHomeOverlayItem) => {
+    setAppliedEndpointFeedback(null);
+    setSelectedOverlay({ kind: 'driver_home', driverHome });
+  }, []);
+
+  const handleClearHiddenDriverHome = useCallback((validDriverIds: Set<string>) => {
+    setSelectedOverlay((prev) =>
+      prev?.kind === 'driver_home' && !validDriverIds.has(prev.driverHome.driverId) ? null : prev
+    );
+  }, []);
+
+  useDriverHomesMapLayer({
+    mapReady,
+    mapInstanceRef,
+    showDriverHomesOverlay: preferences.showDriverHomesOverlay,
+    fleet,
+    selectedVehicleTypes: preferences.selectedVehicleTypes,
+    fleetCars,
+    vehicleTiers,
+    onSelectDriverHome: handleSelectDriverHome,
+    onClearIfHidden: handleClearHiddenDriverHome,
   });
 
   // 1. Live Google TrafficLayer lifecycle

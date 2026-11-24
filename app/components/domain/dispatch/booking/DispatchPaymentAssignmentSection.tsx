@@ -1,6 +1,7 @@
 import React from 'react';
 import type {
   CorporateAccountConfig,
+  CorporateAuthorizedRider,
   NamedPricingRule,
   SurchargesConfig,
   UniversalExtrasConfig,
@@ -9,14 +10,12 @@ import type { TripPricing } from '../../../../core/types/trip';
 import type { PoValidationResult } from '../../../../core/services/corporate-account.service';
 import type { DriverRosterItem } from '../../../../core/services/operator.service';
 import {
-  DEFAULT_CORPORATE_ACCOUNTS,
   DEFAULT_DISPATCH_COMPANIES as DEFAULT_COMPANIES,
 } from '../../../../core/hooks/booking';
 import { DriverAssignDropdown } from '../queue/DriverAssignDropdown';
+import { DispatchCorporateAccountCard } from './DispatchCorporateAccountCard';
 import { DispatchWaiveFeesDropdown } from './DispatchWaiveFeesDropdown';
 import {
-  AlertTriangleIcon,
-  CheckIcon,
   CreditCardIcon,
   LockIcon,
   ShieldCheckIcon,
@@ -46,8 +45,16 @@ export interface DispatchPaymentAssignmentSectionProps {
   setAllowPoOverride: (val: boolean) => void;
   authorizedBy: string;
   setAuthorizedBy: (val: string) => void;
-  invoicingTerms: string;
-  setInvoicingTerms: (val: string) => void;
+  invoicingTerms?: string;
+  setInvoicingTerms?: (val: string) => void;
+  callerPhone?: string;
+  passengerPhone?: string;
+  passengerEmail?: string;
+  bookerPhone?: string;
+  bookerEmail?: string;
+  enteredBookingPin?: string;
+  setEnteredBookingPin?: (val: string) => void;
+  onSelectAuthorizedRider?: (rider: CorporateAuthorizedRider) => void;
   selectedRuleId: string;
   setSelectedRuleId: (val: string) => void;
   setTariff: (val: string) => void;
@@ -107,8 +114,14 @@ export function DispatchPaymentAssignmentSection({
   setAllowPoOverride,
   authorizedBy,
   setAuthorizedBy,
-  invoicingTerms,
-  setInvoicingTerms,
+  callerPhone,
+  passengerPhone,
+  passengerEmail,
+  bookerPhone,
+  bookerEmail,
+  enteredBookingPin,
+  setEnteredBookingPin,
+  onSelectAuthorizedRider,
   selectedRuleId,
   setSelectedRuleId,
   setTariff,
@@ -243,177 +256,30 @@ export function DispatchPaymentAssignmentSection({
           </div>
         )}
 
-        {/* Corporate Account Sub-Panel */}
-        {paymentMethod === 'account' &&
-          (() => {
-            const selectedCorp = selectedCorporateAccount;
-
-            return (
-              <div className="p-2.5 mb-2 bg-amber-50/80 border border-amber-300 rounded-xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wide">
-                    Corporate Account Billing
-                  </span>
-                  {selectedCorp && (
-                    <span
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                        selectedCorp.poRequired
-                          ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                          : 'bg-slate-100 text-slate-600 border border-slate-200'
-                      }`}
-                    >
-                      {selectedCorp.poRequired ? 'PO Required on Booking' : 'PO Optional'}
-                    </span>
-                  )}
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[10px] text-slate-600 font-semibold">
-                      Corporate Client
-                    </span>
-                    {selectedCorp && (
-                      <span className="text-[10px] font-mono text-slate-500 font-semibold">
-                        Acct #{selectedCorp.accountNumber} • Limit: $
-                        {selectedCorp.creditLimit.toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                  <Select
-                    size="sm"
-                    value={corporateAccount}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCorporateAccount(val);
-                    }}
-                    triggerClassName="border-amber-300"
-                  >
-                    {corporateAccountList.length > 0
-                      ? corporateAccountList.map((acc) => (
-                          <option key={acc.id} value={acc.companyName}>
-                            {acc.companyName} ({acc.accountNumber})
-                            {acc.poRequired ? ' [PO REQ]' : ''}
-                          </option>
-                        ))
-                      : DEFAULT_CORPORATE_ACCOUNTS.map((acc) => (
-                          <option key={acc} value={acc}>
-                            {acc}
-                          </option>
-                        ))}
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[10px] text-slate-600 font-semibold">
-                        Billing PO / Code
-                      </span>
-                      {selectedCorp?.currentPoNumber && (
-                        <span className="text-[9px] font-mono text-slate-500">
-                          Active: {selectedCorp.currentPoNumber}
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      placeholder={selectedCorp?.currentPoNumber || 'PO-XXXX'}
-                      value={billingPo}
-                      onChange={(e) => setBillingPo(e.target.value)}
-                      className={`w-full px-2 py-1 bg-white border rounded text-xs font-mono font-bold ${
-                        poValidation?.status === 'expired_revoked'
-                          ? 'border-rose-500 bg-rose-50 text-rose-800 ring-2 ring-rose-500/20'
-                          : poValidation?.status === 'valid'
-                          ? 'border-emerald-500 text-emerald-800'
-                          : 'border-amber-300'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                      Authorized By / Contact
-                    </span>
-                    <input
-                      type="text"
-                      placeholder="Dept Manager or Email"
-                      value={authorizedBy}
-                      onChange={(e) => setAuthorizedBy(e.target.value)}
-                      className="w-full px-2 py-1 bg-white border border-amber-300 rounded text-xs"
-                    />
-                  </div>
-                </div>
-
-                {/* Live Anti-Fraud PO Validation Feedback */}
-                {selectedCorp && billingPo.trim().length > 0 && (
-                  <div className="text-[10px]">
-                    {poValidation?.status === 'valid' && (
-                      <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
-                        <CheckIcon className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-                        <span className="font-semibold">Active Authorized PO verified.</span>
-                      </div>
-                    )}
-                    {poValidation?.status === 'expired_revoked' && (
-                      <div className="flex items-start gap-1.5 text-rose-700 bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-300 font-medium">
-                        <AlertTriangleIcon className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
-                        <div>
-                          <strong className="block font-bold">
-                            FRAUD ALERT: REVOKED PO DETECTED
-                          </strong>
-                          <span>
-                            PO &ldquo;{billingPo}&rdquo; was revoked/rotated on{' '}
-                            {poValidation.revokedRecord?.rotatedAt
-                              ? poValidation.revokedRecord.rotatedAt.slice(0, 10)
-                              : 'previously'}
-                            . This booking cannot proceed under this revoked authorization.
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    {poValidation?.status === 'mismatch' && (
-                      <div className="space-y-1.5 text-rose-800 bg-rose-50 px-2.5 py-2 rounded-lg border border-rose-300">
-                        <div className="flex items-center gap-1.5 font-bold">
-                          <AlertTriangleIcon className="w-3.5 h-3.5 shrink-0 text-rose-600" />
-                          <span>
-                            PO Mismatch — Active PO on file:{' '}
-                            {selectedCorp.currentPoNumber || 'None'}.
-                          </span>
-                        </div>
-                        {selectedCorp.poRequired && (
-                          <label className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-700 cursor-pointer pt-0.5">
-                            <input
-                              type="checkbox"
-                              checked={allowPoOverride}
-                              onChange={(e) => setAllowPoOverride(e.target.checked)}
-                              className="rounded border-rose-400 text-rose-600 focus:ring-rose-500"
-                            />
-                            <span>
-                              Supervisor Override: authorize mismatched PO (logged in audit trail)
-                            </span>
-                          </label>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div>
-                  <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                    Invoicing Terms
-                  </span>
-                  <Select
-                    size="sm"
-                    value={invoicingTerms}
-                    onChange={(e) => setInvoicingTerms(e.target.value)}
-                    triggerClassName="border-amber-300"
-                  >
-                    <option value="Net 30 Direct Bill">Net 30 Direct Bill</option>
-                    <option value="Semi-Monthly Invoice">Semi-Monthly Invoice</option>
-                    <option value="Monthly Statement">Monthly Statement</option>
-                  </Select>
-                </div>
-              </div>
-            );
-          })()}
+        {/* Corporate Account 4-Signal Caller Verification Card (No Dispatcher Billing Cycle Selector) */}
+        {paymentMethod === 'account' && (
+          <DispatchCorporateAccountCard
+            corporateAccount={corporateAccount}
+            setCorporateAccount={setCorporateAccount}
+            corporateAccountList={corporateAccountList}
+            selectedCorporateAccount={selectedCorporateAccount}
+            billingPo={billingPo}
+            setBillingPo={setBillingPo}
+            poValidation={poValidation}
+            allowPoOverride={allowPoOverride}
+            setAllowPoOverride={setAllowPoOverride}
+            authorizedBy={authorizedBy}
+            setAuthorizedBy={setAuthorizedBy}
+            callerPhone={callerPhone}
+            passengerPhone={passengerPhone}
+            passengerEmail={passengerEmail}
+            bookerPhone={bookerPhone}
+            bookerEmail={bookerEmail}
+            enteredBookingPin={enteredBookingPin}
+            setEnteredBookingPin={setEnteredBookingPin}
+            onSelectAuthorizedRider={onSelectAuthorizedRider}
+          />
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           <div>

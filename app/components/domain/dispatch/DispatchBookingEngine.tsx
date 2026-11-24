@@ -19,6 +19,7 @@ import {
 } from '../../../core/services/pricing/surcharges.service';
 import { formatLocalDateStr } from '../../../core/services/pricing/vehicle-matching';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
+import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import type { FlightTelemetrySnapshot } from '../../../core/types/flight';
 import { getOperatorService, type DriverRosterItem } from '../../../core/services/operator.service';
@@ -120,6 +121,20 @@ function DispatchBookingEngineComponent({
     });
     return () => unsub();
   }, [propsDrivers]);
+
+  useEffect(() => {
+    return getWorkspaceBus().subscribe((msg) => {
+      if (msg.type === 'INCOMING_CALL' && msg.payload?.from) {
+        setCallerPhoneFromBus(msg.payload.from);
+      } else if (msg.type === 'CALL_INCOMING' && msg.payload?.callerNumber) {
+        setCallerPhoneFromBus(msg.payload.callerNumber);
+      } else if (msg.type === 'CALL_ANSWERED' && msg.payload?.callerNumber) {
+        setCallerPhoneFromBus(msg.payload.callerNumber);
+      } else if (msg.type === 'CALL_ENDED') {
+        setCallerPhoneFromBus('');
+      }
+    });
+  }, []);
 
   const isEditMode = Boolean(initialTrip?.id);
   const isCompleted = initialTrip?.status === 'completed';
@@ -232,6 +247,8 @@ function DispatchBookingEngineComponent({
   const [saveCardOnFile, setSaveCardOnFile] = useState(false);
   const [corporateAccount, setCorporateAccount] = useState(DEFAULT_CORPORATE_ACCOUNTS[0]);
   const [billingPo, setBillingPo] = useState('');
+  const [enteredBookingPin, setEnteredBookingPin] = useState('');
+  const [callerPhoneFromBus, setCallerPhoneFromBus] = useState('');
   const [allowPoOverride, setAllowPoOverride] = useState(false);
   const [authorizedBy, setAuthorizedBy] = useState('');
   const [invoicingTerms, setInvoicingTerms] = useState('Net 30 Direct Bill');
@@ -621,6 +638,7 @@ function DispatchBookingEngineComponent({
     cancelConflictPrompt,
     handleSubmit,
   } = useDispatchBookingSubmission({
+    enteredBookingPin,
     isEditMode,
     isCompleted,
     isCancelled,
@@ -771,7 +789,7 @@ function DispatchBookingEngineComponent({
     [returnTrip, isSymmetricRoundTrip, estimatedFare, returnEstimatedFare, isFareOverridden, manualFare]
   );
 
-  const { draftSavedAt, handleClear, handleCopyBooking } = useDispatchDraftSync({
+  const { draftSavedAt, handleClear: handleClearDraft, handleCopyBooking } = useDispatchDraftSync({
     draftId,
     draftStorageKey,
     resolvedIsActiveDraft,
@@ -1019,6 +1037,11 @@ function DispatchBookingEngineComponent({
     onCopyBooking,
     onCloneBooking,
   });
+
+  const handleClear = () => {
+    handleClearDraft();
+    setEnteredBookingPin('');
+  };
 
   resetAfterCreateRef.current = () => {
     handleClear();
@@ -1404,6 +1427,18 @@ function DispatchBookingEngineComponent({
           setAuthorizedBy={setAuthorizedBy}
           invoicingTerms={invoicingTerms}
           setInvoicingTerms={setInvoicingTerms}
+          callerPhone={callerPhoneFromBus}
+          passengerPhone={phone}
+          passengerEmail={email}
+          bookerPhone={isBookerDifferent ? contactPhone : ''}
+          bookerEmail={isBookerDifferent ? contactEmail : ''}
+          enteredBookingPin={enteredBookingPin}
+          setEnteredBookingPin={setEnteredBookingPin}
+          onSelectAuthorizedRider={(rider) => {
+            if (rider.name && !passengerName.trim()) setPassengerName(rider.name);
+            if (rider.phone && !phone.trim()) setPhone(rider.phone);
+            if (rider.email && !email.trim()) setEmail(rider.email);
+          }}
           selectedRuleId={selectedRuleId}
           setSelectedRuleId={setSelectedRuleId}
           setTariff={setTariff}

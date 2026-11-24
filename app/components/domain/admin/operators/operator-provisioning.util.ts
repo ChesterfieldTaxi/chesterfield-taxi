@@ -8,6 +8,7 @@ import {
   isFirebaseConfigured,
 } from '../../../../core/services/firebase';
 import type { UserRole } from '../../../../core/services/auth/admin-auth.service';
+import type { GeoPoint } from '../../../../core/types/trip';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
 import {
   generateDriverUsername,
@@ -72,6 +73,8 @@ export interface EditFormState {
   assignedUnit: string;
   driverLicense: string;
   driverScore: number;
+  homeAddress: string;
+  homeCoordinates?: GeoPoint;
   deskExtension: string;
   hireDate: string;
   emergencyContact: string;
@@ -132,6 +135,8 @@ export function buildInitialEditFormState(op: OperatorUser): EditFormState {
     assignedUnit: op.assignedUnit ? op.assignedUnit.replace(/^Cab\s*#?/i, 'Car #') : cab ? `Car #${cab}` : '',
     driverLicense: op.driverLicense || '',
     driverScore: typeof op.driverScore === 'number' ? op.driverScore : 98,
+    homeAddress: op.homeAddress || '',
+    homeCoordinates: op.homeCoordinates,
     deskExtension: op.deskExtension || '',
     hireDate: op.hireDate || '',
     emergencyContact: op.emergencyContact || '',
@@ -216,6 +221,9 @@ export async function saveEditedOperatorProfile(
     ? 'active'
     : editForm.status;
 
+  const cleanHomeAddr = editForm.homeAddress?.trim() || undefined;
+  const cleanHomeCoords = cleanHomeAddr ? editForm.homeCoordinates : undefined;
+
   const updatedOp: OperatorUser = {
     ...editingOperator,
     email: isRootAdmin ? editingOperator.email : editForm.email.trim().toLowerCase() || editingOperator.email,
@@ -230,6 +238,8 @@ export async function saveEditedOperatorProfile(
     assignedUnit,
     driverLicense: editForm.driverLicense.trim(),
     driverScore: clampedScore,
+    homeAddress: cleanHomeAddr,
+    homeCoordinates: cleanHomeCoords,
     deskExtension: editForm.deskExtension.trim(),
     hireDate: editForm.hireDate.trim(),
     emergencyContact: editForm.emergencyContact.trim(),
@@ -246,9 +256,25 @@ export async function saveEditedOperatorProfile(
     const db = getFirestore(getFirebaseApp());
     await setDoc(
       doc(db, 'fleet', `driver-${editingOperator.uid}`),
-      { name: updatedOp.displayName, license: updatedOp.driverLicense || '', cabNumber: cleanCab, username: cleanUsername, phone: updatedOp.phone || '' },
+      {
+        name: updatedOp.displayName,
+        license: updatedOp.driverLicense || '',
+        cabNumber: cleanCab,
+        username: cleanUsername,
+        phone: updatedOp.phone || '',
+        homeAddress: cleanHomeAddr || null,
+        homeCoordinates: cleanHomeCoords || null,
+      },
       { merge: true }
     );
+    await setDoc(
+      doc(db, 'drivers', editingOperator.uid),
+      {
+        homeAddress: cleanHomeAddr || null,
+        homeCoordinates: cleanHomeCoords || null,
+      },
+      { merge: true }
+    ).catch(() => {});
   }
 
   if (!isRootAdmin) {

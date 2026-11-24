@@ -10,6 +10,7 @@ import {
   getCorporateAccountService,
   type PoValidationResult,
 } from '../../services/corporate-account.service';
+import { normalizeCorporateBookingPin } from '../../services/corporate-caller-auth.util';
 import { getInvoicingService } from '../../services/invoicing.service';
 
 export function findMatchingCorporateAccount(
@@ -110,6 +111,7 @@ export async function validateDispatchCorporateSubmission(params: {
   billingPo: string;
   allowPoOverride: boolean;
   projectedFare: number;
+  enteredBookingPin?: string;
   poFormatRegex?: string;
   creditLimitEnforcement?: CreditLimitEnforcementMode;
   openBalanceOverride?: number;
@@ -145,6 +147,15 @@ export async function validateDispatchCorporateSubmission(params: {
     return {
       valid: false,
       error: `Corporate account "${selectedCorp.companyName}" is currently PAUSED / INACTIVE and cannot accept new direct-bill rides.`,
+    };
+  }
+
+  const expectedPin = normalizeCorporateBookingPin(selectedCorp.bookingPin);
+  const candidatePin = normalizeCorporateBookingPin(params.enteredBookingPin);
+  if (expectedPin.length >= 4 && candidatePin.length > 0 && candidatePin !== expectedPin) {
+    return {
+      valid: false,
+      error: `VERBAL PIN MISMATCH: Entered PIN "${candidatePin}" does not match the Verbal Booking PIN on file for "${selectedCorp.companyName}".`,
     };
   }
 

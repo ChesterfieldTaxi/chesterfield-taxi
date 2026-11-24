@@ -4,6 +4,7 @@ export * from './DispatchConvoyBanners';
 export * from './DispatchRoutingTimingSection';
 export * from './DispatchPassengerCrmSection';
 export * from './DispatchExtrasVehicleSection';
+export * from './DispatchCorporateAccountCard';
 export * from './DispatchPaymentAssignmentSection';
 export * from './DispatchReturnRepeatSection';
 export * from './DispatchBookingFooterBar';

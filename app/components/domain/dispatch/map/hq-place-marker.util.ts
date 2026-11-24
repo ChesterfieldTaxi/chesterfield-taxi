@@ -182,24 +182,57 @@ export function useHeadquartersMapPin(params: {
       return;
     }
     const addr = String(effectiveCompanyInfo?.address || '').trim();
-    if (!addr || !mapReady || typeof window === 'undefined' || !window.google?.maps?.Geocoder) return;
+    if (!addr || !mapReady || typeof window === 'undefined' || !window.google?.maps) return;
     if (geocodedHqCacheRef.current?.address === addr) {
       setGeocodedHqCoords(geocodedHqCacheRef.current.coords);
       return;
     }
     let cancelled = false;
+    const commitResolved = (resolved: ZoneCoordinate) => {
+      if (cancelled || !isValidCoord(resolved)) return;
+      geocodedHqCacheRef.current = { address: addr, coords: resolved };
+      setGeocodedHqCoords(resolved);
+    };
+    const runPlacesFallback = () => {
+      if (
+        cancelled ||
+        !mapInstanceRef.current ||
+        !window.google?.maps?.places?.PlacesService
+      ) {
+        return;
+      }
+      try {
+        const placesSvc = new window.google.maps.places.PlacesService(mapInstanceRef.current);
+        placesSvc.findPlaceFromQuery(
+          { query: addr, fields: ['geometry', 'name', 'formatted_address'] },
+          (placeResults, placeStatus) => {
+            if (cancelled) return;
+            const loc = placeResults?.[0]?.geometry?.location;
+            if (placeStatus === 'OK' && loc) {
+              commitResolved({ lat: loc.lat(), lng: loc.lng() });
+            }
+          }
+        );
+      } catch {}
+    };
     try {
-      const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ address: addr }, (results, status) => {
-        if (cancelled) return;
-        if (status === 'OK' && results?.[0]?.geometry?.location) {
-          const loc = results[0].geometry.location;
-          const resolved = { lat: loc.lat(), lng: loc.lng() };
-          geocodedHqCacheRef.current = { address: addr, coords: resolved };
-          setGeocodedHqCoords(resolved);
-        }
-      });
-    } catch {}
+      if (window.google.maps.Geocoder) {
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ address: addr }, (results, status) => {
+          if (cancelled) return;
+          const loc = results?.[0]?.geometry?.location;
+          if (status === 'OK' && loc) {
+            commitResolved({ lat: loc.lat(), lng: loc.lng() });
+          } else {
+            runPlacesFallback();
+          }
+        });
+      } else {
+        runPlacesFallback();
+      }
+    } catch {
+      runPlacesFallback();
+    }
     return () => {
       cancelled = true;
     };

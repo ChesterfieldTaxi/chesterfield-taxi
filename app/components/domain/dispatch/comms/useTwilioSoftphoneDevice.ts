@@ -380,6 +380,10 @@ export function useTwilioSoftphoneDevice({
     setActiveCallSid(call.parameters?.CallSid || null);
     setActiveTab('phone');
     setCallsSubTab('keypad');
+    workspaceBus.publish('CALL_ANSWERED', {
+      callerNumber: callerFrom,
+      callSid: call.parameters?.CallSid,
+    });
 
     setInteractions((prev) => [
       {

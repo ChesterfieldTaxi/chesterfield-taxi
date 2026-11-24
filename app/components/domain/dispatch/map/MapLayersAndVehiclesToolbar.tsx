@@ -31,6 +31,7 @@ const CUSTOM_OVERLAY_ITEMS: ReadonlyArray<{
   { key: 'showZonesOverlay', label: 'Zones', hint: 'Service zone polygons & radii', dotColor: '#3b82f6' },
   { key: 'showTrafficOverlay', label: 'Live Traffic', hint: 'Google real-time road conditions', dotColor: '#10b981' },
   { key: 'showPlacesOverlay', label: 'Places & Hubs', hint: 'Airports, hotels, hospitals & POIs', dotColor: '#6366f1' },
+  { key: 'showDriverHomesOverlay', label: 'Driver Homes', hint: 'Active driver home base pins', dotColor: '#0d9488' },
   { key: 'showExclusionsOverlay', label: 'Exclusions', hint: 'Blocked & review safety circles', dotColor: '#ef4444' },
 ];
 
@@ -79,6 +80,7 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
     (preferences.showZonesOverlay ? 1 : 0) +
     (preferences.showTrafficOverlay ? 1 : 0) +
     (preferences.showPlacesOverlay ? 1 : 0) +
+    (preferences.showDriverHomesOverlay ? 1 : 0) +
     (preferences.showExclusionsOverlay ? 1 : 0);
 
   const selectedVehicleCount = preferences.selectedVehicleTypes.length;

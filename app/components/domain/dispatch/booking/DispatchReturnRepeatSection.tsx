@@ -560,6 +560,14 @@ export function DispatchReturnRepeatSection({
                                     searchable
                                     searchPlaceholder="Search airline or IATA code..."
                                     value={returnAirline}
+                                    options={[
+                                      { value: '', label: 'Select Airline' },
+                                      ...MAJOR_AIRLINES.map((al) => ({
+                                        value: al.name,
+                                        label: `${al.name} (${al.code})`,
+                                        selectedLabel: al.code,
+                                      })),
+                                    ]}
                                     onChange={(e) => {
                                       const v = e.target.value;
                                       setReturnAirline(v);
@@ -572,14 +580,7 @@ export function DispatchReturnRepeatSection({
                                       }
                                     }}
                                     triggerClassName="border-indigo-200"
-                                  >
-                                    <option value="">Select Airline</option>
-                                    {MAJOR_AIRLINES.map((al) => (
-                                      <option key={al.code} value={al.name}>
-                                        {al.name} ({al.code})
-                                      </option>
-                                    ))}
-                                  </Select>
+                                  />
                                 </div>
                                 <div>
                                   <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">

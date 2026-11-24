@@ -770,6 +770,7 @@ export interface CorporateAccountConfig {
   billingContactPhone?: string;
   discountPercent: number;
   poRequired: boolean;
+  bookingPin?: string; // Optional 4–8 alphanumeric Verbal Booking PIN
   isActive: boolean;
   authorizedBookers?: string[];
   notes?: string;

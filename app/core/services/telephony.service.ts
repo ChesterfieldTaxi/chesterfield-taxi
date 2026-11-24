@@ -16,6 +16,8 @@ import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { isFirebaseConfigured, getFirestoreDb } from './firebase';
 import { authorizedFetch, getFirebaseAuthHeaders } from './auth/auth-headers';
 import { getCommsThreadService } from './comms/comms-thread.service';
+import { getContactService } from './customer/contact.service';
+import { getWorkspaceBus } from './workspace-bus.service';
 import { doc, updateDoc } from 'firebase/firestore';
 
 const MASKED_SESSIONS_STORAGE_KEY = 'ct_telephony_masked_sessions';
@@ -296,6 +298,14 @@ class TelephonyService implements ITelephonyService {
     };
 
     this.activeCall = session;
+    if (getContactService().getContactByPhone(sanitizedNumber)) {
+      getWorkspaceBus().publish('OPEN_CLIENT_PROFILE', {
+        phone: sanitizedNumber,
+        name: peerName,
+        callSid: session.callId,
+        source: 'outbound_call',
+      });
+    }
     return session;
   }
 
