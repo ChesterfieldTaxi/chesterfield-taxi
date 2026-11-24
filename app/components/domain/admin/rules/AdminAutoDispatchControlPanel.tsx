@@ -2,26 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '../../../ui/Card';
 import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
+import { Select } from '../../../ui/Select';
 import { Badge } from '../../../ui/Badge';
 import {
-  BoltIcon,
-  CheckIcon,
-  ClockIcon,
-  PlaneIcon,
-  ShieldCheckIcon,
-  SlidersIcon,
-  UsersIcon,
+  BoltIcon, CheckIcon, ClockIcon, PlaneIcon, ShieldCheckIcon, SlidersIcon, UsersIcon,
 } from '../../../ui/Icons';
-import {
-  getOperatorService,
-  type OperatorUser,
-} from '../../../../core/services/operator.service';
+import { getOperatorService, type OperatorUser } from '../../../../core/services/operator.service';
 import type {
-  ActiveAutoDispatchStrategyMode,
-  DispatchAutomationConfig,
-  DispatchAutomationMode,
-  DispatchExhaustionFallbackMode,
-  DispatchRankingStrategy,
+  ActiveAutoDispatchStrategyMode, DispatchAutomationConfig, DispatchAutomationMode,
+  DispatchExhaustionFallbackMode, DispatchRankingStrategy,
 } from '../../../../core/types/config';
 import type { ZoneGeofence } from '../../../../core/types/zone';
 import { AdminAutoDispatchSimulator } from './AdminAutoDispatchSimulator';
@@ -35,43 +24,24 @@ export interface AdminAutoDispatchControlPanelProps {
 }
 
 const MODE_CARDS: ReadonlyArray<{
-  mode: DispatchAutomationMode;
-  title: string;
-  badge: string;
-  description: string;
+  mode: DispatchAutomationMode; title: string; badge: string; description: string;
   accent: 'blue' | 'emerald' | 'indigo' | 'amber';
 }> = [
   {
-    mode: 'manual_1tap',
-    title: '1-Tap Manual',
-    badge: 'Dispatcher Controlled',
-    description:
-      'Dispatchers review and trigger offers manually per ride or click "Auto-Dispatch Ready (N)" on demand.',
-    accent: 'blue',
+    mode: 'manual_1tap', title: '1-Tap Manual', badge: 'Dispatcher Controlled', accent: 'blue',
+    description: 'Dispatchers review and trigger offers manually per ride or click "Auto-Dispatch Ready (N)" on demand.',
   },
   {
-    mode: 'sequential_cascade',
-    title: 'Sequential 1-by-1 Cascade',
-    badge: 'Ordered Rollover',
-    description:
-      'Offers 1 ranked driver at a time inside the Pre-Pickup Lead Window, rolling over automatically on decline or timeout.',
-    accent: 'emerald',
+    mode: 'sequential_cascade', title: 'Sequential 1-by-1 Cascade', badge: 'Ordered Rollover', accent: 'emerald',
+    description: 'Offers 1 ranked driver at a time inside the Pre-Pickup Lead Window, rolling over automatically on decline or timeout.',
   },
   {
-    mode: 'broadcast_pool',
-    title: 'Top-K Broadcast Pool',
-    badge: 'Simultaneous Race',
-    description:
-      'Offers top K (2–8) eligible drivers simultaneously; atomic first-accept wins the ride immediately.',
-    accent: 'indigo',
+    mode: 'broadcast_pool', title: 'Top-K Broadcast Pool', badge: 'Simultaneous Race', accent: 'indigo',
+    description: 'Offers top K (2–8) eligible drivers simultaneously; atomic first-accept wins the ride immediately.',
   },
   {
-    mode: 'direct_auto_assign',
-    title: 'Direct Auto-Assign (#1 Driver)',
-    badge: 'Zero-Wait Assign',
-    description:
-      'Immediately assigns the #1 ranked eligible driver with a frozen vehicle snapshot and instant push alert.',
-    accent: 'amber',
+    mode: 'direct_auto_assign', title: 'Direct Auto-Assign (#1 Driver)', badge: 'Zero-Wait Assign', accent: 'amber',
+    description: 'Immediately assigns the #1 ranked eligible driver with a frozen vehicle snapshot and instant push alert.',
   },
 ];
 
@@ -291,17 +261,19 @@ export function AdminAutoDispatchControlPanel({
                   Choose which execution strategy runs when a dispatcher clicks the 1-click Ready Sweep button in Trips Queue.
                 </span>
               </div>
-              <select
+              <Select
+                size="sm"
+                fullWidth={false}
                 value={config.sweepExecutionMode}
                 onChange={(e) =>
                   update({ sweepExecutionMode: e.target.value as ActiveAutoDispatchStrategyMode })
                 }
-                className="text-xs font-bold py-2 px-3 rounded-lg border border-blue-300 bg-white text-slate-900 shrink-0 cursor-pointer"
+                className="shrink-0"
               >
                 <option value="sequential_cascade">Sequential 1-by-1 Cascade</option>
                 <option value="broadcast_pool">Top-K Broadcast Pool</option>
                 <option value="direct_auto_assign">Direct Auto-Assign (#1 Driver)</option>
-              </select>
+              </Select>
             </div>
           )}
         </div>
@@ -380,24 +352,13 @@ export function AdminAutoDispatchControlPanel({
                   </span>
                 </div>
                 <input
-                  type="range"
-                  min={15}
-                  max={240}
-                  step={5}
-                  value={config.scheduledDispatchLeadMinutes}
-                  onChange={(e) =>
-                    update({ scheduledDispatchLeadMinutes: parseInt(e.target.value, 10) || 45 })
-                  }
+                  type="range" min={15} max={240} step={5} value={config.scheduledDispatchLeadMinutes}
+                  onChange={(e) => update({ scheduledDispatchLeadMinutes: parseInt(e.target.value, 10) || 45 })}
                   className="w-full accent-blue-600 cursor-pointer"
                 />
                 <Input
-                  type="number"
-                  min="15"
-                  max="240"
-                  value={config.scheduledDispatchLeadMinutes}
-                  onChange={(e) =>
-                    update({ scheduledDispatchLeadMinutes: parseInt(e.target.value, 10) || 45 })
-                  }
+                  type="number" min="15" max="240" value={config.scheduledDispatchLeadMinutes}
+                  onChange={(e) => update({ scheduledDispatchLeadMinutes: parseInt(e.target.value, 10) || 45 })}
                   className="text-xs h-8 bg-slate-50"
                 />
                 <span className="text-[10px] text-slate-500 block leading-snug">
@@ -567,17 +528,17 @@ export function AdminAutoDispatchControlPanel({
               <label className="text-xs font-bold text-slate-700 block">
                 Candidate Ranking Strategy
               </label>
-              <select
+              <Select
+                size="sm"
                 value={config.rankingStrategy}
                 onChange={(e) =>
                   update({ rankingStrategy: e.target.value as DispatchRankingStrategy })
                 }
-                className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-white text-slate-800"
               >
                 <option value="nearest_in_zone">Nearest Distance</option>
                 <option value="longest_idle_in_zone">Longest Idle (Fair Queue)</option>
                 <option value="highest_driver_score">Highest Driver Score</option>
-              </select>
+              </Select>
               <label className="flex items-center gap-1.5 pt-1 text-[11px] font-semibold text-slate-700 cursor-pointer">
                 <input
                   type="checkbox"
@@ -713,20 +674,20 @@ export function AdminAutoDispatchControlPanel({
               <label className="text-xs font-bold text-slate-700 block">
                 Fallback on Cascade Exhaustion
               </label>
-              <select
+              <Select
+                size="sm"
                 value={config.fallbackOnExhaustion}
                 onChange={(e) =>
                   update({
                     fallbackOnExhaustion: e.target.value as DispatchExhaustionFallbackMode,
                   })
                 }
-                className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-white text-slate-800"
               >
                 <option value="alert_dispatch">Revert to CONFIRMED &amp; Alert Dispatch</option>
                 <option value="broadcast_all_eligible">
                   Final Broadcast to All Eligible Drivers
                 </option>
-              </select>
+              </Select>
               <span className="text-[10px] text-slate-500 block">
                 Action taken if all {config.maxCascadeAttempts} step(s) decline/timeout.
               </span>
@@ -772,37 +733,37 @@ export function AdminAutoDispatchControlPanel({
                     <label className="text-[11px] font-bold text-slate-600 block">
                       Window Start Hour
                     </label>
-                    <select
+                    <Select
+                      size="sm"
                       value={config.windowStartHour}
                       onChange={(e) =>
                         update({ windowStartHour: parseInt(e.target.value, 10) || 0 })
                       }
-                      className="w-full text-xs font-semibold py-1.5 px-2 rounded-lg border border-slate-300 bg-slate-50"
                     >
                       {Array.from({ length: 24 }, (_, h) => (
                         <option key={h} value={h}>
                           {formatHourLabel(h)}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-slate-600 block">
                       Window End Hour
                     </label>
-                    <select
+                    <Select
+                      size="sm"
                       value={config.windowEndHour}
                       onChange={(e) =>
                         update({ windowEndHour: parseInt(e.target.value, 10) || 0 })
                       }
-                      className="w-full text-xs font-semibold py-1.5 px-2 rounded-lg border border-slate-300 bg-slate-50"
                     >
                       {Array.from({ length: 24 }, (_, h) => (
                         <option key={h} value={h}>
                           {formatHourLabel(h)}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 </div>
               ) : (

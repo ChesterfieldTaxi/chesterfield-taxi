@@ -3,6 +3,7 @@ import type { TariffCorridor } from '~/core/types/tariff';
 import type { ZoneGeofence } from '~/core/types/zone';
 import { getZoneService, DEFAULT_ZONES } from '~/core/services/zones/zone.service';
 import { Input } from '~/components/ui/Input';
+import { Select } from '~/components/ui/Select';
 import { Button } from '~/components/ui/Button';
 import { MapPinIcon, PlusIcon, TrashIcon } from '~/components/ui/Icons';
 
@@ -124,10 +125,10 @@ export function CorridorEditor({
               <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                 Origin Zone
               </label>
-              <select
+              <Select
+                size="sm"
                 value={fromZoneId}
                 onChange={(e) => setFromZoneId(e.target.value)}
-                className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2"
               >
                 <option value="">Any Origin Zone</option>
                 {zones.map((z) => (
@@ -135,16 +136,16 @@ export function CorridorEditor({
                     {z.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                 Destination Zone
               </label>
-              <select
+              <Select
+                size="sm"
                 value={toZoneId}
                 onChange={(e) => setToZoneId(e.target.value)}
-                className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2"
               >
                 <option value="">Any Destination Zone</option>
                 {zones.map((z) => (
@@ -152,7 +153,7 @@ export function CorridorEditor({
                     {z.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="text-[11px] font-semibold text-slate-700 block mb-1">

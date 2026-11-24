@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../../ui/Badge';
+import { Select } from '../../../ui/Select';
 import {
   AlertTriangleIcon,
   BoltIcon,
@@ -391,10 +392,10 @@ export function AdminAutoDispatchSimulator({
               <MapPinIcon className="w-3.5 h-3.5 text-emerald-600" />
               <span>Simulated Pickup Zone</span>
             </label>
-            <select
+            <Select
+              size="sm"
               value={pickupPresetId}
               onChange={(e) => setPickupPresetId(e.target.value)}
-              className="w-full text-xs font-semibold py-1.5 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800"
             >
               {PICKUP_PRESETS.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -408,23 +409,23 @@ export function AdminAutoDispatchSimulator({
                     Zone: {z.name}
                   </option>
                 ))}
-            </select>
+            </Select>
           </div>
 
           <div className="space-y-1">
             <label className="text-[11px] font-bold text-slate-700 block">
               Requested Vehicle Tier
             </label>
-            <select
+            <Select
+              size="sm"
               value={simTier}
               onChange={(e) => setSimTier(e.target.value)}
-              className="w-full text-xs font-semibold py-1.5 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800"
             >
               <option value="standard">Standard Sedan</option>
               <option value="xl">XL SUV / Minivan</option>
               <option value="premium">Executive Premium</option>
               <option value="wheelchair">Wheelchair WAV</option>
-            </select>
+            </Select>
           </div>
 
           <div className="space-y-1">

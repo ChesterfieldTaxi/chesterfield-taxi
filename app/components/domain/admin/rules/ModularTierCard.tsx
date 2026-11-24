@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent } from '../../../ui/Card';
 import { Input } from '../../../ui/Input';
+import { Select } from '../../../ui/Select';
 import { Badge } from '../../../ui/Badge';
 import {
   ClockIcon,
@@ -219,7 +220,8 @@ export function ModularTierCard({
                       {mode.toUpperCase()}
                     </Badge>
                   </div>
-                  <select
+                  <Select
+                    size="sm"
                     value={mode}
                     onChange={(e) =>
                       update(
@@ -228,14 +230,13 @@ export function ModularTierCard({
                           : { dropoffLocationMode: e.target.value as RuleLocationMode }
                       )
                     }
-                    className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-800"
                   >
                     <option value="all">Any Location (All Operational Zones)</option>
                     <option value="specific_zones">Specific Monitored / Whitelisted Zones</option>
                     <option value="airports">Airport Terminals &amp; Perimeters Only</option>
                     <option value="prohibited_only">Prohibited Safety Exclusion Zones</option>
                     <option value="outside_service_area">Outside Service Perimeter / County</option>
-                  </select>
+                  </Select>
                   {mode === 'specific_zones' && (
                     <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1 bg-white rounded-lg border border-slate-200">
                       {zones.map((z) => {
@@ -273,15 +274,15 @@ export function ModularTierCard({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
             <div className="space-y-3">
               <span className="text-xs font-semibold text-slate-700 block">Operating Time Schedule</span>
-              <select
+              <Select
+                size="sm"
                 value={config.timeMode}
                 onChange={(e) => update({ timeMode: e.target.value as RuleTimeMode })}
-                className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-slate-300 bg-white text-slate-800"
               >
                 <option value="all_hours">24/7 Continuous (All Hours)</option>
                 <option value="custom_window">Custom Operating Hours Window</option>
                 <option value="late_night">Late Night Enforcement Window</option>
-              </select>
+              </Select>
               {config.timeMode !== 'all_hours' && (
                 <div className="grid grid-cols-2 gap-2">
                   <Input

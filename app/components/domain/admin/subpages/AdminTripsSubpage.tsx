@@ -2,6 +2,8 @@ import React, { Suspense } from 'react';
 import { useDisplayLayout } from '../../../../core/hooks/useDisplayLayout';
 import { LayoutToggle } from '../../../ui/LayoutToggle';
 import { Button } from '../../../ui/Button';
+import { Checkbox } from '../../../ui/Checkbox';
+import { Select } from '../../../ui/Select';
 import { Alert } from '../../../ui/Alert';
 import { DownloadIcon, SearchIcon, SpinnerIcon } from '../../../ui/Icons';
 import { TripAuditModal } from '../TripAuditModal';
@@ -103,26 +105,25 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
 
               {ctrl.activeSub === 'history' && (
                 <>
-                  <select
+                  <Select
+                    size="sm"
+                    fullWidth={false}
                     value={ctrl.statusFilter}
                     onChange={(e) => ctrl.setStatusFilter(e.target.value)}
-                    className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-semibold text-slate-800"
                   >
                     <option value="all">All Lifecycles ({ctrl.trips.length})</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                     <option value="assigned">Assigned / Active</option>
                     <option value="pending">Pending</option>
-                  </select>
-                  <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={ctrl.includeArchivedInHistory}
-                      onChange={(e) => ctrl.setIncludeArchivedInHistory(e.target.checked)}
-                      className="rounded border-slate-300 text-blue-600"
-                    />
-                    <span>Include Archived</span>
-                  </label>
+                  </Select>
+                  <Checkbox
+                    size="sm"
+                    checked={ctrl.includeArchivedInHistory}
+                    onChange={(checked) => ctrl.setIncludeArchivedInHistory(checked)}
+                    label={<span className="text-xs font-semibold text-slate-700">Include Archived</span>}
+                    className="w-auto!"
+                  />
                 </>
               )}
             </div>

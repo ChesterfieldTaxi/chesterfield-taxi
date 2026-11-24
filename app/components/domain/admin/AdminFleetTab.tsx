@@ -3,6 +3,7 @@ import type { AppSettings, FleetCarConfig, MaintenanceRecord } from '../../../co
 import { Button } from '../../ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../ui/Card';
 import { Input } from '../../ui/Input';
+import { Select } from '../../ui/Select';
 import { Alert } from '../../ui/Alert';
 import { Badge } from '../../ui/Badge';
 import {
@@ -344,22 +345,26 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
           </div>
 
           <div className="grid grid-cols-2 sm:flex items-center gap-2">
-            <select
+            <Select
+              size="sm"
+              fullWidth={false}
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-9 px-2.5 sm:px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 w-full sm:w-auto"
+              className="w-full sm:w-auto"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
               <option value="maintenance">In Maintenance</option>
               <option value="out_of_service">Out of Service</option>
               <option value="inspecting">Inspecting</option>
-            </select>
+            </Select>
 
-            <select
+            <Select
+              size="sm"
+              fullWidth={false}
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="h-9 px-2.5 sm:px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 w-full sm:w-auto"
+              className="w-full sm:w-auto"
             >
               <option value="all">All Classes</option>
               {settings.vehicles.map((v) => (
@@ -367,7 +372,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                   {v.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -455,8 +460,8 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Vehicle Type Class <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  className="w-full h-10 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800"
+                <Select
+                  size="md"
                   value={newCar.vehicleTypeId}
                   onChange={(e) => setNewCar({ ...newCar, vehicleTypeId: e.target.value })}
                 >
@@ -465,7 +470,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                       {v.name} (Tier {v.id})
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -516,8 +521,8 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
-                <select
-                  className="w-full h-10 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800"
+                <Select
+                  size="md"
                   value={newCar.status}
                   onChange={(e) => setNewCar({ ...newCar, status: e.target.value as any })}
                 >
@@ -525,7 +530,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                   <option value="maintenance">In Maintenance</option>
                   <option value="out_of_service">Out of Service</option>
                   <option value="inspecting">Inspecting</option>
-                </select>
+                </Select>
               </div>
             </div>
           </section>
@@ -655,16 +660,17 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                   </div>
 
                   <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                    <select
+                    <Select
+                      size="sm"
+                      fullWidth={false}
                       value={car.status}
                       onChange={(e) => handleUpdateCar(car.id, { status: e.target.value as any })}
-                      className="h-8 px-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700"
                     >
                       <option value="active">Active</option>
                       <option value="maintenance">Maintenance</option>
                       <option value="out_of_service">Out of Service</option>
                       <option value="inspecting">Inspecting</option>
-                    </select>
+                    </Select>
 
                     <Button
                       type="button"
@@ -1117,8 +1123,8 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Vehicle Class</label>
-                  <select
-                    className="w-full h-10 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800"
+                  <Select
+                    size="md"
                     value={editingCar.vehicleTypeId}
                     onChange={(e) => setEditingCar({ ...editingCar, vehicleTypeId: e.target.value })}
                   >
@@ -1127,13 +1133,13 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                         {tier.name} ({tier.badge || tier.id})
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
-                  <select
-                    className="w-full h-10 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800"
+                  <Select
+                    size="md"
                     value={editingCar.status}
                     onChange={(e) => setEditingCar({ ...editingCar, status: e.target.value as any })}
                   >
@@ -1141,7 +1147,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                     <option value="maintenance">In Maintenance</option>
                     <option value="out_of_service">Out of Service</option>
                     <option value="inspecting">Inspecting</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 

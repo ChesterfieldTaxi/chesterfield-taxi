@@ -15,6 +15,7 @@ import {
 } from '~/core/services/pricing/pricing-audit.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
+import { Select } from '~/components/ui/Select';
 import { Badge } from '~/components/ui/Badge';
 import {
   ZapIcon,
@@ -706,7 +707,8 @@ export function SurchargesPanel({
                   <label className="text-[11px] font-semibold text-slate-600 block mb-1">
                     Calculation Mode
                   </label>
-                  <select
+                  <Select
+                    size="sm"
                     value={item.mode}
                     onChange={(e) => {
                       const nextMode = e.target.value as SurchargeCalcMode;
@@ -718,13 +720,12 @@ export function SurchargesPanel({
                           : item.amount;
                       updateItem(item.id, { mode: nextMode, amount: nextAmount });
                     }}
-                    className="w-full h-9 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 px-2.5 font-semibold"
                   >
                     <option value="flat">Flat Fee ($)</option>
                     <option value="per_mile">Per Mile ($/mi)</option>
                     <option value="percent">% of Base Fare</option>
                     <option value="multiplier">Multiplier (×)</option>
-                  </select>
+                  </Select>
                 </div>
 
                 {/* Amount */}
@@ -982,16 +983,16 @@ export function SurchargesPanel({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">Mode</label>
-                  <select
+                  <Select
+                    size="sm"
                     value={formMode}
                     onChange={(e) => setFormMode(e.target.value as SurchargeCalcMode)}
-                    className="w-full h-9 text-xs rounded-lg bg-white border border-slate-300 px-2.5 font-semibold"
                   >
                     <option value="flat">Flat Fee ($)</option>
                     <option value="per_mile">Per Mile ($/mi)</option>
                     <option value="percent">% of Base Fare</option>
                     <option value="multiplier">Multiplier (×)</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-700 block mb-1">Amount</label>
@@ -1010,14 +1011,14 @@ export function SurchargesPanel({
                 <label className="text-xs font-semibold text-slate-700 block mb-1">
                   Default Behavior
                 </label>
-                <select
+                <Select
+                  size="sm"
                   value={formPolicy}
                   onChange={(e) => setFormPolicy(e.target.value as SurchargeDefaultPolicy)}
-                  className="w-full h-9 text-xs rounded-lg bg-white border border-slate-300 px-2.5 font-semibold"
                 >
                   <option value="universal">All Trips — Applies to every trip (unless waived by a Rule)</option>
                   <option value="rule_only">Rule-Only — OFF by default (applies only when turned on by a Rule)</option>
-                </select>
+                </Select>
               </div>
 
               <label className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer">

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '../../ui/Card';
 import { Button } from '../../ui/Button';
+import { Select } from '../../ui/Select';
 import { CheckIcon, ClockIcon, SpinnerIcon } from '../../ui/Icons';
 import { DEFAULT_BOOKING_RULES_CONFIG, type BookingRulesConfig } from '../../../core/services/bookingRulesEngine';
 import {
@@ -183,14 +184,14 @@ export function AdminRulesTab({ initialSection = 'auto-dispatch' }: AdminRulesTa
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <select value={alertDismissMinutes} onChange={(e) => setAlertDismissMinutes(parseInt(e.target.value, 10) || 0)} className="h-9 px-3 rounded-lg border border-slate-300 bg-slate-50 text-xs font-bold text-slate-800">
+                <Select size="sm" fullWidth={false} value={alertDismissMinutes} onChange={(e) => setAlertDismissMinutes(parseInt(e.target.value, 10) || 0)}>
                   <option value={15}>15 Minutes</option>
                   <option value={30}>30 Minutes</option>
                   <option value={60}>1 Hour (Default)</option>
                   <option value={120}>2 Hours</option>
                   <option value={240}>4 Hours</option>
                   <option value={0}>Never Auto-Dismiss</option>
-                </select>
+                </Select>
                 <Button size="sm" variant="outline" disabled={isSaving} onClick={handleSave} className="h-9 text-xs font-bold cursor-pointer">
                   {isSaving ? <SpinnerIcon className="w-3.5 h-3.5 animate-spin" /> : <CheckIcon className="w-3.5 h-3.5 mr-1" />} Save
                 </Button>

@@ -134,12 +134,42 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       [resolvedOptions, currentValue]
     );
 
+    const calculatePosition = useCallback(() => {
+      if (!triggerRef.current || typeof window === 'undefined') return null;
+      const rect = triggerRef.current.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      if (lockedWidthRef.current === null) {
+        lockedWidthRef.current = Math.min(Math.max(Math.round(rect.width), 180), Math.max(180, vw - 16));
+      }
+      const width = Math.min(lockedWidthRef.current, Math.max(180, vw - 16));
+      const estHeight = Math.min(310, resolvedOptions.length * 32 + (showSearch ? 48 : 10));
+      const menuHeight = menuRef.current?.offsetHeight || estHeight;
+      const spaceBelow = vh - rect.bottom;
+      const openUpward = spaceBelow < menuHeight + 10 && rect.top > spaceBelow;
+      const top = openUpward
+        ? Math.max(8, rect.top - menuHeight - 4)
+        : Math.min(Math.max(8, vh - menuHeight - 8), rect.bottom + 4);
+      const left = Math.max(8, Math.min(rect.left, vw - width - 8));
+      return { top, left, width, openUpward };
+    }, [resolvedOptions.length, showSearch]);
+
     const closeMenu = useCallback((restoreFocus = false) => {
       setIsOpen(false);
+      setCoords(null);
       setSearchQuery('');
       lockedWidthRef.current = null;
       if (restoreFocus) triggerRef.current?.focus({ preventScroll: true });
     }, []);
+
+    const openMenu = useCallback(() => {
+      const initial = calculatePosition();
+      if (initial) setCoords(initial);
+      const selectedIdx = filteredOptions.findIndex((o) => !o.disabled && String(o.value) === currentValue);
+      const firstEnabled = filteredOptions.findIndex((o) => !o.disabled);
+      setHighlightedIdx(selectedIdx >= 0 ? selectedIdx : firstEnabled);
+      setIsOpen(true);
+    }, [calculatePosition, filteredOptions, currentValue]);
 
     const commitSelection = useCallback(
       (nextVal: string) => {
@@ -158,34 +188,12 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       [isControlled, name, onValueChange, onChange, closeMenu]
     );
 
-    const calculatePosition = useCallback(() => {
-      if (!triggerRef.current || typeof window === 'undefined') return null;
-      const rect = triggerRef.current.getBoundingClientRect();
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      if (lockedWidthRef.current === null) {
-        lockedWidthRef.current = Math.min(Math.max(Math.round(rect.width), 180), Math.max(180, vw - 16));
-      }
-      const width = Math.min(lockedWidthRef.current, Math.max(180, vw - 16));
-      const estHeight = Math.min(320, resolvedOptions.length * 36 + (showSearch ? 52 : 12));
-      const menuHeight = menuRef.current?.offsetHeight || estHeight;
-      const spaceBelow = vh - rect.bottom;
-      const openUpward = spaceBelow < menuHeight + 12 && rect.top > spaceBelow;
-      const top = openUpward
-        ? Math.max(8, rect.top - menuHeight - 4)
-        : Math.min(Math.max(8, vh - menuHeight - 8), rect.bottom + 4);
-      const left = Math.max(8, Math.min(rect.left, vw - width - 8));
-      return { top, left, width, openUpward };
-    }, [resolvedOptions.length, showSearch]);
-
     useEffect(() => {
       if (!isOpen) { setCoords(null); return; }
-      const initial = calculatePosition();
-      if (initial) setCoords(initial);
       const selectedIdx = filteredOptions.findIndex((o) => !o.disabled && String(o.value) === currentValue);
       const firstEnabled = filteredOptions.findIndex((o) => !o.disabled);
       setHighlightedIdx(selectedIdx >= 0 ? selectedIdx : firstEnabled);
-    }, [isOpen, calculatePosition, filteredOptions, currentValue]);
+    }, [isOpen, filteredOptions, currentValue]);
 
     useEffect(() => {
       if (!isOpen) return;
@@ -236,7 +244,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       if (disabled) return;
       if (!isOpen) {
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault(); setIsOpen(true);
+          e.preventDefault(); openMenu();
         }
         return;
       }
@@ -259,7 +267,11 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
     const variantCls = error
       ? 'bg-white border-red-400 text-slate-900 focus:border-red-500 focus:ring-red-500/20'
       : variant === 'dark'
-      ? 'bg-slate-800/95 border-slate-700 text-slate-100 hover:bg-slate-800 hover:border-slate-600 focus:border-blue-400 focus:ring-blue-500/30'
+      ? isOpen
+        ? 'bg-slate-800 border-blue-400 text-white ring-2 ring-blue-400/30'
+        : 'bg-slate-800/95 border-slate-700 text-slate-100 hover:bg-slate-800 hover:border-slate-600 focus:border-blue-400 focus:ring-blue-500/30'
+      : isOpen
+      ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-500/20'
       : variant === 'subtle'
       ? 'bg-transparent border-transparent text-slate-800 hover:bg-slate-100/80 focus:ring-blue-500/20'
       : 'bg-white border-slate-200 text-slate-900 hover:border-slate-300 shadow-2xs focus:border-blue-500 focus:ring-blue-500/20';
@@ -279,21 +291,12 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
         )}
 
         <button
-          ref={setMergedTriggerRef}
-          id={selectId}
-          type="button"
-          disabled={disabled}
-          title={title}
-          aria-haspopup="listbox"
-          aria-expanded={isOpen}
-          aria-label={ariaLabel || label}
-          aria-invalid={Boolean(error)}
-          aria-describedby={error ? errorId : helperText ? helperId : undefined}
-          onClick={(e) => { e.stopPropagation(); if (!disabled) setIsOpen((prev) => !prev); }}
+          ref={setMergedTriggerRef} id={selectId} type="button" disabled={disabled} title={title}
+          aria-haspopup="listbox" aria-expanded={isOpen} aria-label={ariaLabel || label}
+          aria-invalid={Boolean(error)} aria-describedby={error ? errorId : helperText ? helperId : undefined}
+          onClick={(e) => { e.stopPropagation(); if (!disabled) { if (isOpen) closeMenu(false); else openMenu(); } }}
           onKeyDown={handleKeyNavigation}
-          className={`${fullWidth ? 'w-full' : 'max-w-full'} border inline-flex items-center justify-between font-semibold transition-all cursor-pointer outline-hidden focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed ${sizeCls} ${variantCls} ${
-            isOpen ? 'ring-2 ring-blue-500/25 border-blue-400' : ''
-          } ${className} ${triggerClassName}`}
+          className={`${fullWidth ? 'w-full' : 'max-w-full'} border inline-flex items-center justify-between font-semibold transition-all cursor-pointer outline-hidden focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed ${sizeCls} ${variantCls} ${className} ${triggerClassName}`}
         >
           <span className="inline-flex items-center gap-2 min-w-0 truncate">
             {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}
@@ -302,7 +305,11 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
             )}
             <span className={`truncate ${isPlaceholderShown ? 'text-slate-400 font-normal' : ''}`}>{displayLabel}</span>
           </span>
-          <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 opacity-70 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
+          <ChevronDownIcon
+            className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${
+              isOpen ? (variant === 'dark' ? 'rotate-180 text-white' : 'rotate-180 text-blue-600') : 'opacity-70'
+            }`}
+          />
         </button>
 
         {isOpen && coords !== null && typeof document !== 'undefined' &&
@@ -317,13 +324,14 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                 width: `${coords.width}px`, zIndex: 99999,
                 transformOrigin: coords.openUpward ? 'bottom left' : 'top left',
               }}
-              className="rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden text-xs animate-in fade-in zoom-in-95 duration-100 select-none z-[99999]"
+              className="bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none z-[99999]"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
             >
               {showSearch && (
-                <div className="p-2 bg-slate-50/90 border-b border-slate-100">
-                  <div className="relative flex items-center h-8">
+                <div className="px-2.5 py-1.5 bg-slate-50/70">
+                  <div className="relative flex items-center h-7">
                     <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
                     <input
                       ref={searchInputRef}
@@ -332,7 +340,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={handleKeyNavigation}
                       placeholder={searchPlaceholder}
-                      className="w-full h-8 pl-8 pr-7 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className="w-full h-7 pl-7 pr-6 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     />
                     {searchQuery && (
                       <button type="button" onClick={() => setSearchQuery('')} className="absolute right-2 text-slate-400 hover:text-slate-600 cursor-pointer" aria-label="Clear search">
@@ -343,9 +351,9 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                 </div>
               )}
 
-              <div className="max-h-64 overflow-y-auto p-1 space-y-0.5">
+              <div className="max-h-64 overflow-y-auto py-1">
                 {filteredOptions.length === 0 ? (
-                  <div className="py-5 px-3 text-center text-slate-400 text-[11px] font-medium">No matching options found.</div>
+                  <div className="py-4 px-3 text-center text-slate-400 text-[11px] font-medium">No matching options found.</div>
                 ) : (
                   filteredOptions.map((opt, idx) => {
                     const strVal = String(opt.value);
@@ -355,7 +363,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     return (
                       <React.Fragment key={`${opt.group || 'root'}-${strVal}-${idx}`}>
                         {opt.group && opt.group !== prevGroup && (
-                          <div className="px-2.5 pt-2 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">{opt.group}</div>
+                          <div className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-slate-50/50">{opt.group}</div>
                         )}
                         <button
                           type="button"
@@ -364,17 +372,17 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                           disabled={opt.disabled}
                           onMouseEnter={() => { if (!opt.disabled) setHighlightedIdx(idx); }}
                           onClick={() => { if (!opt.disabled) commitSelection(strVal); }}
-                          className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left transition-colors ${
-                            opt.disabled ? 'opacity-45 cursor-not-allowed bg-slate-50/40 text-slate-400' :
-                            isSelected ? 'bg-blue-50/90 text-blue-950 font-bold cursor-pointer' :
-                            isHighlighted ? 'bg-slate-100/90 text-slate-900 font-medium cursor-pointer' :
-                            'text-slate-800 hover:bg-slate-50 font-medium cursor-pointer'
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs text-left transition-colors ${
+                            opt.disabled ? 'opacity-45 cursor-not-allowed text-slate-400' :
+                            isSelected ? 'font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/70 cursor-pointer' :
+                            isHighlighted ? 'font-semibold text-blue-700 bg-blue-50/80 cursor-pointer' :
+                            'font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700 cursor-pointer'
                           }`}
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             {opt.icon && <span className="shrink-0">{opt.icon}</span>}
                             {(opt.dotClass || opt.dotColor) && (
-                              <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${opt.dotClass || ''}`} style={opt.dotColor ? { backgroundColor: opt.dotColor } : undefined} />
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotClass || ''}`} style={opt.dotColor ? { backgroundColor: opt.dotColor } : undefined} />
                             )}
                             <div className="min-w-0">
                               <div className="truncate text-xs leading-snug">{opt.label}</div>
@@ -382,7 +390,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {opt.badge && <span className="px-1.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-700">{opt.badge}</span>}
+                            {opt.badge && <span className="px-1.5 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-700">{opt.badge}</span>}
                             {isSelected && <CheckIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
                           </div>
                         </button>

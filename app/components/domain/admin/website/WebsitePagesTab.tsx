@@ -4,6 +4,7 @@ import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
+import { Select } from '../../../ui/Select';
 import { CheckIcon, SparklesIcon, FileTextIcon, ShieldCheckIcon } from '../../../ui/Icons';
 
 function EyeIcon({ className = 'w-4 h-4' }: { className?: string }) {
@@ -285,19 +286,19 @@ export function WebsitePagesTab({ settings, onSave, isLoading }: WebsitePagesTab
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
                 <label className="text-xs font-bold text-slate-800 block">Publication State</label>
-                <select
+                <Select
+                  size="sm"
                   value={selectedPage.status}
                   onChange={(e) =>
                     handleUpdateSelected({
                       status: e.target.value as 'published' | 'draft' | 'maintenance',
                     })
                   }
-                  className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-200 rounded-lg"
                 >
                   <option value="published">Published (Live &amp; Indexed)</option>
                   <option value="draft">Draft (Admin Access Only)</option>
                   <option value="maintenance">Maintenance Mode (Public Shield)</option>
-                </select>
+                </Select>
               </div>
 
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 flex flex-col justify-between">

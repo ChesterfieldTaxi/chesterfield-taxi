@@ -3,6 +3,7 @@ import type { AppSettings, VehicleTierConfig } from '../../../core/types/config'
 import { Button } from '../../ui/Button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../ui/Card';
 import { Input } from '../../ui/Input';
+import { Select } from '../../ui/Select';
 import { Alert } from '../../ui/Alert';
 import { Badge } from '../../ui/Badge';
 import {
@@ -351,8 +352,8 @@ export function AdminVehiclesTab({
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Icon Silhouette
                     </label>
-                    <select
-                      className="w-full h-10 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800"
+                    <Select
+                      size="md"
                       value={newTier.iconType || 'standard'}
                       onChange={(e) =>
                         setNewTier({ ...newTier, iconType: e.target.value as any })
@@ -362,7 +363,7 @@ export function AdminVehiclesTab({
                       <option value="premium">Executive Premium</option>
                       <option value="xl">XL / SUV / Van</option>
                       <option value="wheelchair">WAV Accessible</option>
-                    </select>
+                    </Select>
                   </div>
                 </div>
               </section>
@@ -708,8 +709,8 @@ export function AdminVehiclesTab({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Icon Silhouette
                 </label>
-                <select
-                  className="w-full h-10 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800"
+                <Select
+                  size="md"
                   value={editForm.iconType || 'standard'}
                   onChange={(e) =>
                     setEditForm({ ...editForm, iconType: e.target.value as any })
@@ -719,7 +720,7 @@ export function AdminVehiclesTab({
                   <option value="premium">Executive Premium</option>
                   <option value="xl">XL / SUV / Van</option>
                   <option value="wheelchair">WAV Accessible</option>
-                </select>
+                </Select>
               </div>
             </section>
 

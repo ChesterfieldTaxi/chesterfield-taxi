@@ -10,6 +10,7 @@ import type {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '~/components/ui/Card';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
+import { Select } from '~/components/ui/Select';
 import {
   PlusIcon,
   TrashIcon,
@@ -104,8 +105,8 @@ export function ZoneInspectorEditorPane({
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     Zone Type
                   </label>
-                  <select
-                    className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  <Select
+                    size="md"
                     value={zoneFormData.type}
                     onChange={(e) => {
                       const nextType = e.target.value as 'radius' | 'polygon';
@@ -119,7 +120,7 @@ export function ZoneInspectorEditorPane({
                   >
                     <option value="radius">Radius Circle (Center + Miles)</option>
                     <option value="polygon">Custom Polygon Zone (Draw on Map)</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 
@@ -582,8 +583,8 @@ export function ZoneInspectorEditorPane({
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     Category
                   </label>
-                  <select
-                    className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  <Select
+                    size="md"
                     value={collectionFormData.category}
                     onChange={(e) =>
                       setCollectionFormData((prev) => ({ ...prev, category: e.target.value as LocationCategory }))
@@ -595,7 +596,7 @@ export function ZoneInspectorEditorPane({
                     <option value="hotel">Hotel &amp; Resort</option>
                     <option value="hospital">Medical Center</option>
                     <option value="custom">Custom POI List</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 
@@ -957,7 +958,8 @@ export function ZoneInspectorEditorPane({
               </div>
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-700 uppercase">Enforcement Action</label>
-                <select
+                <Select
+                  size="sm"
                   value={blacklistFormData.action}
                   onChange={(e) =>
                     setBlacklistFormData({
@@ -965,11 +967,10 @@ export function ZoneInspectorEditorPane({
                       action: e.target.value as 'BLACKLIST_BLOCK' | 'REQUIRE_REVIEW',
                     })
                   }
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 h-9 text-xs focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="BLACKLIST_BLOCK">Strict Block (Reject Bookings)</option>
                   <option value="REQUIRE_REVIEW">Flag for Review (Mode B)</option>
-                </select>
+                </Select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">

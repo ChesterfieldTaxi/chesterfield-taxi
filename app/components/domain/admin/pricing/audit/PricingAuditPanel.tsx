@@ -13,6 +13,7 @@ import {
 } from '~/core/services/pricing/pricing-audit.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
+import { Select } from '~/components/ui/Select';
 import { Badge } from '~/components/ui/Badge';
 import {
   ClockIcon,
@@ -251,7 +252,8 @@ export function PricingAuditPanel({
 
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
           <div className="sm:col-span-5">
-            <select
+            <Select
+              size="sm"
               value={selectedSurchargeId}
               onChange={(e) => {
                 const v = e.target.value;
@@ -261,7 +263,6 @@ export function PricingAuditPanel({
                 }
               }}
               aria-label="Filter by specific surcharge"
-              className="w-full h-8.5 text-xs rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-2.5 font-semibold"
             >
               <option value="">All Surcharges</option>
               {surchargeOptions.map((opt) => (
@@ -269,7 +270,7 @@ export function PricingAuditPanel({
                   {opt.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="sm:col-span-7 relative">
             <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />

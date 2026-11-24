@@ -3,6 +3,7 @@ import type { AppSettings, BrandingConfig } from '../../../../core/types/config'
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
+import { Select } from '../../../ui/Select';
 import { Badge } from '../../../ui/Badge';
 import { AlertTriangleIcon, CheckIcon, PaletteIcon, SparklesIcon } from '../../../ui/Icons';
 import { BrandLivePreviewCanvas } from './BrandLivePreviewCanvas';
@@ -228,31 +229,31 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="font-bold text-slate-700 block mb-1">Heading Font</label>
-              <select
+              <Select
+                size="sm"
                 value={draftBranding.headingFont || 'Inter'}
                 onChange={(e) => updateDraft({ headingFont: e.target.value })}
-                className="w-full h-9 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-900"
               >
                 {FONT_OPTIONS.map((f) => (
                   <option key={f} value={f}>
                     {f}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="font-bold text-slate-700 block mb-1">Body Font</label>
-              <select
+              <Select
+                size="sm"
                 value={draftBranding.bodyFont || 'Inter'}
                 onChange={(e) => updateDraft({ bodyFont: e.target.value })}
-                className="w-full h-9 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-900"
               >
                 {FONT_OPTIONS.map((f) => (
                   <option key={f} value={f}>
                     {f}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 

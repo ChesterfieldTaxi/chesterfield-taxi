@@ -18,10 +18,6 @@ import {
   CalendarIcon,
   ChevronDownIcon,
   FunnelIcon,
-  Squares2X2Icon,
-  TableCellsIcon,
-  ListBulletIcon,
-  BoltIcon,
   ClockIcon,
   MapPinIcon,
   CarIcon,
@@ -29,11 +25,16 @@ import {
   RadarBroadcastIcon,
 } from '../../../ui/Icons';
 import {
+  computeNextStatusFilterOnUnconfirmedToggle,
+  isUnconfirmedQuickFilterActive,
+} from '../../../../core/hooks/dispatch/dispatch-workspace.util';
+import {
   TABLE_OVERFLOW_MIN_WIDTH_PX,
   type QueueFilterType,
 } from './trip-queue-layout.util';
 import {
   TripAddFilterDropdown,
+  TripQueueLayoutDropdown,
   TripStatusMultiSelectDropdown,
 } from './TripQueueFilterPopovers';
 import { TripQueueBatchActionBar } from './TripQueueBatchActionBar';
@@ -259,23 +260,23 @@ export function TripQueueToolbar({
     autoConfig.dispatchMode !== 'manual_1tap'
       ? autoConfig.dispatchMode
       : autoConfig.sweepExecutionMode;
-  const layoutTriggerLabel =
-    displayLayout === 'auto'
-      ? isAutoCardsFallback
-        ? 'Cards (Auto)'
-        : 'Table (Auto)'
-      : effectiveDisplayLayout === 'cards'
-      ? 'Cards'
-      : effectiveDisplayLayout === 'table'
-      ? 'Table'
-      : 'Compact';
 
-  const layoutTriggerTooltip =
-    displayLayout === 'auto'
-      ? isAutoCardsFallback
-        ? `Auto Layout: switched to Cards because Trips table would overflow horizontally (${effectiveMinTableWidthPx}px needed). Select "Table" to force 10-column table.`
-        : 'Auto Layout (Table ↔ Cards): showing Table while wide enough.'
-      : `Queue Layout: ${layoutTriggerLabel}. Click to change.`;
+  const prevNonUnconfirmedStatusRef = React.useRef<string>('all');
+  const isUnconfirmedOnly = isUnconfirmedQuickFilterActive(statusFilter);
+  React.useEffect(() => {
+    if (!isUnconfirmedOnly && statusFilter) {
+      prevNonUnconfirmedStatusRef.current = statusFilter;
+    }
+  }, [isUnconfirmedOnly, statusFilter]);
+
+  const handleToggleUnconfirmedQuickFilter = () => {
+    const { nextStatusFilter, savedPreviousFilter } = computeNextStatusFilterOnUnconfirmedToggle(
+      statusFilter,
+      prevNonUnconfirmedStatusRef.current
+    );
+    prevNonUnconfirmedStatusRef.current = savedPreviousFilter;
+    onStatusFilterChange(nextStatusFilter);
+  };
 
   return (
     <>
@@ -354,10 +355,39 @@ export function TripQueueToolbar({
               />
             </div>
 
-            {/* 2. Multi-Select Status Checkboxes Popover */}
+            {/* 2. Dedicated Unconfirmed Quick-Filter Button + Red Circle Counter */}
+            <button
+              type="button"
+              onClick={handleToggleUnconfirmedQuickFilter}
+              aria-pressed={isUnconfirmedOnly}
+              title={
+                isUnconfirmedOnly
+                  ? 'Showing Unconfirmed bookings only — click to return to previous queue filter'
+                  : `Filter queue to Unconfirmed bookings (${unconfirmedCount} awaiting review)`
+              }
+              className={`h-7 px-2.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs shrink-0 ${
+                isUnconfirmedOnly
+                  ? 'bg-rose-50 border-rose-400 text-rose-800 ring-2 ring-rose-500/20'
+                  : unconfirmedCount > 0
+                  ? 'bg-white hover:bg-rose-50/50 border-rose-200 text-slate-800'
+                  : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-600'
+              }`}
+            >
+              <span>Unconfirmed</span>
+              <span
+                className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums inline-flex items-center justify-center leading-none ${
+                  unconfirmedCount > 0 || isUnconfirmedOnly
+                    ? 'bg-rose-600 text-white'
+                    : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                {unconfirmedCount}
+              </span>
+            </button>
+
+            {/* 3. Multi-Select Lifecycle Status Dropdown */}
             <TripStatusMultiSelectDropdown
               statusFilter={statusFilter}
-              unconfirmedCount={unconfirmedCount}
               onStatusFilterChange={onStatusFilterChange}
             />
 
@@ -651,114 +681,16 @@ export function TripQueueToolbar({
             </button>
 
             {/* Queue Display Layout Dropdown (Desktop Only — Mobile always uses Cards view) */}
-            <div className="hidden lg:block relative shrink-0" ref={layoutDropdownRef}>
-              <button
-                type="button"
-                onClick={() => onLayoutDropdownOpenChange(!isLayoutDropdownOpen)}
-                className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 border rounded-lg text-xs font-bold shadow-2xs transition-colors cursor-pointer h-7 ${
-                  isAutoCardsFallback
-                    ? 'bg-blue-50/80 hover:bg-blue-50 border-blue-300 text-blue-800'
-                    : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700'
-                }`}
-                title={layoutTriggerTooltip}
-              >
-                {effectiveDisplayLayout === 'cards' ? (
-                  <Squares2X2Icon
-                    className={`w-3.5 h-3.5 ${isAutoCardsFallback ? 'text-blue-600' : 'text-slate-600'}`}
-                  />
-                ) : effectiveDisplayLayout === 'table' ? (
-                  <TableCellsIcon className="w-3.5 h-3.5 text-slate-600" />
-                ) : (
-                  <ListBulletIcon className="w-3.5 h-3.5 text-slate-600" />
-                )}
-                <span className="hidden sm:inline">{layoutTriggerLabel}</span>
-                <ChevronDownIcon className="w-3 h-3 text-slate-400" />
-              </button>
-
-              {isLayoutDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-xl py-1 z-50 text-xs font-semibold text-slate-700 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onDisplayLayoutChange('auto');
-                      onLayoutDropdownOpenChange(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between transition-colors cursor-pointer ${
-                      displayLayout === 'auto' ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <BoltIcon className="w-4 h-4 text-blue-500 shrink-0" />
-                      <div className="flex flex-col leading-tight">
-                        <span>Auto</span>
-                        <span className="text-[10px] font-medium text-slate-400">
-                          Table ↔ Cards
-                        </span>
-                      </div>
-                    </div>
-                    {displayLayout === 'auto' ? (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-[9.5px] font-bold text-blue-600 bg-blue-100/80 px-1.5 py-0.5 rounded">
-                          {isAutoCardsFallback ? 'Cards' : 'Table'}
-                        </span>
-                        <span>✓</span>
-                      </div>
-                    ) : null}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onDisplayLayoutChange('table');
-                      onLayoutDropdownOpenChange(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between transition-colors cursor-pointer ${
-                      displayLayout === 'table' ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <TableCellsIcon className="w-4 h-4 text-slate-500" />
-                      <span>Table</span>
-                    </div>
-                    {displayLayout === 'table' && <span>✓</span>}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onDisplayLayoutChange('cards');
-                      onLayoutDropdownOpenChange(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between transition-colors cursor-pointer ${
-                      displayLayout === 'cards' ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Squares2X2Icon className="w-4 h-4 text-slate-500" />
-                      <span>Cards</span>
-                    </div>
-                    {displayLayout === 'cards' && <span>✓</span>}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onDisplayLayoutChange('compact');
-                      onLayoutDropdownOpenChange(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between transition-colors cursor-pointer ${
-                      displayLayout === 'compact' ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <ListBulletIcon className="w-4 h-4 text-slate-500" />
-                      <span>Compact</span>
-                    </div>
-                    {displayLayout === 'compact' && <span>✓</span>}
-                  </button>
-                </div>
-              )}
-            </div>
+            <TripQueueLayoutDropdown
+              displayLayout={displayLayout}
+              effectiveDisplayLayout={effectiveDisplayLayout}
+              isAutoCardsFallback={isAutoCardsFallback}
+              effectiveMinTableWidthPx={effectiveMinTableWidthPx}
+              isOpen={isLayoutDropdownOpen}
+              onOpenChange={onLayoutDropdownOpenChange}
+              onDisplayLayoutChange={onDisplayLayoutChange}
+              containerRef={layoutDropdownRef}
+            />
 
             {/* Search Component: Desktop inline bar with max-width or compact button */}
             {isSearchExpanded ? (

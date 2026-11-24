@@ -335,6 +335,31 @@ export function matchesQueueStatusFilter(tripStatus: string | undefined, statusF
   return selectedSet.has(normalizedTripStatus as CanonicalQueueStatusKey);
 }
 
+export function isUnconfirmedQuickFilterActive(statusFilter: string): boolean {
+  const selected = parseStatusFilterSelection(statusFilter);
+  return selected.size === 1 && selected.has('unconfirmed');
+}
+
+export function computeNextStatusFilterOnUnconfirmedToggle(
+  currentStatusFilter: string,
+  previousNonUnconfirmedFilter?: string
+): { nextStatusFilter: string; savedPreviousFilter: string } {
+  if (!isUnconfirmedQuickFilterActive(currentStatusFilter)) {
+    const savedPreviousFilter = String(currentStatusFilter || '').trim() || 'all';
+    return {
+      nextStatusFilter: 'unconfirmed',
+      savedPreviousFilter,
+    };
+  }
+  const candidate = String(previousNonUnconfirmedFilter || '').trim();
+  const restored =
+    !candidate || isUnconfirmedQuickFilterActive(candidate) ? 'all' : candidate;
+  return {
+    nextStatusFilter: restored,
+    savedPreviousFilter: restored,
+  };
+}
+
 export function resolveTripEffectiveTimeMs(trip: Trip): number {
   if (trip.scheduledPickupTime && trip.bookingType !== 'asap') {
     const schedMs = Date.parse(trip.scheduledPickupTime);

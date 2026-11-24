@@ -2,20 +2,28 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ACTIVE_QUEUE_STATUS_KEYS,
-  ALL_QUEUE_STATUS_KEYS,
+  isUnconfirmedQuickFilterActive,
   parseStatusFilterSelection,
   serializeStatusFilterSelection,
   type CanonicalQueueStatusKey,
 } from '../../../../core/hooks/dispatch/dispatch-workspace.util';
-import { ChevronDownIcon, FunnelIcon } from '../../../ui/Icons';
-import type { QueueFilterType } from './trip-queue-layout.util';
+import type { DisplayLayout } from '../../../../core/hooks/useDisplayLayout';
+import {
+  BoltIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  FunnelIcon,
+  ListBulletIcon,
+  Squares2X2Icon,
+  TableCellsIcon,
+} from '../../../ui/Icons';
+import { TABLE_OVERFLOW_MIN_WIDTH_PX, type QueueFilterType } from './trip-queue-layout.util';
 
 export const STATUS_FILTER_OPTIONS: ReadonlyArray<{
   key: CanonicalQueueStatusKey;
   label: string;
   dotClass: string;
 }> = [
-  { key: 'unconfirmed', label: 'Unconfirmed', dotClass: 'bg-amber-500' },
   { key: 'confirmed', label: 'Confirmed', dotClass: 'bg-emerald-500' },
   { key: 'pending', label: 'Pending', dotClass: 'bg-yellow-500' },
   { key: 'offered', label: 'Offered', dotClass: 'bg-sky-500' },
@@ -40,18 +48,35 @@ export const QUEUE_FILTER_MENU_ITEMS: ReadonlyArray<{ key: QueueFilterType; labe
   { key: 'has_stops', label: 'Has Stops' },
 ];
 
+const PORTAL_MENU_SHELL_CLASS =
+  'bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none z-[99999]';
+const PORTAL_HEADER_STRIP_CLASS =
+  'px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/60 rounded-t-xl min-h-[28px]';
+
+function MenuCheckIndicator({ checked, indeterminate = false }: { checked: boolean; indeterminate?: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
+        checked ? 'bg-blue-600 border-blue-600 text-white' : indeterminate ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-slate-300'
+      }`}
+    >
+      {checked ? <CheckIcon className="w-2.5 h-2.5 stroke-[3]" /> : indeterminate ? <span className="w-2 h-0.5 bg-blue-600 rounded-full" /> : null}
+    </span>
+  );
+}
+
 function usePortalDropdownPosition(params: {
   isOpen: boolean;
   onClose: () => void;
   menuWidth: number;
   estimatedHeight: number;
+  align?: 'left' | 'right';
 }) {
-  const { isOpen, onClose, menuWidth, estimatedHeight } = params;
+  const { isOpen, onClose, menuWidth, estimatedHeight, align = 'left' } = params;
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const [coords, setCoords] = useState<{ top: number; left: number; openUpward: boolean } | null>(
-    null
-  );
+  const [coords, setCoords] = useState<{ top: number; left: number; openUpward: boolean } | null>(null);
 
   const computeCoords = useCallback(() => {
     const triggerEl = triggerRef.current;
@@ -60,63 +85,44 @@ function usePortalDropdownPosition(params: {
     const menuHeight = menuRef.current?.offsetHeight || estimatedHeight;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-
     const spaceBelow = vh - rect.bottom;
-    const spaceAbove = rect.top;
-    const openUpward = spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow;
+    const openUpward = spaceBelow < menuHeight + 10 && rect.top > spaceBelow;
+    const top = openUpward ? Math.max(8, rect.top - menuHeight - 4) : Math.min(vh - menuHeight - 8, rect.bottom + 4);
 
-    const top = openUpward
-      ? Math.max(8, rect.top - menuHeight - 6)
-      : Math.min(vh - menuHeight - 8, rect.bottom + 6);
-
-    let left = rect.left;
-    if (left + menuWidth > vw - 8) {
-      left = Math.max(8, vw - menuWidth - 8);
-    }
+    let left = align === 'right' ? rect.right - menuWidth : rect.left;
+    if (align === 'right' && left < 8) left = Math.max(8, rect.left);
+    if (left + menuWidth > vw - 8) left = Math.max(8, vw - menuWidth - 8);
     if (left < 8) left = 8;
-
     return { top, left, openUpward };
-  }, [menuWidth, estimatedHeight]);
+  }, [menuWidth, estimatedHeight, align]);
 
   useEffect(() => {
-    if (!isOpen) {
-      setCoords(null);
-      return;
-    }
+    if (!isOpen) { setCoords(null); return; }
     const initial = computeCoords();
     if (initial) setCoords(initial);
-
     const raf = requestAnimationFrame(() => {
       const next = computeCoords();
       if (next) setCoords(next);
     });
-
-    const handleReposition = () => {
+    const handleReposition = (e?: Event) => {
+      if (e?.type === 'scroll' && menuRef.current && e.target instanceof Node && menuRef.current.contains(e.target)) return;
       const next = computeCoords();
       if (next) setCoords(next);
     };
-
     const handleOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (
-        triggerRef.current &&
-        !triggerRef.current.contains(target) &&
-        menuRef.current &&
-        !menuRef.current.contains(target)
-      ) {
+      if (triggerRef.current && !triggerRef.current.contains(target) && menuRef.current && !menuRef.current.contains(target)) {
         onClose();
       }
     };
-
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
     };
 
     window.addEventListener('scroll', handleReposition, true);
     window.addEventListener('resize', handleReposition);
     document.addEventListener('mousedown', handleOutside);
     document.addEventListener('keydown', handleKey);
-
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('scroll', handleReposition, true);
@@ -126,149 +132,105 @@ function usePortalDropdownPosition(params: {
     };
   }, [isOpen, onClose, computeCoords]);
 
-  return { triggerRef, menuRef, coords };
+  return { triggerRef, menuRef, coords, setCoords, computeCoords };
 }
 
 export interface TripStatusMultiSelectDropdownProps {
   statusFilter: string;
-  unconfirmedCount: number;
+  unconfirmedCount?: number;
   onStatusFilterChange: (nextStatusFilter: string) => void;
 }
 
 export function TripStatusMultiSelectDropdown({
   statusFilter,
-  unconfirmedCount,
   onStatusFilterChange,
 }: TripStatusMultiSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const closeMenu = useCallback(() => setIsOpen(false), []);
-
-  const { triggerRef, menuRef, coords } = usePortalDropdownPosition({
-    isOpen,
-    onClose: closeMenu,
-    menuWidth: 232,
-    estimatedHeight: 356,
+  const { triggerRef, menuRef, coords, setCoords, computeCoords } = usePortalDropdownPosition({
+    isOpen, onClose: closeMenu, menuWidth: 232, estimatedHeight: 336, align: 'left',
   });
 
+  const isUnconfirmedOnly = isUnconfirmedQuickFilterActive(statusFilter);
   const selectedSet = parseStatusFilterSelection(statusFilter);
-  const totalCount = ALL_QUEUE_STATUS_KEYS.length;
-  const selectedCount = selectedSet.size;
-  const allSelected = selectedCount >= totalCount;
-  const noneSelected = selectedCount === 0;
-  const someSelected = selectedCount > 0 && !allSelected;
-
-  const buttonLabel = (() => {
-    if (allSelected) {
-      return unconfirmedCount > 0 ? `All Status (${unconfirmedCount} new)` : 'All Status';
-    }
-    if (noneSelected) {
-      return 'Status (0)';
-    }
-    if (selectedCount === 1) {
-      const onlyKey = Array.from(selectedSet)[0];
-      const match = STATUS_FILTER_OPTIONS.find((o) => o.key === onlyKey);
-      if (onlyKey === 'unconfirmed') {
-        return `Unconfirmed (${unconfirmedCount})`;
-      }
-      return match?.label || onlyKey;
-    }
-    return `Status (${selectedCount})`;
-  })();
-
-  const toggleStatusKey = (key: CanonicalQueueStatusKey) => {
-    const next = new Set(selectedSet);
-    if (next.has(key)) {
-      next.delete(key);
-    } else {
-      next.add(key);
-    }
-    onStatusFilterChange(serializeStatusFilterSelection(next));
-  };
-
-  const handleToggleAll = () => {
-    if (allSelected) {
-      onStatusFilterChange('none');
-    } else {
-      onStatusFilterChange('all');
-    }
-  };
-
-  const handleSelectActiveOnly = () => {
-    onStatusFilterChange(serializeStatusFilterSelection(ACTIVE_QUEUE_STATUS_KEYS));
-  };
+  const lifecycleSelectedCount = isUnconfirmedOnly
+    ? 0
+    : STATUS_FILTER_OPTIONS.filter((o) => selectedSet.has(o.key)).length;
+  const allSelected = !isUnconfirmedOnly && lifecycleSelectedCount === STATUS_FILTER_OPTIONS.length;
+  const noneSelected = !isUnconfirmedOnly && lifecycleSelectedCount === 0;
+  const someSelected = !isUnconfirmedOnly && lifecycleSelectedCount > 0 && !allSelected;
+  const isNeutral = allSelected || isUnconfirmedOnly;
 
   const isActivePresetSelected =
-    selectedCount === ACTIVE_QUEUE_STATUS_KEYS.length &&
+    !isUnconfirmedOnly &&
+    selectedSet.size === ACTIVE_QUEUE_STATUS_KEYS.length &&
     ACTIVE_QUEUE_STATUS_KEYS.every((k) => selectedSet.has(k));
+
+  const buttonLabel = isNeutral
+    ? 'All Status'
+    : isActivePresetSelected
+    ? 'Active Only'
+    : noneSelected
+    ? 'Status (0)'
+    : lifecycleSelectedCount === 1
+    ? STATUS_FILTER_OPTIONS.find((o) => selectedSet.has(o.key))?.label || 'Status (1)'
+    : `Status (${lifecycleSelectedCount})`;
+
+  const toggleStatusKey = (key: CanonicalQueueStatusKey) => {
+    if (isUnconfirmedOnly) {
+      onStatusFilterChange(serializeStatusFilterSelection([key]));
+      return;
+    }
+    const next = new Set(selectedSet);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    const nextLifecycleCount = STATUS_FILTER_OPTIONS.filter((o) => next.has(o.key)).length;
+    if (nextLifecycleCount === STATUS_FILTER_OPTIONS.length) onStatusFilterChange('all');
+    else if (nextLifecycleCount === 0) onStatusFilterChange('none');
+    else onStatusFilterChange(serializeStatusFilterSelection(next));
+  };
+
+  const handleTriggerClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isOpen) { setCoords(null); setIsOpen(false); }
+    else { const initial = computeCoords(); if (initial) setCoords(initial); setIsOpen(true); }
+  };
 
   return (
     <div className="relative shrink-0">
       <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setIsOpen((v) => !v)}
-        className={`h-7 px-2.5 bg-white border rounded-lg text-xs font-semibold shadow-2xs cursor-pointer flex items-center gap-1.5 max-w-[145px] sm:max-w-[175px] transition-colors ${
-          !allSelected
-            ? 'border-blue-500 bg-blue-50 text-blue-800 font-bold'
-            : unconfirmedCount > 0
-            ? 'border-amber-300 text-slate-800 hover:bg-slate-50'
-            : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+        ref={triggerRef} type="button" onClick={handleTriggerClick}
+        className={`h-7 px-2.5 border rounded-lg text-xs shadow-2xs cursor-pointer flex items-center gap-1.5 max-w-[145px] sm:max-w-[175px] transition-all ${
+          isOpen ? 'bg-blue-50 border-blue-400 text-blue-700 font-bold ring-2 ring-blue-500/20'
+            : !isNeutral ? 'bg-blue-50 border-blue-500 text-blue-800 font-bold'
+            : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700 font-semibold'
         }`}
-        title="Filter trips by one or more statuses"
-        aria-haspopup="true"
-        aria-expanded={isOpen}
+        title="Filter trips by lifecycle status" aria-haspopup="true" aria-expanded={isOpen}
       >
         <span className="truncate">{buttonLabel}</span>
-        <ChevronDownIcon className="w-3 h-3 text-slate-400 shrink-0" />
+        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`} />
       </button>
 
-      {unconfirmedCount > 0 && !(selectedCount === 1 && selectedSet.has('unconfirmed')) && (
-        <span
-          className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white animate-pulse pointer-events-none"
-          title={`${unconfirmedCount} unconfirmed booking(s)`}
-        />
-      )}
-
-      {isOpen &&
-        coords !== null &&
-        typeof document !== 'undefined' &&
+      {isOpen && coords !== null && typeof document !== 'undefined' &&
         createPortal(
           <div
-            ref={menuRef}
-            style={{
-              position: 'fixed',
-              top: `${coords.top}px`,
-              left: `${coords.left}px`,
-              width: '232px',
-              zIndex: 99999,
-              transformOrigin: coords.openUpward ? 'bottom left' : 'top left',
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden text-xs select-none animate-in fade-in zoom-in-95 duration-100"
+            ref={menuRef} data-ui-select-portal="true"
+            style={{ position: 'fixed', top: `${coords.top}px`, left: `${coords.left}px`, width: '232px', zIndex: 99999, transformOrigin: coords.openUpward ? 'bottom left' : 'top left' }}
+            onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
+            className={PORTAL_MENU_SHELL_CLASS}
           >
-            {/* Header: Select/Deselect All + Active Only Quick Chip */}
-            <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
-              <label className="flex items-center gap-2 font-extrabold text-slate-800 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = someSelected;
-                  }}
-                  onChange={handleToggleAll}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <span>{allSelected ? 'Deselect All' : 'Select All'}</span>
-              </label>
-
+            <div className={PORTAL_HEADER_STRIP_CLASS}>
               <button
-                type="button"
-                onClick={handleSelectActiveOnly}
-                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border cursor-pointer transition-colors ${
-                  isActivePresetSelected
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white hover:bg-blue-50 text-blue-700 border-blue-200'
+                type="button" onClick={() => onStatusFilterChange(allSelected ? 'none' : 'all')}
+                className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-600 hover:text-blue-700 cursor-pointer"
+              >
+                <MenuCheckIndicator checked={allSelected} indeterminate={someSelected} />
+                <span>{allSelected ? 'Deselect All' : 'Select All'}</span>
+              </button>
+              <button
+                type="button" onClick={() => onStatusFilterChange(serializeStatusFilterSelection(ACTIVE_QUEUE_STATUS_KEYS))}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-bold border cursor-pointer transition-colors normal-case tracking-normal ${
+                  isActivePresetSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-blue-50 text-blue-700 border-blue-200'
                 }`}
                 title="Check only live/open statuses (hide Completed, Cancelled, Declined)"
               >
@@ -276,35 +238,22 @@ export function TripStatusMultiSelectDropdown({
               </button>
             </div>
 
-            {/* Individual Status Checkboxes */}
-            <div className="max-h-64 overflow-y-auto py-1 divide-y divide-slate-50">
+            <div className="max-h-64 overflow-y-auto py-1">
               {STATUS_FILTER_OPTIONS.map((opt) => {
-                const checked = selectedSet.has(opt.key);
+                const checked = !isUnconfirmedOnly && selectedSet.has(opt.key);
                 return (
-                  <label
-                    key={opt.key}
-                    className={`px-3 py-1.5 flex items-center justify-between gap-2 cursor-pointer transition-colors ${
-                      checked
-                        ? 'bg-blue-50/40 text-slate-900 font-bold hover:bg-blue-50/80'
-                        : 'text-slate-600 font-medium hover:bg-slate-50'
+                  <button
+                    key={opt.key} type="button" onClick={() => toggleStatusKey(opt.key)}
+                    className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer ${
+                      checked ? 'font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/70' : 'font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
                     }`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleStatusKey(opt.key)}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
-                      />
+                    <span className="flex items-center gap-2 min-w-0">
+                      <MenuCheckIndicator checked={checked} />
                       <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotClass}`} />
                       <span className="truncate">{opt.label}</span>
-                    </div>
-                    {opt.key === 'unconfirmed' && unconfirmedCount > 0 && (
-                      <span className="px-1.5 py-0.1 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-black shrink-0">
-                        {unconfirmedCount}
-                      </span>
-                    )}
-                  </label>
+                    </span>
+                  </button>
                 );
               })}
             </div>
@@ -328,102 +277,227 @@ export function TripAddFilterDropdown({
 }: TripAddFilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const closeMenu = useCallback(() => setIsOpen(false), []);
-
-  const { triggerRef, menuRef, coords } = usePortalDropdownPosition({
-    isOpen,
-    onClose: closeMenu,
-    menuWidth: 204,
-    estimatedHeight: 290,
+  const { triggerRef, menuRef, coords, setCoords, computeCoords } = usePortalDropdownPosition({
+    isOpen, onClose: closeMenu, menuWidth: 204, estimatedHeight: 280, align: 'left',
   });
 
   const toggleFilterKey = (key: QueueFilterType) => {
-    if (activeFilterKeys.includes(key)) {
-      onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== key));
-    } else {
-      onActiveFilterKeysChange([...activeFilterKeys, key]);
-    }
+    onActiveFilterKeysChange(
+      activeFilterKeys.includes(key) ? activeFilterKeys.filter((k) => k !== key) : [...activeFilterKeys, key]
+    );
+  };
+
+  const handleTriggerClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isOpen) { setCoords(null); setIsOpen(false); }
+    else { const initial = computeCoords(); if (initial) setCoords(initial); setIsOpen(true); }
   };
 
   return (
     <div className="relative shrink-0">
       <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setIsOpen((v) => !v)}
-        className={`flex items-center gap-1 bg-white hover:bg-slate-50 border rounded-lg text-xs font-bold shadow-2xs transition-colors cursor-pointer ${
+        ref={triggerRef} type="button" onClick={handleTriggerClick}
+        className={`flex items-center gap-1 border rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer ${
           compactMobile ? 'px-2.5 py-0.5 h-6' : 'px-2.5 py-1 h-7'
         } ${
-          activeFilterKeys.length > 0
-            ? 'border-blue-400 bg-blue-50/70 text-blue-800'
-            : 'border-slate-300 text-slate-700'
+          isOpen ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-500/20'
+            : activeFilterKeys.length > 0 ? 'border-blue-400 bg-blue-50/70 text-blue-800 hover:bg-blue-50'
+            : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700'
         }`}
-        title="Add or toggle queue filters"
-        aria-haspopup="true"
-        aria-expanded={isOpen}
+        title="Add or toggle queue filters" aria-haspopup="true" aria-expanded={isOpen}
       >
-        <FunnelIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+        <FunnelIcon className={`w-3.5 h-3.5 shrink-0 ${isOpen ? 'text-blue-600' : 'text-slate-500'}`} />
         <span>{compactMobile ? '+ Filter' : 'Filter'}</span>
         {activeFilterKeys.length > 0 && (
-          <span className="px-1.5 py-0.1 rounded-full bg-blue-600 text-white text-[9.5px] font-black">
-            {activeFilterKeys.length}
-          </span>
+          <span className="px-1.5 py-0.1 rounded-full bg-blue-600 text-white text-[9.5px] font-black">{activeFilterKeys.length}</span>
         )}
-        <ChevronDownIcon className="w-3 h-3 text-slate-400 shrink-0" />
+        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`} />
       </button>
 
-      {isOpen &&
-        coords !== null &&
-        typeof document !== 'undefined' &&
+      {isOpen && coords !== null && typeof document !== 'undefined' &&
         createPortal(
           <div
-            ref={menuRef}
-            style={{
-              position: 'fixed',
-              top: `${coords.top}px`,
-              left: `${coords.left}px`,
-              width: '204px',
-              zIndex: 99999,
-              transformOrigin: coords.openUpward ? 'bottom left' : 'top left',
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden text-xs select-none animate-in fade-in zoom-in-95 duration-100"
+            ref={menuRef} data-ui-select-portal="true"
+            style={{ position: 'fixed', top: `${coords.top}px`, left: `${coords.left}px`, width: '204px', zIndex: 99999, transformOrigin: coords.openUpward ? 'bottom left' : 'top left' }}
+            onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
+            className={PORTAL_MENU_SHELL_CLASS}
           >
-            <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
-                Queue Filters
-              </span>
-              {activeFilterKeys.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onActiveFilterKeysChange([])}
-                  className="text-[10.5px] font-bold text-rose-600 hover:text-rose-700 cursor-pointer"
-                >
-                  Clear All
-                </button>
-              )}
+            <div className={PORTAL_HEADER_STRIP_CLASS}>
+              <span>Queue Filters</span>
+              <button
+                type="button" disabled={activeFilterKeys.length === 0} onClick={() => onActiveFilterKeysChange([])}
+                className="text-[10px] font-bold text-rose-600 hover:text-rose-700 disabled:opacity-40 disabled:pointer-events-none cursor-pointer normal-case tracking-normal"
+              >
+                Clear
+              </button>
             </div>
 
             <div className="py-1">
               {QUEUE_FILTER_MENU_ITEMS.map((item) => {
                 const active = activeFilterKeys.includes(item.key);
                 return (
-                  <label
-                    key={item.key}
-                    className={`px-3 py-1.5 flex items-center gap-2 cursor-pointer transition-colors ${
-                      active
-                        ? 'bg-blue-50/50 text-blue-800 font-bold hover:bg-blue-50'
-                        : 'text-slate-700 font-semibold hover:bg-slate-50'
+                  <button
+                    key={item.key} type="button" onClick={() => toggleFilterKey(item.key)}
+                    className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer ${
+                      active ? 'font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/70' : 'font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={active}
-                      onChange={() => toggleFilterKey(item.key)}
-                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
-                    />
-                    <span>{item.label}</span>
-                  </label>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <MenuCheckIndicator checked={active} />
+                      <span className="truncate">{item.label}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>,
+          document.body
+        )}
+    </div>
+  );
+}
+
+export interface TripQueueLayoutDropdownProps {
+  displayLayout: DisplayLayout;
+  effectiveDisplayLayout: DisplayLayout;
+  isAutoCardsFallback: boolean;
+  effectiveMinTableWidthPx?: number;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onDisplayLayoutChange: (layout: DisplayLayout) => void;
+  containerRef?: React.RefObject<HTMLDivElement | null>;
+}
+
+export function TripQueueLayoutDropdown({
+  displayLayout,
+  effectiveDisplayLayout,
+  isAutoCardsFallback,
+  effectiveMinTableWidthPx = TABLE_OVERFLOW_MIN_WIDTH_PX,
+  isOpen,
+  onOpenChange,
+  onDisplayLayoutChange,
+  containerRef,
+}: TripQueueLayoutDropdownProps) {
+  const closeMenu = useCallback(() => onOpenChange(false), [onOpenChange]);
+  const { triggerRef, menuRef, coords, setCoords, computeCoords } = usePortalDropdownPosition({
+    isOpen, onClose: closeMenu, menuWidth: 212, estimatedHeight: 192, align: 'right',
+  });
+
+  const layoutTriggerLabel =
+    displayLayout === 'auto'
+      ? isAutoCardsFallback ? 'Cards (Auto)' : 'Table (Auto)'
+      : effectiveDisplayLayout === 'cards' ? 'Cards'
+      : effectiveDisplayLayout === 'table' ? 'Table'
+      : 'Compact';
+
+  const layoutTriggerTooltip =
+    displayLayout === 'auto'
+      ? isAutoCardsFallback
+        ? `Auto Layout: switched to Cards because Trips table would overflow horizontally (${effectiveMinTableWidthPx}px needed). Select "Table" to force 10-column table.`
+        : 'Auto Layout (Table ↔ Cards): showing Table while wide enough.'
+      : `Queue Layout: ${layoutTriggerLabel}. Click to change.`;
+
+  const handleTriggerClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isOpen) { setCoords(null); onOpenChange(false); }
+    else {
+      const initial = computeCoords();
+      if (initial) setCoords(initial);
+      onOpenChange(true);
+    }
+  };
+
+  const selectMode = (mode: DisplayLayout) => {
+    onDisplayLayoutChange(mode);
+    setCoords(null);
+    onOpenChange(false);
+  };
+
+  const items: ReadonlyArray<{ mode: DisplayLayout; label: string; sublabel?: string; icon: React.ReactNode }> = [
+    { mode: 'auto', label: 'Auto', sublabel: 'Table ↔ Cards', icon: <BoltIcon className="w-3.5 h-3.5 text-blue-500 shrink-0" /> },
+    { mode: 'table', label: 'Table', icon: <TableCellsIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" /> },
+    { mode: 'cards', label: 'Cards', icon: <Squares2X2Icon className="w-3.5 h-3.5 text-slate-500 shrink-0" /> },
+    { mode: 'compact', label: 'Compact', icon: <ListBulletIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" /> },
+  ];
+
+  return (
+    <div className="hidden lg:block relative shrink-0" ref={containerRef}>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={handleTriggerClick}
+        className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 border rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer h-7 ${
+          isOpen
+            ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-500/20'
+            : isAutoCardsFallback
+            ? 'bg-blue-50/80 hover:bg-blue-50 border-blue-300 text-blue-800'
+            : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700'
+        }`}
+        title={layoutTriggerTooltip}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+      >
+        {effectiveDisplayLayout === 'cards' ? (
+          <Squares2X2Icon className={`w-3.5 h-3.5 ${isOpen || isAutoCardsFallback ? 'text-blue-600' : 'text-slate-600'}`} />
+        ) : effectiveDisplayLayout === 'table' ? (
+          <TableCellsIcon className={`w-3.5 h-3.5 ${isOpen ? 'text-blue-600' : 'text-slate-600'}`} />
+        ) : (
+          <ListBulletIcon className={`w-3.5 h-3.5 ${isOpen ? 'text-blue-600' : 'text-slate-600'}`} />
+        )}
+        <span className="hidden sm:inline">{layoutTriggerLabel}</span>
+        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`} />
+      </button>
+
+      {isOpen && coords !== null && typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={menuRef}
+            data-ui-select-portal="true"
+            role="listbox"
+            aria-label="Queue Layout"
+            style={{
+              position: 'fixed', top: `${coords.top}px`, left: `${coords.left}px`,
+              width: '212px', zIndex: 99999, transformOrigin: coords.openUpward ? 'bottom right' : 'top right',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            className={PORTAL_MENU_SHELL_CLASS}
+          >
+            <div className={PORTAL_HEADER_STRIP_CLASS}>
+              <span>Queue Layout</span>
+            </div>
+
+            <div className="py-1">
+              {items.map((item) => {
+                const isSelected = displayLayout === item.mode;
+                return (
+                  <button
+                    key={item.mode}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => selectMode(item.mode)}
+                    className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer ${
+                      isSelected ? 'font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/70' : 'font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {item.icon}
+                      <div className="min-w-0">
+                        <div className="truncate leading-tight">{item.label}</div>
+                        {item.sublabel && <div className="text-[10px] font-normal text-slate-400 leading-tight">{item.sublabel}</div>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {item.mode === 'auto' && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-blue-100/80 text-blue-700 text-[10px] font-bold">
+                          {isAutoCardsFallback ? 'Cards' : 'Table'}
+                        </span>
+                      )}
+                      {isSelected && <CheckIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                    </div>
+                  </button>
                 );
               })}
             </div>

@@ -4,6 +4,7 @@ import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
+import { Select } from '../../../ui/Select';
 import { Badge } from '../../../ui/Badge';
 import { Alert } from '../../../ui/Alert';
 import { SparklesIcon, MegaphoneIcon } from '../../../ui/Icons';
@@ -313,15 +314,15 @@ export function WebsiteNavigationTab({
 
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Alert Level</label>
-                <select
+                <Select
+                  size="sm"
                   value={announcementType}
                   onChange={(e) => setAnnouncementType(e.target.value as any)}
-                  className="w-full text-xs font-bold px-3 py-2 bg-white border border-slate-200 rounded-lg"
                 >
                   <option value="info">Info (Blue Notice)</option>
                   <option value="warning">Weather Warning (Amber)</option>
                   <option value="alert">Critical Alert (Red)</option>
-                </select>
+                </Select>
               </div>
             </div>
 

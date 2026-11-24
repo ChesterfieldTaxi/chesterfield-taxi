@@ -11,6 +11,7 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../ui/Card';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
+import { Select } from '../../ui/Select';
 import { Badge } from '../../ui/Badge';
 import { Alert } from '../../ui/Alert';
 import {
@@ -618,7 +619,9 @@ export function AdminAdvancedTab({
                   </p>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-                  <select
+                  <Select
+                    size="sm"
+                    fullWidth={false}
                     value={alertDismissMinutes}
                     onChange={async (e) => {
                       const mins = parseInt(e.target.value, 10);
@@ -630,7 +633,7 @@ export function AdminAdvancedTab({
                         localStorage.setItem('chesterfield_alerts_ttl_minutes', String(mins));
                       } catch {}
                     }}
-                    className="w-full sm:w-auto text-xs font-bold px-3 py-2 sm:py-1.5 rounded-lg border border-slate-300 bg-white text-slate-800 shadow-2xs focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                    className="w-full sm:w-auto"
                   >
                     <option value={15}>15 Minutes</option>
                     <option value={30}>30 Minutes</option>
@@ -640,7 +643,7 @@ export function AdminAdvancedTab({
                     <option value={720}>12 Hours</option>
                     <option value={1440}>24 Hours</option>
                     <option value={0}>Never Auto-Dismiss</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 

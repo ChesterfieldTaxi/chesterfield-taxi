@@ -7,6 +7,7 @@ import {
 } from '~/core/services/places/special-places.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
+import { Select } from '~/components/ui/Select';
 import { Badge } from '~/components/ui/Badge';
 import {
   MapPinIcon,
@@ -453,7 +454,8 @@ export function SpecialPlacesAdminPanel() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-700 block mb-1">Category</label>
-              <select
+              <Select
+                size="sm"
                 value={formData.category}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                   const newCat = e.target.value as SpecialPlaceCategory;
@@ -463,20 +465,20 @@ export function SpecialPlacesAdminPanel() {
                     airportType: newCat === 'airport' ? (formData.airportType || 'commercial') : undefined,
                   });
                 }}
-                className="w-full h-8.5 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-medium"
               >
                 {Object.entries(CATEGORY_CONFIG).map(([key, cat]) => (
                   <option key={key} value={key}>
                     {cat.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {formData.category === 'airport' && (
               <div>
                 <label className="text-xs font-medium text-slate-700 block mb-1">Airport Type</label>
-                <select
+                <Select
+                  size="sm"
                   value={formData.airportType || 'commercial'}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                     setFormData({
@@ -484,11 +486,10 @@ export function SpecialPlacesAdminPanel() {
                       airportType: e.target.value as 'commercial' | 'private',
                     })
                   }
-                  className="w-full h-8.5 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-medium"
                 >
                   <option value="commercial">Commercial Airline Terminal (STL)</option>
                   <option value="private">Private Aviation / FBO (SUS, Signature)</option>
-                </select>
+                </Select>
               </div>
             )}
 
@@ -626,10 +627,11 @@ export function SpecialPlacesAdminPanel() {
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {/* Category Dropdown Filter */}
-          <select
+          <Select
+            size="sm"
+            fullWidth={false}
             value={categoryFilter}
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCategoryFilter(e.target.value)}
-            className="h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-700 px-2 font-medium"
           >
             <option value="all">All Categories ({places.length})</option>
             {Object.entries(CATEGORY_CONFIG).map(([key, cat]) => (
@@ -637,7 +639,7 @@ export function SpecialPlacesAdminPanel() {
                 {cat.label}
               </option>
             ))}
-          </select>
+          </Select>
 
           {/* Popular Toggle Button */}
           <button

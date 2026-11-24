@@ -11,6 +11,7 @@ import { getPayLinkService } from '../../../../core/services/payments/pay-link.s
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
+import { Select } from '../../../ui/Select';
 import { XIcon } from '../../../ui/Icons';
 
 export interface InvoiceBuilderModalProps {
@@ -170,16 +171,16 @@ export function InvoiceBuilderModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Billing Terms</label>
-                  <select
+                  <Select
+                    size="sm"
                     value={newCorpCycle}
                     onChange={(e) => setNewCorpCycle(e.target.value as CorporateBillingCycleOption)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                   >
                     <option value="net15">Net 15 Days</option>
                     <option value="net30">Net 30 Days</option>
                     <option value="net60">Net 60 Days</option>
                     <option value="immediate">Immediate Charge</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Credit Limit ($)</label>
@@ -295,7 +296,8 @@ export function InvoiceBuilderModal({
             <form onSubmit={onCreateInvoice} className="p-5 overflow-y-auto space-y-3 text-xs">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Select Corporate Account (Optional)</label>
-                <select
+                <Select
+                  size="sm"
                   value={newInvCorpId}
                   onChange={(e) => {
                     setNewInvCorpId(e.target.value);
@@ -305,7 +307,6 @@ export function InvoiceBuilderModal({
                       setNewInvEmail(corp.billingContactEmail);
                     }
                   }}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg"
                 >
                   <option value="">Custom / Direct Client</option>
                   {corporateAccounts.map((c) => (
@@ -313,7 +314,7 @@ export function InvoiceBuilderModal({
                       {c.companyName} ({c.accountNumber})
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>

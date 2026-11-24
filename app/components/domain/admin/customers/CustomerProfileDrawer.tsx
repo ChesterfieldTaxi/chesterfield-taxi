@@ -5,6 +5,7 @@ import { getUniversalGovernanceService } from '../../../../core/services/governa
 import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
+import { Select } from '../../../ui/Select';
 import {
   AlertTriangleIcon, BanIcon, CarIcon, CheckIcon, EditIcon,
   ExternalLinkIcon, PlusIcon, ShieldIcon, StarIcon, UserIcon,
@@ -223,16 +224,16 @@ export function CustomerProfileDrawer({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Preferred Vehicle</label>
-                  <select
+                  <Select
+                    size="sm"
                     value={editForm.preferredVehicle || 'Standard Sedan'}
                     onChange={(e) => setEditForm((f) => ({ ...f, preferredVehicle: e.target.value }))}
-                    className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs font-semibold"
                   >
                     <option value="Standard Sedan">Standard Sedan</option>
                     <option value="Premium Executive">Premium Sedan / SUV</option>
                     <option value="XL Minivan / SUV">XL Minivan / SUV</option>
                     <option value="Wheelchair Accessible (WAV)">Wheelchair Accessible (WAV)</option>
-                  </select>
+                  </Select>
                 </div>
                 <label className="inline-flex items-center gap-2 pt-4 cursor-pointer">
                   <input

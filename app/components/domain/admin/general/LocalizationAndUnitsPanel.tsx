@@ -16,6 +16,7 @@ import {
   CardFooter,
 } from '../../../ui/Card';
 import { Input } from '../../../ui/Input';
+import { Select } from '../../../ui/Select';
 import { Alert } from '../../../ui/Alert';
 import { CheckIcon, ClockIcon, GlobeIcon } from '../../../ui/Icons';
 
@@ -151,18 +152,18 @@ export function LocalizationAndUnitsPanel({
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Operational Timezone
                 </label>
-                <select
+                <Select
+                  size="md"
                   value={localization.timezone}
                   onChange={(e) =>
                     setLocalization((prev) => ({ ...prev, timezone: e.target.value }))
                   }
-                  className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white font-semibold text-slate-900"
                 >
                   <option value="America/Chicago">America/Chicago (Central Time – St. Louis)</option>
                   <option value="America/New_York">America/New_York (Eastern Time)</option>
                   <option value="America/Denver">America/Denver (Mountain Time)</option>
                   <option value="America/Los_Angeles">America/Los_Angeles (Pacific Time)</option>
-                </select>
+                </Select>
               </div>
 
               <div>
@@ -202,17 +203,17 @@ export function LocalizationAndUnitsPanel({
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Date Display Format
                 </label>
-                <select
+                <Select
+                  size="md"
                   value={localization.dateFormat}
                   onChange={(e) =>
                     setLocalization((prev) => ({ ...prev, dateFormat: e.target.value }))
                   }
-                  className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white font-semibold text-slate-900"
                 >
                   <option value="MM/DD/YYYY">MM/DD/YYYY (US Standard)</option>
                   <option value="YYYY-MM-DD">YYYY-MM-DD (ISO 8601)</option>
                   <option value="DD/MM/YYYY">DD/MM/YYYY (International)</option>
-                </select>
+                </Select>
               </div>
             </CardContent>
           </Card>
@@ -234,7 +235,8 @@ export function LocalizationAndUnitsPanel({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Distance Unit</label>
-                  <select
+                  <Select
+                    size="md"
                     value={localization.distanceUnit}
                     onChange={(e) =>
                       setLocalization((prev) => ({
@@ -242,16 +244,16 @@ export function LocalizationAndUnitsPanel({
                         distanceUnit: e.target.value === 'km' ? 'km' : 'mi',
                       }))
                     }
-                    className="w-full h-10 px-2.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-900"
                   >
                     <option value="mi">Miles (mi)</option>
                     <option value="km">Kilometers (km)</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Speed Unit</label>
-                  <select
+                  <Select
+                    size="md"
                     value={localization.speedUnit}
                     onChange={(e) =>
                       setLocalization((prev) => ({
@@ -259,16 +261,16 @@ export function LocalizationAndUnitsPanel({
                         speedUnit: e.target.value === 'kmh' ? 'kmh' : 'mph',
                       }))
                     }
-                    className="w-full h-10 px-2.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-900"
                   >
                     <option value="mph">mph</option>
                     <option value="kmh">km/h</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Temperature</label>
-                  <select
+                  <Select
+                    size="md"
                     value={localization.temperatureUnit}
                     onChange={(e) =>
                       setLocalization((prev) => ({
@@ -276,11 +278,10 @@ export function LocalizationAndUnitsPanel({
                         temperatureUnit: e.target.value === 'C' ? 'C' : 'F',
                       }))
                     }
-                    className="w-full h-10 px-2.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-900"
                   >
                     <option value="F">Fahrenheit (°F)</option>
                     <option value="C">Celsius (°C)</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 
@@ -288,7 +289,8 @@ export function LocalizationAndUnitsPanel({
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Currency &amp; Symbol
                 </label>
-                <select
+                <Select
+                  size="md"
                   value={localization.currency}
                   onChange={(e) =>
                     setLocalization((prev) => ({
@@ -297,13 +299,12 @@ export function LocalizationAndUnitsPanel({
                       currencySymbol: resolveCurrencySymbol(e.target.value),
                     }))
                   }
-                  className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white font-semibold text-slate-900"
                 >
                   <option value="USD">USD ($) – US Dollar</option>
                   <option value="CAD">CAD ($) – Canadian Dollar</option>
                   <option value="EUR">EUR (€) – Euro</option>
                   <option value="GBP">GBP (£) – British Pound</option>
-                </select>
+                </Select>
               </div>
 
               <Input

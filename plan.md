@@ -1501,6 +1501,18 @@ export interface PassengerAccount {
 - **Non-Admin `<Select />` Rollout & Verification Gate**:
   - Replace every raw `<select>` across all 22 non-Admin `.tsx` files in `app/components/domain/{booking,dispatch,FieldRenderer.tsx}` and `app/routes/{corporate,app,apply,contact}.tsx` while retaining `DriverAssignDropdown` for driver assignment, enforced via static AST/regex scan in `scripts/test-design-system-and-dispatch-persistence-phase64.ts`.
 
+## Phase 65 Architecture (Wave 5 Phase 7 — Wave 5 Finale): Unified `Actions ▾` Dropdown Visual Language, Dedicated `Unconfirmed` Header Filter & Admin Console Full Sweep (`0` Native `<select>`s Site-Wide)
+- **Unified `Actions ▾` Portal Shell, Custom Check Indicators & Synchronous Frame-1 Coordinates (`Select.tsx < 430`L, `TripQueueFilterPopovers.tsx < 540`L, `MapLayersAndVehiclesToolbar.tsx < 430`L)**:
+  - Restyle `Select.tsx`, `TripQueueLayoutDropdown` (extracted from inline `TripQueueToolbar.tsx` `Table ▾` menu to a `createPortal(..., document.body)` component in `TripQueueFilterPopovers.tsx`), `TripStatusMultiSelectDropdown`, `TripAddFilterDropdown`, and `MapLayersAndVehiclesToolbar.tsx` (`Vehicles ▾` & `Layers ▾`) onto `TripActionDropdown.tsx`'s `rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs divide-y divide-slate-100 select-none z-[99999]` shell with `data-ui-select-portal="true"` (keeping `DriverAssignDropdown.tsx` untouched).
+  - Replace all `<input type="checkbox">` controls inside dropdown menus with custom `14px` rounded check indicators (`w-3.5 h-3.5 rounded-[4px] border`) inside edge-to-edge `px-3 py-1.5` `<button type="button">` rows, and keep `Clear` / `All Off` header actions permanently mounted with `disabled:opacity-40` inside `min-h-[28px]` `bg-slate-50/60` header strips.
+  - Initialize `coords` to `null` across every portal dropdown, compute coordinates synchronously inside the trigger `onClick` handler prior to setting open state (including `openUpward` for accurate `transformOrigin`), and mount `createPortal` strictly when `coords !== null`.
+- **Dedicated `Unconfirmed` Header Filter & Pure Toggle Helpers (`dispatch-workspace.util.ts`, `TripQueueToolbar.tsx < 1,150`L, `TripQueueFilterPopovers.tsx < 540`L)**:
+  - Add pure `isUnconfirmedQuickFilterActive` and `computeNextStatusFilterOnUnconfirmedToggle` in `dispatch-workspace.util.ts` preserving `'unconfirmed'` inside `ALL_QUEUE_STATUS_KEYS` and `ACTIVE_QUEUE_STATUS_KEYS` while toggling exclusively `'unconfirmed'` vs prior filter state (`prevNonUnconfirmedStatusRef`).
+  - Render `Unconfirmed` button + red circle counter badge (`bg-rose-600 text-white` / `bg-slate-200 text-slate-600`) between `All Dates ▾` and `Status ▾` in `TripQueueToolbar.tsx`, remove `'unconfirmed'` from `STATUS_FILTER_OPTIONS` (11 statuses), and strip `(N new)` / amber dot width-shifters from `TripStatusMultiSelectDropdown`.
+- **Full Admin Console `<Select />` Sweep & Global Zero-Native-`<select>` Gate (`27` Admin `.tsx` Files & `scripts/test-unified-dropdowns-and-admin-sweep-phase65.ts`)**:
+  - Replace all `73` native `<select>` elements across `27` Admin Console `.tsx` files with `<Select />` (`size="sm"` / `size="xs"`), replace the adjacent `Include Archived` raw checkbox in `AdminTripsSubpage.tsx` with `<Checkbox />`, update any restyled class assertions in `test-design-system-and-dispatch-persistence-phase64.ts`, and enforce `0` `/<select\b/` across all `app/**/*.tsx` files (`>= 200` files, zero exclusions) in `scripts/test-unified-dropdowns-and-admin-sweep-phase65.ts`.
+
+
 
 
 

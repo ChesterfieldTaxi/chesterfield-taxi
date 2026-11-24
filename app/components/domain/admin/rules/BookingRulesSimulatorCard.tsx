@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Card, CardContent } from '../../../ui/Card';
 import { Input } from '../../../ui/Input';
+import { Select } from '../../../ui/Select';
 import { Badge } from '../../../ui/Badge';
 import {
   AlertTriangleIcon,
@@ -120,22 +121,22 @@ export function BookingRulesSimulatorCard({ config, zones }: BookingRulesSimulat
 
           <div className="space-y-2">
             <span className="text-xs font-bold text-slate-700 block">Pickup Location</span>
-            <select value={simPickupZoneId} onChange={(e) => setSimPickupZoneId(e.target.value)} className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800">
+            <Select size="sm" value={simPickupZoneId} onChange={(e) => setSimPickupZoneId(e.target.value)}>
               <option value="any">Standard Service Area</option>
               <option value="airport">STL Airport Terminal</option>
               <option value="prohibited">Prohibited Exclusion Zone</option>
               {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
-            </select>
+            </Select>
           </div>
 
           <div className="space-y-2">
             <span className="text-xs font-bold text-slate-700 block">Dropoff Location</span>
-            <select value={simDropoffZoneId} onChange={(e) => setSimDropoffZoneId(e.target.value)} className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800">
+            <Select size="sm" value={simDropoffZoneId} onChange={(e) => setSimDropoffZoneId(e.target.value)}>
               <option value="any">Standard Service Area</option>
               <option value="airport">STL Airport Terminal</option>
               <option value="prohibited">Prohibited Exclusion Zone</option>
               {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
-            </select>
+            </Select>
           </div>
 
           <div className="space-y-2">
@@ -159,23 +160,23 @@ export function BookingRulesSimulatorCard({ config, zones }: BookingRulesSimulat
 
           <div className="space-y-2">
             <span className="text-xs font-bold text-slate-700 block">Payment Method</span>
-            <select value={simPaymentMethod} onChange={(e) => setSimPaymentMethod(e.target.value as RulePaymentMethod)} className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800">
+            <Select size="sm" value={simPaymentMethod} onChange={(e) => setSimPaymentMethod(e.target.value as RulePaymentMethod)}>
               <option value="prepaid">Prepaid In-App</option>
               <option value="corporate">Corporate Account</option>
               <option value="card">Credit Card (In-Car)</option>
               <option value="cash">Cash on Board</option>
               <option value="voucher">Voucher / Invoiced</option>
-            </select>
+            </Select>
           </div>
 
           <div className="space-y-2">
             <span className="text-xs font-bold text-slate-700 block">Vehicle Class Tier</span>
-            <select value={simVehicleTier} onChange={(e) => setSimVehicleTier(e.target.value)} className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800">
+            <Select size="sm" value={simVehicleTier} onChange={(e) => setSimVehicleTier(e.target.value)}>
               <option value="standard">Standard Sedan</option>
               <option value="premium">Executive Premium</option>
               <option value="xl">XL SUV (6-Passenger)</option>
               <option value="wheelchair">Wheelchair WAV</option>
-            </select>
+            </Select>
           </div>
 
           <div className="space-y-1.5 pt-1">

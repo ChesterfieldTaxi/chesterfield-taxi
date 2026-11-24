@@ -10,6 +10,7 @@ import type {
 import { resolvePayoutLedgerMapping } from '../../../../core/services/payouts.service';
 import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
 import { Button } from '../../../ui/Button';
+import { Select } from '../../../ui/Select';
 import { CheckIcon, PlusIcon } from '../../../ui/Icons';
 
 export type PayoutSettlementDraft = Omit<PayoutSettlementRecord, 'id' | 'createdAt'>;
@@ -154,29 +155,29 @@ export function PayoutSettlementModal({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Settlement Status</label>
-                <select
+                <Select
+                  size="sm"
                   value={status}
                   onChange={(e) => setStatus(e.target.value as PayoutSettlementStatus)}
-                  className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs font-semibold"
                 >
                   <option value="paid">Paid Immediately (Posts GL)</option>
                   <option value="approved">Approved (Ready to Pay)</option>
                   <option value="pending">Pending Review</option>
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Payment Method</label>
-                <select
+                <Select
+                  size="sm"
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value as PayoutPaymentMethod)}
-                  className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs font-semibold"
                 >
                   <option value="ach">ACH Direct Deposit</option>
                   <option value="zelle">Zelle / Instant Transfer</option>
                   <option value="payroll">Payroll Run</option>
                   <option value="check">Company Check</option>
                   <option value="cash">Cash Disbursement</option>
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -283,28 +284,28 @@ export function PayoutSettlementModal({
             <div className="grid grid-cols-3 gap-2.5">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Category</label>
-                <select
+                <Select
+                  size="sm"
                   value={payeeCategory}
                   onChange={(e) => setPayeeCategory(e.target.value as CustomPayeeCategory)}
-                  className="w-full h-9 px-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold"
                 >
                   <option value="affiliate">Affiliate</option>
                   <option value="concierge">Concierge</option>
                   <option value="contractor">Contractor</option>
                   <option value="vendor">Vendor / Mechanic</option>
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Rate Type</label>
-                <select
+                <Select
+                  size="sm"
                   value={rateType}
                   onChange={(e) => setRateType(e.target.value as CustomPayeeRateType)}
-                  className="w-full h-9 px-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold"
                 >
                   <option value="flat">Flat ($)</option>
                   <option value="percent">Percent (%)</option>
                   <option value="hourly">Hourly ($/hr)</option>
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Default Rate</label>

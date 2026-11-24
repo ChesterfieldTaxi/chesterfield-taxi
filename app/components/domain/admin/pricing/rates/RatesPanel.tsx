@@ -12,6 +12,7 @@ import {
 } from '~/core/services/pricing/tariff.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
+import { Select } from '~/components/ui/Select';
 import { Badge } from '~/components/ui/Badge';
 import {
   PlusIcon,
@@ -441,18 +442,18 @@ export function RatesPanel({
                 </div>
                 <div>
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">Calculation Model</label>
-                  <select
+                  <Select
+                    size="sm"
                     value={workingCopy.rateModel || 'taximeter'}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                       handleModelChange(e.target.value as TariffRateModel)
                     }
-                    className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-medium"
                   >
                     <option value="taximeter">Stepped Mileage / Taximeter</option>
                     <option value="hourly">Hourly Charter</option>
                     <option value="zip_matrix">Zip-Code Flat Matrix</option>
                     <option value="corridor">Zone-to-Zone Corridors</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">Description</label>
@@ -577,7 +578,8 @@ export function RatesPanel({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-medium text-slate-700 block mb-1">Distance Rounding</label>
-                  <select
+                  <Select
+                    size="sm"
                     value={currentRounding.distanceMode}
                     onChange={(e) =>
                       setWorkingCopy({
@@ -588,12 +590,11 @@ export function RatesPanel({
                         },
                       })
                     }
-                    className="w-full h-9 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 px-2.5 font-semibold"
                   >
                     <option value="exact">Exact Mileage (honors 0.1 mi steps)</option>
                     <option value="half_mile_up">Round Up to Next 0.5 Mile</option>
                     <option value="whole_mile_up">Round Up to Next Whole Mile (1.0 mi)</option>
-                  </select>
+                  </Select>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Controls whether route mileage is rounded before applying distance steps.
                   </p>
@@ -601,7 +602,8 @@ export function RatesPanel({
 
                 <div>
                   <label className="text-xs font-medium text-slate-700 block mb-1">Final Fare Rounding</label>
-                  <select
+                  <Select
+                    size="sm"
                     value={currentRounding.fareMode}
                     onChange={(e) =>
                       setWorkingCopy({
@@ -612,13 +614,12 @@ export function RatesPanel({
                         },
                       })
                     }
-                    className="w-full h-9 text-xs rounded-lg bg-white border border-slate-300 text-slate-900 px-2.5 font-semibold"
                   >
                     <option value="ceil_dollar">Round Up to Whole Dollar ($1.00)</option>
                     <option value="nearest_dollar">Round to Nearest Whole Dollar ($1.00)</option>
                     <option value="nearest_half_dollar">Round to Nearest $0.50</option>
                     <option value="exact_cents">Exact Cents ($0.01 — no rounding)</option>
-                  </select>
+                  </Select>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Applied once at the end of the quote after extras, surcharges, and discounts.
                   </p>

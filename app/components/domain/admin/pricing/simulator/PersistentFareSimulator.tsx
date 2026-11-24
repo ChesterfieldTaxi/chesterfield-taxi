@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Input } from '~/components/ui/Input';
+import { Select } from '~/components/ui/Select';
 import {
   CarIcon,
   SparklesIcon,
@@ -553,10 +554,10 @@ export function PersistentFareSimulator({
 
           <div>
             <label className="text-[11px] font-medium text-slate-600 block mb-1">Corporate Account</label>
-            <select
+            <Select
+              size="sm"
               value={corporateAccountId}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCorporateAccountId(e.target.value)}
-              className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 text-slate-900 px-2 font-medium"
             >
               <option value="">None (Retail / Public)</option>
               {activeCorporateAccounts.map((corp) => (
@@ -564,7 +565,7 @@ export function PersistentFareSimulator({
                   {corp.companyName}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
@@ -697,29 +698,29 @@ export function PersistentFareSimulator({
               </div>
               <div className="col-span-2 sm:col-span-1">
                 <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Pickup Zone</label>
-                <select
+                <Select
+                  size="sm"
                   value={originZoneId}
                   onChange={(e) => setOriginZoneId(e.target.value)}
-                  className="w-full h-8 text-[11px] rounded-md bg-white border border-slate-300 px-1.5"
                 >
                   <option value="">Any Zone</option>
                   {availableZones.map((z) => (
                     <option key={z.id} value={z.id}>{z.name}</option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div className="col-span-2 sm:col-span-1">
                 <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Dropoff Zone</label>
-                <select
+                <Select
+                  size="sm"
                   value={destinationZoneId}
                   onChange={(e) => setDestinationZoneId(e.target.value)}
-                  className="w-full h-8 text-[11px] rounded-md bg-white border border-slate-300 px-1.5"
                 >
                   <option value="">Any Zone</option>
                   {availableZones.map((z) => (
                     <option key={z.id} value={z.id}>{z.name}</option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
           </div>

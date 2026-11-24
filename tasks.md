@@ -1055,6 +1055,24 @@
   - [x] 64.4.1 Create `scripts/test-design-system-and-dispatch-persistence-phase64.ts` testing layout persistence (`780px` & `920px` queue heights, zero mount-overwrite effect), `FloatingWindow` clamping, `Select` portal/child extraction, zero native `<select` outside `app/components/domain/admin/**`, monolith line ceilings, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
   - [x] 64.4.2 Pass `npm run typecheck`, `test-design-system-and-dispatch-persistence-phase64.ts`, `test-map-overlays-and-queue-polish-phase63.ts`, `test-admin-website-and-integrations-phase62.ts`, `test-comms-multichannel-ui.ts`, and `npm run build` with `0` errors.
 
+## Phase 65 (Wave 5 Phase 7 — Wave 5 Finale): Unified `Actions ▾` Dropdown Visual Language, Dedicated `Unconfirmed` Header Filter & Admin Console Full Sweep (`0` Native `<select>`s Site-Wide)
+- [x] 65.0 Baseline Commit & Documentation Sync:
+  - [x] 65.0.1 Commit verified Phase 64 changes cleanly on `main` (`feat(phase-64): portal Select, form primitives, dispatch layout persistence, and map popover positioning fix`).
+  - [x] 65.0.2 Document Platform Phase 65 (Wave 5 Phase 7) across `spec.md`, `plan.md`, and `tasks.md`.
+- [x] 65.1 Unify All Dropdowns (Except `DriverAssignDropdown`) onto the `Actions ▾` Visual Language & Synchronous Frame-1 Coordinates:
+  - [x] 65.1.1 Restyle `app/components/ui/Select.tsx` (`< 430`L) onto the `Actions ▾` shell (`rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs divide-y divide-slate-100 select-none z-[99999]`), edge-to-edge `px-3 py-1.5` rows, and synchronous `calculatePosition()` inside trigger `onClick`.
+  - [x] 65.1.2 Extract `TripQueueLayoutDropdown` (`Table ▾` mode portal menu) into `TripQueueFilterPopovers.tsx` (`< 540`L), wire into `TripQueueToolbar.tsx` (`< 1,150`L), and restyle `TripStatusMultiSelectDropdown` (`Status ▾`) & `TripAddFilterDropdown` (`Filter ▾`) with custom `14px` check indicators, permanently mounted `Clear` button, and synchronous `computeCoords`.
+  - [x] 65.1.3 Restyle `Vehicles ▾` & `Layers ▾` in `MapLayersAndVehiclesToolbar.tsx` (`< 430`L) onto the `Actions ▾` shell with `data-ui-select-portal="true"`, `openUpward` `transformOrigin`, custom `14px` check indicators, permanently mounted `Clear` / `All Off` buttons, and fixed trigger labels.
+- [x] 65.2 Dedicated `Unconfirmed` Header Quick-Filter with Red Circle Counter:
+  - [x] 65.2.1 Export pure `isUnconfirmedQuickFilterActive` & `computeNextStatusFilterOnUnconfirmedToggle` in `app/core/hooks/dispatch/dispatch-workspace.util.ts` while keeping `'unconfirmed'` in `ALL_QUEUE_STATUS_KEYS` and `ACTIVE_QUEUE_STATUS_KEYS`.
+  - [x] 65.2.2 Render `Unconfirmed` button + red circle counter badge between `All Dates ▾` and `Status ▾` in `TripQueueToolbar.tsx`, remove `'unconfirmed'` from `STATUS_FILTER_OPTIONS` (11 lifecycle statuses), and remove `(N new)` / amber dot from `TripStatusMultiSelectDropdown`.
+- [x] 65.3 Admin Console Full Dropdown Sweep (`73` Native `<select>`s Across `27` Files → `0` Site-Wide):
+  - [x] 65.3.1 Migrate all `73` native `<select>` elements across all `27` Admin Console `.tsx` files to `<Select />` (plus `<Checkbox />` for `Include Archived` in `AdminTripsSubpage.tsx`) and align `test-design-system-and-dispatch-persistence-phase64.ts` if needed.
+- [x] 65.4 Deterministic Verification Suite (`scripts/test-unified-dropdowns-and-admin-sweep-phase65.ts`) & Full Build Gates:
+  - [x] 65.4.1 Create `scripts/test-unified-dropdowns-and-admin-sweep-phase65.ts` verifying `0` `/<select\b/` across all `app/**/*.tsx`, unified `Actions ▾` visual/portal/zero-fly-in invariants, `Unconfirmed` toggle helpers & badge UI, preserved `DriverAssignDropdown`, monolith line ceilings, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
+  - [x] 65.4.2 Pass `npm run typecheck`, Phase 65 + Phase 64 + Phase 63 + Phase 62 + Phase 59 test suites, and `npm run build` with `0` errors.
+
+
 
 
 

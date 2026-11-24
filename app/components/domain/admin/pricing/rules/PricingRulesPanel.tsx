@@ -19,6 +19,7 @@ import { getZoneService, DEFAULT_ZONES } from '~/core/services/zones/zone.servic
 import { getSurchargeCatalogItems } from '~/core/services/pricing/surcharges.service';
 import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
+import { Select } from '~/components/ui/Select';
 import { Badge } from '~/components/ui/Badge';
 import {
   ShieldCheckIcon,
@@ -819,17 +820,19 @@ export function PricingRulesPanel({
                       <span>Airport Transfer Only (STL / SUS)</span>
                     </label>
 
-                    <select
+                    <Select
+                      size="sm"
+                      fullWidth={false}
                       value={currentZoneMode}
                       onChange={(e) => handleZoneModeChange(e.target.value as any)}
-                      className="w-full sm:w-auto max-w-full h-8 text-xs rounded-lg bg-white border border-slate-300 px-2.5 font-semibold text-slate-800"
+                      className="w-full sm:w-auto"
                     >
                       <option value="none">Any Location (No Zone Filter)</option>
                       <option value="any_end">Either Pickup or Dropoff in Zone(s)</option>
                       <option value="pickup_only">Pickup Only in Zone(s)</option>
                       <option value="dropoff_only">Dropoff Only in Zone(s)</option>
                       <option value="corridor">Corridor (Specific Pickup → Dropoff Zones)</option>
-                    </select>
+                    </Select>
                   </div>
                 </div>
 
@@ -1084,7 +1087,8 @@ export function PricingRulesPanel({
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                     Corporate Account
                   </label>
-                  <select
+                  <Select
+                    size="sm"
                     value={workingCopy.triggers.accountTags?.[0] || ''}
                     onChange={(e) =>
                       setWorkingCopy({
@@ -1095,7 +1099,6 @@ export function PricingRulesPanel({
                         },
                       })
                     }
-                    className="w-full h-8 text-xs rounded-md bg-white border border-slate-300 px-2 font-medium"
                   >
                     <option value="">All Customers (Retail &amp; Corporate)</option>
                     {activeCorporateAccounts.map((corp) => (
@@ -1103,7 +1106,7 @@ export function PricingRulesPanel({
                         {corp.companyName}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div className="flex items-end pb-1">
                   <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
@@ -1145,7 +1148,8 @@ export function PricingRulesPanel({
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                     Use Service Rate
                   </label>
-                  <select
+                  <Select
+                    size="sm"
                     value={workingCopy.modifier.targetTariffId || ''}
                     onChange={(e) =>
                       setWorkingCopy({
@@ -1156,7 +1160,6 @@ export function PricingRulesPanel({
                         },
                       })
                     }
-                    className="w-full h-9 text-xs rounded-lg bg-white border border-slate-300 px-2.5 font-semibold text-slate-900"
                   >
                     <option value="">Keep Default / Lower-Priority Rate</option>
                     {tariffs.map((t) => (
@@ -1164,24 +1167,24 @@ export function PricingRulesPanel({
                         {t.name} {t.isDefault ? '(Default)' : ''}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="text-[11px] font-semibold text-slate-700 block mb-1">
                     Base Fare Adjustment (Optional)
                   </label>
-                  <select
+                  <Select
+                    size="sm"
                     value={fareAdj?.type || 'none'}
                     onChange={(e) => handleFareAdjTypeChange(e.target.value)}
-                    className="w-full h-9 text-xs rounded-lg bg-white border border-slate-300 px-2.5 font-semibold text-slate-900"
                   >
                     <option value="none">None (Use Rate Formula)</option>
                     <option value="flat_override">Flat Base Fare Override ($)</option>
                     <option value="discount_percent">Base Fare Discount (%)</option>
                     <option value="discount_flat">Flat Discount ($)</option>
                     <option value="multiplier">Base Fare Multiplier (×)</option>
-                  </select>
+                  </Select>
                 </div>
 
                 {fareAdj && (
@@ -1253,21 +1256,25 @@ export function PricingRulesPanel({
                         key={idx}
                         className="p-2.5 rounded-lg bg-white border border-slate-200 flex flex-wrap items-center gap-2"
                       >
-                        <select
-                          value={act.surchargeId}
-                          onChange={(e) =>
-                            handleUpdateSurchargeAction(idx, { surchargeId: e.target.value })
-                          }
-                          className="w-full sm:w-auto flex-1 sm:min-w-[180px] max-w-full h-8 text-xs rounded-md bg-white border border-slate-300 px-2 font-semibold text-slate-900"
-                        >
-                          {catalogSurcharges.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name} ({s.defaultPolicy === 'universal' ? 'Universal' : 'Rule-Only'})
-                            </option>
-                          ))}
-                        </select>
+                        <div className="w-full sm:w-auto flex-1 sm:min-w-[180px]">
+                          <Select
+                            size="sm"
+                            value={act.surchargeId}
+                            onChange={(e) =>
+                              handleUpdateSurchargeAction(idx, { surchargeId: e.target.value })
+                            }
+                          >
+                            {catalogSurcharges.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name} ({s.defaultPolicy === 'universal' ? 'Universal' : 'Rule-Only'})
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
 
-                        <select
+                        <Select
+                          size="sm"
+                          fullWidth={false}
                           value={act.action}
                           onChange={(e) => {
                             const nextAction = e.target.value as RuleSurchargeAction['action'];
@@ -1280,7 +1287,7 @@ export function PricingRulesPanel({
                                 nextAction === 'override' ? act.overrideMode ?? ref?.mode ?? 'flat' : undefined,
                             });
                           }}
-                          className={`h-8 text-xs rounded-md border px-2 font-bold ${
+                          triggerClassName={`font-bold ${
                             act.action === 'waive'
                               ? 'bg-rose-50 border-rose-300 text-rose-800'
                               : act.action === 'override'
@@ -1291,24 +1298,25 @@ export function PricingRulesPanel({
                           <option value="apply">APPLY (Include)</option>
                           <option value="waive">WAIVE (Exclude)</option>
                           <option value="override">OVERRIDE Amount</option>
-                        </select>
+                        </Select>
 
                         {act.action === 'override' && (
                           <>
-                            <select
+                            <Select
+                              size="sm"
+                              fullWidth={false}
                               value={act.overrideMode || 'flat'}
                               onChange={(e) =>
                                 handleUpdateSurchargeAction(idx, {
                                   overrideMode: e.target.value as SurchargeCalcMode,
                                 })
                               }
-                              className="h-8 text-xs rounded-md bg-white border border-slate-300 px-2 font-medium"
                             >
                               <option value="flat">Flat $</option>
                               <option value="per_mile">$/mi</option>
                               <option value="percent">%</option>
                               <option value="multiplier">× Mult</option>
-                            </select>
+                            </Select>
                             <div className="w-24 shrink-0">
                               <Input
                                 type="number"
@@ -1375,23 +1383,27 @@ export function PricingRulesPanel({
                         key={idx}
                         className="p-2.5 rounded-lg bg-white border border-slate-200 flex flex-wrap items-center gap-2"
                       >
-                        <select
-                          value={act.extraKey}
-                          onChange={(e) =>
-                            handleUpdateExtraAction(idx, {
-                              extraKey: e.target.value as RuleExtraTarget,
-                            })
-                          }
-                          className="w-full sm:w-auto flex-1 sm:min-w-[180px] max-w-full h-8 text-xs rounded-md bg-white border border-slate-300 px-2 font-semibold text-slate-900"
-                        >
-                          {EXTRA_TARGETS.map((et) => (
-                            <option key={et.id} value={et.id}>
-                              {et.label}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="w-full sm:w-auto flex-1 sm:min-w-[180px]">
+                          <Select
+                            size="sm"
+                            value={act.extraKey}
+                            onChange={(e) =>
+                              handleUpdateExtraAction(idx, {
+                                extraKey: e.target.value as RuleExtraTarget,
+                              })
+                            }
+                          >
+                            {EXTRA_TARGETS.map((et) => (
+                              <option key={et.id} value={et.id}>
+                                {et.label}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
 
-                        <select
+                        <Select
+                          size="sm"
+                          fullWidth={false}
                           value={act.action}
                           onChange={(e) => {
                             const nextAction = e.target.value as RuleExtraAction['action'];
@@ -1400,7 +1412,7 @@ export function PricingRulesPanel({
                               overrideAmount: nextAction === 'override' ? act.overrideAmount ?? 0 : undefined,
                             });
                           }}
-                          className={`h-8 text-xs rounded-md border px-2 font-bold ${
+                          triggerClassName={`font-bold ${
                             act.action === 'waive'
                               ? 'bg-rose-50 border-rose-300 text-rose-800'
                               : 'bg-amber-50 border-amber-300 text-amber-800'
@@ -1408,7 +1420,7 @@ export function PricingRulesPanel({
                         >
                           <option value="waive">WAIVE ($0)</option>
                           <option value="override">OVERRIDE ($)</option>
-                        </select>
+                        </Select>
 
                         {act.action === 'override' && (
                           <div className="w-24 shrink-0">

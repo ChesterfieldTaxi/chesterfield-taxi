@@ -14,6 +14,7 @@ import type {
 } from './useAdminInvoicingActions';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Button } from '../../../ui/Button';
+import { Select } from '../../../ui/Select';
 import { CheckIcon, CreditCardIcon, DownloadIcon, ExternalLinkIcon } from '../../../ui/Icons';
 
 export interface BillingPolicyAndQuickBooksPanelProps {
@@ -273,10 +274,11 @@ export function BillingPolicyAndQuickBooksPanel({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <select
+            <Select
+              size="sm"
+              fullWidth={false}
               value={ledgerTypeFilter}
               onChange={(e) => setLedgerTypeFilter(e.target.value as LedgerEntryTypeFilter)}
-              className="h-8 px-2.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800"
             >
               <option value="all">All Entry Types</option>
               <option value="fare_revenue">Fare Revenue (4010 / 1200)</option>
@@ -285,18 +287,19 @@ export function BillingPolicyAndQuickBooksPanel({
               <option value="staff_payout">Staff Payroll (5020)</option>
               <option value="vendor_payout">Vendor / Affiliate Payout (5030)</option>
               <option value="platform_commission">Platform Commission (4020)</option>
-            </select>
+            </Select>
 
-            <select
+            <Select
+              size="sm"
+              fullWidth={false}
               value={ledgerFilter}
               onChange={(e) => setLedgerFilter(e.target.value as LedgerPeriodFilter)}
-              className="h-8 px-2.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800"
             >
               <option value="all">All Periods</option>
               <option value="30d">Last 30 Days</option>
               <option value="7d">Last 7 Days</option>
               <option value="today">Today</option>
-            </select>
+            </Select>
 
             <Button type="button" variant="outline" size="sm" disabled={isExporting} onClick={() => onExportLedger('quickbooks_csv')} leftIcon={<DownloadIcon className="w-3.5 h-3.5" />} className="text-xs font-semibold">
               QB CSV

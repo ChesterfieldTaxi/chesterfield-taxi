@@ -10,6 +10,7 @@ import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../ui/Card';
 import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
+import { Select } from '../../../ui/Select';
 import { Badge } from '../../../ui/Badge';
 import { Alert } from '../../../ui/Alert';
 import { BuildingIcon, CarIcon, CashIcon, CheckIcon, ClockIcon, CreditCardIcon, InfoIcon, PlaneLandingIcon, ShieldCheckIcon } from '../../../ui/Icons';
@@ -251,11 +252,11 @@ export function WebsiteFormControlsTab({ settings, onSave, isLoading }: WebsiteF
             </div>
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <label className="text-xs font-bold text-slate-800 block mb-1">Meet &amp; Greet Mode</label>
-              <select value={formConfig.airportMeetAndGreetOptions || 'curbside'} onChange={(e) => setFormConfig((prev) => ({ ...prev, airportMeetAndGreetOptions: e.target.value as any }))} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white">
+              <Select size="sm" value={formConfig.airportMeetAndGreetOptions || 'curbside'} onChange={(e) => setFormConfig((prev) => ({ ...prev, airportMeetAndGreetOptions: e.target.value as any }))}>
                 <option value="curbside">Curbside Pickup Only</option>
                 <option value="baggage_claim">Baggage Claim Escort</option>
                 <option value="both">Client Choice</option>
-              </select>
+              </Select>
             </div>
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <label className="text-xs font-bold text-slate-800 block mb-1">Flight Delay Grace (Mins)</label>

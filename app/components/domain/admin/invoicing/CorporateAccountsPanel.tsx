@@ -15,6 +15,7 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
+import { Select } from '../../../ui/Select';
 import {
   AlertTriangleIcon,
   CheckIcon,
@@ -285,16 +286,16 @@ export function CorporateAccountsPanel({
                       <div className="grid grid-cols-3 gap-2">
                         <div>
                           <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Terms</label>
-                          <select
+                          <Select
+                            size="xs"
                             value={termsDraft.billingCycle}
                             onChange={(e) => setTermsDraft((d) => ({ ...d, billingCycle: e.target.value as CorporateBillingCycleOption }))}
-                            className="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
                           >
                             <option value="immediate">Immediate</option>
                             <option value="net15">Net 15</option>
                             <option value="net30">Net 30</option>
                             <option value="net60">Net 60</option>
-                          </select>
+                          </Select>
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Limit ($)</label>
