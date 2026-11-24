@@ -24,6 +24,7 @@ import {
   type GoogleMapsStatus,
 } from '../../../core/services/maps/google-maps-loader';
 import { useDispatchMapPreferences } from '../../../core/hooks/dispatch/useDispatchMapPreferences';
+import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
 import { getTripIntermediateStopCount } from '../../../core/utils/route-markers.util';
 import {
   FLEET_STATUS_COLORS,
@@ -33,11 +34,14 @@ import {
 import { PhoneIcon, CarIcon, MapPinIcon, UsersIcon, XIcon, CheckIcon } from '../../ui/Icons';
 import { useBottomSheetDragToClose } from '../../../core/hooks/useBottomSheetDragToClose';
 import { MapRouteOverlayHud } from './map/MapRouteOverlayHud';
+import { MapCustomOverlayInfoCard } from './map/MapCustomOverlayInfoCard';
+import { MapLayersAndVehiclesToolbar } from './map/MapLayersAndVehiclesToolbar';
 import {
   buildFleetCarMarkerDataUrl,
   computeHaversineMiles,
   extractCabShortLabel,
   formatLastSeen,
+  matchesSelectedVehicleTypes,
 } from './map/fleet-car-marker.util';
 import {
   clearRoutePolylines,
@@ -45,6 +49,10 @@ import {
   type RoutePolylineHandles,
 } from './map/route-map-sync';
 import { useLiveMapRouteOverlaySync } from './map/useLiveMapRouteOverlaySync';
+import {
+  useLiveMapCustomOverlays,
+  type PopulateBookingEndpointPayload,
+} from './map/useLiveMapCustomOverlays';
 
 export { buildFleetCarMarkerDataUrl };
 
@@ -63,6 +71,7 @@ export interface LiveFleetMapProps {
   onChangeDriverDutyStatus?: (driverId: string, dutyStatus: DriverDutyStatus) => void | Promise<void>;
   onSelectTrip?: (trip: Trip) => void;
   onClearSelectedTrip?: () => void;
+  onPopulateBooking?: (payload: PopulateBookingEndpointPayload) => void;
   onSwitchToRoster?: () => void;
   className?: string;
 }
@@ -83,6 +92,7 @@ function LiveFleetMapComponent({
   onChangeDriverDutyStatus,
   onSelectTrip,
   onClearSelectedTrip,
+  onPopulateBooking,
   onSwitchToRoster,
   className = '',
 }: LiveFleetMapProps) {
@@ -96,8 +106,21 @@ function LiveFleetMapComponent({
   const routeWaypointMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const markersByIdRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const clearSelectedWaypointRef = useRef<() => void>(() => {});
+  const clearSelectedOverlayRef = useRef<() => void>(() => {});
 
-  const { preferences: mapPreferences } = useDispatchMapPreferences();
+  const [adminSettings, setAdminSettings] = useState(() =>
+    getAdminConfigService().getCachedSettings()
+  );
+  useEffect(() => {
+    return getAdminConfigService().subscribeToSettings((next) => setAdminSettings(next));
+  }, []);
+
+  const {
+    preferences: mapPreferences,
+    togglePreference,
+    toggleVehicleType,
+    setSelectedVehicleTypes,
+  } = useDispatchMapPreferences(adminSettings.dispatchConsoleConfig);
   const [mapReady, setMapReady] = useState(false);
   const [mapsStatus, setMapsStatus] = useState<GoogleMapsStatus>('loading');
   const [statusFilter, setStatusFilter] = useState<MapFilterKey>('all');
@@ -171,6 +194,7 @@ function LiveFleetMapComponent({
           map.addListener('click', () => {
             setSelectedDriverId(null);
             clearSelectedWaypointRef.current();
+            clearSelectedOverlayRef.current();
             onClearFocusedDriver?.();
           });
 
@@ -235,6 +259,16 @@ function LiveFleetMapComponent({
 
     for (const drv of fleet) {
       if (drv.isBlacklisted) continue;
+      if (
+        !matchesSelectedVehicleTypes(
+          drv,
+          mapPreferences.selectedVehicleTypes,
+          adminSettings.fleet,
+          adminSettings.vehicles
+        )
+      ) {
+        continue;
+      }
       c[drv.mapStatus] += 1;
       if (drv.mapStatus !== 'offline') c.all += 1;
 
@@ -254,7 +288,13 @@ function LiveFleetMapComponent({
     }
 
     return { visibleWithGps: withGps, awaitingGpsDrivers: noGps, counts: c };
-  }, [fleet, statusFilter]);
+  }, [
+    fleet,
+    statusFilter,
+    mapPreferences.selectedVehicleTypes,
+    adminSettings.fleet,
+    adminSettings.vehicles,
+  ]);
 
   // Pooled zero-flicker marker synchronization (runs once mapReady === true)
   useEffect(() => {
@@ -368,6 +408,21 @@ function LiveFleetMapComponent({
   });
   clearSelectedWaypointRef.current = clearSelectedWaypoint;
 
+  const {
+    selectedOverlay,
+    availableDriversInSelectedZone,
+    appliedEndpointFeedback,
+    clearSelectedOverlay,
+    handleSetPlaceEndpoint,
+  } = useLiveMapCustomOverlays({
+    mapReady,
+    mapInstanceRef,
+    preferences: mapPreferences,
+    fleet,
+    onPopulateBooking,
+  });
+  clearSelectedOverlayRef.current = clearSelectedOverlay;
+
   // Fit all visible cars on map
   const handleFitFleet = useCallback(() => {
     if (!mapInstanceRef.current || typeof window === 'undefined' || !window.google?.maps?.LatLngBounds) {
@@ -468,6 +523,12 @@ function LiveFleetMapComponent({
                 .filter(
                   (d) =>
                     !d.isBlacklisted &&
+                    matchesSelectedVehicleTypes(
+                      d,
+                      mapPreferences.selectedVehicleTypes,
+                      adminSettings.fleet,
+                      adminSettings.vehicles
+                    ) &&
                     (statusFilter === 'all'
                       ? d.mapStatus !== 'offline'
                       : d.mapStatus === statusFilter)
@@ -713,6 +774,17 @@ function LiveFleetMapComponent({
             </div>
           )}
 
+          <MapLayersAndVehiclesToolbar
+            fleet={fleet}
+            fleetCars={adminSettings.fleet}
+            vehicleTiers={adminSettings.vehicles}
+            preferences={mapPreferences}
+            onTogglePreference={togglePreference}
+            onToggleVehicleType={toggleVehicleType}
+            onSetSelectedVehicleTypes={setSelectedVehicleTypes}
+            variant="desktop"
+          />
+
           <button
             type="button"
             onClick={handleFitFleet}
@@ -732,6 +804,20 @@ function LiveFleetMapComponent({
             <MapPinIcon className="w-3.5 h-3.5 text-slate-600" />
           </button>
         </div>
+      </div>
+
+      {/* ─── MOBILE VEHICLES & LAYERS HUD STRIP ─── */}
+      <div className="pointer-events-auto sm:hidden absolute top-[62px] right-2.5 z-20 flex items-center gap-1.5">
+        <MapLayersAndVehiclesToolbar
+          fleet={fleet}
+          fleetCars={adminSettings.fleet}
+          vehicleTiers={adminSettings.vehicles}
+          preferences={mapPreferences}
+          onTogglePreference={togglePreference}
+          onToggleVehicleType={toggleVehicleType}
+          onSetSelectedVehicleTypes={setSelectedVehicleTypes}
+          variant="mobile"
+        />
       </div>
 
       {/* ─── MOBILE FLOATING RIGHT-EDGE MAP CONTROLS + ROSTER SWITCHER ─── */}
@@ -1072,6 +1158,15 @@ function LiveFleetMapComponent({
           </div>
         </div>
       )}
+
+      {/* ─── CUSTOM OVERLAY INFO CARD (ZONE / PLACE / EXCLUSION) ─── */}
+      <MapCustomOverlayInfoCard
+        selectedOverlay={selectedOverlay}
+        availableDriversInZone={availableDriversInSelectedZone}
+        appliedEndpointFeedback={appliedEndpointFeedback}
+        onSetPlaceEndpoint={handleSetPlaceEndpoint}
+        onClose={clearSelectedOverlay}
+      />
 
       {/* ─── ROUTE WAYPOINT POPOVER & BOTTOM-LEFT SUMMARY PILL HUD ─── */}
       <MapRouteOverlayHud

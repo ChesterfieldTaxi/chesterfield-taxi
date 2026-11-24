@@ -283,7 +283,7 @@ export function useAdminZonesController(initialSubTab: AdminZonesSubTab = 'zones
     if (!zoneFormData.name.trim()) return;
 
     if (zoneFormData.type === 'polygon' && (!zoneFormData.vertices || zoneFormData.vertices.length < 3)) {
-      setSaveError('A polygon geofence requires at least 3 boundary points. Click on the map to add vertices.');
+      setSaveError('A polygon zone requires at least 3 boundary points. Click on the map to add vertices.');
       return;
     }
 
@@ -296,7 +296,7 @@ export function useAdminZonesController(initialSubTab: AdminZonesSubTab = 'zones
       setSaveSuccess(`Zone "${saved.name}" successfully saved.`);
       setTimeout(() => setSaveSuccess(null), 3500);
     } catch (err: unknown) {
-      setSaveError(err instanceof Error ? err.message : 'Failed to save geofence zone.');
+      setSaveError(err instanceof Error ? err.message : 'Failed to save service zone.');
     }
   };
 

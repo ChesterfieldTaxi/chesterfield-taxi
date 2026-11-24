@@ -83,7 +83,7 @@ export function ZoneInspectorEditorPane({
         <Card variant="elevated" className="border-blue-300 bg-blue-50/20 shadow-md">
           <CardHeader className="p-4 border-b border-blue-200/60 bg-blue-50/50">
             <CardTitle className="text-sm font-bold text-blue-950">
-              {zoneFormData.id ? `Edit Zone: ${zoneFormData.name}` : 'Create Operational Geofence'}
+              {zoneFormData.id ? `Edit Zone: ${zoneFormData.name}` : 'Create Service Zone'}
             </CardTitle>
             <CardDescription className="text-xs text-slate-600">
               Configure perimeter boundaries, flat fees, and surcharge multipliers.
@@ -102,7 +102,7 @@ export function ZoneInspectorEditorPane({
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Geofence Type
+                    Zone Type
                   </label>
                   <select
                     className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
@@ -118,7 +118,7 @@ export function ZoneInspectorEditorPane({
                     }}
                   >
                     <option value="radius">Radius Circle (Center + Miles)</option>
-                    <option value="polygon">Custom Polygon Geofence (Draw on Map)</option>
+                    <option value="polygon">Custom Polygon Zone (Draw on Map)</option>
                   </select>
                 </div>
               </div>
@@ -132,7 +132,7 @@ export function ZoneInspectorEditorPane({
                 }
               />
 
-              {/* RADIUS GEOFENCE CONTROLS */}
+              {/* RADIUS ZONE CONTROLS */}
               {zoneFormData.type === 'radius' && (
                 <div className="p-3 rounded-xl bg-white border border-blue-200 space-y-2.5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
@@ -194,7 +194,7 @@ export function ZoneInspectorEditorPane({
                 </div>
               )}
 
-              {/* POLYGON GEOFENCE DRAWING & VERTEX EDITOR */}
+              {/* POLYGON ZONE DRAWING & VERTEX EDITOR */}
               {zoneFormData.type === 'polygon' && (
                 <div className="p-3 rounded-xl bg-white border border-indigo-200 space-y-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -407,7 +407,7 @@ export function ZoneInspectorEditorPane({
                   size="sm"
                   className="bg-blue-600 hover:bg-blue-700 font-bold"
                 >
-                  Save Geofence Zone
+                  Save Service Zone
                 </Button>
               </div>
             </form>
@@ -423,7 +423,7 @@ export function ZoneInspectorEditorPane({
               {groupFormData.id ? `Edit Zone Group: ${groupFormData.name}` : 'Create Zone Group'}
             </CardTitle>
             <CardDescription className="text-xs text-slate-600">
-              Cluster multiple geofences together for grouped pricing conditions and inheritance rules.
+              Cluster multiple service zones together for grouped pricing conditions and inheritance rules.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4">

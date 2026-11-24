@@ -1429,6 +1429,10 @@ export interface DispatchConsoleSettingsConfig {
   defaultQueueLayout: DispatchQueueLayoutMode; // default 'auto'
   maxConcurrentDraftTabs: number; // default 8, clamped 2..20
   enableRealtimeRouting: boolean; // synced with top-level AppSettings.enableRealtimeRouting
+  defaultShowZonesOverlay?: boolean; // default false
+  defaultShowTrafficOverlay?: boolean; // default false
+  defaultShowPlacesOverlay?: boolean; // default false
+  defaultShowExclusionsOverlay?: boolean; // default false
 }
 
 export const DEFAULT_DISPATCH_CONSOLE_CONFIG: DispatchConsoleSettingsConfig = {
@@ -1439,6 +1443,10 @@ export const DEFAULT_DISPATCH_CONSOLE_CONFIG: DispatchConsoleSettingsConfig = {
   defaultQueueLayout: 'auto',
   maxConcurrentDraftTabs: 8,
   enableRealtimeRouting: false,
+  defaultShowZonesOverlay: false,
+  defaultShowTrafficOverlay: false,
+  defaultShowPlacesOverlay: false,
+  defaultShowExclusionsOverlay: false,
 };
 
 export function normalizeDispatchConsoleConfig(
@@ -1493,6 +1501,16 @@ export function normalizeDispatchConsoleConfig(
       20
     ),
     enableRealtimeRouting: syncedRealtimeRouting,
+    defaultShowZonesOverlay:
+      raw?.defaultShowZonesOverlay !== undefined ? Boolean(raw.defaultShowZonesOverlay) : false,
+    defaultShowTrafficOverlay:
+      raw?.defaultShowTrafficOverlay !== undefined ? Boolean(raw.defaultShowTrafficOverlay) : false,
+    defaultShowPlacesOverlay:
+      raw?.defaultShowPlacesOverlay !== undefined ? Boolean(raw.defaultShowPlacesOverlay) : false,
+    defaultShowExclusionsOverlay:
+      raw?.defaultShowExclusionsOverlay !== undefined
+        ? Boolean(raw.defaultShowExclusionsOverlay)
+        : false,
   };
 }
 

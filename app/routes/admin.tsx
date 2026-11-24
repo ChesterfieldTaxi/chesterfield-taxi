@@ -172,7 +172,7 @@ const PRIMARY_TABS: TabItem[] = [
     key: 'zones',
     label: 'Service Zones',
     icon: MapPinIcon,
-    description: 'Map geofences, places, zone groups, and service area exclusions',
+    description: 'Service zones, places, zone groups, and exclusions',
   },
   {
     key: 'operators',

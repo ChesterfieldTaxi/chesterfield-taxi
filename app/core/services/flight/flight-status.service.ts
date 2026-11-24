@@ -179,34 +179,13 @@ export function resolveTripFlightBadge(trip: Trip): TripFlightBadgeDescriptor {
   const telemetry = trip.flightTelemetry;
 
   if (creds.isPrivateAviation) {
-    const meta = (trip.metadata || {}) as Record<string, any>;
-    const tail = typeof meta.tailNumber === 'string' ? meta.tailNumber.trim() : '';
-    const airportInfo = resolveStlTerminalInfo(
-      typeof meta.fboFacility === 'string' ? meta.fboFacility : undefined,
-      creds.airportCode || 'SUS'
-    );
-    if (!tail && !meta.fboFacility && !creds.isAirportTrip) {
-      return {
-        hasFlight: false,
-        isAirportPickup: false,
-        isPrivateAviation: true,
-        label: '',
-        shortLabel: '',
-        tone: 'slate',
-        delayMinutes: 0,
-        isSimulatedFallback: false,
-      };
-    }
     return {
-      hasFlight: true,
+      hasFlight: false,
       isAirportPickup: creds.isAirportPickup,
       isPrivateAviation: true,
-      flightIdent: tail || undefined,
-      label: `${tail ? `Tail ${tail} · ` : ''}${airportInfo.shortTerminal}`,
-      shortLabel: tail ? `${tail} · ${airportInfo.shortTerminal}` : airportInfo.shortTerminal,
-      tone: 'blue',
-      terminal: airportInfo.terminal,
-      pickupDoorGuidance: airportInfo.pickupDoorGuidance,
+      label: '',
+      shortLabel: '',
+      tone: 'slate',
       delayMinutes: 0,
       isSimulatedFallback: false,
     };

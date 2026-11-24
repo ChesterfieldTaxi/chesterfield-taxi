@@ -103,12 +103,18 @@ export function AdminAutoDispatchControlPanel({
     return () => unsub();
   }, []);
 
-  const dispatcherOperators = useMemo(() => {
-    return operators.filter((op) => {
-      if (op.isArchived) return false;
-      const roleSet = new Set(op.roles || [op.role]);
-      return roleSet.has('dispatcher') && !roleSet.has('admin');
-    });
+  const staffLeadWindowOperators = useMemo(() => {
+    return operators
+      .filter((op) => {
+        if (op.isArchived || op.status === 'suspended') return false;
+        const roleSet = new Set(op.roles || [op.role]);
+        return roleSet.has('admin') || roleSet.has('dispatcher');
+      })
+      .sort((a, b) => {
+        const aIsAdmin = (a.roles || [a.role]).includes('admin') ? 0 : 1;
+        const bIsAdmin = (b.roles || [b.role]).includes('admin') ? 0 : 1;
+        return aIsAdmin - bIsAdmin;
+      });
   }, [operators]);
 
   const update = (partial: Partial<DispatchAutomationConfig>) => {
@@ -480,18 +486,40 @@ export function AdminAutoDispatchControlPanel({
                 </span>
               </div>
 
-              {dispatcherOperators.length === 0 ? (
+              {staffLeadWindowOperators.length === 0 ? (
                 <p className="text-[11px] text-slate-500 italic">
-                  No separate dispatcher-only operator profiles found (Administrators already have full Lead-Window control).
+                  No active administrator or dispatcher operator profiles found.
                 </p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-1">
-                  {dispatcherOperators.map((op) => {
-                    const checked = isDispatcherAuthorized(op);
+                  {staffLeadWindowOperators.map((op) => {
+                    const roleSet = new Set(op.roles || [op.role]);
+                    const isAdminOp = roleSet.has('admin');
+                    const checked = isAdminOp || isDispatcherAuthorized(op);
                     const nameLabel =
                       op.displayName ||
                       [op.firstName, op.lastName].filter(Boolean).join(' ').trim() ||
                       op.email;
+
+                    if (isAdminOp) {
+                      return (
+                        <div
+                          key={op.uid}
+                          className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/50 text-purple-950 flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold block truncate">{nameLabel}</span>
+                            <span className="text-[10px] text-purple-700/80 block truncate">
+                              {op.email}
+                            </span>
+                          </div>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-300 text-[10px] font-bold whitespace-nowrap shrink-0">
+                            ✓ Always Authorized (Admin)
+                          </span>
+                        </div>
+                      );
+                    }
+
                     return (
                       <label
                         key={op.uid}

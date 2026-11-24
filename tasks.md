@@ -1020,4 +1020,23 @@
   - [x] 62.4.1 Create `scripts/test-admin-website-and-integrations-phase62.ts` covering all Phase 62 schemas, live evaluators, SEO/sitemap resolvers, flight/SMS/email policies, monolith line ceilings, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
   - [x] 62.4.2 Pass `npm run typecheck`, `test-admin-website-and-integrations-phase62.ts`, `test-local-corridor-seo.ts`, `test-guest-manage-ride.ts`, `test-admin-automation-and-operators-phase61.ts`, `test-admin-ia-phase59.ts`, and `npm run build` with `0` errors.
 
+## Phase 63 (Wave 5 Phase 5): Custom Dispatch Map Overlays (`Zones`, `Live Traffic`, `Places`, `Exclusions`), Multi-Select Vehicle Filter, `"Geofences"` → `"Zones"` Rename & Dispatch Queue / Time Picker Polish
+- [x] 63.0 Baseline Commit & Documentation Sync:
+  - [x] 63.0.1 Commit verified Phase 62 changes cleanly on `main` (`feat(phase-62): website/local-seo/track controls, corporate portal checkout gate, and integrations monolith split`).
+  - [x] 63.0.2 Document Platform Phase 63 (Wave 5 Phase 5) across `spec.md`, `plan.md`, and `tasks.md`.
+- [x] 63.1 Custom Dispatch Map Overlays (All OFF by Default) + Multi-Select Vehicle Type Filter:
+  - [x] 63.1.1 Extend `DispatchMapPreferences` (`useDispatchMapPreferences.ts`) and `DispatchConsoleSettingsConfig` (`config.ts` & `DispatchConsoleSettingsPanel.tsx`) with 4 default-`false` custom overlay toggles and `selectedVehicleTypes: string[]` (`[]` default).
+  - [x] 63.1.2 Add pure `resolveDriverVehicleTypeKey` & `matchesSelectedVehicleTypes` in `fleet-car-marker.util.ts` and create `useLiveMapCustomOverlays.ts` (`< 430`L) + `MapCustomOverlayInfoCard.tsx` (`< 250`L) + `MapLayersAndVehiclesToolbar.tsx` (`< 430`L), wiring into `LiveFleetMap.tsx` (`< 1,200`L) and `workspace-bus.service.ts`.
+- [x] 63.2 Site-Wide `"Geofences"` → `"Zones"` UI Rename & Admin Authorized Dispatchers Polish:
+  - [x] 63.2.1 Rename user-facing `"Geofence"` / `"Geofences"` labels to `"Zone"` / `"Zones"` across `admin-nav.util.ts`, `AdminSidebar.tsx`, `admin.tsx`, `AdminZonesTab` components, `ModularTierCard.tsx`, and `BookingRulesSimulatorCard.tsx`, and export `OperationalZone` type alias in `zone.ts`.
+  - [x] 63.2.2 Show active `admin` accounts in `AdminAutoDispatchControlPanel.tsx` (`Authorized Dispatchers (Lead-Window Control)`) with locked purple `✓ Always Authorized (Admin)` badge.
+- [x] 63.3 Pickup Time Picker Portal Fix, Strict 2-Line Queue Rows, Clean `ASAP` & Remove `SUS FBO` Badge:
+  - [x] 63.3.1 Render `ModernDatePicker` & `ModernTimePicker` popovers via `createPortal(..., document.body)` (`position: fixed`, `z-[99999]`) with viewport clamping in `ModernDateTimePicker.tsx` (`< 600`L).
+  - [x] 63.3.2 Remove `asapCreatedSubStr` and enforce strict uniform max 2-line height across all columns in `TripQueueTableView.tsx` (`< 620`L).
+  - [x] 63.3.3 Return `hasFlight: false` when `creds.isPrivateAviation` is `true` in `resolveTripFlightBadge` (`flight-status.service.ts`) while keeping `resolveStlTerminalInfo` untouched.
+- [x] 63.4 Deterministic Verification Suite (`scripts/test-map-overlays-and-queue-polish-phase63.ts`) & Build Gates:
+  - [x] 63.4.1 Create `scripts/test-map-overlays-and-queue-polish-phase63.ts` verifying map preferences, vehicle-type multi-select matching, private aviation badge suppression, `"Zones"` rename, portalized Date/Time pickers, 2-line queue rows, monolith line ceilings, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
+  - [x] 63.4.2 Pass `npm run typecheck`, `test-map-overlays-and-queue-polish-phase63.ts`, `test-flight-status.ts`, `test-comms-multichannel-ui.ts`, `test-admin-website-and-integrations-phase62.ts`, `test-admin-ia-phase59.ts`, and `npm run build` with `0` errors.
+
+
 

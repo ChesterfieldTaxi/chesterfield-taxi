@@ -93,7 +93,7 @@ export const ADMIN_NAV_GROUPS: NavGroupConfig[] = [
         key: 'zones',
         label: 'Service Zones',
         icon: MapPinIcon,
-        subHint: 'Geofences & Places',
+        subHint: 'Zones, Places & Exclusions',
       },
       {
         key: 'operators',

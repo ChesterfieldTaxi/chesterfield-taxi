@@ -123,7 +123,7 @@ export function BookingRulesSimulatorCard({ config, zones }: BookingRulesSimulat
             <select value={simPickupZoneId} onChange={(e) => setSimPickupZoneId(e.target.value)} className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800">
               <option value="any">Standard Service Area</option>
               <option value="airport">STL Airport Terminal</option>
-              <option value="prohibited">Prohibited Geofence Zone</option>
+              <option value="prohibited">Prohibited Exclusion Zone</option>
               {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
             </select>
           </div>
@@ -133,7 +133,7 @@ export function BookingRulesSimulatorCard({ config, zones }: BookingRulesSimulat
             <select value={simDropoffZoneId} onChange={(e) => setSimDropoffZoneId(e.target.value)} className="w-full text-xs font-semibold py-2 px-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-800">
               <option value="any">Standard Service Area</option>
               <option value="airport">STL Airport Terminal</option>
-              <option value="prohibited">Prohibited Geofence Zone</option>
+              <option value="prohibited">Prohibited Exclusion Zone</option>
               {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
             </select>
           </div>

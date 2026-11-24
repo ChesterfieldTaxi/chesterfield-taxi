@@ -36,6 +36,8 @@ export interface ZoneGeofence {
   updatedAt?: string;
 }
 
+export type OperationalZone = ZoneGeofence;
+
 /**
  * Zone Group Schema
  * 

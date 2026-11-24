@@ -268,6 +268,11 @@ function main() {
     casedRouteWithArrows: true,
     interactiveRoutePinPopovers: true,
     showRouteSummaryPill: true,
+    showZonesOverlay: false,
+    showTrafficOverlay: false,
+    showPlacesOverlay: false,
+    showExclusionsOverlay: false,
+    selectedVehicleTypes: [],
   });
 
   assert.deepEqual(parseDispatchMapPreferences(null), DEFAULT_DISPATCH_MAP_PREFERENCES);
@@ -278,6 +283,7 @@ function main() {
   assert.deepEqual(
     parseDispatchMapPreferences(JSON.stringify({ casedRouteWithArrows: false, showRouteSummaryPill: 'invalid' })),
     {
+      ...DEFAULT_DISPATCH_MAP_PREFERENCES,
       casedRouteWithArrows: false,
       interactiveRoutePinPopovers: true,
       showRouteSummaryPill: true,
@@ -285,6 +291,7 @@ function main() {
   );
 
   const customPrefs = {
+    ...DEFAULT_DISPATCH_MAP_PREFERENCES,
     casedRouteWithArrows: false,
     interactiveRoutePinPopovers: true,
     showRouteSummaryPill: false,

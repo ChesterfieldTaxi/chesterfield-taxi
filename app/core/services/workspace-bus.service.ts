@@ -75,7 +75,9 @@ export interface WorkspaceEventMap {
     email?: string;
     callingFromPhone?: string;
     pickupAddress?: string;
+    pickupCoordinates?: { lat: number; lng: number };
     dropoffAddress?: string;
+    dropoffCoordinates?: { lat: number; lng: number };
     vehicleTier?: string;
     vehicle?: string;
     corporateAccount?: string;

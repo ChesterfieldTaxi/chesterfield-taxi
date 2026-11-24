@@ -83,7 +83,7 @@ export function ZoneSubTabActionBar({
         {activeSubTab === 'zones' && (
           <>
             <MapPinIcon className="w-4 h-4 text-blue-600 shrink-0" />
-            <span className="truncate">Operational Zones &amp; Geofences ({zonesCount})</span>
+            <span className="truncate">Service Zones ({zonesCount})</span>
           </>
         )}
         {activeSubTab === 'groups' && (
@@ -293,7 +293,7 @@ export function ZoneDirectoryListPane({
       <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-4">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-            {activeSubTab === 'zones' && 'Operational Geofences Directory'}
+            {activeSubTab === 'zones' && 'Service Zones Directory'}
             {activeSubTab === 'groups' && 'Zone Groups Directory'}
             {activeSubTab === 'collections' && 'Location Collections Directory'}
           </span>

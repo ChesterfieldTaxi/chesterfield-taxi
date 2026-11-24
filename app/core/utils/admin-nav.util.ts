@@ -88,7 +88,7 @@ export const SUB_PAGES: Record<string, AdminSubPageItem[]> = {
     { key: 'fleet', label: 'Cars' },
   ],
   zones: [
-    { key: 'zones', label: 'Geofences' },
+    { key: 'zones', label: 'Zones' },
     { key: 'places', label: 'Places' },
     { key: 'groups', label: 'Groups' },
     { key: 'blacklists', label: 'Exclusions' },

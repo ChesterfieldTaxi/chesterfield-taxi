@@ -81,7 +81,7 @@ export function ZonePolygonMapCanvas({
           <div className="min-w-0">
             <CardTitle className="text-xs font-bold text-white flex items-center gap-2">
               <MapIcon className="w-4 h-4 text-blue-400 shrink-0" />
-              <span className="truncate">Chesterfield &amp; St. Louis Geofence Map</span>
+              <span className="truncate">Chesterfield &amp; St. Louis Zones Map</span>
             </CardTitle>
             <CardDescription className="text-[10px] text-slate-400 mt-0.5">
               {activeSubTab === 'zones' &&
@@ -89,7 +89,7 @@ export function ZonePolygonMapCanvas({
                   ? zoneFormData.type === 'polygon'
                     ? 'POLYGON DRAW MODE: Tap map to add vertices, or drag existing handles'
                     : 'RADIUS EDIT MODE: Tap map or drag center to position radius circle'
-                  : 'Spatial visualization of polygon geofences & radius perimeters')}
+                  : 'Spatial visualization of polygon zones & radius perimeters')}
               {activeSubTab === 'groups' && 'Cluster visualization of unified Zone Groups'}
               {activeSubTab === 'collections' && 'Points of Interest with interactive proximity buffers'}
               {activeSubTab === 'blacklists' && 'Restricted & blacklisted security zones'}

@@ -233,7 +233,7 @@ export function ModularTierCard({
                     <option value="all">Any Location (All Operational Zones)</option>
                     <option value="specific_zones">Specific Monitored / Whitelisted Zones</option>
                     <option value="airports">Airport Terminals &amp; Perimeters Only</option>
-                    <option value="prohibited_only">Prohibited Safety Exclusion Geofences</option>
+                    <option value="prohibited_only">Prohibited Safety Exclusion Zones</option>
                     <option value="outside_service_area">Outside Service Perimeter / County</option>
                   </select>
                   {mode === 'specific_zones' && (

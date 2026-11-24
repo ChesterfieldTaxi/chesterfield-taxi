@@ -19,6 +19,7 @@ import {
   getPendingGuestChangeRequest,
   hasPendingGuestChangeRequest,
 } from '../../../../core/services/tracking/guest-manage-ride';
+import { resolveTripFlightBadge } from '../../../../core/services/flight/flight-status.service';
 import type { SlaScanSummary } from '../../../../core/services/dispatch/sla-monitor.service';
 import {
   buildTripItineraryTooltip,
@@ -251,21 +252,15 @@ export function TripQueueTableView({
                     minute: '2-digit',
                   })}`
                 : 'ASAP';
-              const asapCreatedSubStr =
-                isAsapRow && trip.createdAt
-                  ? (() => {
-                      const d = new Date(trip.createdAt);
-                      if (isNaN(d.getTime())) return null;
-                      const now = new Date();
-                      const sameDay =
-                        d.getFullYear() === now.getFullYear() &&
-                        d.getMonth() === now.getMonth() &&
-                        d.getDate() === now.getDate();
-                      return sameDay
-                        ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                        : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-                    })()
-                  : null;
+
+              const tripSla = slaSummary.byTripId[trip.id];
+              const hasSlaBadge = Boolean(
+                tripSla && tripSla.isEligible && tripSla.level !== 'normal' && tripSla.badgeLabel
+              );
+              const flightBadge = resolveTripFlightBadge(trip);
+              const hasFlightBadge = Boolean(flightBadge.hasFlight && flightBadge.label);
+              const hasGuestReq = hasPendingGuestChangeRequest(trip);
+              const hasPendingAck = hasUnacknowledgedDriverUpdate(trip);
 
               const isUnconfirmedTrip = trip.status === 'UNCONFIRMED' || trip.status === 'unconfirmed';
               const stops = getTripIntermediateStops(trip);
@@ -301,21 +296,23 @@ export function TripQueueTableView({
                   </td>
                   <td className="py-2 px-2 font-semibold text-slate-700 whitespace-nowrap">
                     <div className="flex flex-col items-start gap-0.5">
-                      <span className={isAsapRow ? 'font-extrabold text-slate-900' : ''}>
+                      <span className={`whitespace-nowrap ${isAsapRow ? 'font-extrabold text-slate-900' : ''}`}>
                         {pickupTimeStr}
                       </span>
-                      {asapCreatedSubStr && (
-                        <span className="text-[10px] font-medium text-slate-400">
-                          {asapCreatedSubStr}
-                        </span>
+                      {(hasSlaBadge || hasFlightBadge) && (
+                        <div className="flex items-center gap-1 whitespace-nowrap">
+                          <DispatchSlaBadge sla={tripSla} />
+                          <DispatchFlightTelemetryPill trip={trip} compact />
+                        </div>
                       )}
-                      <DispatchSlaBadge sla={slaSummary.byTripId[trip.id]} />
-                      <DispatchFlightTelemetryPill trip={trip} compact />
                     </div>
                   </td>
                   <td className="py-2 px-2 font-medium">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="whitespace-nowrap">
+                    <div className="flex items-center gap-1.5 whitespace-nowrap">
+                      <span
+                        className="truncate max-w-[145px]"
+                        title={`${trip.passenger.firstName} ${trip.passenger.lastName}`.trim()}
+                      >
                         {trip.passenger.firstName} {trip.passenger.lastName}
                       </span>
                       {trip.multiCarGroupId && (trip.multiCarTotal || 1) > 1 && (
@@ -326,7 +323,7 @@ export function TripQueueTableView({
                             onSearchTermChange(trip.multiCarGroupId!);
                             onSearchExpandedChange(true);
                           }}
-                          className="px-1.5 py-0.2 rounded bg-violet-100 hover:bg-violet-200 text-violet-800 border border-violet-300 text-[10px] font-black cursor-pointer whitespace-nowrap"
+                          className="px-1.5 py-0.2 rounded bg-violet-100 hover:bg-violet-200 text-violet-800 border border-violet-300 text-[10px] font-black cursor-pointer whitespace-nowrap shrink-0"
                           title={`Multi-car order ${trip.multiCarGroupId} (${
                             (trip.multiCarAssociates || []).filter((a) => Boolean(a.driverId)).length
                           }/${trip.multiCarTotal} assigned) — click to filter convoy`}
@@ -362,7 +359,7 @@ export function TripQueueTableView({
                           {pickupTwoLine.primary}
                         </div>
                         <div
-                          className="max-w-full bg-amber-50 text-amber-900 border border-amber-300/90 rounded-full px-1.5 py-0.2 text-[10px] font-bold inline-flex items-center gap-1 mt-0.5"
+                          className="max-w-full bg-amber-50 text-amber-900 border border-amber-300/90 rounded-full px-1.5 py-0.2 text-[10px] font-bold inline-flex items-center gap-1 mt-0.5 whitespace-nowrap"
                           title={itineraryTooltip}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
@@ -384,7 +381,7 @@ export function TripQueueTableView({
                       </div>
                     ) : (
                       <div
-                        className="line-clamp-2 whitespace-normal break-words leading-snug font-medium text-slate-800"
+                        className="truncate font-medium text-slate-800"
                         title={trip.pickupLocation.address}
                       >
                         {pickupTwoLine.primary}
@@ -409,7 +406,7 @@ export function TripQueueTableView({
                         </div>
                       </div>
                     ) : (
-                      <div className="line-clamp-2 whitespace-normal break-words leading-snug font-medium text-slate-800">
+                      <div className="truncate font-medium text-slate-800">
                         {dropoffTwoLine.primary}
                       </div>
                     )}
@@ -495,45 +492,49 @@ export function TripQueueTableView({
                     ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                   </td>
                   <td className="py-2 px-2 whitespace-nowrap">
-                    <div className="flex flex-col items-start gap-1">
+                    <div className="flex flex-col items-start gap-0.5">
                       {getDispatchStatusBadge(trip.status)}
-                      {hasPendingGuestChangeRequest(trip) &&
-                        (() => {
-                          const guestReq = getPendingGuestChangeRequest(trip);
-                          return (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onOpenReviewModal(trip, 'details');
-                              }}
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-100 hover:bg-violet-200 text-violet-950 border border-violet-400 text-[10px] font-extrabold animate-pulse whitespace-nowrap cursor-pointer"
-                              title={
-                                guestReq?.customerReason
-                                  ? `Passenger requested itinerary change (${guestReq.customerReason}) — click to Approve or Decline`
-                                  : 'Passenger requested itinerary change on /track — click to Approve or Decline'
-                              }
-                            >
-                              📝 Rider Edit Req
-                            </button>
-                          );
-                        })()}
-                      {hasUnacknowledgedDriverUpdate(trip) &&
-                        (() => {
-                          const pendingAck = getPendingDriverUpdateAck(trip);
-                          return (
-                            <span
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-400 text-[10px] font-extrabold animate-pulse whitespace-nowrap"
-                              title={
-                                pendingAck
-                                  ? `Trip updated — awaiting driver acknowledgement:\n• ${pendingAck.changesSummary.join('\n• ')}`
-                                  : 'Awaiting driver acknowledgement of trip update'
-                              }
-                            >
-                              ⏳ Awaiting Ack
-                            </span>
-                          );
-                        })()}
+                      {(hasGuestReq || hasPendingAck) && (
+                        <div className="flex items-center gap-1 whitespace-nowrap">
+                          {hasGuestReq &&
+                            (() => {
+                              const guestReq = getPendingGuestChangeRequest(trip);
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenReviewModal(trip, 'details');
+                                  }}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-100 hover:bg-violet-200 text-violet-950 border border-violet-400 text-[10px] font-extrabold animate-pulse whitespace-nowrap cursor-pointer"
+                                  title={
+                                    guestReq?.customerReason
+                                      ? `Passenger requested itinerary change (${guestReq.customerReason}) — click to Approve or Decline`
+                                      : 'Passenger requested itinerary change on /track — click to Approve or Decline'
+                                  }
+                                >
+                                  📝 Rider Edit Req
+                                </button>
+                              );
+                            })()}
+                          {hasPendingAck &&
+                            (() => {
+                              const pendingAck = getPendingDriverUpdateAck(trip);
+                              return (
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-400 text-[10px] font-extrabold animate-pulse whitespace-nowrap"
+                                  title={
+                                    pendingAck
+                                      ? `Trip updated — awaiting driver acknowledgement:\n• ${pendingAck.changesSummary.join('\n• ')}`
+                                      : 'Awaiting driver acknowledgement of trip update'
+                                  }
+                                >
+                                  ⏳ Awaiting Ack
+                                </span>
+                              );
+                            })()}
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="py-2 px-2 text-center whitespace-nowrap">

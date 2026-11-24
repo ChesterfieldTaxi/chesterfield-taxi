@@ -268,6 +268,39 @@ export function DispatchConsoleSettingsPanel({
             />
           </label>
 
+          {/* Baseline Dispatch Map Custom Overlay Defaults (All OFF by default) */}
+          <div className="space-y-2 pt-2 border-t border-slate-100">
+            <label className="font-bold text-slate-800 block">
+              Default Dispatch Map Overlays (Fallback Before Local Operator Preference)
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {(
+                [
+                  { key: 'defaultShowZonesOverlay', label: 'Zones Overlay', hint: 'Service zone polygons & circles' },
+                  { key: 'defaultShowTrafficOverlay', label: 'Live Traffic', hint: 'Google real-time road speeds' },
+                  { key: 'defaultShowPlacesOverlay', label: 'Places & Hubs', hint: 'Airports, hotels, hospitals & POIs' },
+                  { key: 'defaultShowExclusionsOverlay', label: 'Exclusions', hint: 'Blocked & review safety circles' },
+                ] as const
+              ).map((item) => (
+                <label
+                  key={item.key}
+                  className="p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 flex items-start justify-between gap-2 cursor-pointer"
+                >
+                  <div>
+                    <span className="font-extrabold text-slate-900 block">{item.label}</span>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">{item.hint}</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(consoleConfig[item.key])}
+                    onChange={(e) => updateConsole({ [item.key]: e.target.checked })}
+                    className="w-4 h-4 mt-0.5 rounded text-indigo-600 cursor-pointer shrink-0"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
           {/* SLA Thresholds */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
             <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
