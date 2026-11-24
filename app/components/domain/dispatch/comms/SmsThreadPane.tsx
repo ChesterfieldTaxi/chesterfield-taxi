@@ -6,6 +6,8 @@ import {
   type CommsConversationRowSummary,
   type CommsCrmContextSummary,
 } from '../../../../core/services/comms/comms-templates.service';
+import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
+import type { AppSettings } from '../../../../core/types/config';
 import type { ContactRecord } from '../../../../core/services/customer/contact.service';
 import { normalizePhone } from '../../../../core/services/passenger.service';
 import type {
@@ -237,9 +239,18 @@ export function SmsThreadPane({
     }
   }, [threadTab, effectivePhone]);
 
+  const [appSettings, setAppSettings] = useState<Partial<AppSettings> | null>(null);
+
+  useEffect(() => {
+    const unsub = getAdminConfigService().subscribeToSettings((s) => {
+      setAppSettings(s);
+    });
+    return () => unsub();
+  }, []);
+
   const cannedChips = React.useMemo(
-    () => buildInterpolatedCommsSmsChips(threadCrmContext?.templateContext),
-    [threadCrmContext?.templateContext]
+    () => buildInterpolatedCommsSmsChips(threadCrmContext?.templateContext, appSettings),
+    [threadCrmContext?.templateContext, appSettings]
   );
 
   if (mode === 'thread' && activeContactSummary) {
@@ -1338,9 +1349,18 @@ export function NewSmsMessageModal({
     }
   }, [isOpen]);
 
+  const [appSettings, setAppSettings] = useState<Partial<AppSettings> | null>(null);
+
+  useEffect(() => {
+    const unsub = getAdminConfigService().subscribeToSettings((s) => {
+      setAppSettings(s);
+    });
+    return () => unsub();
+  }, []);
+
   const dynamicChips = React.useMemo(
-    () => buildInterpolatedCommsSmsChips(recipientCrmContext?.templateContext),
-    [recipientCrmContext?.templateContext]
+    () => buildInterpolatedCommsSmsChips(recipientCrmContext?.templateContext, appSettings),
+    [recipientCrmContext?.templateContext, appSettings]
   );
 
   if (!isOpen) return null;

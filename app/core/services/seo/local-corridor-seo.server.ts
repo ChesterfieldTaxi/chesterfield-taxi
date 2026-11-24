@@ -1,3 +1,5 @@
+import type { AppSettings } from '../../types/config';
+import { loadPublicSettingsForServer } from '../config/public-settings.server';
 import {
   generateRobotsTxt,
   generateSitemapXml,
@@ -21,10 +23,22 @@ export function buildRobotsTxtResponse(request: Request): Response {
   });
 }
 
-export function buildSitemapXmlResponse(request: Request): Response {
+export async function buildSitemapXmlResponse(request: Request): Promise<Response> {
   const origin = resolveCanonicalSiteOrigin(request);
   const lastmodDate = new Date().toISOString().slice(0, 10);
-  const body = generateSitemapXml({ origin, lastmodDate });
+
+  let settings: Partial<AppSettings> | undefined;
+  try {
+    const loaded = await Promise.race<Partial<AppSettings> | null>([
+      loadPublicSettingsForServer(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+    ]);
+    settings = loaded ?? undefined;
+  } catch {
+    settings = undefined;
+  }
+
+  const body = generateSitemapXml({ origin, lastmodDate, settings });
   return new Response(body, {
     status: 200,
     headers: {

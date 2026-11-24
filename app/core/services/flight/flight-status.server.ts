@@ -12,11 +12,15 @@
  */
 
 import {
-  FLIGHT_LOOKUP_FUTURE_WINDOW_MS,
   FLIGHT_LOOKUP_PAST_WINDOW_MS,
   parseFlightIdent,
   resolveStlTerminalInfo,
 } from '../../config/airports';
+import {
+  normalizeFlightTrackingPolicy,
+  type FlightPreferredProvider,
+  type FlightTrackingPolicyConfig,
+} from '../../types/config';
 import type {
   FlightDiagnosticsSummary,
   FlightLookupQuery,
@@ -655,6 +659,7 @@ export interface LookupFlightServerOptions {
   fetchImpl?: typeof fetch;
   nowMs?: number;
   skipFirestoreCache?: boolean;
+  policyOverride?: Partial<FlightTrackingPolicyConfig>;
 }
 
 export interface LookupFlightServerResult {
@@ -668,10 +673,38 @@ export interface LookupFlightServerResult {
   error?: string;
 }
 
+async function resolveServerFlightTrackingPolicy(
+  options?: Pick<LookupFlightServerOptions, 'policyOverride' | 'staffBearerToken' | 'skipFirestoreCache'>
+): Promise<FlightTrackingPolicyConfig> {
+  if (options?.policyOverride) {
+    return normalizeFlightTrackingPolicy(options.policyOverride);
+  }
+  if (!options?.skipFirestoreCache && isFirebaseConfigured()) {
+    try {
+      const readToken =
+        options?.staffBearerToken || (await getServiceAccountDatastoreToken()) || undefined;
+      if (readToken) {
+        const appSettingsDoc = await fetchFirestoreDocumentRest(
+          'config',
+          'appSettings',
+          readToken
+        );
+        if (appSettingsDoc?.integrations?.flightTracking) {
+          return normalizeFlightTrackingPolicy(appSettingsDoc.integrations.flightTracking);
+        }
+      }
+    } catch {
+      // Fallback to default policy
+    }
+  }
+  return normalizeFlightTrackingPolicy();
+}
+
 function resolveProvidersFromEnv(
   envOverride?: Record<string, string | undefined>,
   fetchImpl?: typeof fetch,
-  nowFn?: () => number
+  nowFn?: () => number,
+  preferredProvider: FlightPreferredProvider = 'auto'
 ): {
   primaryProviders: IFlightStatusProvider[];
   fallbackProvider: FallbackScheduleProvider;
@@ -686,14 +719,16 @@ function resolveProvidersFromEnv(
     return (process.env[key] || '').trim();
   };
 
-  const providerPref = readEnv('FLIGHT_API_PROVIDER').toLowerCase();
+  const envPref = readEnv('FLIGHT_API_PROVIDER').toLowerCase();
+  const effectivePref =
+    preferredProvider && preferredProvider !== 'auto' ? preferredProvider : envPref;
   const sharedKey = readEnv('FLIGHT_API_KEY');
   const aeroKey =
     readEnv('AERODATABOX_API_KEY') ||
-    (providerPref !== 'flightaware' ? sharedKey : '');
+    (envPref !== 'flightaware' ? sharedKey : '');
   const faKey =
     readEnv('FLIGHTAWARE_API_KEY') ||
-    (providerPref === 'flightaware' ? sharedKey : '');
+    (envPref === 'flightaware' ? sharedKey : '');
   const rapidHost = readEnv('AERODATABOX_RAPIDAPI_HOST') || 'aerodatabox.p.rapidapi.com';
   const aeroDirectUrl = readEnv('AERODATABOX_BASE_URL');
   const faBaseUrl = readEnv('FLIGHTAWARE_BASE_URL') || 'https://aeroapi.flightaware.com/aeroapi';
@@ -713,8 +748,18 @@ function resolveProvidersFromEnv(
   });
   const fallback = new FallbackScheduleProvider({ nowFn });
 
+  if (effectivePref === 'heuristic_only') {
+    return {
+      primaryProviders: [],
+      fallbackProvider: fallback,
+      aeroConfigured: aero.isConfigured(),
+      flightAwareConfigured: flightAware.isConfigured(),
+      activeProvider: 'fallback',
+    };
+  }
+
   const ordered =
-    providerPref === 'flightaware'
+    effectivePref === 'flightaware'
       ? [flightAware, aero]
       : [aero, flightAware];
   const configuredLive = ordered.filter((p) => p.isConfigured());
@@ -730,16 +775,23 @@ function resolveProvidersFromEnv(
 }
 
 export function getFlightIntegrationDiagnostics(
-  envOverride?: Record<string, string | undefined>
+  envOverride?: Record<string, string | undefined>,
+  policyOverride?: Partial<FlightTrackingPolicyConfig>
 ): FlightDiagnosticsSummary {
-  const resolved = resolveProvidersFromEnv(envOverride);
+  const policy = normalizeFlightTrackingPolicy(policyOverride);
+  const resolved = resolveProvidersFromEnv(
+    envOverride,
+    undefined,
+    undefined,
+    policy.preferredProvider
+  );
   return {
     activeProvider: resolved.activeProvider,
     liveApiConfigured: resolved.aeroConfigured || resolved.flightAwareConfigured,
     aeroDataBoxConfigured: resolved.aeroConfigured,
     flightAwareConfigured: resolved.flightAwareConfigured,
     fallbackReady: true,
-    cacheTtlMinutes: 15,
+    cacheTtlMinutes: policy.cacheTtlMinutes,
     cachedEntriesCount: flightCacheStore.entries.size,
     supportedAirports: ['STL', 'SUS', 'CPS'],
     endpointPath: '/api/flight-status',
@@ -806,8 +858,13 @@ export async function lookupFlightTelemetryServer(
     };
   }
 
-  // Phase 38.B Operational Window Guard (enforced before cache or upstream provider calls):
-  // 1. If scheduledPickupIso is supplied, require [-12h, +24h] relative to nowMs.
+  const policy = await resolveServerFlightTrackingPolicy(options);
+  const futureWindowMs = policy.flightLookupWindowHours * 3_600_000;
+  const cacheTtlMs = policy.cacheTtlMinutes * 60_000;
+  const maxFutureCalendarDays = Math.max(1, Math.ceil(policy.flightLookupWindowHours / 24));
+
+  // Phase 38.B + Phase 62 Operational Window Guard (enforced before cache or upstream provider calls):
+  // 1. If scheduledPickupIso is supplied, require [-12h, +flightLookupWindowHours] relative to nowMs.
   if (typeof input.scheduledPickupIso === 'string' && input.scheduledPickupIso.trim()) {
     const pickupMs = Date.parse(input.scheduledPickupIso.trim());
     if (!Number.isFinite(pickupMs)) {
@@ -818,13 +875,13 @@ export async function lookupFlightTelemetryServer(
         error: 'Valid scheduledPickupIso timestamp is required.',
       };
     }
-    if (pickupMs - nowMs > FLIGHT_LOOKUP_FUTURE_WINDOW_MS) {
+    if (pickupMs - nowMs > futureWindowMs) {
       return {
         success: false,
         status: 400,
         code: 'OUTSIDE_24H_WINDOW',
-        unlocksAtIso: new Date(pickupMs - FLIGHT_LOOKUP_FUTURE_WINDOW_MS).toISOString(),
-        error: 'Live flight tracking unlocks within 24 hours of scheduled pickup.',
+        unlocksAtIso: new Date(pickupMs - futureWindowMs).toISOString(),
+        error: `Live flight tracking unlocks within ${policy.flightLookupWindowHours} hours of scheduled pickup.`,
       };
     }
     if (nowMs - pickupMs > FLIGHT_LOOKUP_PAST_WINDOW_MS) {
@@ -837,19 +894,19 @@ export async function lookupFlightTelemetryServer(
     }
   }
 
-  // 2. Always require serviceDate (YYYY-MM-DD) within [-1, +1] calendar days of nowMs
+  // 2. Always require serviceDate (YYYY-MM-DD) within [-1, +maxFutureCalendarDays] calendar days of nowMs
   const [yNum, mNum, dNum] = serviceDate.split('-').map(Number);
   const serviceDayIndex = Math.floor(Date.UTC(yNum, mNum - 1, dNum) / 86_400_000);
   const nowDayIndex = Math.floor(nowMs / 86_400_000);
   const calendarDayDelta = serviceDayIndex - nowDayIndex;
-  if (calendarDayDelta > 1 || calendarDayDelta < -1) {
+  if (calendarDayDelta > maxFutureCalendarDays || calendarDayDelta < -1) {
     return {
       success: false,
       status: 400,
       code: 'OUTSIDE_24H_WINDOW',
       error:
-        calendarDayDelta > 1
-          ? 'Live flight tracking unlocks within 24 hours of scheduled pickup.'
+        calendarDayDelta > maxFutureCalendarDays
+          ? `Live flight tracking unlocks within ${policy.flightLookupWindowHours} hours of scheduled pickup.`
           : 'Pickup window has passed; live flight lookup locked.',
     };
   }
@@ -863,7 +920,7 @@ export async function lookupFlightTelemetryServer(
     };
   }
 
-  // Only authenticated Dispatchers/Admins may force-bypass the 15-minute quota cache
+  // Only authenticated Dispatchers/Admins may force-bypass the quota cache
   const allowForceRefresh = Boolean(options?.forceRefresh && options?.isStaffAuthorized);
   const useFirestoreCache = !options?.skipFirestoreCache && isFirebaseConfigured();
 
@@ -900,7 +957,8 @@ export async function lookupFlightTelemetryServer(
   const { primaryProviders, fallbackProvider } = resolveProvidersFromEnv(
     options?.env,
     options?.fetchImpl,
-    nowFn
+    nowFn,
+    policy.preferredProvider
   );
 
   const query: FlightLookupQuery = {
@@ -930,6 +988,11 @@ export async function lookupFlightTelemetryServer(
   if (!resolvedSnapshot) {
     resolvedSnapshot = await fallbackProvider.lookupFlight(query);
   }
+
+  resolvedSnapshot = {
+    ...resolvedSnapshot,
+    cacheExpiresAt: new Date(nowMs + cacheTtlMs).toISOString(),
+  };
 
   setMemoryCachedSnapshot(cacheKey, resolvedSnapshot);
 
@@ -1017,9 +1080,12 @@ export async function handleFlightStatusGet(
     url.searchParams.get('diagnostics') === 'true';
 
   if (isDiagnostics) {
+    const serverPolicy = await resolveServerFlightTrackingPolicy({
+      staffBearerToken: auth.isDispatcher ? auth.rawToken : undefined,
+    });
     return jsonResponse({
       success: true,
-      ...getFlightIntegrationDiagnostics(),
+      ...getFlightIntegrationDiagnostics(undefined, serverPolicy),
     });
   }
 

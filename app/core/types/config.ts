@@ -521,6 +521,71 @@ export interface FleetCarConfig {
   groundedReason?: string;
 }
 
+export interface GuestSelfServicePolicyConfig {
+  enableGuestSelfService: boolean; // default true
+  allowGuestNotesAndFlightEdits: boolean; // default true
+  allowGuestPreDispatchRouteTimeEdits: boolean; // default true
+  guestDirectEditMinLeadMinutes: number; // default 30, clamped 0..720
+  allowGuestAssignedChangeRequests: boolean; // default true
+  allowGuestCancellation: boolean; // default true
+  maxLookupAttemptsPer5Min: number; // default 5, clamped 3..30
+}
+
+export const DEFAULT_GUEST_SELF_SERVICE_POLICY: GuestSelfServicePolicyConfig = {
+  enableGuestSelfService: true,
+  allowGuestNotesAndFlightEdits: true,
+  allowGuestPreDispatchRouteTimeEdits: true,
+  guestDirectEditMinLeadMinutes: 30,
+  allowGuestAssignedChangeRequests: true,
+  allowGuestCancellation: true,
+  maxLookupAttemptsPer5Min: 5,
+};
+
+export function normalizeGuestSelfServicePolicy(
+  raw?: Partial<GuestSelfServicePolicyConfig> | null
+): GuestSelfServicePolicyConfig {
+  const clampInt = (val: unknown, fallback: number, min: number, max: number): number => {
+    const num = typeof val === 'number' ? val : val !== undefined && val !== '' ? Number(val) : NaN;
+    if (!Number.isFinite(num)) return fallback;
+    return Math.min(max, Math.max(min, Math.round(num)));
+  };
+
+  return {
+    enableGuestSelfService:
+      raw?.enableGuestSelfService !== undefined
+        ? Boolean(raw.enableGuestSelfService)
+        : DEFAULT_GUEST_SELF_SERVICE_POLICY.enableGuestSelfService,
+    allowGuestNotesAndFlightEdits:
+      raw?.allowGuestNotesAndFlightEdits !== undefined
+        ? Boolean(raw.allowGuestNotesAndFlightEdits)
+        : DEFAULT_GUEST_SELF_SERVICE_POLICY.allowGuestNotesAndFlightEdits,
+    allowGuestPreDispatchRouteTimeEdits:
+      raw?.allowGuestPreDispatchRouteTimeEdits !== undefined
+        ? Boolean(raw.allowGuestPreDispatchRouteTimeEdits)
+        : DEFAULT_GUEST_SELF_SERVICE_POLICY.allowGuestPreDispatchRouteTimeEdits,
+    guestDirectEditMinLeadMinutes: clampInt(
+      raw?.guestDirectEditMinLeadMinutes,
+      DEFAULT_GUEST_SELF_SERVICE_POLICY.guestDirectEditMinLeadMinutes,
+      0,
+      720
+    ),
+    allowGuestAssignedChangeRequests:
+      raw?.allowGuestAssignedChangeRequests !== undefined
+        ? Boolean(raw.allowGuestAssignedChangeRequests)
+        : DEFAULT_GUEST_SELF_SERVICE_POLICY.allowGuestAssignedChangeRequests,
+    allowGuestCancellation:
+      raw?.allowGuestCancellation !== undefined
+        ? Boolean(raw.allowGuestCancellation)
+        : DEFAULT_GUEST_SELF_SERVICE_POLICY.allowGuestCancellation,
+    maxLookupAttemptsPer5Min: clampInt(
+      raw?.maxLookupAttemptsPer5Min,
+      DEFAULT_GUEST_SELF_SERVICE_POLICY.maxLookupAttemptsPer5Min,
+      3,
+      30
+    ),
+  };
+}
+
 export interface CustomerBookingConfig {
   allowMultiVehicle: boolean;
   maxVehiclesAllowed: number;
@@ -545,6 +610,8 @@ export interface CustomerBookingConfig {
   noShowFeeAmount?: number; // e.g. $50
   cardPreAuthThresholdAmount?: number; // e.g. $100 requires card on file
   acceptedPaymentMethods: Array<'card' | 'cash' | 'account'>;
+  allowPublicCorporateCheckout?: boolean; // default false — gates 'account' off /book unless explicitly enabled
+  guestSelfServicePolicy?: GuestSelfServicePolicyConfig; // Phase 62 /track policy controls
   allowDriverNotes?: boolean;
   allowPetRequest?: boolean;
   allowWheelchairRequest?: boolean;
@@ -556,6 +623,85 @@ export interface CustomerBookingConfig {
     text: string;
     type: 'info' | 'warning' | 'alert';
   };
+}
+
+/**
+ * Resolves accepted retail payment methods on `/book` & `/app/passenger`,
+ * filtering out `'account'` unless `bookingConfig?.allowPublicCorporateCheckout === true`.
+ */
+export function resolveRetailAcceptedPaymentMethods(
+  bookingConfig?: Partial<CustomerBookingConfig> | null
+): Array<'card' | 'cash' | 'account'> {
+  const allowPublicCorp = bookingConfig?.allowPublicCorporateCheckout === true;
+  const rawList =
+    Array.isArray(bookingConfig?.acceptedPaymentMethods) &&
+    bookingConfig.acceptedPaymentMethods.length > 0
+      ? bookingConfig.acceptedPaymentMethods
+      : allowPublicCorp
+      ? (['card', 'cash', 'account'] as const)
+      : (['card', 'cash'] as const);
+
+  const seen = new Set<'card' | 'cash' | 'account'>();
+  const out: Array<'card' | 'cash' | 'account'> = [];
+
+  for (const method of rawList) {
+    if (method !== 'card' && method !== 'cash' && method !== 'account') continue;
+    if (method === 'account' && !allowPublicCorp) continue;
+    if (!seen.has(method)) {
+      seen.add(method);
+      out.push(method);
+    }
+  }
+
+  if (allowPublicCorp && !seen.has('account')) {
+    out.push('account');
+    seen.add('account');
+  }
+
+  if (out.length === 0) {
+    return ['card', 'cash'];
+  }
+
+  return out;
+}
+
+/**
+ * Pure helper ensuring `/app/corporate` (`hasCorporatePortalContext === true`)
+ * always preserves `'account'` payment method and is NEVER clamped to `'card'`
+ * when retail `acceptedPaymentMethods` excludes `'account'`.
+ */
+export function resolveAllowedCustomerPaymentMethod(params: {
+  currentMethod: 'card' | 'cash' | 'account';
+  bookingConfig?: Partial<CustomerBookingConfig> | null;
+  hasCorporatePortalContext?: boolean;
+}): 'card' | 'cash' | 'account' {
+  if (params.hasCorporatePortalContext) {
+    return 'account';
+  }
+  const retailAllowed = resolveRetailAcceptedPaymentMethods(params.bookingConfig);
+  if (retailAllowed.includes(params.currentMethod)) {
+    return params.currentMethod;
+  }
+  return retailAllowed[0] || 'card';
+}
+
+export function validatePublicCorporateCheckoutGate(params: {
+  paymentMethod: 'card' | 'cash' | 'account';
+  bookingConfig?: Partial<CustomerBookingConfig> | null;
+  hasCorporatePortalContext?: boolean;
+}): { allowed: boolean; error?: string } {
+  if (
+    !params.hasCorporatePortalContext &&
+    params.paymentMethod === 'account' &&
+    params.bookingConfig?.allowPublicCorporateCheckout !== true
+  ) {
+    return {
+      allowed: false,
+      error:
+        'Company account rides must be booked through the Corporate Portal (/app/corporate). Please sign in there or select Card or Cash.',
+    };
+  }
+  return { allowed: true };
 }
 
 export interface PoHistoryRecord {
@@ -1588,21 +1734,351 @@ export interface PaymentGatewaysConfig {
   stripe?: {
     mode: 'test' | 'live';
     publishableKey: string;
-    secretKey: string;
+    secretKey?: string;
     webhookSecret?: string;
     status?: 'idle' | 'checking' | 'connected' | 'error';
   };
   square?: {
     applicationId: string;
-    accessToken: string;
+    accessToken?: string;
     locationId: string;
     status?: 'idle' | 'checking' | 'connected' | 'error';
   };
 }
 
+export interface LocalSeoFaqOverrideItem {
+  question: string;
+  answer: string;
+}
+
+export interface LocalSeoCorridorOverride {
+  enabled?: boolean;
+  featured?: boolean;
+  customHeroHeadline?: string;
+  customHeroSubheadline?: string;
+  customMetaTitle?: string;
+  customMetaDescription?: string;
+  customFaqs?: LocalSeoFaqOverrideItem[];
+}
+
+export interface LocalSeoAdminConfig {
+  corridorOverrides: Record<string, LocalSeoCorridorOverride>;
+}
+
+export const DEFAULT_LOCAL_SEO_CONFIG: LocalSeoAdminConfig = {
+  corridorOverrides: {},
+};
+
+export function normalizeLocalSeoConfig(
+  raw?: Partial<LocalSeoAdminConfig> | null
+): LocalSeoAdminConfig {
+  const rawOverrides =
+    raw && raw.corridorOverrides && typeof raw.corridorOverrides === 'object'
+      ? raw.corridorOverrides
+      : {};
+  const corridorOverrides: Record<string, LocalSeoCorridorOverride> = {};
+
+  for (const [rawSlug, entry] of Object.entries(rawOverrides)) {
+    const slug = String(rawSlug || '').trim().toLowerCase();
+    if (!slug || !entry || typeof entry !== 'object') continue;
+
+    const cleanOpt = (v: unknown): string | undefined => {
+      if (typeof v !== 'string') return undefined;
+      const trimmed = v.trim();
+      return trimmed ? trimmed : undefined;
+    };
+
+    const customFaqs: LocalSeoFaqOverrideItem[] | undefined = Array.isArray(entry.customFaqs)
+      ? entry.customFaqs
+          .map((f) => ({
+            question: typeof f?.question === 'string' ? f.question.trim() : '',
+            answer: typeof f?.answer === 'string' ? f.answer.trim() : '',
+          }))
+          .filter((f) => f.question.length > 0 && f.answer.length > 0)
+      : undefined;
+
+    const normalizedEntry: LocalSeoCorridorOverride = {};
+    if (entry.enabled !== undefined) normalizedEntry.enabled = Boolean(entry.enabled);
+    if (entry.featured !== undefined) normalizedEntry.featured = Boolean(entry.featured);
+
+    const headline = cleanOpt(entry.customHeroHeadline);
+    const subheadline = cleanOpt(entry.customHeroSubheadline);
+    const metaTitle = cleanOpt(entry.customMetaTitle);
+    const metaDesc = cleanOpt(entry.customMetaDescription);
+
+    if (headline) normalizedEntry.customHeroHeadline = headline;
+    if (subheadline) normalizedEntry.customHeroSubheadline = subheadline;
+    if (metaTitle) normalizedEntry.customMetaTitle = metaTitle;
+    if (metaDesc) normalizedEntry.customMetaDescription = metaDesc;
+    if (customFaqs && customFaqs.length > 0) normalizedEntry.customFaqs = customFaqs;
+
+    if (Object.keys(normalizedEntry).length > 0) {
+      corridorOverrides[slug] = normalizedEntry;
+    }
+  }
+
+  return { corridorOverrides };
+}
+
+export type FlightPreferredProvider = 'auto' | 'aerodatabox' | 'flightaware' | 'heuristic_only';
+
+export interface FlightTrackingPolicyConfig {
+  flightLookupWindowHours: number; // default 24, clamped 2..72
+  cacheTtlMinutes: number; // default 15, clamped 1..120
+  preferredProvider: FlightPreferredProvider; // default 'auto'
+  delayAlertThresholdMinutes: number; // default 20, clamped 5..180
+}
+
+export const DEFAULT_FLIGHT_TRACKING_POLICY: FlightTrackingPolicyConfig = {
+  flightLookupWindowHours: 24,
+  cacheTtlMinutes: 15,
+  preferredProvider: 'auto',
+  delayAlertThresholdMinutes: 20,
+};
+
+export function normalizeFlightTrackingPolicy(
+  raw?: Partial<FlightTrackingPolicyConfig> | null
+): FlightTrackingPolicyConfig {
+  const clampInt = (val: unknown, fallback: number, min: number, max: number): number => {
+    const num = typeof val === 'number' ? val : val !== undefined && val !== '' ? Number(val) : NaN;
+    if (!Number.isFinite(num)) return fallback;
+    return Math.min(max, Math.max(min, Math.round(num)));
+  };
+
+  const validProviders: readonly FlightPreferredProvider[] = [
+    'auto',
+    'aerodatabox',
+    'flightaware',
+    'heuristic_only',
+  ];
+  const preferredProvider: FlightPreferredProvider =
+    raw?.preferredProvider && validProviders.includes(raw.preferredProvider)
+      ? raw.preferredProvider
+      : DEFAULT_FLIGHT_TRACKING_POLICY.preferredProvider;
+
+  return {
+    flightLookupWindowHours: clampInt(
+      raw?.flightLookupWindowHours,
+      DEFAULT_FLIGHT_TRACKING_POLICY.flightLookupWindowHours,
+      2,
+      72
+    ),
+    cacheTtlMinutes: clampInt(
+      raw?.cacheTtlMinutes,
+      DEFAULT_FLIGHT_TRACKING_POLICY.cacheTtlMinutes,
+      1,
+      120
+    ),
+    preferredProvider,
+    delayAlertThresholdMinutes: clampInt(
+      raw?.delayAlertThresholdMinutes,
+      DEFAULT_FLIGHT_TRACKING_POLICY.delayAlertThresholdMinutes,
+      5,
+      180
+    ),
+  };
+}
+
+export type CannedSmsTemplateCategory =
+  | 'dispatch'
+  | 'airport'
+  | 'arrival'
+  | 'billing'
+  | 'custom';
+
+export interface BuiltInSmsTemplateOverride {
+  label?: string;
+  shortLabel?: string;
+  bodyTemplate?: string;
+  enabled?: boolean;
+}
+
+export interface CustomCannedSmsTemplateItem {
+  id: string;
+  label: string;
+  shortLabel?: string;
+  category: CannedSmsTemplateCategory;
+  description?: string;
+  bodyTemplate: string;
+  enabled: boolean;
+}
+
+export interface CannedSmsTemplatesConfig {
+  builtInOverrides: Record<string, BuiltInSmsTemplateOverride>;
+  customTemplates: CustomCannedSmsTemplateItem[];
+}
+
+export const DEFAULT_CANNED_SMS_TEMPLATES_CONFIG: CannedSmsTemplatesConfig = {
+  builtInOverrides: {},
+  customTemplates: [],
+};
+
+export function normalizeCannedSmsTemplates(
+  raw?: Partial<CannedSmsTemplatesConfig> | null
+): CannedSmsTemplatesConfig {
+  const validCategories: readonly CannedSmsTemplateCategory[] = [
+    'dispatch',
+    'airport',
+    'arrival',
+    'billing',
+    'custom',
+  ];
+
+  const rawBuiltIn =
+    raw && raw.builtInOverrides && typeof raw.builtInOverrides === 'object'
+      ? raw.builtInOverrides
+      : {};
+  const builtInOverrides: Record<string, BuiltInSmsTemplateOverride> = {};
+
+  for (const [rawId, item] of Object.entries(rawBuiltIn)) {
+    const id = String(rawId || '').trim();
+    if (!id || !item || typeof item !== 'object') continue;
+    const next: BuiltInSmsTemplateOverride = {};
+    if (typeof item.label === 'string' && item.label.trim()) {
+      next.label = item.label.trim().slice(0, 80);
+    }
+    if (typeof item.shortLabel === 'string' && item.shortLabel.trim()) {
+      next.shortLabel = item.shortLabel.trim().slice(0, 40);
+    }
+    if (typeof item.bodyTemplate === 'string' && item.bodyTemplate.trim()) {
+      next.bodyTemplate = item.bodyTemplate.trim().slice(0, 600);
+    }
+    if (item.enabled !== undefined) {
+      next.enabled = Boolean(item.enabled);
+    }
+    if (Object.keys(next).length > 0) {
+      builtInOverrides[id] = next;
+    }
+  }
+
+  const customTemplates: CustomCannedSmsTemplateItem[] = [];
+  const seenIds = new Set<string>();
+  if (Array.isArray(raw?.customTemplates)) {
+    for (const rawTpl of raw.customTemplates) {
+      if (!rawTpl || typeof rawTpl !== 'object') continue;
+      const id = String(rawTpl.id || '')
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]/g, '_');
+      const label = String(rawTpl.label || '').trim().slice(0, 80);
+      const bodyTemplate = String(rawTpl.bodyTemplate || '').trim().slice(0, 600);
+      if (!id || !label || !bodyTemplate || seenIds.has(id)) continue;
+      seenIds.add(id);
+
+      const category: CannedSmsTemplateCategory = validCategories.includes(
+        rawTpl.category as CannedSmsTemplateCategory
+      )
+        ? (rawTpl.category as CannedSmsTemplateCategory)
+        : 'custom';
+      const shortLabel =
+        typeof rawTpl.shortLabel === 'string' && rawTpl.shortLabel.trim()
+          ? rawTpl.shortLabel.trim().slice(0, 40)
+          : label.slice(0, 28);
+      const description =
+        typeof rawTpl.description === 'string' && rawTpl.description.trim()
+          ? rawTpl.description.trim().slice(0, 160)
+          : undefined;
+
+      customTemplates.push({
+        id,
+        label,
+        shortLabel,
+        category,
+        ...(description ? { description } : {}),
+        bodyTemplate,
+        enabled: rawTpl.enabled !== undefined ? Boolean(rawTpl.enabled) : true,
+      });
+    }
+  }
+
+  return {
+    builtInOverrides,
+    customTemplates,
+  };
+}
+
+export interface DispatchEmailPolicyConfig {
+  inboundParseToBookingDraft: boolean; // default true
+  outboundSignature: string; // default 'Chesterfield Taxi Dispatch · (314) 738-0100'
+  blockedSenderList: string[]; // default [] — lowercase emails or '@domain.com' entries
+  autoAckInboundBookingEmails: boolean; // default false
+}
+
+export const DEFAULT_DISPATCH_EMAIL_POLICY: DispatchEmailPolicyConfig = {
+  inboundParseToBookingDraft: true,
+  outboundSignature: 'Chesterfield Taxi Dispatch · (314) 738-0100',
+  blockedSenderList: [],
+  autoAckInboundBookingEmails: false,
+};
+
+export function normalizeDispatchEmailPolicy(
+  raw?: Partial<DispatchEmailPolicyConfig> | null
+): DispatchEmailPolicyConfig {
+  const blockedSenderList = Array.isArray(raw?.blockedSenderList)
+    ? Array.from(
+        new Set(
+          raw.blockedSenderList
+            .map((entry) =>
+              String(entry || '')
+                .trim()
+                .toLowerCase()
+                .replace(/^\*@/, '@')
+            )
+            .filter((entry) => entry.length >= 3 && (entry.includes('@') || entry.includes('.')))
+            .map((entry) => (entry.includes('@') ? entry : `@${entry}`))
+        )
+      )
+    : [];
+
+  return {
+    inboundParseToBookingDraft:
+      raw?.inboundParseToBookingDraft !== undefined
+        ? Boolean(raw.inboundParseToBookingDraft)
+        : DEFAULT_DISPATCH_EMAIL_POLICY.inboundParseToBookingDraft,
+    outboundSignature:
+      typeof raw?.outboundSignature === 'string'
+        ? raw.outboundSignature.trim().slice(0, 500)
+        : DEFAULT_DISPATCH_EMAIL_POLICY.outboundSignature,
+    blockedSenderList,
+    autoAckInboundBookingEmails:
+      raw?.autoAckInboundBookingEmails !== undefined
+        ? Boolean(raw.autoAckInboundBookingEmails)
+        : DEFAULT_DISPATCH_EMAIL_POLICY.autoAckInboundBookingEmails,
+  };
+}
+
+export function isInboundEmailSenderBlocked(
+  senderEmail: string | null | undefined,
+  policy?: Partial<DispatchEmailPolicyConfig> | null
+): boolean {
+  const raw = String(senderEmail || '').trim().toLowerCase();
+  if (!raw) return false;
+  const angleMatch = raw.match(/<([^>]+)>/);
+  const candidate = (angleMatch ? angleMatch[1] : raw).trim().toLowerCase();
+  const atIdx = candidate.lastIndexOf('@');
+  if (atIdx <= 0 || atIdx === candidate.length - 1) return false;
+
+  const senderDomain = candidate.slice(atIdx); // '@domain.com'
+  const cfg = normalizeDispatchEmailPolicy(policy);
+  if (cfg.blockedSenderList.length === 0) return false;
+
+  for (const rule of cfg.blockedSenderList) {
+    if (rule.startsWith('@')) {
+      if (senderDomain === rule || senderDomain.endsWith(`.${rule.slice(1)}`)) {
+        return true;
+      }
+    } else if (candidate === rule) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export interface IntegrationsConfig {
   telephony?: TelephonyIntegrationConfig;
   payments?: PaymentGatewaysConfig;
+  flightTracking?: FlightTrackingPolicyConfig;
+  cannedSmsTemplates?: CannedSmsTemplatesConfig;
+  dispatchEmail?: DispatchEmailPolicyConfig;
 }
 
 export interface AppSettings {
@@ -1614,6 +2090,7 @@ export interface AppSettings {
   localization?: LocalizationConfig;
   publicFormVersion?: 'v1' | 'v2';
   customerBookingConfig?: CustomerBookingConfig;
+  localSeoConfig?: LocalSeoAdminConfig;
   corporateAccounts?: CorporateAccountConfig[];
   corporatePortalPolicy?: CorporatePortalGovernanceConfig;
   invoices?: InvoiceRecord[];

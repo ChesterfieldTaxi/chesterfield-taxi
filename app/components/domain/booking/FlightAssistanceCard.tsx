@@ -8,6 +8,8 @@ import {
   RefreshCwIcon,
   SpinnerIcon,
 } from '../../ui/Icons';
+import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
+import { normalizeFlightTrackingPolicy } from '../../../core/types/config';
 import {
   MAJOR_AIRLINES,
   evaluateFlightCheckEligibility,
@@ -81,11 +83,18 @@ export function FlightTelemetryCheckPanel({
   const effectiveBookingType: 'asap' | 'scheduled' =
     bookingType || (scheduledPickupIso ? 'scheduled' : 'asap');
 
-  const eligibility = evaluateFlightCheckEligibility({
-    isStaffContext: allowLiveCheck,
-    bookingType: effectiveBookingType,
-    scheduledPickupTime: scheduledPickupIso,
-  });
+  const flightPolicy = normalizeFlightTrackingPolicy(
+    getAdminConfigService().getCachedSettings().integrations?.flightTracking
+  );
+
+  const eligibility = evaluateFlightCheckEligibility(
+    {
+      isStaffContext: allowLiveCheck,
+      bookingType: effectiveBookingType,
+      scheduledPickupTime: scheduledPickupIso,
+    },
+    flightPolicy.flightLookupWindowHours
+  );
 
   // Ensure displayed telemetry matches current airline + flight number
   const activeTelemetry =
@@ -100,6 +109,7 @@ export function FlightTelemetryCheckPanel({
     allowLiveCheck && isPickupAirport && activeTelemetry
       ? evaluateFlightPickupAlignment(activeTelemetry, scheduledPickupIso, {
           hasCheckedLuggage,
+          delayThresholdMinutes: flightPolicy.delayAlertThresholdMinutes,
         })
       : null;
 

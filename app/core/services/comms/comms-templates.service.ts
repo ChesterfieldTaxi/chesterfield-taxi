@@ -22,6 +22,11 @@ import {
   detectAirportInAddresses,
   resolveStlTerminalInfo,
 } from '../../config/airports';
+import {
+  normalizeCannedSmsTemplates,
+  type AppSettings,
+  type CannedSmsTemplateCategory,
+} from '../../types/config';
 import type {
   CommsChannel,
   CommsContactType,
@@ -338,6 +343,7 @@ function resolveSmsTemplateVariableMap(
 
   return {
     firstName: derivedFirst,
+    passengerFirstName: derivedFirst,
     passengerName: effectivePassenger,
     tripId: (context.tripId || '').trim() || 'your reservation',
     pickupTime: (context.pickupTime || '').trim() || 'your scheduled pickup time',
@@ -351,6 +357,7 @@ function resolveSmsTemplateVariableMap(
       (context.trackingUrl || '').trim() || 'https://chesterfieldtaxi.com/booking/lookup',
     payUrl: (context.payUrl || '').trim() || 'https://chesterfieldtaxi.com/pay',
     airportCurbsideGuidance,
+    pickupDoor: airportCurbsideGuidance,
   };
 }
 
@@ -387,14 +394,80 @@ export function interpolateCommsSmsTemplate(
     .trim();
 }
 
+export interface ResolvedCannedSmsTemplate {
+  id: string;
+  label: string;
+  shortLabel: string;
+  category: CannedSmsTemplateCategory;
+  description: string;
+  bodyTemplate: string;
+  enabled: boolean;
+  isBuiltIn: boolean;
+}
+
+const BUILT_IN_SMS_CATEGORIES: Record<CannedDispatchSmsTemplateId, CannedSmsTemplateCategory> = {
+  driver_en_route: 'dispatch',
+  driver_arrived: 'arrival',
+  airport_curbside: 'airport',
+  reservation_confirmed: 'dispatch',
+  payment_link: 'billing',
+  flight_checkin: 'airport',
+};
+
+/**
+ * Resolves built-in + custom Canned SMS templates merged with `settings.integrations.cannedSmsTemplates`.
+ * Excludes disabled templates by default (`includeDisabled: false`).
+ */
+export function getResolvedCannedSmsTemplates(
+  settings?: Partial<AppSettings> | null,
+  options?: { includeDisabled?: boolean }
+): ResolvedCannedSmsTemplate[] {
+  const cfg = normalizeCannedSmsTemplates(settings?.integrations?.cannedSmsTemplates);
+  const includeDisabled = Boolean(options?.includeDisabled);
+
+  const builtInResolved: ResolvedCannedSmsTemplate[] = CANNED_DISPATCH_SMS_TEMPLATES.map((tpl) => {
+    const ov = cfg.builtInOverrides[tpl.id];
+    return {
+      id: tpl.id,
+      label: ov?.label?.trim() || tpl.label,
+      shortLabel: ov?.shortLabel?.trim() || tpl.shortLabel,
+      category: BUILT_IN_SMS_CATEGORIES[tpl.id] || 'dispatch',
+      description: tpl.description,
+      bodyTemplate: ov?.bodyTemplate?.trim() || tpl.bodyTemplate,
+      enabled: ov?.enabled !== false,
+      isBuiltIn: true,
+    };
+  });
+
+  const customResolved: ResolvedCannedSmsTemplate[] = cfg.customTemplates.map((custom) => ({
+    id: custom.id,
+    label: custom.label,
+    shortLabel: custom.shortLabel?.trim() || custom.label.slice(0, 28),
+    category: custom.category,
+    description: custom.description || 'Custom dispatch SMS template',
+    bodyTemplate: custom.bodyTemplate,
+    enabled: custom.enabled,
+    isBuiltIn: false,
+  }));
+
+  const combined = [...builtInResolved, ...customResolved];
+  return includeDisabled ? combined : combined.filter((item) => item.enabled);
+}
+
 export function getCannedDispatchSmsTemplateById(
-  id: CannedDispatchSmsTemplateId | string
-): CannedDispatchSmsTemplate | undefined {
+  id: CannedDispatchSmsTemplateId | string,
+  settings?: Partial<AppSettings> | null
+): CannedDispatchSmsTemplate | ResolvedCannedSmsTemplate | undefined {
+  if (settings) {
+    return getResolvedCannedSmsTemplates(settings, { includeDisabled: true }).find(
+      (t) => t.id === id
+    );
+  }
   return CANNED_SMS_TEMPLATE_MAP.get(id);
 }
 
 export interface InterpolatedCommsSmsChip {
-  id: CannedDispatchSmsTemplateId;
+  id: CannedDispatchSmsTemplateId | string;
   label: string;
   shortLabel: string;
   description: string;
@@ -402,15 +475,17 @@ export interface InterpolatedCommsSmsChip {
 }
 
 export function buildInterpolatedCommsSmsChips(
-  context?: CommsSmsTemplateContext | null
+  context?: CommsSmsTemplateContext | null,
+  settings?: Partial<AppSettings> | null
 ): InterpolatedCommsSmsChip[] {
   const safeCtx = context || {};
-  return CANNED_DISPATCH_SMS_TEMPLATES.map((tpl) => ({
+  const templates = getResolvedCannedSmsTemplates(settings, { includeDisabled: false });
+  return templates.map((tpl) => ({
     id: tpl.id,
     label: tpl.label,
     shortLabel: tpl.shortLabel,
     description: tpl.description,
-    text: interpolateCommsSmsTemplate(tpl, safeCtx),
+    text: interpolateCommsSmsTemplate({ bodyTemplate: tpl.bodyTemplate } as any, safeCtx),
   }));
 }
 

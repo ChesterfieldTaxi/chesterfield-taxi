@@ -29,6 +29,12 @@ import type {
   DispatchConsoleSettingsConfig,
   StandingOrdersGovernanceConfig,
   DriverAppPoliciesConfig,
+  GuestSelfServicePolicyConfig,
+  LocalSeoAdminConfig,
+  FlightTrackingPolicyConfig,
+  CannedSmsTemplatesConfig,
+  DispatchEmailPolicyConfig,
+  IntegrationsConfig,
 } from '../../types/config';
 import {
   DEFAULT_OVERSIZED_BAG_CATEGORIES,
@@ -36,6 +42,11 @@ import {
   DEFAULT_DISPATCH_CONSOLE_CONFIG,
   DEFAULT_STANDING_ORDERS_CONFIG,
   DEFAULT_DRIVER_APP_POLICIES_CONFIG,
+  DEFAULT_GUEST_SELF_SERVICE_POLICY,
+  DEFAULT_LOCAL_SEO_CONFIG,
+  DEFAULT_FLIGHT_TRACKING_POLICY,
+  DEFAULT_CANNED_SMS_TEMPLATES_CONFIG,
+  DEFAULT_DISPATCH_EMAIL_POLICY,
   DEFAULT_US_HOLIDAY_CALENDAR_DATES,
   DEFAULT_LOCALIZATION_CONFIG,
   DEFAULT_CORPORATE_PORTAL_POLICY,
@@ -48,6 +59,15 @@ import {
   normalizeDispatchConsoleConfig,
   normalizeStandingOrdersConfig,
   normalizeDriverAppPoliciesConfig,
+  normalizeGuestSelfServicePolicy,
+  resolveRetailAcceptedPaymentMethods,
+  resolveAllowedCustomerPaymentMethod,
+  validatePublicCorporateCheckoutGate,
+  normalizeLocalSeoConfig,
+  normalizeFlightTrackingPolicy,
+  normalizeCannedSmsTemplates,
+  normalizeDispatchEmailPolicy,
+  isInboundEmailSenderBlocked,
   buildUsFederalHolidaysForYear,
   mapDriverPolicyNavToPreferredApp,
   canOperatorConfigureLeadWindows,
@@ -69,11 +89,25 @@ export {
   DEFAULT_DISPATCH_CONSOLE_CONFIG,
   DEFAULT_STANDING_ORDERS_CONFIG,
   DEFAULT_DRIVER_APP_POLICIES_CONFIG,
+  DEFAULT_GUEST_SELF_SERVICE_POLICY,
+  DEFAULT_LOCAL_SEO_CONFIG,
+  DEFAULT_FLIGHT_TRACKING_POLICY,
+  DEFAULT_CANNED_SMS_TEMPLATES_CONFIG,
+  DEFAULT_DISPATCH_EMAIL_POLICY,
   DEFAULT_US_HOLIDAY_CALENDAR_DATES,
   normalizeDispatchAutomationConfig,
   normalizeDispatchConsoleConfig,
   normalizeStandingOrdersConfig,
   normalizeDriverAppPoliciesConfig,
+  normalizeGuestSelfServicePolicy,
+  resolveRetailAcceptedPaymentMethods,
+  resolveAllowedCustomerPaymentMethod,
+  validatePublicCorporateCheckoutGate,
+  normalizeLocalSeoConfig,
+  normalizeFlightTrackingPolicy,
+  normalizeCannedSmsTemplates,
+  normalizeDispatchEmailPolicy,
+  isInboundEmailSenderBlocked,
   buildUsFederalHolidaysForYear,
   mapDriverPolicyNavToPreferredApp,
   canOperatorConfigureLeadWindows,
@@ -102,7 +136,9 @@ export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
   lateCancellationFeePercent: 25,
   noShowFeeAmount: 50,
   cardPreAuthThresholdAmount: 100,
-  acceptedPaymentMethods: ['card', 'cash', 'account'],
+  acceptedPaymentMethods: ['card', 'cash'],
+  allowPublicCorporateCheckout: false,
+  guestSelfServicePolicy: { ...DEFAULT_GUEST_SELF_SERVICE_POLICY },
   allowDriverNotes: true,
   allowPetRequest: true,
   allowWheelchairRequest: false,
@@ -324,6 +360,88 @@ export const DEFAULT_CONFIG_AUDIT_TRAIL: ConfigAuditEntry[] = [
   },
 ];
 
+function normalizeCustomerBookingConfig(
+  incoming?: Partial<CustomerBookingConfig> | null,
+  fallback: CustomerBookingConfig = DEFAULT_CUSTOMER_BOOKING_CONFIG
+): CustomerBookingConfig {
+  const merged: CustomerBookingConfig = {
+    ...DEFAULT_CUSTOMER_BOOKING_CONFIG,
+    ...fallback,
+    ...(incoming || {}),
+  };
+  return {
+    ...merged,
+    allowPublicCorporateCheckout: Boolean(merged.allowPublicCorporateCheckout),
+    guestSelfServicePolicy: normalizeGuestSelfServicePolicy(
+      incoming?.guestSelfServicePolicy ?? fallback?.guestSelfServicePolicy
+    ),
+    oversizedBags:
+      merged.oversizedBags && merged.oversizedBags.length > 0
+        ? merged.oversizedBags
+        : [...DEFAULT_OVERSIZED_BAG_CATEGORIES],
+  };
+}
+
+function normalizeIntegrationsConfig(
+  incoming?: Partial<IntegrationsConfig> | null,
+  fallback?: Partial<IntegrationsConfig> | null
+): IntegrationsConfig {
+  const rawTel = {
+    provider: 'twilio' as const,
+    accountSid: '',
+    phoneNumber: COMPANY_CONFIG.phone.primaryRaw || '+13147380100',
+    status: 'idle' as const,
+    ...(fallback?.telephony || {}),
+    ...(incoming?.telephony || {}),
+  };
+  // Never store plaintext authToken or apiKeySecret in browser memory / Firestore config
+  delete (rawTel as Record<string, unknown>).authToken;
+  delete (rawTel as Record<string, unknown>).apiKeySecret;
+
+  const rawStripe = {
+    ...(fallback?.payments?.stripe || {}),
+    ...(incoming?.payments?.stripe || {}),
+  };
+  delete (rawStripe as Record<string, unknown>).secretKey;
+  delete (rawStripe as Record<string, unknown>).webhookSecret;
+
+  const rawSquare = {
+    ...(fallback?.payments?.square || {}),
+    ...(incoming?.payments?.square || {}),
+  };
+  delete (rawSquare as Record<string, unknown>).accessToken;
+
+  const payments: IntegrationsConfig['payments'] = {};
+  if (Object.keys(rawStripe).length > 0) {
+    payments.stripe = {
+      mode: rawStripe.mode === 'live' ? 'live' : 'test',
+      publishableKey: String(rawStripe.publishableKey || '').trim(),
+      ...(rawStripe.status ? { status: rawStripe.status } : {}),
+    };
+  }
+  if (Object.keys(rawSquare).length > 0) {
+    payments.square = {
+      applicationId: String(rawSquare.applicationId || '').trim(),
+      locationId: String(rawSquare.locationId || '').trim(),
+      ...(rawSquare.status ? { status: rawSquare.status } : {}),
+    };
+  }
+
+  return {
+    telephony: rawTel,
+    payments,
+    flightTracking: normalizeFlightTrackingPolicy(
+      incoming?.flightTracking ?? fallback?.flightTracking
+    ),
+    cannedSmsTemplates: normalizeCannedSmsTemplates(
+      incoming?.cannedSmsTemplates ?? fallback?.cannedSmsTemplates
+    ),
+    dispatchEmail: normalizeDispatchEmailPolicy(
+      incoming?.dispatchEmail ?? fallback?.dispatchEmail
+    ),
+  };
+}
+
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   company: normalizeCompanyConfig({
     name: COMPANY_CONFIG.name,
@@ -508,7 +626,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
   ],
   publicFormVersion: COMPANY_CONFIG.publicFormVersion || 'v2',
-  customerBookingConfig: { ...DEFAULT_CUSTOMER_BOOKING_CONFIG },
+  customerBookingConfig: normalizeCustomerBookingConfig(DEFAULT_CUSTOMER_BOOKING_CONFIG),
+  localSeoConfig: { ...DEFAULT_LOCAL_SEO_CONFIG },
   corporateAccounts: [...DEFAULT_CORPORATE_ACCOUNTS],
   corporatePortalPolicy: { ...DEFAULT_CORPORATE_PORTAL_POLICY },
   invoices: [...DEFAULT_INVOICES],
@@ -520,16 +639,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   tariffs: [...DEFAULT_TARIFF_PROFILES],
   tariffGroups: [],
   fleetAlertsConfig: { ...DEFAULT_FLEET_ALERTS_CONFIG },
-  integrations: {
-    telephony: {
-      provider: 'twilio',
-      accountSid: '',
-      authToken: '',
-      phoneNumber: COMPANY_CONFIG.phone.primaryRaw || '+13147380100',
-      status: 'idle',
-    },
-    payments: {},
-  },
+  integrations: normalizeIntegrationsConfig(),
   constructionMode: COMPANY_CONFIG.constructionMode ?? false,
   enableRealtimeRouting: COMPANY_CONFIG.enableRealtimeRouting ?? false,
   enableGetAppButtons: COMPANY_CONFIG.enableGetAppButtons ?? false,
@@ -563,7 +673,13 @@ export function sanitizePublicSettings(raw: Record<string, any> = {}): Partial<A
     vehicles: raw.vehicles ?? DEFAULT_APP_SETTINGS.vehicles,
     pricing: raw.pricing ?? DEFAULT_APP_SETTINGS.pricing,
     tariffs: raw.tariffs ?? DEFAULT_APP_SETTINGS.tariffs,
-    customerBookingConfig: raw.customerBookingConfig ?? DEFAULT_APP_SETTINGS.customerBookingConfig,
+    customerBookingConfig: normalizeCustomerBookingConfig(
+      raw.customerBookingConfig,
+      DEFAULT_APP_SETTINGS.customerBookingConfig || DEFAULT_CUSTOMER_BOOKING_CONFIG
+    ),
+    localSeoConfig: normalizeLocalSeoConfig(
+      raw.localSeoConfig ?? DEFAULT_LOCAL_SEO_CONFIG
+    ),
     corporatePortalPolicy: normalizeCorporatePortalPolicy(
       raw.corporatePortalPolicy ?? DEFAULT_CORPORATE_PORTAL_POLICY
     ),
@@ -675,13 +791,15 @@ export class AdminConfigService implements IAdminConfigService {
         ? incoming.fleet
         : DEFAULT_APP_SETTINGS.fleet,
       publicFormVersion: 'v2',
-      customerBookingConfig: {
-        ...DEFAULT_CUSTOMER_BOOKING_CONFIG,
-        ...(incoming.customerBookingConfig || {}),
-        oversizedBags: (incoming.customerBookingConfig?.oversizedBags && incoming.customerBookingConfig.oversizedBags.length > 0)
-          ? incoming.customerBookingConfig.oversizedBags
-          : [...DEFAULT_OVERSIZED_BAG_CATEGORIES],
-      },
+      customerBookingConfig: normalizeCustomerBookingConfig(
+        incoming.customerBookingConfig,
+        this.cachedSettings?.customerBookingConfig || DEFAULT_CUSTOMER_BOOKING_CONFIG
+      ),
+      localSeoConfig: normalizeLocalSeoConfig(
+        incoming.localSeoConfig ??
+          this.cachedSettings?.localSeoConfig ??
+          DEFAULT_LOCAL_SEO_CONFIG
+      ),
       corporateAccounts: incoming.corporateAccounts && incoming.corporateAccounts.length > 0
         ? incoming.corporateAccounts
         : DEFAULT_APP_SETTINGS.corporateAccounts,
@@ -716,19 +834,10 @@ export class AdminConfigService implements IAdminConfigService {
       tariffGroups: incoming.tariffGroups && incoming.tariffGroups.length > 0
         ? incoming.tariffGroups
         : DEFAULT_APP_SETTINGS.tariffGroups,
-      integrations: {
-        telephony: {
-          provider: 'twilio',
-          accountSid: '',
-          authToken: '',
-          phoneNumber: COMPANY_CONFIG.phone.primaryRaw || '+13147380100',
-          status: 'idle',
-          ...(incoming.integrations?.telephony || {}),
-        },
-        payments: {
-          ...(incoming.integrations?.payments || {}),
-        },
-      },
+      integrations: normalizeIntegrationsConfig(
+        incoming.integrations,
+        this.cachedSettings?.integrations || DEFAULT_APP_SETTINGS.integrations
+      ),
       constructionMode: incoming.constructionMode !== undefined
         ? incoming.constructionMode
         : (DEFAULT_APP_SETTINGS.constructionMode ?? false),
@@ -902,11 +1011,28 @@ export class AdminConfigService implements IAdminConfigService {
         ...(updates.pricing || {}),
       },
       customerBookingConfig: updates.customerBookingConfig
-        ? {
-            ...(this.cachedSettings.customerBookingConfig || DEFAULT_CUSTOMER_BOOKING_CONFIG),
-            ...updates.customerBookingConfig,
-          }
-        : (this.cachedSettings.customerBookingConfig || DEFAULT_CUSTOMER_BOOKING_CONFIG),
+        ? normalizeCustomerBookingConfig(
+            updates.customerBookingConfig,
+            this.cachedSettings.customerBookingConfig || DEFAULT_CUSTOMER_BOOKING_CONFIG
+          )
+        : normalizeCustomerBookingConfig(
+            this.cachedSettings.customerBookingConfig,
+            DEFAULT_CUSTOMER_BOOKING_CONFIG
+          ),
+      localSeoConfig: updates.localSeoConfig
+        ? normalizeLocalSeoConfig(updates.localSeoConfig)
+        : normalizeLocalSeoConfig(
+            this.cachedSettings.localSeoConfig || DEFAULT_LOCAL_SEO_CONFIG
+          ),
+      integrations: updates.integrations
+        ? normalizeIntegrationsConfig(
+            updates.integrations,
+            this.cachedSettings.integrations || DEFAULT_APP_SETTINGS.integrations
+          )
+        : normalizeIntegrationsConfig(
+            this.cachedSettings.integrations,
+            DEFAULT_APP_SETTINGS.integrations
+          ),
       corporateAccounts: updates.corporateAccounts || this.cachedSettings.corporateAccounts,
       corporatePortalPolicy: updates.corporatePortalPolicy
         ? normalizeCorporatePortalPolicy({

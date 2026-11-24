@@ -666,6 +666,7 @@ export interface FlightCheckEligibilityInput {
   scheduledPickupTime?: string;
   isStaffContext?: boolean;
   nowMs?: number;
+  maxWindowHours?: number;
 }
 
 export interface FlightCheckEligibilityResult {
@@ -679,10 +680,11 @@ export interface FlightCheckEligibilityResult {
  * Pure operational quota gate controlling when live aviation API lookups are permitted:
  * 1. Staff-only (`isStaffContext === true`).
  * 2. Never for `UNCONFIRMED` bookings or closed/terminal (`DECLINED` / `cancelled` / `completed`) trips.
- * 3. For scheduled rides, strictly within `[-12h, +24h]` of `scheduledPickupTime`.
+ * 3. For scheduled rides, strictly within `[-12h, +maxWindowHours]` (default `24h`, clamped `2..72`) of `scheduledPickupTime`.
  */
 export function evaluateFlightCheckEligibility(
-  input: FlightCheckEligibilityInput
+  input: FlightCheckEligibilityInput,
+  maxWindowHours?: number
 ): FlightCheckEligibilityResult {
   if (!input.isStaffContext) {
     return {
@@ -713,16 +715,23 @@ export function evaluateFlightCheckEligibility(
     };
   }
 
+  const rawWindowHours = maxWindowHours ?? input.maxWindowHours;
+  const effectiveWindowHours =
+    typeof rawWindowHours === 'number' && Number.isFinite(rawWindowHours)
+      ? Math.min(72, Math.max(2, Math.round(rawWindowHours)))
+      : 24;
+  const futureWindowMs = effectiveWindowHours * 3_600_000;
+
   if (input.bookingType !== 'asap' && input.scheduledPickupTime) {
     const pickupMs = Date.parse(input.scheduledPickupTime);
     if (Number.isFinite(pickupMs)) {
       const nowMs = input.nowMs ?? Date.now();
-      if (pickupMs - nowMs > FLIGHT_LOOKUP_FUTURE_WINDOW_MS) {
+      if (pickupMs - nowMs > futureWindowMs) {
         return {
           eligible: false,
           reason: 'outside_24h_window',
-          unlocksAtIso: new Date(pickupMs - FLIGHT_LOOKUP_FUTURE_WINDOW_MS).toISOString(),
-          message: 'Live flight tracking unlocks within 24 hours of scheduled pickup.',
+          unlocksAtIso: new Date(pickupMs - futureWindowMs).toISOString(),
+          message: `Live flight tracking unlocks within ${effectiveWindowHours} hours of scheduled pickup.`,
         };
       }
       if (nowMs - pickupMs > FLIGHT_LOOKUP_PAST_WINDOW_MS) {

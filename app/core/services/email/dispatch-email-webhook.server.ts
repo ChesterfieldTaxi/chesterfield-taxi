@@ -13,6 +13,11 @@
 
 import crypto from 'node:crypto';
 import {
+  isInboundEmailSenderBlocked,
+  normalizeDispatchEmailPolicy,
+  type DispatchEmailPolicyConfig,
+} from '../../types/config';
+import {
   SUBSCRIBED_RESEND_WEBHOOK_EVENTS,
   buildDispatchEmailCommsEventId,
   normalizeRfcMessageId,
@@ -436,6 +441,29 @@ async function fetchResendInboundEmailDetails(
   }
 }
 
+async function resolveServerDispatchEmailPolicy(options?: {
+  emailPolicyOverride?: Partial<DispatchEmailPolicyConfig>;
+  skipFirestore?: boolean;
+}): Promise<DispatchEmailPolicyConfig> {
+  if (options?.emailPolicyOverride) {
+    return normalizeDispatchEmailPolicy(options.emailPolicyOverride);
+  }
+  if (!options?.skipFirestore && isFirebaseConfigured()) {
+    try {
+      const token = await resolveServerFirestoreToken();
+      if (token) {
+        const doc = await fetchFirestoreDocumentRest('config', 'appSettings', token);
+        if (doc?.integrations?.dispatchEmail) {
+          return normalizeDispatchEmailPolicy(doc.integrations.dispatchEmail);
+        }
+      }
+    } catch {
+      // Fallback to default policy
+    }
+  }
+  return normalizeDispatchEmailPolicy();
+}
+
 async function handleResendInboundEmailReceived(params: {
   webhookId: string;
   eventData: Record<string, any>;
@@ -446,6 +474,7 @@ async function handleResendInboundEmailReceived(params: {
   fetchFn: typeof fetch;
   nowMs: number;
   skipFirestore?: boolean;
+  emailPolicyOverride?: Partial<DispatchEmailPolicyConfig>;
 }): Promise<Response> {
   const {
     webhookId,
@@ -519,6 +548,36 @@ async function handleResendInboundEmailReceived(params: {
     parsedSender.email ||
     normalizeEmail(hydratedData.from_email) ||
     'unknown-sender@external.invalid';
+
+  const emailPolicy = await resolveServerDispatchEmailPolicy({
+    emailPolicyOverride: params.emailPolicyOverride,
+    skipFirestore,
+  });
+
+  if (isInboundEmailSenderBlocked(fromEmail, emailPolicy)) {
+    const blockedWebhook: EmailWebhookEventRecord = {
+      id: webhookId,
+      svixId: webhookId,
+      eventType: 'email.received',
+      resendEmailId: resendEmailId || undefined,
+      fromEmail,
+      toEmail: configuredMailbox,
+      outcome: 'ignored_blocked_sender',
+      processedAt: nowIso,
+    };
+    await persistDispatchEmailAndWebhook({
+      webhookRecord: blockedWebhook,
+      skipFirestore,
+    });
+    return Response.json({
+      success: true,
+      received: true,
+      ignored: true,
+      reason: 'blocked_sender',
+      fromEmail,
+    });
+  }
+
   const rawSubject = String(hydratedData.subject || '(No Subject)').trim() || '(No Subject)';
   const normalizedSubject = normalizeEmailSubject(rawSubject);
 
@@ -552,13 +611,16 @@ async function handleResendInboundEmailReceived(params: {
   );
   const replyTo = replyToList[0] || fromEmail;
 
-  const extracted = extractSuggestedBookingFromEmail({
+  const rawExtracted = extractSuggestedBookingFromEmail({
     subject: rawSubject,
     textBody,
     htmlBody: rawHtml,
     fromName: parsedSender.name,
     fromEmail,
   });
+  const extracted = emailPolicy.inboundParseToBookingDraft
+    ? rawExtracted
+    : { ...rawExtracted, suggestedBooking: undefined };
 
   // Correlate thread:
   // 1. RFC `In-Reply-To` / `References` match against stored `rfcMessageId` first
@@ -1238,6 +1300,7 @@ export async function handleEmailWebhookPost(
       fetchFn,
       nowMs,
       skipFirestore: options?.skipFirestore,
+      emailPolicyOverride: options?.emailPolicyOverride,
     });
   }
 

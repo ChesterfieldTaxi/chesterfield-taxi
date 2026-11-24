@@ -27,6 +27,7 @@ import {
   computeCorridorFareEstimates,
   getCorridorBySlug,
   getRelatedCorridors,
+  getResolvedCorridorBySlug,
   resolveCanonicalSiteOrigin,
   serializeJsonLdScriptPayload,
   type CorridorDirection,
@@ -34,8 +35,7 @@ import {
 import type { AppSettings, CompanyConfig } from '../core/types/config';
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const corridor = getCorridorBySlug(params.corridorSlug);
-  if (!corridor) {
+  if (!getCorridorBySlug(params.corridorSlug)) {
     throw new Response('Corridor Not Found', { status: 404, statusText: 'Not Found' });
   }
 
@@ -52,6 +52,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     settings = undefined;
   }
 
+  const corridor = getResolvedCorridorBySlug(params.corridorSlug, settings);
+  if (!corridor) {
+    throw new Response('Corridor Not Found', { status: 404, statusText: 'Not Found' });
+  }
+
   const company: CompanyConfig = settings?.company ?? {
     name: COMPANY_CONFIG.name,
     phone: COMPANY_CONFIG.phone.dispatch,
@@ -66,7 +71,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     settings,
   });
 
-  const relatedCorridors = getRelatedCorridors(corridor.slug, 3).map((rel) => {
+  const relatedCorridors = getRelatedCorridors(corridor.slug, 3, settings).map((rel) => {
     const relEst = computeCorridorFareEstimates({
       corridor: rel,
       direction: 'outbound',

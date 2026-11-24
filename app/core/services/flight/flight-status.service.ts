@@ -37,6 +37,8 @@ import type { Trip, TripAuditEvent } from '../../types/trip';
 import { authorizedFetch } from '../auth/auth-headers';
 import { getBookingService } from '../booking';
 import type { IBookingService } from '../booking-service';
+import { getAdminConfigService } from '../config/admin-config.service';
+import { normalizeFlightTrackingPolicy } from '../../types/config';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
 
@@ -559,13 +561,19 @@ export class FlightStatusService {
     snapshot?: FlightTelemetrySnapshot;
     error?: string;
   }> {
-    const eligibility = evaluateFlightCheckEligibility({
-      status: trip.status,
-      bookingType: trip.bookingType,
-      scheduledPickupTime: trip.scheduledPickupTime,
-      isStaffContext: true,
-      nowMs: options?.nowMs,
-    });
+    const flightPolicy = normalizeFlightTrackingPolicy(
+      getAdminConfigService().getCachedSettings().integrations?.flightTracking
+    );
+    const eligibility = evaluateFlightCheckEligibility(
+      {
+        status: trip.status,
+        bookingType: trip.bookingType,
+        scheduledPickupTime: trip.scheduledPickupTime,
+        isStaffContext: true,
+        nowMs: options?.nowMs,
+      },
+      flightPolicy.flightLookupWindowHours
+    );
     if (!eligibility.eligible) {
       return {
         success: false,
@@ -638,13 +646,19 @@ export class FlightStatusService {
       notifyDriverFn?: (driverId: string, payload: { title: string; body: string; url: string }) => Promise<void>;
     }
   ): Promise<SyncTripPickupResult> {
-    const eligibility = evaluateFlightCheckEligibility({
-      status: trip.status,
-      bookingType: trip.bookingType,
-      scheduledPickupTime: trip.scheduledPickupTime,
-      isStaffContext: true,
-      nowMs: options?.nowMs,
-    });
+    const flightPolicy = normalizeFlightTrackingPolicy(
+      getAdminConfigService().getCachedSettings().integrations?.flightTracking
+    );
+    const eligibility = evaluateFlightCheckEligibility(
+      {
+        status: trip.status,
+        bookingType: trip.bookingType,
+        scheduledPickupTime: trip.scheduledPickupTime,
+        isStaffContext: true,
+        nowMs: options?.nowMs,
+      },
+      flightPolicy.flightLookupWindowHours
+    );
     if (!eligibility.eligible) {
       return {
         success: false,

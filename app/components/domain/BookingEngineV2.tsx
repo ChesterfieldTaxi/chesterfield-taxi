@@ -7,6 +7,7 @@ import {
 } from '../../core/services/config/admin-config.service';
 import {
   DEFAULT_OVERSIZED_BAG_CATEGORIES,
+  resolveAllowedCustomerPaymentMethod,
   type AppSettings,
   type CustomerBookingConfig,
   type VehicleTierConfig,
@@ -688,19 +689,25 @@ export function BookingEngineV2({
     activeVehicleTiers,
   ]);
 
-  // Ensure selected payment method is allowed by admin configuration
+  // Ensure selected payment method is allowed by admin configuration (NEVER reset /app/corporate!)
   useEffect(() => {
-    if (
-      bookingConfig.acceptedPaymentMethods &&
-      bookingConfig.acceptedPaymentMethods.length > 0 &&
-      !bookingConfig.acceptedPaymentMethods.includes(form.paymentMethod)
-    ) {
+    const resolvedMethod = resolveAllowedCustomerPaymentMethod({
+      currentMethod: form.paymentMethod,
+      bookingConfig,
+      hasCorporatePortalContext: Boolean(corporatePortalContext),
+    });
+    if (resolvedMethod !== form.paymentMethod) {
       setForm((prev) => ({
         ...prev,
-        paymentMethod: bookingConfig.acceptedPaymentMethods[0] as CustomerBookingFormState['paymentMethod'],
+        paymentMethod: resolvedMethod,
       }));
     }
-  }, [bookingConfig.acceptedPaymentMethods, form.paymentMethod]);
+  }, [
+    corporatePortalContext,
+    bookingConfig.acceptedPaymentMethods,
+    bookingConfig.allowPublicCorporateCheckout,
+    form.paymentMethod,
+  ]);
 
   // Auto-upgrade return vehicle tier if return passengers, bags, car seats, or oversized cargo exceed capacity
   useEffect(() => {

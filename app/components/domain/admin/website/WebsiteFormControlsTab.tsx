@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import type { AppSettings, CustomerBookingConfig } from '../../../../core/types/config';
+import { Link } from 'react-router';
+import {
+  normalizeGuestSelfServicePolicy,
+  type AppSettings,
+  type CustomerBookingConfig,
+} from '../../../../core/types/config';
 import { DEFAULT_CUSTOMER_BOOKING_CONFIG } from '../../../../core/services/config/admin-config.service';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../ui/Card';
@@ -7,17 +12,8 @@ import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
 import { Badge } from '../../../ui/Badge';
 import { Alert } from '../../../ui/Alert';
-import {
-  CarIcon,
-  ClockIcon,
-  ShieldCheckIcon,
-  CheckIcon,
-  CreditCardIcon,
-  CashIcon,
-  BuildingIcon,
-  InfoIcon,
-  PlaneLandingIcon,
-} from '../../../ui/Icons';
+import { BuildingIcon, CarIcon, CashIcon, CheckIcon, ClockIcon, CreditCardIcon, InfoIcon, PlaneLandingIcon, ShieldCheckIcon } from '../../../ui/Icons';
+import { GuestSelfServicePolicyCard } from './GuestSelfServicePolicyCard';
 
 export interface WebsiteFormControlsTabProps {
   settings: AppSettings;
@@ -25,35 +21,49 @@ export interface WebsiteFormControlsTabProps {
   isLoading: boolean;
 }
 
-export function WebsiteFormControlsTab({
-  settings,
-  onSave,
-  isLoading,
-}: WebsiteFormControlsTabProps) {
-  const [formConfig, setFormConfig] = useState<CustomerBookingConfig>({
+export function WebsiteFormControlsTab({ settings, onSave, isLoading }: WebsiteFormControlsTabProps) {
+  const [formConfig, setFormConfig] = useState<CustomerBookingConfig>(() => ({
     ...DEFAULT_CUSTOMER_BOOKING_CONFIG,
     ...(settings.customerBookingConfig || {}),
-  });
+    allowPublicCorporateCheckout: Boolean(settings.customerBookingConfig?.allowPublicCorporateCheckout),
+    guestSelfServicePolicy: normalizeGuestSelfServicePolicy(
+      settings.customerBookingConfig?.guestSelfServicePolicy
+    ),
+  }));
 
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const displayPhone =
-    formConfig.multiVehicleCallPhone || COMPANY_CONFIG.phone.dispatch || '(314) 738-0100';
+  const displayPhone = formConfig.multiVehicleCallPhone || COMPANY_CONFIG.phone.dispatch || '(314) 738-0100';
   const displayEmail =
     formConfig.multiVehicleCallEmail || COMPANY_CONFIG.email.dispatch || 'dispatch@chesterfieldtaxi.com';
 
-  const togglePaymentMethod = (method: 'card' | 'cash' | 'account') => {
+  const toggleRetailPaymentMethod = (method: 'card' | 'cash') => {
     setFormConfig((prev) => {
-      const exists = prev.acceptedPaymentMethods.includes(method);
-      let updated: ('card' | 'cash' | 'account')[];
-      if (exists) {
-        if (prev.acceptedPaymentMethods.length <= 1) return prev;
-        updated = prev.acceptedPaymentMethods.filter((m) => m !== method);
-      } else {
-        updated = [...prev.acceptedPaymentMethods, method];
-      }
-      return { ...prev, acceptedPaymentMethods: updated };
+      const retailList = prev.acceptedPaymentMethods.filter(
+        (m): m is 'card' | 'cash' => m === 'card' || m === 'cash'
+      );
+      const exists = retailList.includes(method);
+      if (exists && retailList.length <= 1) return prev;
+      const nextRetail = exists ? retailList.filter((m) => m !== method) : [...retailList, method];
+      const nextMethods: Array<'card' | 'cash' | 'account'> = prev.allowPublicCorporateCheckout
+        ? [...nextRetail, 'account']
+        : nextRetail;
+      return { ...prev, acceptedPaymentMethods: nextMethods };
+    });
+  };
+
+  const handleTogglePublicCorporateGate = (enabled: boolean) => {
+    setFormConfig((prev) => {
+      const baseRetail = prev.acceptedPaymentMethods.filter(
+        (m): m is 'card' | 'cash' => m === 'card' || m === 'cash'
+      );
+      const safeRetail = baseRetail.length > 0 ? baseRetail : (['card', 'cash'] as const);
+      return {
+        ...prev,
+        allowPublicCorporateCheckout: enabled,
+        acceptedPaymentMethods: enabled ? [...safeRetail, 'account'] : [...safeRetail],
+      };
     });
   };
 
@@ -62,13 +72,8 @@ export function WebsiteFormControlsTab({
     try {
       setSaveSuccessMessage(null);
       setSaveError(null);
-
-      await onSave({
-        customerBookingConfig: formConfig,
-        updatedAt: new Date().toISOString(),
-      });
-
-      setSaveSuccessMessage('Client booking form configurations successfully published.');
+      await onSave({ customerBookingConfig: formConfig, updatedAt: new Date().toISOString() });
+      setSaveSuccessMessage('Booking form & /track self-service policies published.');
       setTimeout(() => setSaveSuccessMessage(null), 4000);
     } catch (err: any) {
       setSaveError(err.message || 'Failed to save client form settings.');
@@ -77,27 +82,25 @@ export function WebsiteFormControlsTab({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in duration-200">
-      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xs">
         <div className="min-w-0">
           <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
-            Online Booking Engine Rules
+            Online Booking &amp; Self-Service Governance
           </span>
           <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 mt-0.5">
-            Client Booking Form Controls &amp; Policies
+            Client Booking Form, Corporate Portal Gate &amp; /track Controls
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Govern client self-service capabilities, fleet selection limits, lead times, and airport flight tracking.
+            Configure retail checkout payment gates, group vehicle rules, scheduling lead windows, STL airport curbside instructions, and <code>/track</code> rider self-service.
           </p>
         </div>
-
         <Button
           type="submit"
           disabled={isLoading}
           className="w-full sm:w-auto justify-center shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-sm inline-flex items-center gap-2"
         >
           <CheckIcon className="w-4 h-4" />
-          <span>{isLoading ? 'Saving...' : 'Save Form Controls'}</span>
+          <span>{isLoading ? 'Saving...' : 'Save Form & /track Controls'}</span>
         </Button>
       </div>
 
@@ -106,7 +109,6 @@ export function WebsiteFormControlsTab({
           {saveSuccessMessage}
         </Alert>
       )}
-
       {saveError && (
         <Alert variant="error" className="animate-in fade-in text-xs">
           {saveError}
@@ -116,510 +118,280 @@ export function WebsiteFormControlsTab({
       {/* Card 1: Multi-Vehicle & Group Transport Policy */}
       <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
         <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 sm:gap-4">
-            <div className="min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+            <div>
               <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
                 <CarIcon className="w-5 h-5 text-blue-600 shrink-0" />
                 <span>Multi-Vehicle Dispatch &amp; Large Party Assistance</span>
               </CardTitle>
               <CardDescription className="text-xs text-slate-500 mt-0.5">
-                Configure client self-service vehicle addition or automatic routing to dispatch for group transport.
+                Configure client multi-car selection on <code>/book</code> or automatic group transport routing to Dispatch.
               </CardDescription>
             </div>
-            <Badge
-              variant={formConfig.allowMultiVehicle ? 'success' : 'default'}
-              size="sm"
-              className="font-bold text-[10px] self-start shrink-0"
-            >
+            <Badge variant={formConfig.allowMultiVehicle ? 'success' : 'default'} size="sm" className="font-bold text-[10px] self-start shrink-0">
               {formConfig.allowMultiVehicle ? 'Multi-Vehicle Allowed' : 'Dispatch Assistance Notice'}
             </Badge>
           </div>
         </CardHeader>
 
-        <CardContent className="p-4 sm:p-6 space-y-6">
-          <div className="flex items-start justify-between gap-3 p-4 rounded-xl border border-blue-200/80 bg-blue-50/30">
-            <div className="space-y-1 min-w-0">
+        <CardContent className="p-4 sm:p-6 space-y-4">
+          <div className="flex items-start justify-between gap-3 p-3.5 rounded-xl border border-blue-200/80 bg-blue-50/30">
+            <div className="space-y-0.5 min-w-0">
               <h4 className="text-xs font-extrabold text-slate-900">
                 Allow Clients to Select Multiple Vehicles on <code>/book</code>
               </h4>
               <p className="text-[11px] text-slate-600">
-                When enabled, riders see the <strong>&ldquo;+ Add Vehicle&rdquo;</strong> button to book multiple sedans/SUVs simultaneously in a single reservation. When disabled, clients see an advisory note to call or email dispatch.
+                Shows <strong>&ldquo;+ Add Vehicle&rdquo;</strong> when enabled, or displays an assistance callout with your dispatch contact info when disabled.
               </p>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
-              <input
-                type="checkbox"
-                checked={formConfig.allowMultiVehicle}
-                onChange={(e) =>
-                  setFormConfig((prev) => ({ ...prev, allowMultiVehicle: e.target.checked }))
-                }
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
-            </label>
+            <input
+              type="checkbox"
+              checked={formConfig.allowMultiVehicle}
+              onChange={(e) => setFormConfig((prev) => ({ ...prev, allowMultiVehicle: e.target.checked }))}
+              className="w-4 h-4 rounded text-blue-600 mt-1 shrink-0 cursor-pointer"
+            />
           </div>
 
           {formConfig.allowMultiVehicle ? (
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-3 animate-in fade-in">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-xs font-extrabold text-slate-900">
-                    Maximum Vehicles per Client Booking
-                  </h4>
-                  <p className="text-[11px] text-slate-500">
-                    Limits simultaneous fleet allocation per single checkout.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormConfig((prev) => ({
-                        ...prev,
-                        maxVehiclesAllowed: Math.max(2, prev.maxVehiclesAllowed - 1),
-                      }))
-                    }
-                    className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 flex items-center justify-center shadow-xs"
-                  >
-                    -
-                  </button>
-                  <span className="font-mono font-black text-slate-900 text-base w-6 text-center">
-                    {formConfig.maxVehiclesAllowed}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormConfig((prev) => ({
-                        ...prev,
-                        maxVehiclesAllowed: Math.min(10, prev.maxVehiclesAllowed + 1),
-                      }))
-                    }
-                    className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 flex items-center justify-center shadow-xs"
-                  >
-                    +
-                  </button>
-                </div>
+            <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50/60">
+              <div>
+                <h4 className="text-xs font-extrabold text-slate-900">Max Vehicles per Booking</h4>
+                <p className="text-[11px] text-slate-500">Limits simultaneous cars per checkout (2–10).</p>
               </div>
+              <input
+                type="number"
+                min={2}
+                max={10}
+                value={formConfig.maxVehiclesAllowed}
+                onChange={(e) =>
+                  setFormConfig((prev) => ({
+                    ...prev,
+                    maxVehiclesAllowed: Math.min(10, Math.max(2, Number(e.target.value) || 3)),
+                  }))
+                }
+                className="w-20 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-mono font-bold bg-white text-center"
+              />
             </div>
           ) : (
-            <div className="space-y-4 animate-in fade-in">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Dispatch Phone for Assistance
-                  </label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Dispatch Assistance Phone</label>
                   <Input
                     value={formConfig.multiVehicleCallPhone || ''}
-                    onChange={(e) =>
-                      setFormConfig((prev) => ({
-                        ...prev,
-                        multiVehicleCallPhone: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setFormConfig((prev) => ({ ...prev, multiVehicleCallPhone: e.target.value }))}
                     placeholder={COMPANY_CONFIG.phone.dispatch}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Dispatch Email for Assistance
-                  </label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Dispatch Assistance Email</label>
                   <Input
                     value={formConfig.multiVehicleCallEmail || ''}
-                    onChange={(e) =>
-                      setFormConfig((prev) => ({
-                        ...prev,
-                        multiVehicleCallEmail: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setFormConfig((prev) => ({ ...prev, multiVehicleCallEmail: e.target.value }))}
                     placeholder={COMPANY_CONFIG.email.dispatch}
                   />
                 </div>
               </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Custom Assistance Note (Optional Override)
-                </label>
-                <textarea
-                  rows={2}
-                  value={formConfig.multiVehicleCustomNote || ''}
-                  onChange={(e) =>
-                    setFormConfig((prev) => ({
-                      ...prev,
-                      multiVehicleCustomNote: e.target.value,
-                    }))
-                  }
-                  placeholder="Need more than 1 vehicle? Call or email dispatch for group discounts and coordinated multi-vehicle arrivals."
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block mb-1">
-                  Live Client Notice Preview (Rendered on <code>/book</code>)
-                </span>
-                <div className="flex items-start gap-2.5 text-xs text-amber-900">
-                  <InfoIcon className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <div className="min-w-0">
-                    <p className="font-semibold break-words">
-                      {formConfig.multiVehicleCustomNote || (
-                        <>
-                          Need more than 1 vehicle? For group travel or multi-car bookings, please call our 24/7 dispatch at{' '}
-                          <strong className="underline">{displayPhone}</strong> or email{' '}
-                          <strong className="underline break-all">{displayEmail}</strong>.
-                        </>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <textarea
+                rows={2}
+                value={formConfig.multiVehicleCustomNote || ''}
+                onChange={(e) => setFormConfig((prev) => ({ ...prev, multiVehicleCustomNote: e.target.value }))}
+                placeholder={`Need more than 1 vehicle? Call ${displayPhone} or email ${displayEmail} for coordinated multi-car dispatch.`}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Card 2: Scheduling Windows & Airport Rules */}
+      {/* Card 2: Scheduling Windows & STL Lambert Airport Rules */}
       <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
         <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5">
           <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
             <ClockIcon className="w-5 h-5 text-amber-600 shrink-0" />
-            <span>Scheduling Windows, Lead Times &amp; Flight Tracking</span>
+            <span>Scheduling Windows &amp; STL Airport Pickup Rules</span>
           </CardTitle>
           <CardDescription className="text-xs text-slate-500">
-            Operational boundaries for immediate ASAP requests, scheduled advance pickups, and airport delay grace periods.
+            Operational lead times, ASAP radius, flight number requirement, and STL Lambert curbside guidance.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-4 sm:p-6 space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <label className="text-xs font-bold text-slate-800 block mb-1">
-                Allow On-Demand ASAP Rides
-              </label>
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[11px] text-slate-500">Immediate pickup option</span>
-                <input
-                  type="checkbox"
-                  checked={formConfig.allowImmediateAsap}
-                  onChange={(e) =>
-                    setFormConfig((prev) => ({ ...prev, allowImmediateAsap: e.target.checked }))
-                  }
-                  className="w-4 h-4 rounded text-blue-600 shrink-0"
-                />
+        <CardContent className="p-4 sm:p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2">
+              <div>
+                <span className="text-xs font-bold text-slate-800 block">Allow ASAP Rides</span>
+                <span className="text-[10px] text-slate-500">On-demand pickup</span>
               </div>
+              <input type="checkbox" checked={formConfig.allowImmediateAsap} onChange={(e) => setFormConfig((prev) => ({ ...prev, allowImmediateAsap: e.target.checked }))} className="w-4 h-4 rounded text-blue-600 shrink-0 cursor-pointer" />
             </div>
-
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <label className="text-xs font-bold text-slate-800 block mb-1">
-                Min Advance Notice (Minutes)
-              </label>
-              <input
-                type="number"
-                min="15"
-                max="1440"
-                step="15"
-                value={formConfig.minAdvanceNoticeMinutes}
-                onChange={(e) =>
-                  setFormConfig((prev) => ({
-                    ...prev,
-                    minAdvanceNoticeMinutes: Number(e.target.value),
-                  }))
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white"
-              />
-              <span className="text-[10px] text-slate-400 mt-1 block">Lead time for scheduled trips</span>
+              <label className="text-xs font-bold text-slate-800 block mb-1">Min Advance Notice (Mins)</label>
+              <input type="number" min={15} max={1440} step={15} value={formConfig.minAdvanceNoticeMinutes} onChange={(e) => setFormConfig((prev) => ({ ...prev, minAdvanceNoticeMinutes: Number(e.target.value) }))} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white" />
             </div>
-
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <label className="text-xs font-bold text-slate-800 block mb-1">
-                Max Advance Booking (Days)
-              </label>
-              <input
-                type="number"
-                min="7"
-                max="365"
-                value={formConfig.maxAdvanceBookingDays || 90}
-                onChange={(e) =>
-                  setFormConfig((prev) => ({
-                    ...prev,
-                    maxAdvanceBookingDays: Number(e.target.value),
-                  }))
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white"
-              />
-              <span className="text-[10px] text-slate-400 mt-1 block">Future calendar limit</span>
+              <label className="text-xs font-bold text-slate-800 block mb-1">Max Advance (Days)</label>
+              <input type="number" min={7} max={365} value={formConfig.maxAdvanceBookingDays || 90} onChange={(e) => setFormConfig((prev) => ({ ...prev, maxAdvanceBookingDays: Number(e.target.value) }))} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white" />
             </div>
-
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <label className="text-xs font-bold text-slate-800 block mb-1">
-                ASAP Search Radius (Miles)
-              </label>
-              <input
-                type="number"
-                min="5"
-                max="100"
-                value={formConfig.asapSearchRadiusMiles || 25}
-                onChange={(e) =>
-                  setFormConfig((prev) => ({
-                    ...prev,
-                    asapSearchRadiusMiles: Number(e.target.value),
-                  }))
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white"
-              />
-              <span className="text-[10px] text-slate-400 mt-1 block">Geographic limit for ASAP calls</span>
+              <label className="text-xs font-bold text-slate-800 block mb-1">ASAP Radius (Miles)</label>
+              <input type="number" min={5} max={100} value={formConfig.asapSearchRadiusMiles || 25} onChange={(e) => setFormConfig((prev) => ({ ...prev, asapSearchRadiusMiles: Number(e.target.value) }))} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white" />
             </div>
           </div>
 
-        </CardContent>
-      </Card>
-
-      {/* Card 3: STL Lambert Airport Rules & Curbside Description */}
-      <Card variant="elevated" className="border-blue-200 bg-white shadow-xs">
-        <CardHeader className="border-b border-blue-100 bg-blue-50/50 p-4 sm:p-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <CardTitle className="text-base font-extrabold text-blue-950 flex items-center gap-2">
-              <PlaneLandingIcon className="w-5 h-5 text-blue-600 shrink-0" />
-              <span>STL Lambert Airport Rules &amp; Curbside Pickup Description</span>
-            </CardTitle>
-            <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full uppercase tracking-wider self-start sm:self-auto shrink-0">
-              Airport Automation
-            </span>
-          </div>
-          <CardDescription className="text-xs text-blue-800/80">
-            Configure automated flight tracking, complimentary grace windows, terminal pickup meet points, and client confirmation email instructions.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-6 space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-              <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-bold text-slate-800">Require Flight # for Airports</label>
-                <input
-                  type="checkbox"
-                  checked={formConfig.requireFlightNumberForAirport}
-                  onChange={(e) =>
-                    setFormConfig((prev) => ({
-                      ...prev,
-                      requireFlightNumberForAirport: e.target.checked,
-                    }))
-                  }
-                  className="w-4 h-4 rounded text-blue-600 shrink-0"
-                />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2">
+              <div>
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                  <PlaneLandingIcon className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Require Flight #</span>
+                </span>
+                <span className="text-[10px] text-slate-500">STL &amp; SUS pickups</span>
               </div>
-              <span className="text-[10px] text-slate-500 block mt-1">STL Lambert &amp; Spirit transfers</span>
+              <input type="checkbox" checked={formConfig.requireFlightNumberForAirport} onChange={(e) => setFormConfig((prev) => ({ ...prev, requireFlightNumberForAirport: e.target.checked }))} className="w-4 h-4 rounded text-blue-600 shrink-0 cursor-pointer" />
             </div>
-
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-              <label className="text-xs font-bold text-slate-800 block mb-1">
-                Airport Meet &amp; Greet Preference
-              </label>
-              <select
-                value={formConfig.airportMeetAndGreetOptions || 'curbside'}
-                onChange={(e) =>
-                  setFormConfig((prev) => ({
-                    ...prev,
-                    airportMeetAndGreetOptions: e.target.value as any,
-                  }))
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white"
-              >
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <label className="text-xs font-bold text-slate-800 block mb-1">Meet &amp; Greet Mode</label>
+              <select value={formConfig.airportMeetAndGreetOptions || 'curbside'} onChange={(e) => setFormConfig((prev) => ({ ...prev, airportMeetAndGreetOptions: e.target.value as any }))} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white">
                 <option value="curbside">Curbside Pickup Only</option>
-                <option value="baggage_claim">Baggage Claim Inside Escort</option>
-                <option value="both">Client Choice at Booking</option>
+                <option value="baggage_claim">Baggage Claim Escort</option>
+                <option value="both">Client Choice</option>
               </select>
             </div>
-
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-              <label className="text-xs font-bold text-slate-800 block mb-1">
-                Flight Delay Grace Period (Mins)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="120"
-                step="5"
-                value={formConfig.flightDelayGraceMinutes || 45}
-                onChange={(e) =>
-                  setFormConfig((prev) => ({
-                    ...prev,
-                    flightDelayGraceMinutes: Number(e.target.value),
-                  }))
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white"
-              />
-              <span className="text-[10px] text-slate-400 block mt-0.5">Complimentary airport wait time</span>
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <label className="text-xs font-bold text-slate-800 block mb-1">Flight Delay Grace (Mins)</label>
+              <input type="number" min={0} max={120} step={5} value={formConfig.flightDelayGraceMinutes || 45} onChange={(e) => setFormConfig((prev) => ({ ...prev, flightDelayGraceMinutes: Number(e.target.value) }))} className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white" />
             </div>
           </div>
 
-          {/* Lambert Airport Pickup Location Description */}
-          <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-              <label className="text-xs font-bold text-blue-950 block">
-                STL Lambert Airport Pickup Location Description (Curbside &amp; Baggage Claim)
-              </label>
-              <span className="text-[10px] text-blue-700 font-bold bg-white px-2.5 py-0.5 rounded border border-blue-200 shadow-2xs self-start sm:self-auto shrink-0">
-                Email &amp; Confirmation Notice
-              </span>
-            </div>
-            <p className="text-[11px] text-blue-900 leading-relaxed font-medium">
-              Curbside doors, terminal baggage claim instructions, or driver meetup points shown to passengers on the confirmation screen and emails when pickup is STL Lambert Airport.
-            </p>
+          <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl space-y-1.5">
+            <label className="text-xs font-bold text-blue-950 block">
+              STL Lambert Airport Pickup Instructions (Confirmation Screen &amp; Emails)
+            </label>
             <textarea
-              rows={3}
-              value={formConfig.lambertPickupInstructions ?? 'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time.'}
-              onChange={(e) =>
-                setFormConfig((prev) => ({
-                  ...prev,
-                  lambertPickupInstructions: e.target.value,
-                }))
-              }
-              placeholder="e.g. Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2..."
-              className="w-full px-3 py-2 border border-blue-200 rounded-lg text-xs text-slate-900 leading-relaxed bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+              rows={2}
+              value={formConfig.lambertPickupInstructions ?? ''}
+              onChange={(e) => setFormConfig((prev) => ({ ...prev, lambertPickupInstructions: e.target.value }))}
+              className="w-full px-3 py-2 border border-blue-200 rounded-lg text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Card 3: Equipment, Child Seats & Cancellation Penalties */}
+      {/* Card 3: Retail Payment Methods & Corporate Portal Gate */}
       <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
         <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5">
           <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
             <ShieldCheckIcon className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>Child Seats, Round Trips &amp; Payment Options</span>
+            <span>Equipment, Retail Payment Options &amp; Corporate Portal Gate</span>
           </CardTitle>
           <CardDescription className="text-xs text-slate-500">
-            Child seat options, round-trip bookings, and accepted payment methods.
+            Child safety seats, round-trip toggles, retail checkout methods, and B2B Corporate Portal enforcement.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-4 sm:p-6 space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-bold text-slate-800">Child Safety Seats</label>
-                <input
-                  type="checkbox"
-                  checked={formConfig.allowChildSafetySeats}
-                  onChange={(e) =>
-                    setFormConfig((prev) => ({
-                      ...prev,
-                      allowChildSafetySeats: e.target.checked,
-                    }))
-                  }
-                  className="w-4 h-4 rounded text-blue-600 shrink-0"
-                />
-              </div>
-              {formConfig.allowChildSafetySeats && (
-                <p className="mt-2 pt-2 border-t border-slate-200 text-[10px] text-slate-500">
-                  Per-seat fee is managed in{' '}
-                  <a href="/app/admin?tab=rates&sub=extras" className="text-blue-600 font-semibold hover:underline">
-                    Rates &amp; Pricing → Extras
-                  </a>.
-                </p>
-              )}
+        <CardContent className="p-4 sm:p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-800">Child Safety Seats</span>
+              <input
+                type="checkbox"
+                checked={formConfig.allowChildSafetySeats}
+                onChange={(e) => setFormConfig((prev) => ({ ...prev, allowChildSafetySeats: e.target.checked }))}
+                className="w-4 h-4 rounded text-blue-600 shrink-0 cursor-pointer"
+              />
             </div>
-
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-bold text-slate-800">Round Trip Booking</label>
-                <input
-                  type="checkbox"
-                  checked={formConfig.allowRoundTrip}
-                  onChange={(e) =>
-                    setFormConfig((prev) => ({
-                      ...prev,
-                      allowRoundTrip: e.target.checked,
-                    }))
-                  }
-                  className="w-4 h-4 rounded text-blue-600 shrink-0"
-                />
-              </div>
-              {formConfig.allowRoundTrip && (
-                <p className="mt-2 pt-2 border-t border-slate-200 text-[10px] text-slate-500">
-                  Shows the return-trip toggle on <code>/book</code>.
-                </p>
-              )}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-800">Round Trip Booking</span>
+              <input
+                type="checkbox"
+                checked={formConfig.allowRoundTrip}
+                onChange={(e) => setFormConfig((prev) => ({ ...prev, allowRoundTrip: e.target.checked }))}
+                className="w-4 h-4 rounded text-blue-600 shrink-0 cursor-pointer"
+              />
             </div>
-
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <label className="text-xs font-bold text-slate-800 block mb-1">
-                No-Show &amp; Cancellation Policy
-              </label>
-              <p className="text-[11px] text-slate-500 leading-snug">
-                Managed per rate in{' '}
-                <a href="/app/admin?tab=rates&sub=rates" className="text-blue-600 font-semibold hover:underline">
-                  Rates &amp; Pricing → Rates
-                </a>.
-              </p>
-            </div>
-
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <label className="text-xs font-bold text-slate-800 block mb-1">
-                Card Pre-Auth Threshold ($)
-              </label>
+              <label className="text-xs font-bold text-slate-800 block mb-1">Card Pre-Auth Threshold ($)</label>
               <input
                 type="number"
-                min="0"
-                step="10"
+                min={0}
+                step={10}
                 value={formConfig.cardPreAuthThresholdAmount || 100}
-                onChange={(e) =>
-                  setFormConfig((prev) => ({
-                    ...prev,
-                    cardPreAuthThresholdAmount: Number(e.target.value),
-                  }))
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold bg-white"
+                onChange={(e) => setFormConfig((prev) => ({ ...prev, cardPreAuthThresholdAmount: Number(e.target.value) }))}
+                className="w-full px-2.5 py-1 border border-slate-200 rounded-lg text-xs font-bold bg-white"
               />
-              <span className="text-[10px] text-slate-400 mt-1 block">Fares above require card on file</span>
             </div>
           </div>
 
-          <div className="p-4 bg-slate-50/80 border border-slate-200 rounded-xl">
-            <span className="text-xs font-bold text-slate-800 block mb-2">
-              Accepted Client Payment Methods:
+          <div className="p-3.5 bg-slate-50/80 border border-slate-200 rounded-xl space-y-2">
+            <span className="text-xs font-bold text-slate-800 block">
+              Retail Checkout Payment Methods (<code>/book</code> &amp; <code>/app/passenger</code>):
             </span>
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formConfig.acceptedPaymentMethods.includes('card')}
-                  onChange={() => togglePaymentMethod('card')}
+                  onChange={() => toggleRetailPaymentMethod('card')}
                   className="w-4 h-4 rounded text-blue-600 shrink-0"
                 />
                 <CreditCardIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                <span>Credit / Debit Card (Online)</span>
+                <span>Credit / Debit Card</span>
               </label>
               <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formConfig.acceptedPaymentMethods.includes('cash')}
-                  onChange={() => togglePaymentMethod('cash')}
+                  onChange={() => toggleRetailPaymentMethod('cash')}
                   className="w-4 h-4 rounded text-blue-600 shrink-0"
                 />
                 <CashIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span>Pay Driver in Car (Cash or Card)</span>
-              </label>
-              <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formConfig.acceptedPaymentMethods.includes('account')}
-                  onChange={() => togglePaymentMethod('account')}
-                  className="w-4 h-4 rounded text-blue-600 shrink-0"
-                />
-                <BuildingIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span>Corporate Account</span>
+                <span>Cash (Pay Driver in Car)</span>
               </label>
             </div>
           </div>
-        </CardContent>
 
-        <CardFooter className="border-t border-slate-100 bg-slate-50/50 p-4 flex justify-end">
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={isLoading}
-            className="w-full sm:w-auto justify-center text-xs font-bold"
-          >
-            {isLoading ? 'Saving Changes...' : 'Save Client Booking Form Controls'}
+          <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 flex items-start justify-between gap-3">
+            <div className="space-y-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+                  <BuildingIcon className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Allow Public Corporate Account Checkout on <code>/book</code></span>
+                </h4>
+                <Badge variant={formConfig.allowPublicCorporateCheckout ? 'warning' : 'success'} size="sm" className="text-[10px] font-bold">
+                  {formConfig.allowPublicCorporateCheckout ? 'Public Account Tab Enabled' : 'Gated to /app/corporate (Recommended)'}
+                </Badge>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Default <strong>OFF</strong>: self-service corporate rides authenticate through{' '}
+                <Link to="/app/corporate" className="font-bold text-indigo-700 underline">
+                  /app/corporate
+                </Link>{' '}
+                with locked PO &amp; credit governance, while internal operators on <code>/app/dispatch</code> always retain full <code>Account</code> billing.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={Boolean(formConfig.allowPublicCorporateCheckout)}
+              onChange={(e) => handleTogglePublicCorporateGate(e.target.checked)}
+              className="w-4 h-4 rounded text-indigo-600 mt-1 shrink-0 cursor-pointer"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Card 4: Guest /track Self-Service Policy Card */}
+      <GuestSelfServicePolicyCard
+        policy={formConfig.guestSelfServicePolicy}
+        onChange={(nextPolicy) => setFormConfig((prev) => ({ ...prev, guestSelfServicePolicy: nextPolicy }))}
+      />
+
+      <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
+        <CardFooter className="p-4 flex items-center justify-between gap-3 flex-wrap">
+          <span className="text-xs text-slate-500 flex items-center gap-1.5">
+            <InfoIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>Changes sync live to <code>config/publicSettings</code> for <code>/book</code> &amp; <code>/track</code>.</span>
+          </span>
+          <Button type="submit" variant="primary" disabled={isLoading} className="w-full sm:w-auto justify-center text-xs font-bold">
+            {isLoading ? 'Saving Changes...' : 'Save Form & /track Policies'}
           </Button>
         </CardFooter>
       </Card>

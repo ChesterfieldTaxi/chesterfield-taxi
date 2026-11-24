@@ -12,6 +12,7 @@ import {
   type DispatchEmailRecord,
   type EmailWebhookEventRecord,
 } from '../../types/dispatch-email';
+import type { DispatchEmailPolicyConfig } from '../../types/config';
 import type { VerifiedServerAuth } from '../auth/server-auth.server';
 import { normalizeEmail } from '../customer/contact.service';
 import { isFirebaseConfigured } from '../firebase';
@@ -88,6 +89,7 @@ export interface EmailHttpHandlerOptions {
   nowMs?: number;
   toleranceSeconds?: number;
   skipFirestore?: boolean;
+  emailPolicyOverride?: Partial<DispatchEmailPolicyConfig>;
 }
 
 export function makeEnvReader(envOverride?: Record<string, string | undefined>) {

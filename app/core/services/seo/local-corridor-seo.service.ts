@@ -12,7 +12,12 @@
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { detectAirportInAddresses } from '../../config/airports';
 import type { BookingEngineV2InitialValues } from '../../hooks/booking/useCustomerBookingSubmission';
-import type { AppSettings, CompanyConfig, VehicleTierConfig } from '../../types/config';
+import {
+  normalizeLocalSeoConfig,
+  type AppSettings,
+  type CompanyConfig,
+  type VehicleTierConfig,
+} from '../../types/config';
 import type { GeoPoint } from '../../types/trip';
 
 export type LocalSeoCorridorCategory = 'airport' | 'fbo' | 'corporate' | 'suburban';
@@ -560,11 +565,93 @@ export function getCorridorBySlug(slug?: string | null): LocalSeoCorridor | null
   return LOCAL_SEO_CORRIDORS.find((c) => c.slug === normalized) ?? null;
 }
 
-export function getRelatedCorridors(currentSlug: string, limit = 3): LocalSeoCorridor[] {
-  const safeLimit = Math.max(1, Math.min(LOCAL_SEO_CORRIDORS.length - 1, Math.trunc(limit) || 3));
+export type ResolvedLocalSeoCorridor = LocalSeoCorridor & {
+  enabled: boolean;
+  featured: boolean;
+  hasCustomOverrides: boolean;
+};
+
+/**
+ * Resolves all 8 local SEO corridors merged with Admin overrides (`settings.localSeoConfig`),
+ * excluding disabled corridors by default (`includeDisabled: false`) and ordering
+ * `featured` corridors ahead of standard corridors while preserving catalog order.
+ */
+export function getResolvedLocalSeoCorridors(
+  settings?: Partial<AppSettings>,
+  options?: { includeDisabled?: boolean }
+): ResolvedLocalSeoCorridor[] {
+  const seoCfg = normalizeLocalSeoConfig(settings?.localSeoConfig);
+  const includeDisabled = Boolean(options?.includeDisabled);
+
+  const merged: ResolvedLocalSeoCorridor[] = LOCAL_SEO_CORRIDORS.map((base) => {
+    const ov = seoCfg.corridorOverrides[base.slug];
+    const enabled = ov?.enabled !== false;
+    const featured = Boolean(ov?.featured);
+    const customHeroHeadline = ov?.customHeroHeadline?.trim();
+    const customHeroSubheadline = ov?.customHeroSubheadline?.trim();
+    const customMetaTitle = ov?.customMetaTitle?.trim();
+    const customMetaDescription = ov?.customMetaDescription?.trim();
+    const customFaqs =
+      Array.isArray(ov?.customFaqs) && ov.customFaqs.length > 0 ? ov.customFaqs : undefined;
+
+    const hasCustomOverrides = Boolean(
+      customHeroHeadline ||
+        customHeroSubheadline ||
+        customMetaTitle ||
+        customMetaDescription ||
+        customFaqs
+    );
+
+    return {
+      ...base,
+      heroHeadline: customHeroHeadline || base.heroHeadline,
+      heroSubheadline: customHeroSubheadline || base.heroSubheadline,
+      metaTitle: customMetaTitle || base.metaTitle,
+      metaDescription: customMetaDescription || base.metaDescription,
+      faqs: customFaqs || base.faqs,
+      enabled,
+      featured,
+      hasCustomOverrides,
+    };
+  });
+
+  const visible = includeDisabled ? merged : merged.filter((item) => item.enabled);
+  const featuredItems = visible.filter((item) => item.featured);
+  const regularItems = visible.filter((item) => !item.featured);
+  return [...featuredItems, ...regularItems];
+}
+
+/**
+ * Resolves a single enabled corridor by slug with Admin overrides applied.
+ * Returns `null` when unknown OR when `enabled === false` (so SSR routes return 404).
+ */
+export function getResolvedCorridorBySlug(
+  slug?: string | null,
+  settings?: Partial<AppSettings>
+): (LocalSeoCorridor & { featured: boolean }) | null {
+  if (!slug || typeof slug !== 'string') return null;
+  const normalized = slug.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const found = getResolvedLocalSeoCorridors(settings, { includeDisabled: false }).find(
+    (c) => c.slug === normalized
+  );
+  return found ?? null;
+}
+
+export function getRelatedCorridors(
+  currentSlug: string,
+  limit = 3,
+  settings?: Partial<AppSettings>
+): LocalSeoCorridor[] {
+  const pool = settings
+    ? getResolvedLocalSeoCorridors(settings, { includeDisabled: false })
+    : LOCAL_SEO_CORRIDORS;
+  const maxSafe = Math.max(1, pool.length - 1);
+  const safeLimit = Math.max(1, Math.min(maxSafe, Math.trunc(limit) || 3));
   const normalized = (currentSlug || '').trim().toLowerCase();
-  const current = getCorridorBySlug(normalized);
-  const others = LOCAL_SEO_CORRIDORS.filter((c) => c.slug !== normalized);
+  const current = pool.find((c) => c.slug === normalized) ?? getCorridorBySlug(normalized);
+  const others = pool.filter((c) => c.slug !== normalized);
 
   if (!current) {
     return others.slice(0, safeLimit);
@@ -1270,7 +1357,13 @@ const CORE_PUBLIC_SITEMAP_ROUTES: readonly SitemapRouteEntry[] = [
   { path: '/privacy', changefreq: 'yearly', priority: '0.4' },
 ] as const;
 
-export function generateSitemapXml(params: { origin: string; lastmodDate?: string }): string {
+export interface BuildSitemapXmlParams {
+  origin?: string;
+  lastmodDate?: string;
+  settings?: Partial<AppSettings>;
+}
+
+export function generateSitemapXml(params: BuildSitemapXmlParams): string {
   const cleanOrigin = stripTrailingSlash(params.origin || DEFAULT_CANONICAL_SITE_ORIGIN);
   const fallbackIsoDate = new Date().toISOString().slice(0, 10);
   const lastmod =
@@ -1278,10 +1371,14 @@ export function generateSitemapXml(params: { origin: string; lastmodDate?: strin
       ? params.lastmodDate.trim()
       : fallbackIsoDate;
 
-  const corridorEntries: SitemapRouteEntry[] = LOCAL_SEO_CORRIDORS.map((corridor) => ({
+  const activeCorridors = getResolvedLocalSeoCorridors(params.settings, {
+    includeDisabled: false,
+  });
+
+  const corridorEntries: SitemapRouteEntry[] = activeCorridors.map((corridor) => ({
     path: `/service-areas/${corridor.slug}`,
     changefreq: 'weekly',
-    priority: '0.85',
+    priority: corridor.featured ? '0.90' : '0.85',
   }));
 
   const allEntries: SitemapRouteEntry[] = [...CORE_PUBLIC_SITEMAP_ROUTES, ...corridorEntries];
@@ -1305,4 +1402,19 @@ export function generateSitemapXml(params: { origin: string; lastmodDate?: strin
     '</urlset>',
     '',
   ].join('\n');
+}
+
+export function buildSitemapXml(
+  paramsOrOrigin?: BuildSitemapXmlParams | string,
+  settingsArg?: Partial<AppSettings>,
+  lastmodDateArg?: string
+): string {
+  if (typeof paramsOrOrigin === 'string') {
+    return generateSitemapXml({
+      origin: paramsOrOrigin,
+      settings: settingsArg,
+      lastmodDate: lastmodDateArg,
+    });
+  }
+  return generateSitemapXml(paramsOrOrigin || {});
 }

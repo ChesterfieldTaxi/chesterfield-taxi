@@ -10,7 +10,11 @@
  * automated test suites.
  */
 
-import type { CustomerBookingConfig } from '../../types/config';
+import {
+  normalizeGuestSelfServicePolicy,
+  type CustomerBookingConfig,
+  type GuestSelfServicePolicyConfig,
+} from '../../types/config';
 import type {
   GeoPoint,
   Trip,
@@ -205,9 +209,26 @@ export function hasPendingGuestChangeRequest(
  * Pure eligibility evaluator determining what self-service actions a passenger may take on `/track`.
  */
 export function evaluateGuestManageEligibility(
-  trip: Pick<Trip, 'status' | 'assignedDriverId' | 'bookingType' | 'scheduledPickupTime'>
+  trip: Pick<Trip, 'status' | 'assignedDriverId' | 'bookingType' | 'scheduledPickupTime'>,
+  policy?: Partial<GuestSelfServicePolicyConfig> | null,
+  nowMs?: number
 ): GuestManageEligibility {
+  const cfg = normalizeGuestSelfServicePolicy(policy);
+  const resolvedNow = resolveNowMs(nowMs);
   const statusStr = String(trip.status || '');
+
+  // 0. Master policy kill-switch
+  if (!cfg.enableGuestSelfService) {
+    return {
+      canSelfManage: false,
+      canEditNotesFlight: false,
+      canModifyTimeRoute: false,
+      routeTimeMode: 'locked',
+      canCancel: false,
+      lockReason:
+        'Online self-service ride management is currently disabled. Please call dispatch directly for assistance.',
+    };
+  }
 
   // 1. Terminal / active-ride lock
   if (LOCKED_ACTIVE_OR_TERMINAL_STATUSES.has(statusStr)) {
@@ -227,8 +248,9 @@ export function evaluateGuestManageEligibility(
     };
   }
 
-  const canEditNotesFlight = INSTANT_NOTES_ALLOWED_STATUSES.has(statusStr);
-  const canCancel = INSTANT_NOTES_ALLOWED_STATUSES.has(statusStr);
+  const canEditNotesFlight =
+    cfg.allowGuestNotesAndFlightEdits && INSTANT_NOTES_ALLOWED_STATUSES.has(statusStr);
+  const canCancel = cfg.allowGuestCancellation && INSTANT_NOTES_ALLOWED_STATUSES.has(statusStr);
   const hasAssignedDriver = Boolean(trip.assignedDriverId);
 
   // 2. Driver already arrived at pickup curb -> lock time/route self-edits
@@ -244,8 +266,45 @@ export function evaluateGuestManageEligibility(
     };
   }
 
-  // 3. Pre-dispatch unassigned -> auto-apply time & route edits
+  // 3. Pre-dispatch unassigned -> auto-apply time & route edits (unless inside min lead window or disabled)
   if (!hasAssignedDriver && PRE_DISPATCH_AUTO_EDIT_STATUSES.has(statusStr)) {
+    if (!cfg.allowGuestPreDispatchRouteTimeEdits) {
+      return {
+        canSelfManage: canEditNotesFlight || canCancel,
+        canEditNotesFlight,
+        canModifyTimeRoute: false,
+        routeTimeMode: 'locked',
+        canCancel,
+        lockReason: 'Online schedule and address modifications are disabled. Please call dispatch.',
+      };
+    }
+
+    if (cfg.guestDirectEditMinLeadMinutes > 0 && trip.bookingType !== 'asap' && trip.scheduledPickupTime) {
+      const pickupMs = Date.parse(trip.scheduledPickupTime);
+      if (Number.isFinite(pickupMs)) {
+        const minutesUntilPickup = (pickupMs - resolvedNow) / 60_000;
+        if (minutesUntilPickup < cfg.guestDirectEditMinLeadMinutes) {
+          if (cfg.allowGuestAssignedChangeRequests) {
+            return {
+              canSelfManage: true,
+              canEditNotesFlight,
+              canModifyTimeRoute: true,
+              routeTimeMode: 'request_approval',
+              canCancel,
+            };
+          }
+          return {
+            canSelfManage: canEditNotesFlight || canCancel,
+            canEditNotesFlight,
+            canModifyTimeRoute: false,
+            routeTimeMode: 'locked',
+            canCancel,
+            lockReason: `Pickup is within ${cfg.guestDirectEditMinLeadMinutes} minutes. Please call dispatch directly to adjust time or route.`,
+          };
+        }
+      }
+    }
+
     return {
       canSelfManage: true,
       canEditNotesFlight,
@@ -257,6 +316,17 @@ export function evaluateGuestManageEligibility(
 
   // 4. Driver assigned (assigned / accepted / en_route, or assignedDriverId present pre-curb) -> request approval
   if (hasAssignedDriver || ASSIGNED_APPROVAL_EDIT_STATUSES.has(statusStr)) {
+    if (!cfg.allowGuestAssignedChangeRequests) {
+      return {
+        canSelfManage: canEditNotesFlight || canCancel,
+        canEditNotesFlight,
+        canModifyTimeRoute: false,
+        routeTimeMode: 'locked',
+        canCancel,
+        lockReason:
+          'Online route and schedule change requests after driver assignment are disabled. Please call dispatch.',
+      };
+    }
     return {
       canSelfManage: true,
       canEditNotesFlight,
@@ -281,10 +351,14 @@ export function evaluateGuestManageEligibility(
 export function evaluateGuestCancellationPolicy(params: {
   trip: Trip;
   bookingConfig?: Partial<CustomerBookingConfig>;
+  policy?: Partial<GuestSelfServicePolicyConfig> | null;
   nowMs?: number;
 }): GuestCancellationPolicyEvaluation {
   const { trip, bookingConfig } = params;
   const resolvedNow = resolveNowMs(params.nowMs);
+  const guestPolicy = normalizeGuestSelfServicePolicy(
+    params.policy ?? bookingConfig?.guestSelfServicePolicy
+  );
 
   const freeWindowMinutes =
     typeof bookingConfig?.freeCancellationWindowMinutes === 'number' &&
@@ -312,6 +386,20 @@ export function evaluateGuestCancellationPolicy(params: {
     if (Number.isFinite(pickupMs)) {
       minutesUntilPickup = Math.round((pickupMs - resolvedNow) / 60_000);
     }
+  }
+
+  // 0. Policy kill-switches for self-service / online cancellation
+  if (!guestPolicy.enableGuestSelfService || !guestPolicy.allowGuestCancellation) {
+    return {
+      canCancel: false,
+      isFreeCancellation: false,
+      minutesUntilPickup,
+      freeWindowMinutes,
+      cancellationFeeAmount: 0,
+      policyTier: 'locked_in_progress',
+      summaryText:
+        'Online cancellation is currently disabled by dispatch policy. Please call dispatch directly to cancel or reschedule.',
+    };
   }
 
   // 1. Terminal or active in-progress ride lock
@@ -563,6 +651,7 @@ export function applyInstantGuestDetailsUpdate(params: {
   gateCode?: string;
   airline?: string;
   flightNumber?: string;
+  policy?: Partial<GuestSelfServicePolicyConfig> | null;
   nowMs?: number;
 }): {
   updatedTrip: Trip;
@@ -574,7 +663,7 @@ export function applyInstantGuestDetailsUpdate(params: {
   const resolvedNow = resolveNowMs(params.nowMs);
   const nowIso = new Date(resolvedNow).toISOString();
 
-  const eligibility = evaluateGuestManageEligibility(trip);
+  const eligibility = evaluateGuestManageEligibility(trip, params.policy, resolvedNow);
   if (!eligibility.canEditNotesFlight) {
     throw new Error(
       eligibility.lockReason || 'Notes and flight details can no longer be edited on this trip.'

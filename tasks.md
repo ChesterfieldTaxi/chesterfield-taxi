@@ -1001,3 +1001,23 @@
   - [x] 61.4.1 Create `scripts/test-admin-automation-and-operators-phase61.ts` testing all normalizers, conflict guard config overrides, holiday skip calendar & standing defaults, `requireDriverUpdateAck` & `isDriverUpdateAckOverdue`, `SUB_PAGES.operators` resolution, monolith line ceilings, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
   - [x] 61.4.2 Pass `npm run typecheck`, `test-admin-automation-and-operators-phase61.ts`, `test-admin-clients-and-billing-phase60.ts`, `test-admin-ia-phase59.ts`, `test-standing-orders.ts`, `test-staged-driver-planner.ts`, and `npm run build` with `0` errors.
 
+## Phase 62 (Wave 5 Phase 4): `Website, Brand & SEO` Controls (Public Corporate Checkout Gate, Guest `/track` Self-Service & Local SEO Corridor Manager) + `Comms & Integrations` Decomposition & Controls
+- [x] 62.0 Baseline Commit & Documentation Sync:
+  - [x] 62.0.1 Commit verified Phase 61 changes cleanly on `main` (`feat(phase-61): dispatch & automation top-level hub, driver app policies, and operators monolith split`).
+  - [x] 62.0.2 Document Platform Phase 62 (Wave 5 Phase 4) across `spec.md`, `plan.md`, and `tasks.md`.
+- [x] 62.1 Schemas & Live Runtime Wiring (`Corporate Checkout Gate`, `/track` Self-Service, `Local SEO`, `Flights`, `Canned SMS` & `Dispatch Email`):
+  - [x] 62.1.1 Add `allowPublicCorporateCheckout` (default `false`), retail `['card', 'cash']` defaults, `resolveRetailAcceptedPaymentMethods`, and `/app/corporate` portal gate across `config.ts`, `admin-config.service.ts`, `BookingEngineV2.tsx`, `CustomerPaymentSection.tsx`, and `useCustomerBookingSubmission.ts`.
+  - [x] 62.1.2 Add `GuestSelfServicePolicyConfig` + `normalizeGuestSelfServicePolicy` and wire across `guest-manage-ride.ts`, `guest-manage-ride.server.ts`, `api.track.ts`, `public-settings.server.ts`, and `GuestManageRidePanel.tsx`.
+  - [x] 62.1.3 Add `LocalSeoAdminConfig` + `normalizeLocalSeoConfig` and wire `getResolvedLocalSeoCorridors`, `getResolvedCorridorBySlug`, and `buildSitemapXml` across `local-corridor-seo.service.ts`, `local-corridor-seo.server.ts`, `service-areas._index.tsx`, and `service-areas.$corridorSlug.tsx`.
+  - [x] 62.1.4 Add `FlightTrackingPolicyConfig`, `CannedSmsTemplatesConfig`, and `DispatchEmailPolicyConfig` (+ normalizers & `isInboundEmailSenderBlocked`) and wire across `airports.ts`, `flight-status.service.ts`, `flight-status.server.ts`, `comms-templates.service.ts`, `SmsThreadPane.tsx`, `dispatch-email.service.ts`, `dispatch-email-webhook.server.ts`, `EmailDock.tsx`, and `EmailComposerPane.tsx`.
+- [x] 62.2 `Website, Brand & SEO` Panels (`WebsiteFormControlsTab.tsx < 450`L & `WebsiteLocalSeoPanel.tsx < 450`L):
+  - [x] 62.2.1 Create `GuestSelfServicePolicyCard.tsx` (`< 350`L) and refactor `WebsiteFormControlsTab.tsx` (`< 450`L) with Corporate Portal Gate toggle and `/track` self-service controls.
+  - [x] 62.2.2 Create `WebsiteLocalSeoPanel.tsx` (`< 450`L) with 8-corridor manager, customize copy/FAQs editor, and crawlability/global SEO card; mount in `AdminWebsiteTab.tsx` (`< 360`L).
+- [x] 62.3 `Comms & Integrations` 5-Subtab Decomposition (`AdminIntegrationsSubpage.tsx < 300`L):
+  - [x] 62.3.1 Expand `SUB_PAGES.integrations` (`gateways`, `telephony`, `email`, `flights`, `webhooks`) in `admin-nav.util.ts` and update `test-admin-ia-phase59.ts`.
+  - [x] 62.3.2 Create `PaymentGatewaysPanel.tsx` (`< 420`L), `TelephonyAndSmsTemplatesPanel.tsx` (`< 440`L), `DispatchEmailConfigPanel.tsx` (`< 360`L), `FlightTrackingConfigPanel.tsx` (`< 380`L), and `WebhooksAndPushPanel.tsx` (`< 380`L) under `app/components/domain/admin/integrations/`, and slim `AdminIntegrationsSubpage.tsx` (`< 260`L).
+- [x] 62.4 Deterministic Verification Suite (`scripts/test-admin-website-and-integrations-phase62.ts`) & Full Build Gates:
+  - [x] 62.4.1 Create `scripts/test-admin-website-and-integrations-phase62.ts` covering all Phase 62 schemas, live evaluators, SEO/sitemap resolvers, flight/SMS/email policies, monolith line ceilings, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
+  - [x] 62.4.2 Pass `npm run typecheck`, `test-admin-website-and-integrations-phase62.ts`, `test-local-corridor-seo.ts`, `test-guest-manage-ride.ts`, `test-admin-automation-and-operators-phase61.ts`, `test-admin-ia-phase59.ts`, and `npm run build` with `0` errors.
+
+

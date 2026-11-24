@@ -6,20 +6,7 @@ import { WebsiteThemesTab } from './WebsiteThemesTab';
 import { WebsitePagesTab } from './WebsitePagesTab';
 import { WebsiteFormControlsTab } from './WebsiteFormControlsTab';
 import { WebsiteNavigationTab } from './WebsiteNavigationTab';
-import {
-  FileTextIcon,
-  PaletteIcon,
-  SlidersIcon,
-  LayersIcon,
-  CompassIcon,
-  SearchIcon,
-  CodeIcon,
-  SparklesIcon,
-  SettingsIcon,
-  ShieldCheckIcon,
-  HistoryIcon,
-  CarIcon,
-} from '../../../ui/Icons';
+import { WebsiteLocalSeoPanel } from './WebsiteLocalSeoPanel';
 
 export interface AdminWebsiteTabProps {
   settings: any;
@@ -36,20 +23,6 @@ export type WebsiteSubTab =
   | 'navigation'
   | 'seo'
   | 'css';
-
-const WEBSITE_SUB_TABS: Array<{
-  id: WebsiteSubTab;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-}> = [
-  { id: 'themes', label: 'Themes & Branding', icon: PaletteIcon },
-  { id: 'form', label: 'Booking & /track', icon: SlidersIcon },
-  { id: 'seo', label: 'Service Areas & SEO', icon: SearchIcon },
-  { id: 'pages', label: 'Pages', icon: FileTextIcon },
-  { id: 'layout', label: 'Page Sections', icon: LayersIcon },
-  { id: 'navigation', label: 'Header & Footer', icon: CompassIcon },
-  { id: 'css', label: 'Custom CSS', icon: CodeIcon },
-];
 
 export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
   settings,
@@ -78,20 +51,6 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
     { id: '7', type: 'ContactBar', isEnabled: true },
   ];
   const [layout, setLayout] = useState(defaultLayout);
-
-  // SEO State
-  const [seo, setSeo] = useState(
-    settings.cms?.seo || {
-      defaultMetaTitle: '',
-      defaultMetaDescription: '',
-      defaultOpenGraphImage: '',
-    }
-  );
-
-  // Scripts & CSS State
-  const [scripts, setScripts] = useState(
-    settings.cms?.scripts || { head: '', footer: '' }
-  );
   const [customCss, setCustomCss] = useState(settings.cms?.customCss || '');
 
   const handleDragEnd = (result: DropResult) => {
@@ -111,12 +70,10 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
     });
   };
 
-  const handleSaveSeo = async () => {
+  const handleSaveCustomCss = async () => {
     await onSave({
       cms: {
         ...settings.cms,
-        seo,
-        scripts,
         customCss,
       },
     });
@@ -150,7 +107,7 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
         />
       )}
 
-      {/* 3. FORM CONTROLS TAB */}
+      {/* 3. FORM CONTROLS & /TRACK SELF-SERVICE TAB */}
       {activeSubTab === 'form' && (
         <WebsiteFormControlsTab
           settings={settings}
@@ -263,93 +220,13 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
         />
       )}
 
-      {/* 6. SEO & SCRIPTS TAB */}
+      {/* 6. SERVICE AREAS, CORRIDORS & GLOBAL SEO TAB */}
       {activeSubTab === 'seo' && (
-        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-slate-200 space-y-5 sm:space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-slate-100 pb-4">
-            <div className="min-w-0">
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
-                Search Engine Optimization
-              </span>
-              <h2 className="text-base sm:text-lg font-extrabold text-slate-900 mt-0.5">
-                Global SEO &amp; Analytics Script Injector
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Manage global OpenGraph metadata, Google Tag Manager, Meta Pixel, and tracking tags.
-              </p>
-            </div>
-
-            <button
-              onClick={handleSaveSeo}
-              disabled={isLoading}
-              className="w-full sm:w-auto justify-center shrink-0 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm cursor-pointer"
-            >
-              {isLoading ? 'Saving...' : 'Save SEO & Scripts'}
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Default Meta Title
-              </label>
-              <input
-                type="text"
-                value={seo.defaultMetaTitle}
-                onChange={(e) => setSeo({ ...seo, defaultMetaTitle: e.target.value })}
-                className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                placeholder="Chesterfield Taxi & Car Service — 24/7 St. Louis Airport & Executive Travel"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Default Meta Description
-              </label>
-              <textarea
-                value={seo.defaultMetaDescription}
-                onChange={(e) =>
-                  setSeo({ ...seo, defaultMetaDescription: e.target.value })
-                }
-                rows={3}
-                className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
-                placeholder="Reliable 24-hour taxi and airport car service in Chesterfield, Ballwin, and West County..."
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Head Scripts (Google Tag Manager, Meta Pixel, Analytics)
-                </label>
-                <textarea
-                  value={scripts.head}
-                  onChange={(e) =>
-                    setScripts({ ...scripts, head: e.target.value })
-                  }
-                  rows={6}
-                  className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white font-mono"
-                  placeholder="<!-- <script async src='https://www.googletagmanager.com/gtag/js?id=G-XXXXX'></script> -->"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Footer Scripts (Chat Widgets, Conversion Tags)
-                </label>
-                <textarea
-                  value={scripts.footer}
-                  onChange={(e) =>
-                    setScripts({ ...scripts, footer: e.target.value })
-                  }
-                  rows={6}
-                  className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white font-mono"
-                  placeholder="<!-- Live Chat SDK or conversion trackers -->"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+        <WebsiteLocalSeoPanel
+          settings={settings}
+          onSave={onSave}
+          isLoading={isLoading}
+        />
       )}
 
       {/* 7. MONACO CSS EDITOR */}
@@ -369,7 +246,7 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
             </div>
 
             <button
-              onClick={handleSaveSeo}
+              onClick={handleSaveCustomCss}
               disabled={isLoading}
               className="w-full sm:w-auto shrink-0 bg-blue-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm cursor-pointer"
             >

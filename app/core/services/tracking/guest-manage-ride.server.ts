@@ -16,7 +16,11 @@
  */
 
 import { detectAirportInAddresses } from '../../config/airports';
-import type { CustomerBookingConfig } from '../../types/config';
+import {
+  normalizeGuestSelfServicePolicy,
+  type CustomerBookingConfig,
+  type GuestSelfServicePolicyConfig,
+} from '../../types/config';
 import type {
   GeoPoint,
   Trip,
@@ -451,6 +455,13 @@ async function resolveBookingConfig(
   return DEFAULT_APP_SETTINGS.customerBookingConfig || {};
 }
 
+export async function resolveGuestSelfServicePolicyServer(
+  options?: GuestManageRideServerOptions
+): Promise<GuestSelfServicePolicyConfig> {
+  const bookingConfig = await resolveBookingConfig(options);
+  return normalizeGuestSelfServicePolicy(bookingConfig?.guestSelfServicePolicy);
+}
+
 /**
  * Handles all `POST /api/track` requests carrying a self-service `body.intent`.
  */
@@ -540,13 +551,19 @@ export async function handleGuestManageRidePost(
 
   // 2. Write Intents (`update_notes_flight` | `modify_time_route` | `confirm_cancel`)
   const auth = await verifyServerRequestAuth(request);
+  const bookingConfig = await resolveBookingConfig(options);
+  const guestPolicy = normalizeGuestSelfServicePolicy(bookingConfig?.guestSelfServicePolicy);
 
   // Rate-limit per IP + trackingToken on unauthenticated write attempts
   if (
     !options?.skipRateLimitForTests &&
     !auth.isAdminSecret &&
     !auth.isDispatcher &&
-    !checkRateLimit(`track_manage_write:${clientIp}:${token}`, 8, 5 * 60_000)
+    !checkRateLimit(
+      `track_manage_write:${clientIp}:${token}`,
+      Math.max(3, guestPolicy.maxLookupAttemptsPer5Min),
+      5 * 60_000
+    )
   ) {
     return Response.json(
       {
@@ -555,6 +572,18 @@ export async function handleGuestManageRidePost(
         error: 'Too many modification attempts. Please wait 5 minutes or contact dispatch.',
       },
       { status: 429 }
+    );
+  }
+
+  if (!guestPolicy.enableGuestSelfService && !auth.isAdminSecret && !auth.isDispatcher) {
+    return Response.json(
+      {
+        success: false,
+        code: 'SELF_SERVICE_DISABLED',
+        error:
+          'Online self-service ride management is currently disabled. Please call dispatch directly.',
+      },
+      { status: 403 }
     );
   }
 
@@ -600,7 +629,7 @@ export async function handleGuestManageRidePost(
   // Intent A: `update_notes_flight` (Instant Notes, Gate Code & Flight #)
   // ───────────────────────────────────────────────────────────────────────────
   if (intent === 'update_notes_flight') {
-    const eligibility = evaluateGuestManageEligibility(trip);
+    const eligibility = evaluateGuestManageEligibility(trip, guestPolicy, options?.nowMs);
     if (!eligibility.canEditNotesFlight) {
       return Response.json(
         {
@@ -629,6 +658,7 @@ export async function handleGuestManageRidePost(
       gateCode,
       airline,
       flightNumber,
+      policy: guestPolicy,
       nowMs: options?.nowMs,
     });
 
@@ -655,7 +685,7 @@ export async function handleGuestManageRidePost(
   // Intent B: `modify_time_route` (Pre-Dispatch Auto-Apply vs Assigned Request)
   // ───────────────────────────────────────────────────────────────────────────
   if (intent === 'modify_time_route') {
-    const eligibility = evaluateGuestManageEligibility(trip);
+    const eligibility = evaluateGuestManageEligibility(trip, guestPolicy, options?.nowMs);
     if (!eligibility.canModifyTimeRoute || eligibility.routeTimeMode === 'locked') {
       return Response.json(
         {
@@ -961,10 +991,10 @@ export async function handleGuestManageRidePost(
   // ───────────────────────────────────────────────────────────────────────────
   // Intent C: `confirm_cancel` (Policy-Aware Cancellation)
   // ───────────────────────────────────────────────────────────────────────────
-  const bookingConfig = await resolveBookingConfig(options);
   const policy = evaluateGuestCancellationPolicy({
     trip,
     bookingConfig,
+    policy: guestPolicy,
     nowMs: options?.nowMs,
   });
 

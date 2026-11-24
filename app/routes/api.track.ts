@@ -22,6 +22,7 @@ import {
 } from '../core/services/auth/server-auth.server';
 import {
   handleGuestManageRidePost,
+  resolveGuestSelfServicePolicyServer,
   resolvePublicTrackingByTokenServer,
 } from '../core/services/tracking/guest-manage-ride.server';
 import {
@@ -153,8 +154,15 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-    // Strict brute-force protection: max 6 lookup attempts per 5 minutes per IP + Trip ID
-    if (!checkRateLimit(`track_verify:${clientIp}:${rawTripId}`, 6, 5 * 60_000)) {
+    // Strict brute-force protection: configurable lookup attempts per 5 minutes per IP + Trip ID
+    const guestPolicy = await resolveGuestSelfServicePolicyServer();
+    if (
+      !checkRateLimit(
+        `track_verify:${clientIp}:${rawTripId}`,
+        guestPolicy.maxLookupAttemptsPer5Min,
+        5 * 60_000
+      )
+    ) {
       return Response.json(
         {
           success: false,

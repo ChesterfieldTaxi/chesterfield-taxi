@@ -33,6 +33,8 @@ import {
   isTripCascadeActive,
 } from '../DispatchCascadeSlaBadges';
 import { evaluateTripSlaUrgency } from '../../../../core/services/dispatch/sla-monitor.service';
+import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
+import { normalizeFlightTrackingPolicy } from '../../../../core/types/config';
 import {
   evaluateFlightCheckEligibility,
   evaluateFlightPickupAlignment,
@@ -668,12 +670,18 @@ export function TripDrawerOverviewSection({
                   'DECLINED',
                   'declined',
                 ].includes(String(reviewTrip.status || ''));
-                const flightEligibility = evaluateFlightCheckEligibility({
-                  status: reviewTrip.status,
-                  bookingType: reviewTrip.bookingType,
-                  scheduledPickupTime: reviewTrip.scheduledPickupTime,
-                  isStaffContext: true,
-                });
+                const flightPolicy = normalizeFlightTrackingPolicy(
+                  getAdminConfigService().getCachedSettings().integrations?.flightTracking
+                );
+                const flightEligibility = evaluateFlightCheckEligibility(
+                  {
+                    status: reviewTrip.status,
+                    bookingType: reviewTrip.bookingType,
+                    scheduledPickupTime: reviewTrip.scheduledPickupTime,
+                    isStaffContext: true,
+                  },
+                  flightPolicy.flightLookupWindowHours
+                );
                 const unlockWindowLabel =
                   flightEligibility.unlocksAtIso &&
                   Number.isFinite(Date.parse(flightEligibility.unlocksAtIso))
@@ -688,6 +696,7 @@ export function TripDrawerOverviewSection({
                   creds.isAirportPickup && snap
                     ? evaluateFlightPickupAlignment(snap, reviewTrip.scheduledPickupTime, {
                         hasCheckedLuggage,
+                        delayThresholdMinutes: flightPolicy.delayAlertThresholdMinutes,
                       })
                     : null;
                 const etaPlan =

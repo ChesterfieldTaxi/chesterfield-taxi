@@ -16,10 +16,10 @@ import { Card } from '../components/ui/Card';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { loadPublicSettingsForServer } from '../core/services/config/public-settings.server';
 import {
-  LOCAL_SEO_CORRIDORS,
   buildBreadcrumbListJsonLd,
   buildTaxiServiceJsonLd,
   computeCorridorFareEstimates,
+  getResolvedLocalSeoCorridors,
   resolveCanonicalSiteOrigin,
   serializeJsonLdScriptPayload,
   type LocalSeoCorridorCategory,
@@ -49,7 +49,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
     address: COMPANY_CONFIG.address.formatted,
   };
 
-  const corridorSummaries = LOCAL_SEO_CORRIDORS.map((corridor) => {
+  const activeCorridors = getResolvedLocalSeoCorridors(settings, { includeDisabled: false });
+
+  const corridorSummaries = activeCorridors.map((corridor) => {
     const estimates = computeCorridorFareEstimates({
       corridor,
       direction: 'outbound',
@@ -259,12 +261,20 @@ export default function ServiceAreasHubRoute() {
                 <div className="space-y-4">
                   {/* Top Badge + Live Starting Fare */}
                   <div className="flex items-start justify-between gap-3">
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full border ${badge.className}`}
-                    >
-                      {badge.icon}
-                      <span>{badge.label}</span>
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full border ${badge.className}`}
+                      >
+                        {badge.icon}
+                        <span>{badge.label}</span>
+                      </span>
+                      {corridor.featured && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                          <SparklesIcon className="w-3 h-3 text-amber-600" />
+                          <span>Featured</span>
+                        </span>
+                      )}
+                    </div>
                     <div className="text-right shrink-0">
                       <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
                         Upfront From

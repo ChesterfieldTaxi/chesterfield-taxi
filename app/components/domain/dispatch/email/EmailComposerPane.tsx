@@ -4,12 +4,15 @@ import {
   normalizeEmail,
   type ContactRecord,
 } from '../../../../core/services/customer/contact.service';
+import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
 import {
   CANNED_DISPATCH_EMAIL_TEMPLATES,
+  appendOutboundEmailSignature,
   buildTripTrackingUrl,
   formatDispatchEmailTimestamp,
   getDispatchEmailService,
   interpolateDispatchEmailTemplate,
+  normalizeDispatchEmailPolicy,
   type CannedDispatchTemplateId,
   type DispatchEmailDraft,
   type DispatchEmailTemplateContext,
@@ -294,13 +297,16 @@ export function EmailComposerPane({
 
       const ctx = buildTemplateInterpolationContext(resolvedPayUrl);
       const rendered = interpolateDispatchEmailTemplate(tpl, ctx);
+      const emailPolicy = normalizeDispatchEmailPolicy(
+        getAdminConfigService().getCachedSettings().integrations?.dispatchEmail
+      );
 
       const isReplyMode =
         initialDraft.mode === 'reply' || initialDraft.mode === 'reply_all';
       if (!isReplyMode || !subject.trim()) {
         setSubject(rendered.subject);
       }
-      setBodyText(rendered.bodyText);
+      setBodyText(appendOutboundEmailSignature(rendered.bodyText, emailPolicy.outboundSignature));
       setSelectedTemplateId('');
       textareaRef.current?.focus();
     },

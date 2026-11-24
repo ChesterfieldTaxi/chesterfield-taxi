@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
 import { getFirebaseAuth, isFirebaseConfigured } from '../../../core/services/firebase';
 import {
   evaluateGuestManageEligibility,
@@ -7,6 +8,11 @@ import {
   type GuestCancellationPolicyEvaluation,
   type GuestRouteTimeMode,
 } from '../../../core/services/tracking/guest-manage-ride';
+import {
+  DEFAULT_GUEST_SELF_SERVICE_POLICY,
+  normalizeGuestSelfServicePolicy,
+  type GuestSelfServicePolicyConfig,
+} from '../../../core/types/config';
 import type { GeoPoint, Trip } from '../../../core/types/trip';
 import {
   extractPhoneLast4,
@@ -33,6 +39,7 @@ export interface GuestManageRidePanelProps {
   trackingToken: string;
   trip: Trip | null;
   publicTracking: PublicTripTrackingProjection | null;
+  policyOverride?: Partial<GuestSelfServicePolicyConfig>;
   initialPhoneLast4?: string;
   isAuthenticatedOwner?: boolean;
   onTrackingUpdated: (nextTracking: PublicTripTrackingProjection) => void;
@@ -73,6 +80,7 @@ export function GuestManageRidePanel({
   trackingToken,
   trip,
   publicTracking,
+  policyOverride,
   initialPhoneLast4 = '',
   isAuthenticatedOwner = false,
   onTrackingUpdated,
@@ -80,10 +88,29 @@ export function GuestManageRidePanel({
 }: GuestManageRidePanelProps) {
   const effectiveToken = (trackingToken || trip?.trackingToken || publicTracking?.trackingToken || '').trim();
 
+  const [liveGuestPolicy, setLiveGuestPolicy] = useState<GuestSelfServicePolicyConfig>(
+    DEFAULT_GUEST_SELF_SERVICE_POLICY
+  );
+
+  useEffect(() => {
+    const svc = getAdminConfigService();
+    const unsub = svc.subscribeToSettings((s) => {
+      setLiveGuestPolicy(
+        normalizeGuestSelfServicePolicy(s.customerBookingConfig?.guestSelfServicePolicy)
+      );
+    });
+    return () => unsub();
+  }, []);
+
+  const resolvedPolicy = useMemo(
+    () => normalizeGuestSelfServicePolicy(policyOverride ?? liveGuestPolicy),
+    [policyOverride, liveGuestPolicy]
+  );
+
   // Derive zero-PII eligibility & change summary across both Guest (`publicTracking`) and Owner (`trip`) views
   const eligibility = useMemo(() => {
     if (trip) {
-      return evaluateGuestManageEligibility(trip);
+      return evaluateGuestManageEligibility(trip, resolvedPolicy);
     }
     if (publicTracking) {
       const inferredAssigned =
@@ -92,19 +119,27 @@ export function GuestManageRidePanel({
         ['assigned', 'accepted', 'en_route', 'arrived', 'in_progress'].includes(
           String(publicTracking.status || '')
         );
-      const base = evaluateGuestManageEligibility({
-        status: publicTracking.status,
-        assignedDriverId: inferredAssigned ? 'assigned' : null,
-        bookingType: publicTracking.bookingType,
-        scheduledPickupTime: publicTracking.scheduledPickupTime,
-      });
+      const base = evaluateGuestManageEligibility(
+        {
+          status: publicTracking.status,
+          assignedDriverId: inferredAssigned ? 'assigned' : null,
+          bookingType: publicTracking.bookingType,
+          scheduledPickupTime: publicTracking.scheduledPickupTime,
+        },
+        resolvedPolicy
+      );
+      const canSelfManage =
+        base.canSelfManage && publicTracking.canSelfManage !== false;
+      const routeTimeMode: GuestRouteTimeMode = !base.canModifyTimeRoute
+        ? 'locked'
+        : base.routeTimeMode === 'request_approval' ||
+          publicTracking.routeTimeMode === 'request_approval'
+        ? 'request_approval'
+        : base.routeTimeMode;
       return {
         ...base,
-        canSelfManage:
-          typeof publicTracking.canSelfManage === 'boolean'
-            ? publicTracking.canSelfManage
-            : base.canSelfManage,
-        routeTimeMode: (publicTracking.routeTimeMode || base.routeTimeMode) as GuestRouteTimeMode,
+        canSelfManage,
+        routeTimeMode,
       };
     }
     return {
@@ -114,7 +149,7 @@ export function GuestManageRidePanel({
       routeTimeMode: 'locked' as GuestRouteTimeMode,
       canCancel: false,
     };
-  }, [trip, publicTracking]);
+  }, [trip, publicTracking, resolvedPolicy]);
 
   const pendingChangeSummary: PublicPendingGuestChangeSummary | null = useMemo(() => {
     if (trip) {
@@ -134,7 +169,21 @@ export function GuestManageRidePanel({
     return publicTracking?.pendingGuestChangeSummary ?? null;
   }, [trip, publicTracking]);
 
+  const availableTabs = useMemo((): ManageTabKey[] => {
+    const out: ManageTabKey[] = [];
+    if (eligibility.canEditNotesFlight) out.push('notes_flight');
+    if (eligibility.canModifyTimeRoute) out.push('time_route');
+    if (eligibility.canCancel) out.push('cancel');
+    return out;
+  }, [eligibility.canEditNotesFlight, eligibility.canModifyTimeRoute, eligibility.canCancel]);
+
   const [activeTab, setActiveTab] = useState<ManageTabKey | null>('notes_flight');
+
+  useEffect(() => {
+    if (activeTab && !availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0] ?? null);
+    }
+  }, [activeTab, availableTabs]);
 
   // Cached 4-digit phone verification for guest session
   const [phoneLast4, setPhoneLast4] = useState<string>(() => extractPhoneLast4(initialPhoneLast4));
@@ -721,56 +770,72 @@ export function GuestManageRidePanel({
             </div>
           )}
 
-          {/* 3-Tab Self-Service Selector */}
-          <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-2xl">
-            <button
-              type="button"
-              onClick={() => {
-                setFeedback(null);
-                setActiveTab((prev) => (prev === 'notes_flight' ? null : 'notes_flight'));
-              }}
-              className={`py-2.5 px-2 rounded-xl text-[11.5px] sm:text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === 'notes_flight'
-                  ? 'bg-white text-slate-950 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+          {/* Policy-Filtered Self-Service Tab Selector */}
+          {availableTabs.length > 0 && (
+            <div
+              className={`grid ${
+                availableTabs.length === 1
+                  ? 'grid-cols-1'
+                  : availableTabs.length === 2
+                  ? 'grid-cols-2'
+                  : 'grid-cols-3'
+              } gap-1.5 bg-slate-100 p-1 rounded-2xl`}
             >
-              <PlaneIcon className="w-3.5 h-3.5 text-blue-600 shrink-0 hidden sm:inline" />
-              <span>Notes &amp; Flight</span>
-            </button>
+              {eligibility.canEditNotesFlight && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFeedback(null);
+                    setActiveTab((prev) => (prev === 'notes_flight' ? null : 'notes_flight'));
+                  }}
+                  className={`py-2.5 px-2 rounded-xl text-[11.5px] sm:text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    activeTab === 'notes_flight'
+                      ? 'bg-white text-slate-950 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <PlaneIcon className="w-3.5 h-3.5 text-blue-600 shrink-0 hidden sm:inline" />
+                  <span>Notes &amp; Flight</span>
+                </button>
+              )}
 
-            <button
-              type="button"
-              onClick={() => {
-                setFeedback(null);
-                setActiveTab((prev) => (prev === 'time_route' ? null : 'time_route'));
-              }}
-              className={`py-2.5 px-2 rounded-xl text-[11.5px] sm:text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === 'time_route'
-                  ? 'bg-white text-slate-950 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <CalendarIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0 hidden sm:inline" />
-              <span>Time / Address</span>
-            </button>
+              {eligibility.canModifyTimeRoute && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFeedback(null);
+                    setActiveTab((prev) => (prev === 'time_route' ? null : 'time_route'));
+                  }}
+                  className={`py-2.5 px-2 rounded-xl text-[11.5px] sm:text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    activeTab === 'time_route'
+                      ? 'bg-white text-slate-950 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <CalendarIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0 hidden sm:inline" />
+                  <span>Time / Address</span>
+                </button>
+              )}
 
-            <button
-              type="button"
-              onClick={() => {
-                setFeedback(null);
-                setActiveTab((prev) => (prev === 'cancel' ? null : 'cancel'));
-              }}
-              className={`py-2.5 px-2 rounded-xl text-[11.5px] sm:text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === 'cancel'
-                  ? 'bg-white text-rose-700 shadow-xs'
-                  : 'text-slate-600 hover:text-rose-700'
-              }`}
-            >
-              <BanIcon className="w-3.5 h-3.5 text-rose-500 shrink-0 hidden sm:inline" />
-              <span>Cancel Ride</span>
-            </button>
-          </div>
+              {eligibility.canCancel && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFeedback(null);
+                    setActiveTab((prev) => (prev === 'cancel' ? null : 'cancel'));
+                  }}
+                  className={`py-2.5 px-2 rounded-xl text-[11.5px] sm:text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    activeTab === 'cancel'
+                      ? 'bg-white text-rose-700 shadow-xs'
+                      : 'text-slate-600 hover:text-rose-700'
+                  }`}
+                >
+                  <BanIcon className="w-3.5 h-3.5 text-rose-500 shrink-0 hidden sm:inline" />
+                  <span>Cancel Ride</span>
+                </button>
+              )}
+            </div>
+          )}
 
           {/* ─── TAB 1: Instant Notes, Gate Code & Flight # ─── */}
           {activeTab === 'notes_flight' && eligibility.canEditNotesFlight && (

@@ -2,12 +2,15 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { getBookingService } from '../../../core/services/booking';
 import { getCommsThreadService } from '../../../core/services/comms/comms-thread.service';
 import { getContactService, normalizeEmail } from '../../../core/services/customer/contact.service';
+import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
 import {
+  appendOutboundEmailSignature,
   buildPopulateBookingPayloadFromEmail,
   buildReplyOrForwardDraftSeed,
   filterDispatchDrafts,
   filterDispatchEmails,
   getDispatchEmailService,
+  normalizeDispatchEmailPolicy,
   type DispatchEmailDraft,
   type DispatchEmailFolderView,
   type DispatchEmailSnapshot,
@@ -401,19 +404,27 @@ export function EmailDock({
     [handlePopulateBookingFromPayload, showToast]
   );
 
+  const resolveConfiguredEmailSignature = useCallback((): string => {
+    const policy = normalizeDispatchEmailPolicy(
+      getAdminConfigService().getCachedSettings().integrations?.dispatchEmail
+    );
+    return policy.outboundSignature;
+  }, []);
+
   // Compose & Reply / Forward orchestration
   const handleOpenNewCompose = useCallback(() => {
     const nowMs = Date.now();
+    const sig = resolveConfiguredEmailSignature();
     setModalComposeDraft({
       id: `draft_${nowMs}_${Math.random().toString(36).slice(2, 6)}`,
       mode: 'new',
       toEmail: '',
       subject: '',
-      bodyText: '',
+      bodyText: appendOutboundEmailSignature('', sig),
       createdAtMs: nowMs,
       updatedAtMs: nowMs,
     });
-  }, []);
+  }, [resolveConfiguredEmailSignature]);
 
   const handleOpenExistingDraft = useCallback(
     (draft: DispatchEmailDraft) => {
@@ -449,16 +460,18 @@ export function EmailDock({
         email: targetEmail,
         conversation: conv,
       });
+      const sig = resolveConfiguredEmailSignature();
       const nowMs = Date.now();
       setSelectedEmailId(targetEmail.id);
       setInlineReplyDraft({
         ...seed,
+        bodyText: appendOutboundEmailSignature(seed.bodyText || '', sig),
         id: `draft_${nowMs}_${Math.random().toString(36).slice(2, 6)}`,
         createdAtMs: nowMs,
         updatedAtMs: nowMs,
       });
     },
-    [emailService]
+    [emailService, resolveConfiguredEmailSignature]
   );
 
   const handleInsertIntoComposer = useCallback(

@@ -1,7 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router';
 import type { TripPricing } from '../../../../core/types';
-import type { CustomerBookingConfig } from '../../../../core/types/config';
+import {
+  resolveRetailAcceptedPaymentMethods,
+  type CustomerBookingConfig,
+} from '../../../../core/types/config';
 import type { QuoteResponse } from '../../../../core/services/booking-service';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import {
@@ -49,10 +52,8 @@ export function CustomerPaymentSection({
   totalDisplayFare,
   corporatePortalContext,
 }: CustomerPaymentSectionProps) {
-  const allowed =
-    bookingConfig.acceptedPaymentMethods && bookingConfig.acceptedPaymentMethods.length > 0
-      ? bookingConfig.acceptedPaymentMethods
-      : ['card', 'cash', 'account'];
+  const retailAllowed = resolveRetailAcceptedPaymentMethods(bookingConfig);
+  const publicCorporateEnabled = bookingConfig.allowPublicCorporateCheckout === true;
 
   const allMethods = [
     {
@@ -63,7 +64,7 @@ export function CustomerPaymentSection({
     { key: 'cash' as const, label: 'Cash (In Car)', Icon: DollarSignIcon },
     { key: 'account' as const, label: 'Corporate', Icon: BuildingIcon },
   ];
-  const methodsToRender = allMethods.filter((m) => allowed.includes(m.key));
+  const methodsToRender = allMethods.filter((m) => retailAllowed.includes(m.key));
   const colClass =
     methodsToRender.length === 1
       ? 'grid-cols-1'
@@ -72,7 +73,10 @@ export function CustomerPaymentSection({
       : 'grid-cols-3';
 
   return (
-    <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs p-3 sm:p-5 space-y-3 sm:space-y-4">
+    <div
+      data-field="paymentMethod"
+      className="bg-white border border-slate-200/90 rounded-2xl shadow-xs p-3 sm:p-5 space-y-3 sm:space-y-4"
+    >
       <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
         <div className="flex items-center gap-2">
           <span className="w-6 h-6 rounded-lg bg-blue-600 text-white text-xs font-black flex items-center justify-center">
@@ -81,37 +85,71 @@ export function CustomerPaymentSection({
           <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">Payment Method</h2>
         </div>
         <span className="text-[11px] text-slate-500 font-medium">
-          {stripeOnlineEnabled ? 'Online or In Car' : 'Pay in Car'}
+          {corporatePortalContext
+            ? 'Corporate Direct Bill'
+            : stripeOnlineEnabled
+            ? 'Online or In Car'
+            : 'Pay in Car'}
         </span>
       </div>
 
-      <div className={`grid ${colClass} gap-1.5 p-1 bg-slate-100 border border-slate-200 rounded-xl`}>
-        {methodsToRender.map((m) => (
-          <button
-            key={m.key}
-            type="button"
-            onClick={() =>
-              setForm((prev) => ({
-                ...prev,
-                paymentMethod: m.key,
-                cardPaymentType:
-                  m.key === 'card' && stripeOnlineEnabled ? prev.cardPaymentType : 'terminal',
-              }))
-            }
-            className={`py-2.5 px-2 text-center rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-              form.paymentMethod === m.key
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
-            }`}
-          >
-            <m.Icon className="w-4 h-4 shrink-0" />
-            <span className="truncate">{m.label}</span>
-          </button>
-        ))}
-      </div>
+      {!corporatePortalContext && (
+        <div className="space-y-2">
+          <div className={`grid ${colClass} gap-1.5 p-1 bg-slate-100 border border-slate-200 rounded-xl`}>
+            {methodsToRender.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => {
+                  setForm((prev) => ({
+                    ...prev,
+                    paymentMethod: m.key,
+                    cardPaymentType:
+                      m.key === 'card' && stripeOnlineEnabled ? prev.cardPaymentType : 'terminal',
+                  }));
+                  if (errors.paymentMethod) {
+                    setErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.paymentMethod;
+                      return next;
+                    });
+                  }
+                }}
+                className={`py-2.5 px-2 text-center rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  form.paymentMethod === m.key
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
+                }`}
+              >
+                <m.Icon className="w-4 h-4 shrink-0" />
+                <span className="truncate">{m.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {!publicCorporateEnabled && (
+            <div className="flex flex-wrap items-center justify-between gap-1.5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-600">
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <BuildingIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span>Booking on a company account?</span>
+              </span>
+              <Link
+                to="/app/corporate"
+                className="font-extrabold text-indigo-700 hover:text-indigo-900 hover:underline whitespace-nowrap"
+              >
+                Sign in to the Corporate Portal &rarr;
+              </Link>
+            </div>
+          )}
+
+          {errors.paymentMethod && (
+            <p className="text-xs text-red-600 font-semibold">{errors.paymentMethod}</p>
+          )}
+        </div>
+      )}
 
       {/* Credit Card Sub-panel */}
-      {form.paymentMethod === 'card' && (
+      {!corporatePortalContext && form.paymentMethod === 'card' && (
         <div className="space-y-2.5 animate-in fade-in duration-150">
           {stripeOnlineEnabled ? (
             <div className="space-y-3">
@@ -220,7 +258,7 @@ export function CustomerPaymentSection({
       )}
 
       {/* Cash Sub-panel */}
-      {form.paymentMethod === 'cash' && (
+      {!corporatePortalContext && form.paymentMethod === 'cash' && (
         <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs text-emerald-950 flex items-center gap-2.5">
           <DollarSignIcon className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>
@@ -230,7 +268,7 @@ export function CustomerPaymentSection({
       )}
 
       {/* Corporate Account Sub-panel */}
-      {form.paymentMethod === 'account' && (
+      {(corporatePortalContext || form.paymentMethod === 'account') && (
         <div
           className={`p-3.5 rounded-xl space-y-3 animate-in fade-in duration-150 ${
             corporatePortalContext

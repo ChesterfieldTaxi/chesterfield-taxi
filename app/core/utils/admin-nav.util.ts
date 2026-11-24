@@ -111,9 +111,11 @@ export const SUB_PAGES: Record<string, AdminSubPageItem[]> = {
     { key: 'css', label: 'Custom CSS' },
   ],
   integrations: [
-    { key: 'gateways', label: 'Payment Processing' },
-    { key: 'telephony', label: 'Phone & SMS' },
-    { key: 'webhooks', label: 'Webhooks & APIs' },
+    { key: 'gateways', label: 'Payments' },
+    { key: 'telephony', label: 'Phone, SMS & Templates' },
+    { key: 'email', label: 'Dispatch Email' },
+    { key: 'flights', label: 'Flight Tracking' },
+    { key: 'webhooks', label: 'Push & Webhooks' },
   ],
   general: [
     { key: 'profile', label: 'Company Info & Hours' },

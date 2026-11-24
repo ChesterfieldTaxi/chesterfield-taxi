@@ -31,6 +31,12 @@ import {
 } from 'firebase/firestore';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import {
+  DEFAULT_DISPATCH_EMAIL_POLICY,
+  isInboundEmailSenderBlocked,
+  normalizeDispatchEmailPolicy,
+  type DispatchEmailPolicyConfig,
+} from '../../types/config';
+import {
   DISPATCH_MAILBOX_ADDRESS,
   DISPATCH_MAILBOX_DOMAIN,
   buildDeterministicRfcMessageId,
@@ -125,6 +131,9 @@ export {
   matchesDispatchEmailFolderView,
   matchesDispatchEmailSearch,
   parseRequestedPickupDateTime,
+  DEFAULT_DISPATCH_EMAIL_POLICY,
+  isInboundEmailSenderBlocked,
+  normalizeDispatchEmailPolicy,
 };
 
 export type {
@@ -136,9 +145,30 @@ export type {
   DispatchEmailFolderConfig,
   DispatchEmailFolderCounts,
   DispatchEmailFolderView,
+  DispatchEmailPolicyConfig,
   DispatchEmailTemplateContext,
   SenderCrossChannelContext,
 };
+
+export function appendOutboundEmailSignature(
+  bodyText: string,
+  signature?: string | null
+): string {
+  const trimmedSig = typeof signature === 'string' ? signature.trim() : '';
+  if (!trimmedSig) return bodyText;
+  if (bodyText.includes(trimmedSig)) return bodyText;
+
+  const quoteMarkerIdx = bodyText.indexOf('\n--- Original Message');
+  if (quoteMarkerIdx >= 0) {
+    const before = bodyText.slice(0, quoteMarkerIdx).trimEnd();
+    const after = bodyText.slice(quoteMarkerIdx);
+    const prefix = before ? `${before}\n\n--\n${trimmedSig}` : `\n\n--\n${trimmedSig}`;
+    return `${prefix}\n${after}`;
+  }
+
+  const trimmedBody = bodyText.trimEnd();
+  return trimmedBody ? `${trimmedBody}\n\n--\n${trimmedSig}` : `\n\n--\n${trimmedSig}`;
+}
 
 const MAX_LOCAL_DISPATCH_EMAILS = 250;
 const MAX_LOCAL_EMAIL_DRAFTS = 100;

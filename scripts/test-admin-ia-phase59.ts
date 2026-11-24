@@ -166,7 +166,13 @@ function testAdminNavigationAndLegacyRedirects(): void {
     'navigation',
     'css',
   ]);
-  assert.deepEqual(SUB_PAGES.integrations.map((s) => s.key), ['gateways', 'telephony', 'webhooks']);
+  assert.deepEqual(SUB_PAGES.integrations.map((s) => s.key), [
+    'gateways',
+    'telephony',
+    'email',
+    'flights',
+    'webhooks',
+  ]);
   assert.deepEqual(SUB_PAGES.general.map((s) => s.key), ['profile', 'units']);
   assert.deepEqual(SUB_PAGES.advanced.map((s) => s.key), [
     'security',

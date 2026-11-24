@@ -9,10 +9,11 @@ import type {
   TripLocation,
   TripPricing,
 } from '../../types';
-import type {
-  CreditLimitEnforcementMode,
-  CustomerBookingConfig,
-  VehicleTierConfig,
+import {
+  validatePublicCorporateCheckoutGate,
+  type CreditLimitEnforcementMode,
+  type CustomerBookingConfig,
+  type VehicleTierConfig,
 } from '../../types/config';
 import type { FlightTelemetrySnapshot } from '../../types/flight';
 import { parseFlightIdent, type AirportDetectionResult } from '../../config/airports';
@@ -1033,11 +1034,22 @@ export function useCustomerBookingSubmission({
     }
 
     if (form.paymentMethod === 'account') {
-      if (!form.corporateOrgName.trim()) {
-        newErrors.corporateOrgName = 'Organization / Company name is required.';
-      }
-      if (!form.corporateAccountNumber.trim()) {
-        newErrors.corporateAccountNumber = 'Corporate account number is required.';
+      const corpGate = validatePublicCorporateCheckoutGate({
+        paymentMethod: form.paymentMethod,
+        bookingConfig,
+        hasCorporatePortalContext: Boolean(corporatePortalContext),
+      });
+      if (!corpGate.allowed) {
+        newErrors.paymentMethod =
+          corpGate.error ||
+          'Company account rides must be booked through the Corporate Portal (/app/corporate).';
+      } else {
+        if (!form.corporateOrgName.trim()) {
+          newErrors.corporateOrgName = 'Organization / Company name is required.';
+        }
+        if (!form.corporateAccountNumber.trim()) {
+          newErrors.corporateAccountNumber = 'Corporate account number is required.';
+        }
       }
     }
 
