@@ -93,6 +93,8 @@ export interface WorkspaceEventMap {
       extraAssistance?: boolean;
     };
     notes?: string;
+    /** When true, an already-entered different passenger on the active draft is never overwritten. */
+    onlyFillEmptyPassenger?: boolean;
     date?: string;
     time?: string;
     pickupTime?: string;

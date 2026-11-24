@@ -2,19 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getContactService } from '../../../core/services/customer/contact.service';
 import type { DriverRosterItem } from '../../../core/services/operator.service';
 import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
-import type { FleetCarConfig, VehicleTierConfig } from '../../../core/types/config';
+import type { FleetCarConfig, VehicleTierConfig, CorporateAccountConfig } from '../../../core/types/config';
 import type { Trip } from '../../../core/types/trip';
 import { formatTripVehicleColumnDisplay } from '../../../core/utils/vehicle-tier-format.util';
 import { FloatingWindow } from '../../ui/FloatingWindow';
-import {
-  BuildingIcon,
-  CopyIcon,
-  MailIcon,
-  MapPinIcon,
-  PhoneIcon,
-  ShieldCheckIcon,
-  UserIcon,
-} from '../../ui/Icons';
+import { CopyIcon, MapPinIcon, UserIcon } from '../../ui/Icons';
 import {
   CLIENT_TRIPS_PAGE_SIZE,
   buildNewTabValuesFromClientTrip,
@@ -22,6 +14,16 @@ import {
   resolveClientProfileData,
   shouldAutoOpenClientProfileOnCall,
 } from './client-trip-history.util';
+import {
+  buildPopulateDraftPayloadFromClientPlace,
+  buildReturnTabValuesFromClientTrip,
+  partitionClientActiveUpcomingAndPastTrips,
+  resolveClientSavedAndFrequentPlaces,
+  type ClientPopulatePayload,
+  type ClientQuickPlaceItem,
+} from './client-profile-workflows.util';
+import { ClientProfileHeaderCard } from './ClientProfileHeaderCard';
+import { ClientSavedPlacesSection, ClientUpcomingRidesStrip } from './ClientProfileSections';
 import type { DispatchFormValues } from './DispatchBookingEngine';
 import { DispatchStatusBadge } from './queue/DispatchStatusBadge';
 
@@ -44,9 +46,13 @@ export interface ClientProfileWindowProps {
   vehicles?: VehicleTierConfig[];
   drivers?: DriverRosterItem[];
   fleetCars?: FleetCarConfig[];
+  corporateAccounts?: ReadonlyArray<CorporateAccountConfig>;
   nowMs?: number;
   onLoadTripIntoNewTab: (values: DispatchFormValues, trip: Trip) => void;
   onOpenTripDetails?: (trip: Trip) => void;
+  onEditTrip?: (trip: Trip) => void;
+  onFocusTripOnMap?: (trip: Trip) => void;
+  onPopulateBookingDraft?: (payload: ClientPopulatePayload) => void;
   onCallClient?: (phone: string, name?: string) => void;
 }
 
@@ -68,9 +74,13 @@ export function ClientProfileWindow({
   vehicles,
   drivers,
   fleetCars,
+  corporateAccounts,
   nowMs,
   onLoadTripIntoNewTab,
   onOpenTripDetails,
+  onEditTrip,
+  onFocusTripOnMap,
+  onPopulateBookingDraft,
   onCallClient,
 }: ClientProfileWindowProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -151,10 +161,32 @@ export function ClientProfileWindow({
     [target, contacts, trips]
   );
 
-  const page = useMemo(
-    () => paginateClientTrips(profile.sortedTrips, visibleCount),
-    [profile.sortedTrips, visibleCount]
+  const { activeUpcomingTrips, pastTrips } = useMemo(
+    () => partitionClientActiveUpcomingAndPastTrips(profile.sortedTrips, nowMs),
+    [profile.sortedTrips, nowMs]
   );
+
+  const page = useMemo(
+    () => paginateClientTrips(pastTrips, visibleCount),
+    [pastTrips, visibleCount]
+  );
+
+  const places = useMemo(
+    () =>
+      resolveClientSavedAndFrequentPlaces({
+        contact: profile.contact,
+        corporateAccounts,
+        corporateAccountName: profile.corporateAccountName,
+        sortedTrips: profile.sortedTrips,
+      }),
+    [profile.contact, profile.corporateAccountName, profile.sortedTrips, corporateAccounts]
+  );
+
+  const handleSetPlaceEndpoint = (place: ClientQuickPlaceItem, endpoint: 'pickup' | 'dropoff') => {
+    const payload = buildPopulateDraftPayloadFromClientPlace(place, endpoint, profile);
+    getWorkspaceBus().publish('POPULATE_BOOKING', payload);
+    onPopulateBookingDraft?.(payload);
+  };
 
   return (
     <FloatingWindow
@@ -173,82 +205,32 @@ export function ClientProfileWindow({
       zIndex={220}
     >
       <div className="p-3 space-y-3 text-xs">
-        {/* CRM Badges & Metrics Card */}
-        <div className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {profile.isVip && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
-                  ★ VIP Client
-                </span>
-              )}
-              {profile.isBlacklisted && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
-                  DO NOT DISPATCH
-                </span>
-              )}
-              {profile.corporateAccountName && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
-                  <BuildingIcon className="w-3 h-3 shrink-0" />
-                  <span>{profile.corporateAccountName}</span>
-                </span>
-              )}
-              {profile.customerScore !== null && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  <ShieldCheckIcon className="w-3 h-3 shrink-0" />
-                  <span>Score {profile.customerScore}</span>
-                </span>
-              )}
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-800 border border-slate-200">
-                {profile.totalTrips} {profile.totalTrips === 1 ? 'Trip' : 'Trips'} · $
-                {profile.totalSpend.toFixed(2)} Spend
-              </span>
-            </div>
+        <ClientProfileHeaderCard profile={profile} onCallClient={onCallClient} />
 
-            {profile.rawPhone && onCallClient && (
-              <button
-                type="button"
-                onClick={() => onCallClient(profile.rawPhone, profile.displayName)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] border border-blue-200 cursor-pointer"
-              >
-                <PhoneIcon className="w-3 h-3" />
-                <span>Call</span>
-              </button>
-            )}
-          </div>
+        {/* Active & Upcoming Rides Action Strip */}
+        <ClientUpcomingRidesStrip
+          trips={activeUpcomingTrips}
+          nowMs={nowMs}
+          drivers={drivers}
+          onOpenTripDetails={onOpenTripDetails}
+          onEditTrip={onEditTrip}
+          onFocusTripOnMap={onFocusTripOnMap}
+        />
 
-          {(profile.displayPhone || profile.displayEmail) && (
-            <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-600">
-              {profile.displayPhone && (
-                <span className="inline-flex items-center gap-1 font-mono">
-                  <PhoneIcon className="w-3 h-3 text-slate-400" />
-                  {profile.displayPhone}
-                </span>
-              )}
-              {profile.displayEmail && (
-                <span className="inline-flex items-center gap-1">
-                  <MailIcon className="w-3 h-3 text-slate-400" />
-                  {profile.displayEmail}
-                </span>
-              )}
-            </div>
-          )}
-
-          {profile.dispatcherNotes && (
-            <div className="p-2 rounded-lg bg-amber-50/80 border border-amber-200 text-[11px] text-amber-950">
-              <strong className="font-extrabold uppercase text-[9.5px] tracking-wider text-amber-800 block mb-0.5">
-                Dispatcher Notes
-              </strong>
-              <span>{profile.dispatcherNotes}</span>
-            </div>
-          )}
-        </div>
+        {/* Saved & Frequent Places Quick-Fill */}
+        <ClientSavedPlacesSection
+          key={profile.contact?.id || profile.rawPhone || profile.displayEmail || 'client'}
+          places={places}
+          contactId={profile.contact?.id}
+          identity={{ phone: profile.rawPhone, email: profile.displayEmail, name: profile.displayName }}
+          onSetEndpoint={handleSetPlaceEndpoint}
+        />
 
         {/* Trip History Section */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between px-0.5">
             <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
-              Recent Trips ({page.visibleTrips.length} of {profile.sortedTrips.length})
+              Recent Trips ({page.visibleTrips.length} of {pastTrips.length})
             </span>
           </div>
 
@@ -315,18 +297,25 @@ export function ClientProfileWindow({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const cloned = buildNewTabValuesFromClientTrip(trip);
-                        onLoadTripIntoNewTab(cloned, trip);
-                      }}
-                      className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10.5px] shadow-2xs transition-colors cursor-pointer active:scale-95"
-                      title="Open a new booking draft tab pre-populated from this trip"
-                    >
-                      <CopyIcon className="w-3 h-3 shrink-0" />
-                      <span>Load into New Tab</span>
-                    </button>
+                    <div className="shrink-0 flex flex-col items-stretch gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onLoadTripIntoNewTab(buildNewTabValuesFromClientTrip(trip, nowMs), trip)}
+                        className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10.5px] shadow-2xs transition-colors cursor-pointer active:scale-95"
+                        title="Open a new booking draft tab pre-populated from this trip"
+                      >
+                        <CopyIcon className="w-3 h-3 shrink-0" />
+                        <span>Load into New Tab</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onLoadTripIntoNewTab(buildReturnTabValuesFromClientTrip(trip, nowMs), trip)}
+                        className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-blue-50 text-blue-700 font-bold text-[10.5px] border border-blue-200 transition-colors cursor-pointer active:scale-95"
+                        title="Open a new draft with the route reversed (pickup ⇄ dropoff)"
+                      >
+                        <span>⇄ Book Return</span>
+                      </button>
+                    </div>
                   </div>
                 );
               })}

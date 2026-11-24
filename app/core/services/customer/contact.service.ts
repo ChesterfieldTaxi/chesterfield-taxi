@@ -28,6 +28,17 @@ export interface AdditionalPhone {
   label?: string;
 }
 
+export type ContactSavedPlaceCategory = 'home' | 'work' | 'airport' | 'medical' | 'favorite' | 'other';
+
+export interface ContactSavedPlace {
+  id: string;
+  label: string;
+  category: ContactSavedPlaceCategory;
+  address: string;
+  coordinates?: { lat: number; lng: number };
+  notes?: string;
+}
+
 export interface ContactRecord {
   id: string;
   name: string;
@@ -52,6 +63,7 @@ export interface ContactRecord {
   preferredVehicleTier?: 'standard' | 'premium' | 'xl' | 'wheelchair' | 'executive' | 'suv' | 'van';
   homeAddress?: string;
   workAddress?: string;
+  savedPlaces?: ContactSavedPlace[];
   accessibilityNeeds?: {
     wheelchair?: boolean;
     walker?: boolean;
@@ -137,6 +149,15 @@ export function normalizeEmail(email: string | null | undefined): string {
 
 function sanitizeThreadIdPart(raw: string): string {
   return raw.trim().replace(/[\/\s]+/g, '_');
+}
+
+/** Normalized dedupe key for street addresses (case/punctuation/whitespace-insensitive). */
+export function normalizePlaceAddressKey(address: string | null | undefined): string {
+  return String(address || '')
+    .toLowerCase()
+    .replace(/[.,#]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
@@ -922,6 +943,89 @@ class ContactService {
       corporateAccountName,
       threadId,
     };
+  }
+
+  /** Persists an already-built record (index + storage + CONTACT_UPDATED + listeners). */
+  private commitContactRecord(record: ContactRecord): ContactRecord {
+    const next: ContactRecord = { ...record, updatedAt: Date.now() };
+    this.indexContactRecord(next);
+    this.saveToStorage();
+    try {
+      getWorkspaceBus().publish('CONTACT_UPDATED', { contact: next });
+    } catch {}
+    this.notifyListeners({ action: 'saved', contact: next });
+    return next;
+  }
+
+  /**
+   * Saves (or updates) a client's saved place. Creates the `ContactRecord` when the caller only
+   * existed in `trips`, dedupes by `id` or normalized address, and syncs `homeAddress` /
+   * `workAddress` for `'home'` / `'work'` categories.
+   */
+  public saveContactPlace(
+    identity: { contactId?: string; phone?: string; email?: string; name?: string },
+    place: Omit<ContactSavedPlace, 'id'> & { id?: string }
+  ): ContactRecord {
+    const address = String(place.address || '').trim();
+    const existing =
+      (identity.contactId ? this.getContactById(identity.contactId) : null) ||
+      (identity.phone ? this.getContactByPhone(identity.phone) : null) ||
+      (identity.email ? this.getContactByEmail(identity.email) : null);
+
+    const base: ContactRecord =
+      existing ||
+      this.saveContact({
+        name: (identity.name || '').trim() || identity.phone || identity.email || 'Customer',
+        phone: identity.phone || '',
+        email: identity.email || '',
+      });
+
+    if (!address) return base;
+
+    const addrKey = normalizePlaceAddressKey(address);
+    const list = [...(base.savedPlaces || [])];
+    const idx = list.findIndex(
+      (p) => (place.id && p.id === place.id) || (addrKey && normalizePlaceAddressKey(p.address) === addrKey)
+    );
+    const defaultLabel =
+      place.category === 'other' ? 'Place' : place.category.charAt(0).toUpperCase() + place.category.slice(1);
+    const saved: ContactSavedPlace = {
+      id: place.id || (idx >= 0 ? list[idx].id : `place_${Date.now().toString(36)}_${list.length}`),
+      label: String(place.label || '').trim() || defaultLabel,
+      category: place.category,
+      address,
+      ...(place.coordinates ? { coordinates: { ...place.coordinates } } : {}),
+      ...(place.notes ? { notes: place.notes } : {}),
+    };
+    if (idx >= 0) list[idx] = saved;
+    else list.push(saved);
+
+    return this.commitContactRecord({
+      ...base,
+      savedPlaces: list,
+      homeAddress: saved.category === 'home' ? address : base.homeAddress,
+      workAddress: saved.category === 'work' ? address : base.workAddress,
+    });
+  }
+
+  public removeContactPlace(contactId: string, placeId: string): ContactRecord | null {
+    const existing = this.getContactById(contactId);
+    const removed = existing?.savedPlaces?.find((p) => p.id === placeId);
+    if (!existing || !removed) return null;
+    const key = normalizePlaceAddressKey(removed.address);
+    const remaining = (existing.savedPlaces || []).filter((p) => p.id !== placeId);
+    return this.commitContactRecord({
+      ...existing,
+      savedPlaces: remaining,
+      homeAddress:
+        removed.category === 'home' && normalizePlaceAddressKey(existing.homeAddress) === key
+          ? remaining.find((p) => p.category === 'home')?.address || ''
+          : existing.homeAddress,
+      workAddress:
+        removed.category === 'work' && normalizePlaceAddressKey(existing.workAddress) === key
+          ? remaining.find((p) => p.category === 'work')?.address || ''
+          : existing.workAddress,
+    });
   }
 
   public deleteContact(id: string): boolean {

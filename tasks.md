@@ -1148,3 +1148,20 @@
   - [x] 69.4.3 Replace `<ConfirmationModal />` in `DispatchBookingFooterBar.tsx` with a sidebar-docked confirmation card (`w-full`, `z-30`), portal `FloatingWindow.tsx` via `createPortal(..., document.body)` (`zIndex >= 200`), and add `PlacesService.findPlaceFromQuery` fallback in `hq-place-marker.util.ts`.
 - [x] 69.5 Verification Suite (`scripts/test-corporate-auth-client-window-and-driver-homes-phase69.ts < 400`L) & Build Gate:
   - [x] 69.5.1 Create `scripts/test-corporate-auth-client-window-and-driver-homes-phase69.ts` (`< 400`L) and pass `npm run typecheck`, Phases 63–69 verification suites, and `npm run build` with exit code `0`.
+
+
+## Phase 70 (Wave 6 Phase 5): `ClientProfileWindow` Operational Upgrades — 1-Click `⇄ Book Return`, `Active & Upcoming Rides` Action Strip & Unified `Saved & Frequent Places` Quick-Fill
+- [x] 70.0 Baseline Commit & Spec-Driven Documentation:
+  - [x] 70.0.1 Stage and commit clean Phase 69 baseline on `main` (`feat(phase-69): redesign corporate 4-signal caller auth, add incoming-call ClientProfileWindow & Driver Homes map layer, and polish flight codes, badges & portals`).
+  - [x] 70.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 70 scope and checklist.
+- [x] 70.1 `ContactRecord.savedPlaces` & Pure Client Profile Workflows Engine:
+  - [x] 70.1.1 Add `ContactSavedPlaceCategory` / `ContactSavedPlace` / `savedPlaces?` plus `saveContactPlace` & `removeContactPlace` to `contact.service.ts`.
+  - [x] 70.1.2 Create `client-profile-workflows.util.ts` (`< 240`L): `buildReturnTabValuesFromClientTrip`, future-safe `buildNewTabValuesFromClientTrip(trip, nowMs?)`, `partitionClientActiveUpcomingAndPastTrips`, `resolveClientSavedAndFrequentPlaces`, `buildPopulateDraftPayloadFromClientPlace`.
+  - [x] 70.1.3 Add `onlyFillEmptyPassenger?: boolean` to `POPULATE_BOOKING` and honour it in `mergePopulateBookingIntoDraftForm` + `useDispatchDraftSync.ts`.
+- [x] 70.2 UI Wiring:
+  - [x] 70.2.1 Create `ClientProfileSections.tsx` (`< 320`L) with `<ClientUpcomingRidesStrip />` and `<ClientSavedPlacesSection />` (`Set Pickup` / `Set Dropoff`, `+ Save Place`).
+  - [x] 70.2.2 Update `ClientProfileWindow.tsx` (`< 380`L; extract `ClientProfileHeaderCard.tsx`): mount sections above Past Trips, paginate `pastTrips`, add `⇄ Book Return`, publish `POPULATE_BOOKING` + `onPopulateBookingDraft`.
+  - [x] 70.2.3 Wire `corporateAccounts`, `onEditTrip`, `onFocusTripOnMap`, `onPopulateBookingDraft` in `dispatch.tsx` (`< 1,600`L).
+- [x] 70.3 Verification Suite (`scripts/test-client-profile-return-places-and-upcoming-phase70.ts < 400`L) & Build Gate:
+  - [x] 70.3.1 Create the Phase 70 suite and pass `npm run typecheck`, Phases 64–70 verification suites, and `npm run build` with exit code `0`.
+  - [x] 70.3.2 Leave Phase 70 changes uncommitted on top of the Phase 69 baseline commit for review.

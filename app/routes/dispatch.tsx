@@ -1412,9 +1412,13 @@ export default function DispatchRoute() {
         vehicles={settings.vehicles}
         drivers={drivers}
         fleetCars={settings.fleet}
+        corporateAccounts={settings.corporateAccounts}
         nowMs={clockNowMs}
         onLoadTripIntoNewTab={(vals) => handleCloneBookingToNewDraft(vals)}
         onOpenTripDetails={(t) => handleOpenReviewModal(t, 'details')}
+        onEditTrip={stableEditTripFromWorkspace}
+        onFocusTripOnMap={stableFocusTripOnMapFromWorkspace}
+        onPopulateBookingDraft={stableCommsPopulateBooking}
         onCallClient={(ph, nm) => {
           void handleStartCall(ph, nm);
           setActiveDockTab('phone');

@@ -1,14 +1,11 @@
 import {
-  collectContactEmailsNormalized,
-  collectContactPhonesE164,
-  normalizeEmail,
-  normalizePhone,
-  type ContactRecord,
+  collectContactEmailsNormalized, collectContactPhonesE164, normalizeEmail, normalizePhone, type ContactRecord,
 } from '../../../core/services/customer/contact.service';
 import { cloneTripToDispatchFormValues } from '../../../core/hooks/dispatch/dispatch-workspace.util';
 import type { Trip } from '../../../core/types/trip';
 import { formatDisplayPhone } from '../../../core/utils/phone';
 import type { DispatchFormValues } from './DispatchBookingEngine';
+import { normalizeClonedDraftTiming } from './client-profile-workflows.util';
 
 export const CLIENT_TRIPS_PAGE_SIZE = 10;
 
@@ -173,6 +170,7 @@ export function shouldAutoOpenClientProfileOnCall(params: {
   return { shouldOpen: true, dedupeKey, profile };
 }
 
-export function buildNewTabValuesFromClientTrip(trip: Trip): DispatchFormValues {
-  return cloneTripToDispatchFormValues(trip);
+/** Same-direction clone; historical (past) pickup times reset to `asap` today, future ones are preserved. */
+export function buildNewTabValuesFromClientTrip(trip: Trip, nowMs?: number): DispatchFormValues {
+  return normalizeClonedDraftTiming(cloneTripToDispatchFormValues(trip), trip, nowMs);
 }

@@ -86,23 +86,66 @@ export function getDateRangeButtonLabel(dateTimeRange: DateTimeRange): string {
   return 'All Dates';
 }
 
+export type PopulatePassengerMode = 'overwrite' | 'fill_empty' | 'keep_current';
+
+/**
+ * Pure passenger-clobber policy for `POPULATE_BOOKING` payloads carrying `onlyFillEmptyPassenger`.
+ * - No flag, or blank draft passenger -> `'overwrite'` (legacy behaviour / clean hydrate).
+ * - Same passenger already on the draft (phone / email / name match) -> `'fill_empty'`.
+ * - A different passenger already entered -> `'keep_current'` (passenger + corporate fields untouched).
+ */
+export function resolvePopulatePassengerMode(
+  current: { passengerName?: string; phone?: string; email?: string } | undefined,
+  payload: Record<string, any>
+): PopulatePassengerMode {
+  if (!payload?.onlyFillEmptyPassenger) return 'overwrite';
+  const curName = String(current?.passengerName || '').trim().toLowerCase();
+  const curPhone = String(current?.phone || '').replace(/\D/g, '').slice(-10);
+  const curEmail = String(current?.email || '').trim().toLowerCase();
+  if (!curName && !curPhone && !curEmail) return 'overwrite';
+  const newName = String(payload.passengerName || '').trim().toLowerCase();
+  const newPhone = String(payload.passengerPhone || payload.phone || '').replace(/\D/g, '').slice(-10);
+  const newEmail = String(payload.passengerEmail || payload.email || '').trim().toLowerCase();
+  const same =
+    (curPhone.length >= 7 && curPhone === newPhone) ||
+    (curEmail !== '' && curEmail === newEmail) ||
+    (curName !== '' && curName === newName);
+  return same ? 'fill_empty' : 'keep_current';
+}
+
+const PASSENGER_AND_CORPORATE_PAYLOAD_KEYS = [
+  'passengerName', 'passengerPhone', 'phone', 'passengerEmail', 'email',
+  'corporateAccount', 'corporateAccountName', 'accountNumber', 'billingPo', 'poNumber',
+] as const;
+
 export function mergePopulateBookingIntoDraftForm(
   currentFormRaw: Partial<DispatchFormValues> | undefined,
-  payload: Record<string, any>
+  payloadRaw: Record<string, any>
 ): DispatchFormValues {
   const currentForm = (currentFormRaw || {}) as DispatchFormValues;
+  const mode = resolvePopulatePassengerMode(currentForm, payloadRaw);
+  const payload: Record<string, any> = { ...payloadRaw };
+  if (mode === 'keep_current') {
+    for (const key of PASSENGER_AND_CORPORATE_PAYLOAD_KEYS) delete payload[key];
+  }
+  const pick = (cur: string | undefined, next: string | undefined): string =>
+    (mode === 'fill_empty' ? cur || next : next || cur) || '';
   const corpName =
     payload.corporateAccount ||
     payload.corporateAccountName ||
     payload.accountNumber ||
     currentForm.corporateDetails?.corporateAccount ||
     '';
+  const skipDuplicateNote =
+    Boolean(payloadRaw.onlyFillEmptyPassenger) &&
+    Boolean(payload.notes) &&
+    String(currentForm.internalNotes || '').includes(payload.notes);
 
   return {
     ...currentForm,
-    passengerName: payload.passengerName || currentForm.passengerName || '',
-    phone: payload.passengerPhone || payload.phone || currentForm.phone || '',
-    email: payload.passengerEmail || payload.email || currentForm.email || '',
+    passengerName: pick(currentForm.passengerName, payload.passengerName),
+    phone: pick(currentForm.phone, payload.passengerPhone || payload.phone),
+    email: pick(currentForm.email, payload.passengerEmail || payload.email),
     pickupAddress: payload.pickupAddress || currentForm.pickupAddress || '',
     pickupCoordinates: payload.pickupAddress
       ? payload.pickupCoordinates
@@ -126,7 +169,7 @@ export function mergePopulateBookingIntoDraftForm(
       payload.corporateAccount || payload.corporateAccountName || payload.accountNumber
         ? 'account'
         : currentForm.paymentMethod || 'cash',
-    internalNotes: payload.notes
+    internalNotes: payload.notes && !skipDuplicateNote
       ? `${currentForm.internalNotes ? `${currentForm.internalNotes}\n` : ''}${payload.notes}`
       : currentForm.internalNotes,
   };
@@ -153,11 +196,14 @@ export function cloneTripToDispatchFormValues(trip: Trip): DispatchFormValues {
     scheduledTime: `${hh}:${mm}`,
     pickupAddress: trip.pickupLocation?.address || '',
     pickupCoordinates: trip.pickupLocation?.coordinates,
+    pickupPlaceId: trip.pickupLocation?.placeId,
     dropoffAddress: trip.dropoffLocation?.address || '',
     dropoffCoordinates: trip.dropoffLocation?.coordinates,
+    dropoffPlaceId: trip.dropoffLocation?.placeId,
     intermediateStops: (trip.intermediateStops || []).map((s) => ({
       address: s.address,
       coordinates: s.coordinates,
+      ...(s.placeId ? { placeId: s.placeId } : {}),
     })),
     passengerName: `${trip.passenger?.firstName || ''} ${trip.passenger?.lastName || ''}`.trim(),
     phone: trip.passenger?.phone || '',

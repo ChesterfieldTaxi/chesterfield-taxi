@@ -10,6 +10,7 @@ import type { FlightTelemetrySnapshot } from '../../../../core/types/flight';
 import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
 import { getUniversalExtrasConfig } from '../../../../core/services/pricing/extras.service';
 import { getWorkspaceBus } from '../../../../core/services/workspace-bus.service';
+import { resolvePopulatePassengerMode } from '../../../../core/hooks/dispatch/dispatch-workspace.util';
 import {
   DEFAULT_CORPORATE_ACCOUNTS,
   buildDispatchVehicleCapacities,
@@ -192,6 +193,8 @@ export function useDispatchDraftSync({
 
   const settersRef = useRef(setters);
   settersRef.current = setters;
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
 
   // Hydrate ONCE per tab identity
   useEffect(() => {
@@ -314,11 +317,17 @@ export function useDispatchDraftSync({
         }
 
         const s = settersRef.current;
-        if (payload.passengerName) s.setPassengerName(payload.passengerName);
+        const curPax = valuesRef.current;
+        const paxMode = resolvePopulatePassengerMode(curPax, payload);
+        const keepPax = paxMode === 'keep_current';
+        const fillPax = paxMode === 'fill_empty';
+        if (payload.passengerName && !keepPax && !(fillPax && curPax?.passengerName)) {
+          s.setPassengerName(payload.passengerName);
+        }
         const contactPh = payload.passengerPhone || payload.phone;
-        if (contactPh) s.setPhone(contactPh);
+        if (contactPh && !keepPax && !(fillPax && curPax?.phone)) s.setPhone(contactPh);
         const contactEm = payload.passengerEmail || payload.email;
-        if (contactEm) s.setEmail(contactEm);
+        if (contactEm && !keepPax && !(fillPax && curPax?.email)) s.setEmail(contactEm);
 
         if (payload.pickupAddress) {
           s.setPickupAddress(payload.pickupAddress);
@@ -349,8 +358,9 @@ export function useDispatchDraftSync({
           s.setSelectedVehicles([v as VehicleChoice]);
         }
 
-        const acct =
-          payload.corporateAccount || payload.corporateAccountName || payload.accountNumber;
+        const acct = keepPax
+          ? undefined
+          : payload.corporateAccount || payload.corporateAccountName || payload.accountNumber;
         if (acct) {
           const matchedCorp = findMatchingCorporateAccount(corporateAccountList, String(acct), {
             caseInsensitiveName: true,
@@ -359,7 +369,7 @@ export function useDispatchDraftSync({
           s.setPaymentMethod('account');
         }
 
-        const po = payload.billingPo || payload.poNumber;
+        const po = keepPax ? undefined : payload.billingPo || payload.poNumber;
         if (po) {
           s.setBillingPo(po);
         }
