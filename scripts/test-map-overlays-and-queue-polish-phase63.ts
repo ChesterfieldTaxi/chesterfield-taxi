@@ -294,11 +294,17 @@ function testVehicleTypeResolverAndMultiSelect(): void {
   const wavDriver = { id: 'drv-wav', cabNumber: '310', vehicle: 'BraunAbility Accessible Ramp WAV', tier: 'Wheelchair WAV', mapStatus: 'available' as const };
   const customTierDriver = { id: 'drv-vip', cabNumber: '900', vehicle: 'Car #900', tier: 'exec_sprinter_vip', mapStatus: 'available' as const };
 
-  assert.equal(resolveDriverVehicleTypeKey(sedanDriver, fleetCars, vehicleTiers), 'sedan');
-  assert.equal(resolveDriverVehicleTypeKey(suvDriver, fleetCars, vehicleTiers), 'suv');
-  assert.equal(resolveDriverVehicleTypeKey(minivanDriver, fleetCars, vehicleTiers), 'minivan');
-  assert.equal(resolveDriverVehicleTypeKey(vanDriver, fleetCars, vehicleTiers), 'van');
-  assert.equal(resolveDriverVehicleTypeKey(wavDriver, fleetCars, vehicleTiers), 'wheelchair_wav');
+  // Canonical fallback when vehicleTiers is empty/null
+  assert.equal(resolveDriverVehicleTypeKey(sedanDriver, fleetCars, null), 'sedan');
+  assert.equal(resolveDriverVehicleTypeKey(suvDriver, fleetCars, null), 'suv');
+  assert.equal(resolveDriverVehicleTypeKey(minivanDriver, fleetCars, null), 'minivan');
+  assert.equal(resolveDriverVehicleTypeKey(vanDriver, fleetCars, null), 'van');
+  assert.equal(resolveDriverVehicleTypeKey(wavDriver, fleetCars, null), 'wheelchair_wav');
+  assert.equal(resolveDriverVehicleTypeKey(customTierDriver, fleetCars, null), 'exec_sprinter_vip');
+
+  // Active Admin vehicleTiers resolution maps cleanly onto configured tier IDs
+  assert.equal(resolveDriverVehicleTypeKey(sedanDriver, fleetCars, vehicleTiers), 'standard');
+  assert.equal(resolveDriverVehicleTypeKey(suvDriver, fleetCars, vehicleTiers), 'xl');
   assert.equal(resolveDriverVehicleTypeKey(customTierDriver, fleetCars, vehicleTiers), 'exec_sprinter_vip');
 
   // Empty selection ([]): all drivers match
@@ -325,18 +331,32 @@ function testVehicleTypeResolverAndMultiSelect(): void {
   assert.equal(matchesSelectedVehicleTypes(customTierDriver, ['exec_sprinter_vip'], fleetCars, vehicleTiers), true);
   assert.equal(matchesSelectedVehicleTypes(sedanDriver, ['exec_sprinter_vip'], fleetCars, vehicleTiers), false);
 
-  // Filter option catalog counts
-  const options = buildVehicleTypeFilterOptions(
+  // Canonical filter option catalog counts (when vehicleTiers is null)
+  const canonicalOptions = buildVehicleTypeFilterOptions(
     [sedanDriver, suvDriver, minivanDriver, vanDriver, wavDriver, customTierDriver],
+    fleetCars,
+    null
+  );
+  assert.equal(canonicalOptions.find((o) => o.key === 'sedan')?.onShiftDriversCount, 1);
+  assert.equal(canonicalOptions.find((o) => o.key === 'suv')?.onShiftDriversCount, 1);
+  assert.equal(canonicalOptions.find((o) => o.key === 'minivan')?.onShiftDriversCount, 1);
+  assert.equal(canonicalOptions.find((o) => o.key === 'van')?.onShiftDriversCount, 1);
+  assert.equal(canonicalOptions.find((o) => o.key === 'wheelchair_wav')?.onShiftDriversCount, 1);
+  assert.equal(canonicalOptions.find((o) => o.key === 'exec_sprinter_vip')?.onShiftDriversCount, 1);
+
+  // Active Admin vehicleTiers filter option catalog builds strictly from active Admin entries
+  const adminOptions = buildVehicleTypeFilterOptions(
+    [sedanDriver, suvDriver, customTierDriver],
     fleetCars,
     vehicleTiers
   );
-  assert.equal(options.find((o) => o.key === 'sedan')?.onShiftDriversCount, 1);
-  assert.equal(options.find((o) => o.key === 'suv')?.onShiftDriversCount, 1);
-  assert.equal(options.find((o) => o.key === 'minivan')?.onShiftDriversCount, 1);
-  assert.equal(options.find((o) => o.key === 'van')?.onShiftDriversCount, 1);
-  assert.equal(options.find((o) => o.key === 'wheelchair_wav')?.onShiftDriversCount, 1);
-  assert.equal(options.find((o) => o.key === 'exec_sprinter_vip')?.onShiftDriversCount, 1);
+  assert.deepEqual(
+    adminOptions.map((o) => o.key),
+    ['standard', 'xl', 'exec_sprinter_vip']
+  );
+  assert.equal(adminOptions.find((o) => o.key === 'standard')?.onShiftDriversCount, 1);
+  assert.equal(adminOptions.find((o) => o.key === 'xl')?.onShiftDriversCount, 1);
+  assert.equal(adminOptions.find((o) => o.key === 'exec_sprinter_vip')?.onShiftDriversCount, 1);
 
   console.log('   ✅ Passed vehicle-type resolution & multi-select filtering.\n');
 }

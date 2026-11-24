@@ -8,11 +8,13 @@ import {
   isCoordinateInZone,
   calculateHaversineDistanceMiles,
 } from '../../../../core/services/zones/zone.service';
-import { getSpecialPlacesService } from '../../../../core/services/places/special-places.service';
+import {
+  getSpecialPlacesService,
+  type SpecialPlace,
+} from '../../../../core/services/places/special-places.service';
 import { getWorkspaceBus } from '../../../../core/services/workspace-bus.service';
 import type {
   BlacklistedLocation,
-  LocationCollection,
   ZoneCoordinate,
   ZoneGeofence,
 } from '../../../../core/types/zone';
@@ -81,6 +83,39 @@ function isValidCoord(c?: ZoneCoordinate | null): c is ZoneCoordinate {
       Number.isFinite(c.lng) &&
       (c.lat !== 0 || c.lng !== 0)
   );
+}
+
+/**
+ * Pure filter/mapper for the Dispatch Map `Places` overlay:
+ * Renders strictly active Starred (`isPopular`) non-archived Admin `SpecialPlace` entries.
+ */
+export function buildStarredPlacesOverlayItems(
+  specialPlaces: readonly SpecialPlace[] | null | undefined
+): MapOverlayPlaceItem[] {
+  const merged: MapOverlayPlaceItem[] = [];
+  for (const sp of specialPlaces || []) {
+    if (!sp.isActive || !sp.isPopular || sp.isArchived) continue;
+    if (!isValidCoord(sp.coordinates) || !sp.address) continue;
+    const candidateName = (sp.shortName || sp.name || '').trim();
+    if (!candidateName) continue;
+    const dup = merged.some(
+      (ex) =>
+        ex.name.trim().toLowerCase() === candidateName.toLowerCase() ||
+        calculateHaversineDistanceMiles(ex.coordinates, sp.coordinates) < 0.05
+    );
+    if (dup) continue;
+    const cat = normalizePlaceCategory(sp.category);
+    merged.push({
+      id: `sp-${sp.id}`,
+      name: candidateName,
+      address: sp.address,
+      coordinates: sp.coordinates,
+      category: cat,
+      categoryLabel: PLACE_CATEGORY_META[cat].label,
+      notes: sp.notes,
+    });
+  }
+  return merged;
 }
 
 function disposeGoogleOverlayList(
@@ -218,7 +253,7 @@ export function useLiveMapCustomOverlays({
     };
   }, [mapReady, mapInstanceRef, preferences.showZonesOverlay]);
 
-  // 3. Curated Places & Location Collections (/locationCollections + SpecialPlaces) lifecycle
+  // 3. Starred Admin Places (sp.isActive && sp.isPopular && !sp.isArchived) lifecycle
   useEffect(() => {
     disposeGoogleOverlayList(placeMarkersRef.current);
     placeMarkersRef.current = [];
@@ -233,79 +268,56 @@ export function useLiveMapCustomOverlays({
     let cancelled = false;
     const map = mapInstanceRef.current;
     const gMaps = window.google.maps;
+    const placesSvc = getSpecialPlacesService();
 
-    Promise.all([
-      getZoneService().getLocationCollections(),
-      getSpecialPlacesService().syncWithFirestore(),
-    ])
-      .then(([collections, specialPlaces]) => {
-        if (cancelled || !mapInstanceRef.current) return;
-        const merged: MapOverlayPlaceItem[] = [];
-        const pushUnique = (candidate: MapOverlayPlaceItem) => {
-          if (!isValidCoord(candidate.coordinates) || !candidate.address) return;
-          const dup = merged.some(
-            (ex) =>
-              ex.name.trim().toLowerCase() === candidate.name.trim().toLowerCase() ||
-              calculateHaversineDistanceMiles(ex.coordinates, candidate.coordinates) < 0.05
-          );
-          if (!dup) merged.push(candidate);
-        };
-
-        for (const coll of (collections || []) as LocationCollection[]) {
-          if (!coll.isActive || coll.isArchived) continue;
-          for (const loc of coll.locations || []) {
-            if (loc.isArchived || !isValidCoord(loc.coordinates)) continue;
-            const cat = normalizePlaceCategory(loc.category || coll.category);
-            pushUnique({
-              id: `coll-${coll.id}-${loc.id}`,
-              name: loc.name,
-              address: loc.address,
-              coordinates: loc.coordinates,
-              category: cat,
-              categoryLabel: PLACE_CATEGORY_META[cat].label,
-              flatFee: loc.flatFee ?? coll.flatFee,
-              notes: loc.notes,
-            });
-          }
-        }
-
-        for (const sp of specialPlaces || []) {
-          if (!sp.isActive || !isValidCoord(sp.coordinates)) continue;
-          const cat = normalizePlaceCategory(sp.category);
-          pushUnique({
-            id: `sp-${sp.id}`,
-            name: sp.shortName || sp.name,
-            address: sp.address,
-            coordinates: sp.coordinates,
-            category: cat,
-            categoryLabel: PLACE_CATEGORY_META[cat].label,
-            notes: sp.notes,
-          });
-        }
-
-        placeMarkersRef.current = merged.map((place) => {
-          const marker = new gMaps.Marker({
-            position: place.coordinates,
-            map,
-            icon: {
-              url: buildPlaceMarkerDataUrl(place.category),
-              scaledSize: new gMaps.Size(30, 35),
-              anchor: new gMaps.Point(15, 34),
-            },
-            title: `${place.categoryLabel} · ${place.name}`,
-            zIndex: 120,
-          });
-          marker.addListener('click', () => {
-            setAppliedEndpointFeedback(null);
-            setSelectedOverlay({ kind: 'place', place });
-          });
-          return marker;
+    const renderPlacesList = (specialPlaces: readonly SpecialPlace[]) => {
+      if (cancelled || !mapInstanceRef.current) return;
+      disposeGoogleOverlayList(placeMarkersRef.current);
+      const starredItems = buildStarredPlacesOverlayItems(specialPlaces);
+      setSelectedOverlay((prev) => {
+        if (prev?.kind !== 'place') return prev;
+        const updated = starredItems.find((p) => p.id === prev.place.id);
+        return updated ? { kind: 'place', place: updated } : null;
+      });
+      placeMarkersRef.current = starredItems.map((place) => {
+        const marker = new gMaps.Marker({
+          position: place.coordinates,
+          map,
+          icon: {
+            url: buildPlaceMarkerDataUrl(place.category),
+            scaledSize: new gMaps.Size(30, 35),
+            anchor: new gMaps.Point(15, 34),
+          },
+          title: `${place.categoryLabel} · ${place.name}`,
+          zIndex: 120,
         });
-      })
-      .catch(() => {});
+        marker.addListener('click', () => {
+          setAppliedEndpointFeedback(null);
+          setSelectedOverlay({ kind: 'place', place });
+        });
+        return marker;
+      });
+    };
+
+    placesSvc
+      .syncWithFirestore()
+      .then((specialPlaces) => renderPlacesList(specialPlaces))
+      .catch(() => renderPlacesList(placesSvc.getAllPlaces()));
+
+    const unsubLocal = placesSvc.subscribe((updatedPlaces) => renderPlacesList(updatedPlaces));
+    const unsubBus = getWorkspaceBus().subscribe((msg) => {
+      if (msg.type === 'SPECIAL_PLACES_UPDATED') {
+        placesSvc
+          .syncWithFirestore()
+          .then((specialPlaces) => renderPlacesList(specialPlaces))
+          .catch(() => renderPlacesList(placesSvc.getAllPlaces()));
+      }
+    });
 
     return () => {
       cancelled = true;
+      unsubLocal();
+      unsubBus();
       disposeGoogleOverlayList(placeMarkersRef.current);
       placeMarkersRef.current = [];
     };

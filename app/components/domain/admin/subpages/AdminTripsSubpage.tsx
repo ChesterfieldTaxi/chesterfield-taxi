@@ -176,6 +176,8 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
             <AdminTripsTablePanel
               trips={ctrl.activeSub === 'dispatch' ? ctrl.activeQueueTrips : ctrl.historyTrips}
               drivers={ctrl.drivers}
+              vehicles={ctrl.vehicles}
+              fleetCars={ctrl.fleetCars}
               exceptionByTripId={ctrl.exceptionByTripId}
               isLoading={ctrl.isLoading}
               displayLayout={displayLayout}

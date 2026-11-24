@@ -98,6 +98,8 @@ export interface UseDispatchDraftSyncParams {
     waiveAirportFee: boolean;
     waiveMultiStopFees: boolean;
     bypassSurge: boolean;
+    waivedSurchargeIds?: string[];
+    waivedExtraKeys?: string[];
     company: string;
     driverId: string;
     driverAssignmentMode?: 'send_to_driver' | 'stage_hold';
@@ -550,6 +552,8 @@ export function useDispatchDraftSync({
       waiveAirportFee: v.waiveAirportFee,
       waiveMultiStopFees: v.waiveMultiStopFees,
       bypassSurge: v.bypassSurge,
+      waivedSurchargeIds: v.waivedSurchargeIds || [],
+      waivedExtraKeys: v.waivedExtraKeys || [],
       returnTrip: v.returnTrip,
       returnPickupAddress: v.returnPickupAddress,
       returnPickupCoordinates: v.returnPickupCoordinates,
@@ -672,6 +676,8 @@ export function useDispatchDraftSync({
     s.setWaiveAirportFee(false);
     s.setWaiveMultiStopFees(false);
     s.setBypassSurge(false);
+    s.setWaivedSurchargeIds?.([]);
+    s.setWaivedExtraKeys?.([]);
     s.setDriverId('unassigned');
     s.setDriverAssignmentMode?.('send_to_driver');
     s.setNotesForAll('');

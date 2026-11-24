@@ -57,6 +57,8 @@ export interface QuoteRequest {
   bypassSurge?: boolean;
   waiveMultiStopFees?: boolean;
   waiveAirportFee?: boolean;
+  waivedSurchargeIds?: string[];
+  waivedExtraKeys?: string[];
   manualDiscount?: number;
   manualDiscountPercent?: number;
   manualDiscountLabel?: string;

@@ -22,6 +22,7 @@ import {
   type FlightCheckEligibilityInput,
   type FlightCheckEligibilityResult,
 } from '../../config/airports';
+import { extractAirportIataCode } from '../../config/airport-catalog';
 
 export {
   evaluateFlightCheckEligibility,
@@ -161,11 +162,14 @@ export function extractTripFlightCredentials(trip: Trip): {
     isAirportTrip: Boolean(detection.isAirportTrip || trip.flightTelemetry || parsed.isValid),
     isAirportPickup: Boolean(detection.isPickupAirport || trip.flightTelemetry),
     isPrivateAviation,
-    airportCode: detection.airport?.iataCode || trip.flightTelemetry?.destinationIata || 'STL',
+    airportCode:
+      extractAirportIataCode(
+        detection.airport?.iataCode || trip.flightTelemetry?.destinationIata || 'STL'
+      ) || 'STL',
     airline: parsed.airlineCode || rawAirline,
     flightNumber: parsed.flightNumber || rawFlightNumber,
     flightIdent: parsed.flightIdent,
-    originIata: rawOrigin.trim().toUpperCase(),
+    originIata: extractAirportIataCode(rawOrigin),
     hasCheckedLuggage: Boolean(meta.hasCheckedLuggage),
   };
 }
@@ -464,8 +468,8 @@ export class FlightStatusService {
           airline: parsed.airlineCode,
           flightNumber: parsed.flightNumber,
           serviceDate,
-          destinationIata: params.destinationIata || 'STL',
-          originIata: params.originIata || undefined,
+          destinationIata: extractAirportIataCode(params.destinationIata) || 'STL',
+          originIata: extractAirportIataCode(params.originIata) || undefined,
           scheduledPickupIso: params.scheduledPickupIso,
           forceRefresh: Boolean(params.forceRefresh),
         }),

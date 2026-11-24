@@ -166,6 +166,11 @@ export interface WorkspaceEventMap {
     unreadCount: number;
     updatedAt: number;
   };
+  SPECIAL_PLACES_UPDATED: {
+    action: 'save' | 'delete' | 'reset' | 'sync';
+    placeId?: string;
+    updatedAt: number;
+  };
 }
 
 export type WorkspaceEventType = keyof WorkspaceEventMap;

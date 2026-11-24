@@ -63,13 +63,26 @@ function findMatchedFleetCar(
   return undefined;
 }
 
+function normalizeTierToken(raw?: string | null): string {
+  return String(raw || '').trim().toLowerCase().replace(/[\s_]+/g, '-');
+}
+
+export function getActiveAdminVehicleTiers(
+  vehicleTiers?: readonly VehicleTierConfig[] | null
+): VehicleTierConfig[] {
+  if (!Array.isArray(vehicleTiers) || vehicleTiers.length === 0) return [];
+  return vehicleTiers.filter(
+    (t) => !t.isArchived && t.isActive !== false && Boolean(String(t.id || '').trim())
+  );
+}
+
 function findMatchedVehicleTier(
   driver: DriverVehicleFilterTarget,
   matchedCar: FleetCarConfig | undefined,
-  vehicleTiers?: VehicleTierConfig[] | null
+  vehicleTiers?: readonly VehicleTierConfig[] | null
 ): VehicleTierConfig | undefined {
-  if (!Array.isArray(vehicleTiers) || vehicleTiers.length === 0) return undefined;
-  const activeTiers = vehicleTiers.filter((t) => !t.isArchived);
+  const activeTiers = getActiveAdminVehicleTiers(vehicleTiers);
+  if (activeTiers.length === 0) return undefined;
   const candidateTokens = [
     driver.vehicleTypeId,
     matchedCar?.vehicleTypeId,
@@ -80,8 +93,13 @@ function findMatchedVehicleTier(
     .filter(Boolean);
 
   for (const tok of candidateTokens) {
+    const slug = normalizeTierToken(tok);
     const exact = activeTiers.find(
-      (t) => t.id.trim().toLowerCase() === tok || t.name.trim().toLowerCase() === tok
+      (t) =>
+        t.id.trim().toLowerCase() === tok ||
+        normalizeTierToken(t.id) === slug ||
+        t.name.trim().toLowerCase() === tok ||
+        normalizeTierToken(t.name) === slug
     );
     if (exact) return exact;
   }
@@ -121,21 +139,10 @@ function classifyCanonicalVehicleText(text: string): CanonicalVehicleTypeKey | n
   return null;
 }
 
-/**
- * Resolves a driver's canonical vehicle type key (`'sedan' | 'suv' | 'minivan' | 'van' | 'wheelchair_wav'`
- * or a custom `VehicleTierConfig.id` when configured).
- */
-export function resolveDriverVehicleTypeKey(
-  driver: DriverVehicleFilterTarget | null | undefined,
-  fleetCars?: FleetCarConfig[] | null,
-  vehicleTiers?: VehicleTierConfig[] | null
+function resolveCanonicalDriverVehicleKey(
+  driver: DriverVehicleFilterTarget,
+  matchedCar?: FleetCarConfig
 ): string {
-  if (!driver) return 'sedan';
-
-  const matchedCar = findMatchedFleetCar(driver, fleetCars);
-  const matchedTier = findMatchedVehicleTier(driver, matchedCar, vehicleTiers);
-
-  // 1. Explicit driver vehicleType or physical car make/model/vehicle description
   const specificVehicleSignal = [
     driver.vehicleType,
     matchedCar ? `${matchedCar.make} ${matchedCar.model}` : '',
@@ -146,33 +153,11 @@ export function resolveDriverVehicleTypeKey(
   const fromSpecific = classifyCanonicalVehicleText(specificVehicleSignal);
   if (fromSpecific) return fromSpecific;
 
-  // 2. Check driver.tier / vehicleTypeId directly for canonical keywords
   const directTierSignal = [driver.tier, driver.vehicleTypeId].filter(Boolean).join(' ');
   const fromDirectTier = classifyCanonicalVehicleText(directTierSignal);
   if (fromDirectTier) return fromDirectTier;
 
-  // 3. Check matched VehicleTierConfig
-  if (matchedTier) {
-    const tierIdLower = matchedTier.id.trim().toLowerCase();
-    if (matchedTier.iconType === 'wheelchair' || tierIdLower === 'wheelchair') {
-      return 'wheelchair_wav';
-    }
-    const builtInGenericIds = new Set(['standard', 'premium', 'executive', 'xl']);
-    if (!builtInGenericIds.has(tierIdLower)) {
-      const canonicalIds = new Set<string>(CANONICAL_VEHICLE_TYPE_OPTIONS.map((o) => o.key));
-      if (canonicalIds.has(tierIdLower)) return tierIdLower;
-      return tierIdLower;
-    }
-    const fromTierName = classifyCanonicalVehicleText(matchedTier.name);
-    if (fromTierName) return fromTierName;
-    if (tierIdLower === 'xl' || matchedTier.iconType === 'xl') return 'suv';
-    return 'sedan';
-  }
-
-  // 4. Generic tier fallbacks
-  const rawTierLower = String(driver.vehicleTypeId || driver.tier || '')
-    .trim()
-    .toLowerCase();
+  const rawTierLower = String(driver.vehicleTypeId || driver.tier || '').trim().toLowerCase();
   if (rawTierLower === 'wheelchair' || rawTierLower === 'wav') return 'wheelchair_wav';
   if (rawTierLower === 'xl') return 'suv';
   if (
@@ -184,8 +169,76 @@ export function resolveDriverVehicleTypeKey(
   ) {
     return 'sedan';
   }
-
   return rawTierLower;
+}
+
+function mapCanonicalClassToActiveTier(
+  canonicalKey: string,
+  activeTiers: readonly VehicleTierConfig[]
+): VehicleTierConfig | undefined {
+  const matchByClass = (target: CanonicalVehicleTypeKey) =>
+    activeTiers.find((t) => classifyCanonicalVehicleText(`${t.id} ${t.name}`) === target);
+
+  if (canonicalKey === 'wheelchair_wav') {
+    return (
+      activeTiers.find((t) => t.id.toLowerCase() === 'wheelchair' || t.iconType === 'wheelchair') ||
+      matchByClass('wheelchair_wav')
+    );
+  }
+  if (canonicalKey === 'minivan') {
+    return (
+      matchByClass('minivan') ||
+      activeTiers.find((t) => t.id.toLowerCase() === 'xl' || t.iconType === 'xl') ||
+      matchByClass('suv')
+    );
+  }
+  if (canonicalKey === 'van') {
+    return (
+      matchByClass('van') ||
+      matchByClass('minivan') ||
+      activeTiers.find((t) => t.id.toLowerCase() === 'xl' || t.iconType === 'xl') ||
+      matchByClass('suv')
+    );
+  }
+  if (canonicalKey === 'suv') {
+    return (
+      matchByClass('suv') ||
+      activeTiers.find((t) => t.id.toLowerCase() === 'xl' || t.iconType === 'xl')
+    );
+  }
+  return (
+    activeTiers.find((t) => t.id.toLowerCase() === 'standard') ||
+    matchByClass('sedan') ||
+    activeTiers.find((t) => t.iconType === 'standard') ||
+    activeTiers[0]
+  );
+}
+
+/**
+ * Resolves a driver's vehicle type key onto active Admin `VehicleTierConfig` IDs when present,
+ * falling back to canonical keys (`'sedan' | 'suv' | 'minivan' | 'van' | 'wheelchair_wav'`) only when
+ * `vehicleTiers` is empty or null.
+ */
+export function resolveDriverVehicleTypeKey(
+  driver: DriverVehicleFilterTarget | null | undefined,
+  fleetCars?: FleetCarConfig[] | null,
+  vehicleTiers?: VehicleTierConfig[] | null
+): string {
+  const activeTiers = getActiveAdminVehicleTiers(vehicleTiers);
+  if (!driver) {
+    return activeTiers[0] ? activeTiers[0].id.trim().toLowerCase() : 'sedan';
+  }
+
+  const matchedCar = findMatchedFleetCar(driver, fleetCars);
+  if (activeTiers.length > 0) {
+    const matchedTier = findMatchedVehicleTier(driver, matchedCar, activeTiers);
+    if (matchedTier) return matchedTier.id.trim().toLowerCase();
+    const canonical = resolveCanonicalDriverVehicleKey(driver, matchedCar);
+    const mappedTier = mapCanonicalClassToActiveTier(canonical, activeTiers);
+    return mappedTier ? mappedTier.id.trim().toLowerCase() : canonical;
+  }
+
+  return resolveCanonicalDriverVehicleKey(driver, matchedCar);
 }
 
 /**
@@ -209,65 +262,60 @@ export function matchesSelectedVehicleTypes(
   }
   if (!driver) return false;
 
-  const canonicalKey = resolveDriverVehicleTypeKey(driver, fleetCars, vehicleTiers);
-  if (normalizedSelected.has(canonicalKey)) {
-    return true;
-  }
-
-  // Also support matching directly by configured VehicleTierConfig ID (e.g. 'standard', 'premium', 'xl', or custom IDs)
   const matchedCar = findMatchedFleetCar(driver, fleetCars);
-  const matchedTier = findMatchedVehicleTier(driver, matchedCar, vehicleTiers);
-  if (matchedTier && normalizedSelected.has(matchedTier.id.trim().toLowerCase())) {
-    return true;
-  }
-  if (matchedCar?.vehicleTypeId && normalizedSelected.has(matchedCar.vehicleTypeId.trim().toLowerCase())) {
-    return true;
-  }
-  if (driver.vehicleTypeId && normalizedSelected.has(driver.vehicleTypeId.trim().toLowerCase())) {
-    return true;
-  }
-  if (driver.tier && normalizedSelected.has(driver.tier.trim().toLowerCase())) {
+  const resolvedKey = resolveDriverVehicleTypeKey(driver, fleetCars, vehicleTiers);
+  const canonicalKey = resolveCanonicalDriverVehicleKey(driver, matchedCar);
+  if (normalizedSelected.has(resolvedKey) || normalizedSelected.has(canonicalKey)) {
     return true;
   }
 
+  const matchedTier = findMatchedVehicleTier(driver, matchedCar, vehicleTiers);
+  const candidateTokens = [
+    matchedTier?.id,
+    matchedCar?.vehicleTypeId,
+    driver.vehicleTypeId,
+    driver.tier,
+  ]
+    .map((v) => String(v || '').trim().toLowerCase())
+    .filter(Boolean);
+
+  for (const tok of candidateTokens) {
+    if (normalizedSelected.has(tok) || normalizedSelected.has(normalizeTierToken(tok))) {
+      return true;
+    }
+  }
   return false;
 }
 
 /**
  * Builds the multi-select option catalog with live driver counts for `Vehicles ▾` HUD popover.
+ * Strictly uses active Admin `VehicleTierConfig` entries (preserving configured order & `v.name`)
+ * when present, falling back to `CANONICAL_VEHICLE_TYPE_OPTIONS` only when `vehicleTiers` is empty/null.
  */
 export function buildVehicleTypeFilterOptions(
   fleet: readonly DriverVehicleFilterTarget[],
   fleetCars?: FleetCarConfig[] | null,
   vehicleTiers?: VehicleTierConfig[] | null
 ): VehicleTypeFilterOption[] {
+  const activeTiers = getActiveAdminVehicleTiers(vehicleTiers);
   const optionsMap = new Map<string, VehicleTypeFilterOption>();
-  for (const item of CANONICAL_VEHICLE_TYPE_OPTIONS) {
-    optionsMap.set(item.key, {
-      key: item.key,
-      label: item.label,
-      totalDriversCount: 0,
-      onShiftDriversCount: 0,
-    });
-  }
 
-  // Include any custom non-archived VehicleTierConfig IDs beyond generic standard/premium/xl
-  const genericBuiltInTierIds = new Set([
-    'standard',
-    'premium',
-    'executive',
-    'xl',
-    'wheelchair',
-    ...CANONICAL_VEHICLE_TYPE_OPTIONS.map((o) => o.key),
-  ]);
-  if (Array.isArray(vehicleTiers)) {
-    for (const tier of vehicleTiers) {
-      if (tier.isArchived) continue;
+  if (activeTiers.length > 0) {
+    for (const tier of activeTiers) {
       const key = tier.id.trim().toLowerCase();
-      if (!key || genericBuiltInTierIds.has(key) || optionsMap.has(key)) continue;
+      if (!key || optionsMap.has(key)) continue;
       optionsMap.set(key, {
         key,
         label: tier.name || tier.id,
+        totalDriversCount: 0,
+        onShiftDriversCount: 0,
+      });
+    }
+  } else {
+    for (const item of CANONICAL_VEHICLE_TYPE_OPTIONS) {
+      optionsMap.set(item.key, {
+        key: item.key,
+        label: item.label,
         totalDriversCount: 0,
         onShiftDriversCount: 0,
       });
@@ -276,9 +324,9 @@ export function buildVehicleTypeFilterOptions(
 
   for (const drv of fleet) {
     if (drv.isBlacklisted) continue;
-    const key = resolveDriverVehicleTypeKey(drv, fleetCars, vehicleTiers);
+    const key = resolveDriverVehicleTypeKey(drv, fleetCars, activeTiers.length > 0 ? activeTiers : null);
     let entry = optionsMap.get(key);
-    if (!entry) {
+    if (!entry && activeTiers.length === 0) {
       entry = {
         key,
         label: key.toUpperCase(),
@@ -287,6 +335,7 @@ export function buildVehicleTypeFilterOptions(
       };
       optionsMap.set(key, entry);
     }
+    if (!entry) continue;
     entry.totalDriversCount += 1;
     if (drv.mapStatus && drv.mapStatus !== 'offline') {
       entry.onShiftDriversCount += 1;

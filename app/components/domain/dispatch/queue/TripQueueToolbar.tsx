@@ -222,6 +222,11 @@ export function TripQueueToolbar({
     onStatusFilterChange(nextStatusFilter);
   };
 
+  const activeAdminVehicles = React.useMemo(
+    () => (settings.vehicles || []).filter((v) => !v.isArchived && v.isActive !== false),
+    [settings.vehicles]
+  );
+
   return (
     <>
       {/* ─── Modern Filter & Trips Control Bar ─── */}
@@ -433,7 +438,8 @@ export function TripQueueToolbar({
                       triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
                     >
                       <option value="all">All Vehicles</option>
-                      {settings.vehicles.map((v) => (
+                      <option value="any">Any</option>
+                      {activeAdminVehicles.map((v) => (
                         <option key={v.id} value={v.id}>
                           {v.name}
                         </option>
@@ -799,7 +805,8 @@ export function TripQueueToolbar({
                 triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
               >
                 <option value="all">All</option>
-                {settings.vehicles.map((v) => (
+                <option value="any">Any</option>
+                {activeAdminVehicles.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.name}
                   </option>

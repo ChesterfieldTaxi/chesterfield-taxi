@@ -1088,3 +1088,23 @@
 - [x] 66.7 Automated Verification Suite (`scripts/test-queue-columns-sorting-and-icons-phase66.ts`) & Build Gate:
   - [x] 66.7.1 Create `scripts/test-queue-columns-sorting-and-icons-phase66.ts` and pass `npm run typecheck`, Phases 63–66 verification suites, and `npm run build` with `0` errors.
 
+## Phase 67 (Wave 6 Phase 2): Active Admin Vehicles (`Any → Assigned`), Starred `Places` Overlay Fix, Searchable `YYZ Toronto` Flight Combobox & Dynamic `Waive Fees ▾` Dropdown
+- [x] 67.0 Baseline Commit & Spec-Driven Documentation:
+  - [x] 67.0.1 Stage and commit clean Phase 66 baseline on `main` (`feat(phase-66): default queue to Active Only, pure icon status pills, Columns selector, multi-column sort, and clickable Trip IDs`).
+  - [x] 67.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 67 scope and checklist.
+- [x] 67.1 Active Admin Vehicles Unification + `Any → Assigned` Display:
+  - [x] 67.1.1 Update `buildVehicleTypeFilterOptions` & `resolveDriverVehicleTypeKey` / `matchesSelectedVehicleTypes` in `fleet-car-marker.util.ts` to build strictly from active non-archived Admin `VehicleTierConfig` entries (`!v.isArchived && v.isActive !== false`) in configured order (`CANONICAL_VEHICLE_TYPE_OPTIONS` fallback only when empty/null) and filter `TripQueueToolbar.tsx` `Filter ▾ -> Vehicle` to active Admin vehicles + `"Any"`.
+  - [x] 67.1.2 Prioritize live `vehicles` lookup by `tier` ID in `formatVehicleTier` / `formatVehicleTierDisplay`, export `formatTripVehicleColumnDisplay(trip, vehicles, drivers, fleetCars)` (`Any → <Assigned Tier>`), and wire into `TripQueueTableView.tsx`, `AdminTripsTablePanel.tsx`, and `sortQueueTripsByColumn`.
+- [x] 67.2 Starred (`isPopular`) Admin Places Overlay Fix:
+  - [x] 67.2.1 Fix `SpecialPlacesService.syncWithFirestore()` to merge Firestore docs by `id` over non-deleted `DEFAULT_SPECIAL_PLACES` (`ct_deleted_special_place_ids_v1` in `deletePlace(id)`), and emit live `WorkspaceBus` + subscriber notifications on `savePlace` / `deletePlace`.
+  - [x] 67.2.2 Update `showPlacesOverlay` in `useLiveMapCustomOverlays.ts` to render strictly active Starred Admin Places (`sp.isActive && sp.isPopular && !sp.isArchived`) and re-sync live when starred/unstarred.
+- [x] 67.3 Searchable `YYZ Toronto` Airport Combobox + Auto Return Flight:
+  - [x] 67.3.1 Create `app/core/config/airport-catalog.ts` (`< 320`L) with `MAJOR_AIRPORTS`, `formatAirportCodeCity`, `searchAirportCatalog`, and `extractAirportIataCode`, plus portal `<AirportCityCombobox />` (`< 280`L) wired into all 6 flight origin/destination fields across `FlightAssistanceCard.tsx`, `DispatchRoutingTimingSection.tsx`, and `DispatchReturnRepeatSection.tsx`.
+  - [x] 67.3.2 Normalize `"YYZ Toronto"` -> `"YYZ"` via `extractAirportIataCode` in `flight-status.service.ts` and auto-enable `returnProvideFlightInfo = true` when outbound dropoff is an airport and `Return Trip` is toggled ON (unless manually dismissed).
+- [x] 67.4 Dynamic `Waive Fees ▾` Multi-Select Dropdown:
+  - [x] 67.4.1 Add `waivedSurchargeIds?: string[]` & `waivedExtraKeys?: string[]` to `PricingCalculationInput` (`types.ts`) and waive matching enabled catalog surcharges & active extras in `rules.ts` (`amount: 0`, `isWaived: true`, `originalAmount`), keeping `waiveAirportFee` / `waiveMultiStopFees` / `bypassSurge` backward-compatible.
+  - [x] 67.4.2 Create `DispatchWaiveFeesDropdown.tsx` (`< 280`L) with `Actions ▾` portal UI + `MenuCheckIndicator`, live quote badges, and removable green waived chips, wire into `DispatchPaymentAssignmentSection.tsx` & `DispatchBookingEngine.tsx`, and render emerald/strikethrough `(Waived)` items in `PriceBreakdownPanel.tsx`.
+- [x] 67.5 Automated Verification Suite (`scripts/test-vehicles-places-flights-and-waivers-phase67.ts`) & Build Gate:
+  - [x] 67.5.1 Create `scripts/test-vehicles-places-flights-and-waivers-phase67.ts` and pass `npm run typecheck`, Phases 63–67 verification suites, and `npm run build` with `0` errors.
+
+

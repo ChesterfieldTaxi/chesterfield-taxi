@@ -32,12 +32,14 @@ function buildCleanBreakdownLines(
             amount: pricing.tariffBaseSubtotal ?? pricing.subtotal ?? pricing.baseFare,
           },
           ...(pricing.itemizedSurcharges || [])
-            .filter((s) => s.amount > 0)
+            .filter((s) => s.amount > 0 || /\(waived\)/i.test(s.name))
             .map((s, i) => ({
               id: `legacy-surcharge-${i}`,
               category: 'surcharge' as const,
               label: s.name,
               amount: s.amount,
+              isWaived: s.amount === 0 && /\(waived\)/i.test(s.name),
+              originalAmount: s.originalAmount,
             })),
           ...(pricing.discountAmount > 0
             ? [
@@ -52,9 +54,11 @@ function buildCleanBreakdownLines(
         ];
 
   const baseLine = canonicalItems.find((item) => item.category === 'base');
-  const extrasLines = canonicalItems.filter((item) => item.category === 'extra' && item.amount !== 0);
+  const extrasLines = canonicalItems.filter(
+    (item) => item.category === 'extra' && (item.amount !== 0 || item.isWaived)
+  );
   const surchargeLines = canonicalItems.filter(
-    (item) => item.category === 'surcharge' && item.amount !== 0
+    (item) => item.category === 'surcharge' && (item.amount !== 0 || item.isWaived)
   );
   const discountLines = canonicalItems.filter(
     (item) => item.category === 'discount' && item.amount !== 0
@@ -139,6 +143,7 @@ export function PriceBreakdownPanel({
 
       <div className="space-y-1.5 text-slate-700">
         {outboundLines.map((item) => {
+          const isWaived = Boolean(item.isWaived || (item.amount === 0 && /\(waived\)/i.test(item.label)));
           const isDiscount = item.category === 'discount' || item.amount < 0;
           const isBase = item.category === 'base';
 
@@ -146,20 +151,31 @@ export function PriceBreakdownPanel({
             <div
               key={item.id}
               className={`flex items-center justify-between gap-2 ${
-                isDiscount ? 'text-emerald-700 font-semibold' : ''
+                isDiscount || isWaived ? 'text-emerald-700 font-semibold' : ''
               }`}
             >
-              <span className={isBase ? 'font-semibold text-slate-900' : 'text-slate-700'}>
+              <span className={isBase ? 'font-semibold text-slate-900' : isWaived ? 'text-emerald-700' : 'text-slate-700'}>
                 {item.label}
               </span>
               <span
-                className={`font-mono font-semibold shrink-0 ${
-                  isDiscount ? 'text-emerald-700' : 'text-slate-900'
+                className={`font-mono font-semibold shrink-0 inline-flex items-center gap-1.5 ${
+                  isDiscount || isWaived ? 'text-emerald-700' : 'text-slate-900'
                 }`}
               >
-                {isDiscount
-                  ? `-$${Math.abs(item.amount).toFixed(2)}`
-                  : `$${item.amount.toFixed(2)}`}
+                {isWaived ? (
+                  <>
+                    {typeof item.originalAmount === 'number' && item.originalAmount > 0 && (
+                      <span className="line-through text-slate-400 font-normal">
+                        ${item.originalAmount.toFixed(2)}
+                      </span>
+                    )}
+                    <span>$0.00</span>
+                  </>
+                ) : isDiscount ? (
+                  `-$${Math.abs(item.amount).toFixed(2)}`
+                ) : (
+                  `$${item.amount.toFixed(2)}`
+                )}
               </span>
             </div>
           );
@@ -190,26 +206,38 @@ export function PriceBreakdownPanel({
               </div>
 
               {returnLines.map((item) => {
+                const isWaived = Boolean(item.isWaived || (item.amount === 0 && /\(waived\)/i.test(item.label)));
                 const isDiscount = item.category === 'discount' || item.amount < 0;
                 const isBase = item.category === 'base';
                 return (
                   <div
                     key={`ret-${item.id}`}
                     className={`flex items-center justify-between gap-2 ${
-                      isDiscount ? 'text-emerald-700 font-semibold' : ''
+                      isDiscount || isWaived ? 'text-emerald-700 font-semibold' : ''
                     }`}
                   >
-                    <span className={isBase ? 'font-semibold text-slate-900' : 'text-slate-700'}>
+                    <span className={isBase ? 'font-semibold text-slate-900' : isWaived ? 'text-emerald-700' : 'text-slate-700'}>
                       {item.label}
                     </span>
                     <span
-                      className={`font-mono font-semibold shrink-0 ${
-                        isDiscount ? 'text-emerald-700' : 'text-slate-900'
+                      className={`font-mono font-semibold shrink-0 inline-flex items-center gap-1.5 ${
+                        isDiscount || isWaived ? 'text-emerald-700' : 'text-slate-900'
                       }`}
                     >
-                      {isDiscount
-                        ? `-$${Math.abs(item.amount).toFixed(2)}`
-                        : `$${item.amount.toFixed(2)}`}
+                      {isWaived ? (
+                        <>
+                          {typeof item.originalAmount === 'number' && item.originalAmount > 0 && (
+                            <span className="line-through text-slate-400 font-normal">
+                              ${item.originalAmount.toFixed(2)}
+                            </span>
+                          )}
+                          <span>$0.00</span>
+                        </>
+                      ) : isDiscount ? (
+                        `-$${Math.abs(item.amount).toFixed(2)}`
+                      ) : (
+                        `$${item.amount.toFixed(2)}`
+                      )}
                     </span>
                   </div>
                 );

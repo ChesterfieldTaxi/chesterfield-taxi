@@ -260,6 +260,8 @@ export interface DispatchHydrationSetters {
   setWaiveAirportFee: (v: boolean) => void;
   setWaiveMultiStopFees: (v: boolean) => void;
   setBypassSurge: (v: boolean) => void;
+  setWaivedSurchargeIds?: (v: string[]) => void;
+  setWaivedExtraKeys?: (v: string[]) => void;
   setCompany: (v: string) => void;
   setDriverId: (v: string) => void;
   setDriverAssignmentMode?: (v: 'send_to_driver' | 'stage_hold') => void;
@@ -451,6 +453,12 @@ export function applySavedDraftOverlayToDispatchState(
   if (parsed.waiveAirportFee !== undefined) s.setWaiveAirportFee(parsed.waiveAirportFee);
   if (parsed.waiveMultiStopFees !== undefined) s.setWaiveMultiStopFees(parsed.waiveMultiStopFees);
   if (parsed.bypassSurge !== undefined) s.setBypassSurge(parsed.bypassSurge);
+  if (Array.isArray(parsed.waivedSurchargeIds)) {
+    s.setWaivedSurchargeIds?.(parsed.waivedSurchargeIds);
+  }
+  if (Array.isArray(parsed.waivedExtraKeys)) {
+    s.setWaivedExtraKeys?.(parsed.waivedExtraKeys);
+  }
   if (parsed.company) s.setCompany(parsed.company);
   const hasLiveAssignedDriver = Boolean(options?.initialTrip?.assignedDriverId);
   const explicitlyUnassignedInDraft = parsed._explicitlyUnassigned === true;
@@ -836,6 +844,12 @@ export function hydrateInitialTripIntoDispatchState(
     s.setWaiveMultiStopFees(Boolean(meta.waiveMultiStopFees));
   }
   if (meta.bypassSurge !== undefined) s.setBypassSurge(Boolean(meta.bypassSurge));
+  if (Array.isArray(meta.waivedSurchargeIds)) {
+    s.setWaivedSurchargeIds?.(meta.waivedSurchargeIds);
+  }
+  if (Array.isArray(meta.waivedExtraKeys)) {
+    s.setWaivedExtraKeys?.(meta.waivedExtraKeys);
+  }
   if (meta.manualDiscountDollars) s.setManualDiscountDollars(String(meta.manualDiscountDollars));
 
   if (initialTrip.driverNotes) {
@@ -1001,6 +1015,8 @@ export interface UseDispatchBookingSubmissionParams {
   waiveAirportFee: boolean;
   waiveMultiStopFees: boolean;
   bypassSurge: boolean;
+  waivedSurchargeIds?: string[];
+  waivedExtraKeys?: string[];
   company: string;
   driverId: string;
   driverAssignmentMode?: 'send_to_driver' | 'stage_hold';
@@ -1138,6 +1154,8 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     waiveAirportFee,
     waiveMultiStopFees,
     bypassSurge,
+    waivedSurchargeIds = [],
+    waivedExtraKeys = [],
     company,
     driverId,
     driverAssignmentMode = 'send_to_driver',
@@ -1396,6 +1414,8 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           waiveAirportFee,
           waiveMultiStopFees,
           bypassSurge,
+          waivedSurchargeIds,
+          waivedExtraKeys,
           isAirportPickup: airportDetection.isPickupAirport,
           isAirportDropoff: airportDetection.isDropoffAirport,
           isAirportTrip: airportDetection.isAirportTrip,
@@ -1475,6 +1495,8 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     waiveAirportFee,
     waiveMultiStopFees,
     bypassSurge,
+    JSON.stringify(waivedSurchargeIds),
+    JSON.stringify(waivedExtraKeys),
     availableNamedRules,
     universalExtrasConfig,
     surchargesVersion,
@@ -1563,6 +1585,8 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           waiveAirportFee,
           waiveMultiStopFees,
           bypassSurge,
+          waivedSurchargeIds,
+          waivedExtraKeys,
           isAirportPickup: returnAirportDetection.isPickupAirport,
           isAirportDropoff: returnAirportDetection.isDropoffAirport,
           isAirportTrip: returnAirportDetection.isAirportTrip,
@@ -1640,6 +1664,8 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     waiveAirportFee,
     waiveMultiStopFees,
     bypassSurge,
+    JSON.stringify(waivedSurchargeIds),
+    JSON.stringify(waivedExtraKeys),
     availableNamedRules,
     universalExtrasConfig,
     surchargesVersion,
@@ -1801,6 +1827,8 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
       waiveAirportFee,
       waiveMultiStopFees,
       bypassSurge,
+      waivedSurchargeIds: waivedSurchargeIds.length > 0 ? waivedSurchargeIds : undefined,
+      waivedExtraKeys: waivedExtraKeys.length > 0 ? waivedExtraKeys : undefined,
       vehicleTypeId: primaryVehicle === 'any' ? 'any' : String(tier),
       vehicleDisplayName: primaryVehicleDisplayName,
       vehiclePreference: primaryVehicle,

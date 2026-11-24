@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
+import { getWorkspaceBus } from '../workspace-bus.service';
 
 export type SpecialPlaceCategory =
   | 'airport'
@@ -45,6 +46,7 @@ export interface SpecialPlace {
   airportType?: 'commercial' | 'private';
   isPopular: boolean; // Shown prominently in initial suggestions
   isActive: boolean;
+  isArchived?: boolean;
   notes?: string;
   aliases?: string[]; // e.g. ["STL", "Lambert", "Terminal 1", "T1", "Terminal 2", "T2"]
   createdAt?: string;
@@ -743,12 +745,66 @@ export const DEFAULT_SPECIAL_PLACES: SpecialPlace[] = [
 ];
 
 const SPECIAL_PLACES_STORAGE_KEY = 'chesterfield_taxi_special_places_v2';
+export const DELETED_SPECIAL_PLACES_STORAGE_KEY = 'ct_deleted_special_place_ids_v1';
+
+/**
+ * Pure non-clobbering catalog merger: overlays saved/Firestore `SpecialPlace` docs by `id`
+ * onto non-deleted `DEFAULT_SPECIAL_PLACES`, preserving default catalog entries that have
+ * not yet been individually written to Firestore while omitting deleted tombstones.
+ */
+export function mergeSpecialPlacesWithDefaults(
+  savedPlaces: readonly SpecialPlace[] | null | undefined,
+  defaultPlaces: readonly SpecialPlace[] = DEFAULT_SPECIAL_PLACES,
+  deletedIds: Iterable<string> = []
+): SpecialPlace[] {
+  const deletedSet = new Set(
+    Array.from(deletedIds, (id) => String(id || '').trim()).filter(Boolean)
+  );
+  const savedList = Array.isArray(savedPlaces) ? savedPlaces : [];
+  const savedById = new Map<string, SpecialPlace>();
+  for (const item of savedList) {
+    if (!item?.id || deletedSet.has(item.id)) continue;
+    savedById.set(item.id, item);
+  }
+
+  const consumedIds = new Set<string>();
+  const merged: SpecialPlace[] = [];
+
+  for (const def of defaultPlaces) {
+    if (deletedSet.has(def.id)) continue;
+    consumedIds.add(def.id);
+    const saved = savedById.get(def.id);
+    if (saved) {
+      merged.push({ ...def, ...saved });
+    } else {
+      merged.push({ ...def });
+    }
+  }
+
+  for (const item of savedList) {
+    if (!item?.id || deletedSet.has(item.id) || consumedIds.has(item.id)) continue;
+    consumedIds.add(item.id);
+    merged.push({ ...item });
+  }
+
+  return merged;
+}
+
+function getStorageSafe(): Storage | null {
+  try {
+    if (typeof localStorage !== 'undefined') return localStorage;
+  } catch {}
+  return null;
+}
 
 export class SpecialPlacesService {
   private db: Firestore | null = null;
   private cache: SpecialPlace[] = [];
+  private deletedIds: Set<string> = new Set();
+  private listeners: Set<(places: SpecialPlace[]) => void> = new Set();
 
   constructor() {
+    this.deletedIds = this.loadDeletedIds();
     this.cache = this.loadFromLocalStorage();
   }
 
@@ -758,37 +814,98 @@ export class SpecialPlacesService {
     }
   }
 
-  private loadFromLocalStorage(): SpecialPlace[] {
-    if (typeof window === 'undefined') return DEFAULT_SPECIAL_PLACES;
+  private loadDeletedIds(): Set<string> {
+    const store = getStorageSafe();
+    if (!store) return new Set();
     try {
-      const stored = localStorage.getItem(SPECIAL_PLACES_STORAGE_KEY);
+      const raw = store.getItem(DELETED_SPECIAL_PLACES_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return new Set(parsed.map((id) => String(id || '').trim()).filter(Boolean));
+        }
+      }
+    } catch (e) {
+      console.warn('[SpecialPlacesService] Failed to load deleted IDs:', e);
+    }
+    return new Set();
+  }
+
+  private saveDeletedIds() {
+    const store = getStorageSafe();
+    if (!store) return;
+    try {
+      store.setItem(
+        DELETED_SPECIAL_PLACES_STORAGE_KEY,
+        JSON.stringify(Array.from(this.deletedIds))
+      );
+    } catch (e) {
+      console.warn('[SpecialPlacesService] Failed to save deleted IDs:', e);
+    }
+  }
+
+  public getDeletedPlaceIds(): string[] {
+    return Array.from(this.deletedIds);
+  }
+
+  private loadFromLocalStorage(): SpecialPlace[] {
+    const store = getStorageSafe();
+    if (!store) {
+      return mergeSpecialPlacesWithDefaults([], DEFAULT_SPECIAL_PLACES, this.deletedIds);
+    }
+    try {
+      const stored = store.getItem(SPECIAL_PLACES_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Merge in any newly added default places that might not yet exist in local cache
-          const existingIds = new Set(parsed.map((p) => p.id));
-          const missingDefaults = DEFAULT_SPECIAL_PLACES.filter((p) => !existingIds.has(p.id));
-          if (missingDefaults.length > 0) {
-            const merged = [...parsed, ...missingDefaults];
-            this.saveToLocalStorage(merged);
-            return merged;
-          }
-          return parsed;
+          const merged = mergeSpecialPlacesWithDefaults(
+            parsed,
+            DEFAULT_SPECIAL_PLACES,
+            this.deletedIds
+          );
+          this.saveToLocalStorage(merged);
+          return merged;
         }
       }
     } catch (e) {
       console.warn('[SpecialPlacesService] Failed to load from localStorage:', e);
     }
-    return DEFAULT_SPECIAL_PLACES;
+    return mergeSpecialPlacesWithDefaults([], DEFAULT_SPECIAL_PLACES, this.deletedIds);
   }
 
   private saveToLocalStorage(places: SpecialPlace[]) {
-    if (typeof window === 'undefined') return;
+    const store = getStorageSafe();
+    if (!store) return;
     try {
-      localStorage.setItem(SPECIAL_PLACES_STORAGE_KEY, JSON.stringify(places));
+      store.setItem(SPECIAL_PLACES_STORAGE_KEY, JSON.stringify(places));
     } catch (e) {
       console.warn('[SpecialPlacesService] Failed to save to localStorage:', e);
     }
+  }
+
+  private emitUpdate(action: 'save' | 'delete' | 'reset' | 'sync', placeId?: string) {
+    const snapshot = this.getAllPlaces();
+    this.listeners.forEach((cb) => {
+      try {
+        cb(snapshot);
+      } catch (e) {
+        console.warn('[SpecialPlacesService] Listener error:', e);
+      }
+    });
+    try {
+      getWorkspaceBus().publish('SPECIAL_PLACES_UPDATED', {
+        action,
+        placeId,
+        updatedAt: Date.now(),
+      });
+    } catch {}
+  }
+
+  public subscribe(listener: (places: SpecialPlace[]) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
   public getAllPlaces(): SpecialPlace[] {
@@ -799,7 +916,7 @@ export class SpecialPlacesService {
   }
 
   public getActivePlaces(): SpecialPlace[] {
-    return this.getAllPlaces().filter((p) => p.isActive);
+    return this.getAllPlaces().filter((p) => p.isActive && !p.isArchived);
   }
 
   public getPopularPlaces(): SpecialPlace[] {
@@ -827,6 +944,11 @@ export class SpecialPlacesService {
       updatedAt: new Date().toISOString(),
     };
 
+    if (this.deletedIds.has(place.id)) {
+      this.deletedIds.delete(place.id);
+      this.saveDeletedIds();
+    }
+
     const index = this.cache.findIndex((p) => p.id === place.id);
     if (index >= 0) {
       this.cache[index] = updated;
@@ -835,8 +957,8 @@ export class SpecialPlacesService {
     }
 
     this.saveToLocalStorage(this.cache);
+    this.emitUpdate('save', place.id);
 
-    // Save to Firestore if connected
     this.initDb();
     if (this.db) {
       try {
@@ -849,8 +971,11 @@ export class SpecialPlacesService {
   }
 
   public async deletePlace(id: string): Promise<void> {
+    this.deletedIds.add(id);
+    this.saveDeletedIds();
     this.cache = this.cache.filter((p) => p.id !== id);
     this.saveToLocalStorage(this.cache);
+    this.emitUpdate('delete', id);
 
     this.initDb();
     if (this.db) {
@@ -864,8 +989,17 @@ export class SpecialPlacesService {
   }
 
   public async syncWithFirestore(): Promise<SpecialPlace[]> {
+    this.deletedIds = new Set([...this.deletedIds, ...this.loadDeletedIds()]);
     this.initDb();
-    if (!this.db) return this.getAllPlaces();
+    if (!this.db) {
+      this.cache = mergeSpecialPlacesWithDefaults(
+        this.cache,
+        DEFAULT_SPECIAL_PLACES,
+        this.deletedIds
+      );
+      this.saveToLocalStorage(this.cache);
+      return this.getAllPlaces();
+    }
 
     try {
       const snapshot = await getDocs(collection(this.db, 'specialPlaces'));
@@ -875,9 +1009,14 @@ export class SpecialPlacesService {
           loaded.push({ id: d.id, ...d.data() } as SpecialPlace);
         });
         if (loaded.length > 0) {
-          this.cache = loaded;
-          this.saveToLocalStorage(loaded);
-          return loaded;
+          const merged = mergeSpecialPlacesWithDefaults(
+            loaded,
+            DEFAULT_SPECIAL_PLACES,
+            this.deletedIds
+          );
+          this.cache = merged;
+          this.saveToLocalStorage(merged);
+          return [...merged];
         }
       }
     } catch (e) {
@@ -887,8 +1026,11 @@ export class SpecialPlacesService {
   }
 
   public async resetToDefaults(): Promise<SpecialPlace[]> {
-    this.cache = [...DEFAULT_SPECIAL_PLACES];
+    this.deletedIds.clear();
+    this.saveDeletedIds();
+    this.cache = DEFAULT_SPECIAL_PLACES.map((p) => ({ ...p }));
     this.saveToLocalStorage(this.cache);
+    this.emitUpdate('reset');
     return this.getAllPlaces();
   }
 }

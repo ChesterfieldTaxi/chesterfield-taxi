@@ -14,7 +14,7 @@ import type { SlaScanSummary } from '../../../../core/services/dispatch/sla-moni
 import {
   buildTripItineraryTooltip, formatShortStopPreview, getTripIntermediateStopCount, getTripIntermediateStops,
 } from '../../../../core/utils/route-markers.util';
-import { formatVehicleTierDisplay } from '../../../../core/utils/vehicle-tier-format.util';
+import { formatTripVehicleColumnDisplay } from '../../../../core/utils/vehicle-tier-format.util';
 import { TripActionDropdown } from '../TripActionDropdown';
 import {
   DispatchCascadePill, DispatchFlightTelemetryPill, DispatchSlaBadge, getTripCascadeExhaustedTooltip,
@@ -98,8 +98,9 @@ export function TripQueueTableView({
         : sortQueueTripsByColumn(filteredTrips, columnSort, {
             drivers,
             vehicles: settings.vehicles,
+            fleetCars: settings.fleet,
           }),
-    [filteredTrips, columnSort, drivers, settings.vehicles]
+    [filteredTrips, columnSort, drivers, settings.vehicles, settings.fleet]
   );
 
   useIsomorphicLayoutEffect(() => {
@@ -469,11 +470,7 @@ export function TripQueueTableView({
                 {visibleColSet.has('vehicle') && (
                   <td className="py-2 px-2 whitespace-nowrap">
                     <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
-                      {formatVehicleTierDisplay(
-                        (trip.metadata as any)?.vehicleTypeId || trip.vehicleTier,
-                        settings.vehicles,
-                        (trip.metadata as any)?.vehicleDisplayName
-                      )}
+                      {formatTripVehicleColumnDisplay(trip, settings.vehicles, drivers, settings.fleet)}
                     </span>
                   </td>
                 )}

@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import type { VehicleTierConfig } from '../../types/config';
+import type { FleetCarConfig, VehicleTierConfig } from '../../types/config';
 import type { GeoPoint, Trip } from '../../types/trip';
 import type { SlaScanSummary } from '../../services/dispatch/sla-monitor.service';
 import { formatLocalDateStr } from '../../services/pricing/vehicle-matching';
 import { getTripIntermediateStopCount } from '../../utils/route-markers.util';
-import { formatVehicleTierDisplay } from '../../utils/vehicle-tier-format.util';
+import { formatTripVehicleColumnDisplay } from '../../utils/vehicle-tier-format.util';
 import type { DispatchFormValues } from '../../../components/domain/dispatch/DispatchBookingEngine';
 import type { DateTimeRange } from '../../../components/domain/dispatch/CustomDateTimePicker';
 import type { QueueFilterType } from '../../../components/domain/dispatch/DispatchTripQueuePane';
@@ -496,8 +496,18 @@ export function sortQueueTripsByColumn(
   list: ReadonlyArray<Trip>,
   sort: QueueColumnSortState,
   options?: {
-    drivers?: ReadonlyArray<{ id: string; name?: string; formattedLabel?: string }>;
+    drivers?: ReadonlyArray<{
+      id: string;
+      name?: string;
+      formattedLabel?: string;
+      cabNumber?: string;
+      vehicle?: string;
+      tier?: string;
+      vehicleType?: string;
+      vehicleTypeId?: string;
+    }>;
     vehicles?: VehicleTierConfig[];
+    fleetCars?: ReadonlyArray<FleetCarConfig>;
   }
 ): Trip[] {
   if (!sort || sort.column === 'smart') {
@@ -580,15 +590,17 @@ export function sortQueueTripsByColumn(
         });
         break;
       case 'vehicle': {
-        const vehA = formatVehicleTierDisplay(
-          (a.metadata as any)?.vehicleTypeId || a.vehicleTier,
+        const vehA = formatTripVehicleColumnDisplay(
+          a,
           options?.vehicles,
-          (a.metadata as any)?.vehicleDisplayName
+          options?.drivers,
+          options?.fleetCars
         ).toLowerCase();
-        const vehB = formatVehicleTierDisplay(
-          (b.metadata as any)?.vehicleTypeId || b.vehicleTier,
+        const vehB = formatTripVehicleColumnDisplay(
+          b,
           options?.vehicles,
-          (b.metadata as any)?.vehicleDisplayName
+          options?.drivers,
+          options?.fleetCars
         ).toLowerCase();
         cmp = vehA.localeCompare(vehB, undefined, { numeric: true, sensitivity: 'base' });
         break;
@@ -739,11 +751,16 @@ export function filterDispatchQueueTrips({
     }
 
     if (activeFilterKeys.includes('vehicle') && selectedVehicleFilter !== 'all') {
+      const targetVeh = selectedVehicleFilter.toLowerCase();
       const vId = String(meta.vehicleTypeId || trip.vehicleTier || '').toLowerCase();
-      if (
-        vId !== selectedVehicleFilter.toLowerCase() &&
-        (trip.vehicleTier || '').toLowerCase() !== selectedVehicleFilter.toLowerCase()
-      ) {
+      if (targetVeh === 'any') {
+        const isAny =
+          vId === 'any' ||
+          (trip.vehicleTier || '').toLowerCase() === 'any' ||
+          Boolean(meta.requestedAnyVehicle) ||
+          String(meta.vehiclePreference || '').toLowerCase() === 'any';
+        if (!isAny) return false;
+      } else if (vId !== targetVeh && (trip.vehicleTier || '').toLowerCase() !== targetVeh) {
         return false;
       }
     }

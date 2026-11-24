@@ -405,6 +405,7 @@ export function BookingEngineV2({
     returnDropoffAddress: form.returnDropoffAddress,
     returnTrip: form.returnTrip,
     clearWhenNoAirport: true,
+    returnFlightInfoDismissed: Boolean(form.returnFlightInfoDismissed),
     onSyncOutboundFlightInfo: (shouldEnable) => {
       setForm((prev) =>
         prev.provideFlightInfo === shouldEnable
@@ -856,7 +857,9 @@ export function BookingEngineV2({
       return {
         ...prev,
         returnTrip: true,
-        ...buildReturnLegSeedFromOutbound(prev, prev),
+        ...buildReturnLegSeedFromOutbound(prev, prev, {
+          returnFlightInfoDismissed: Boolean(prev.returnFlightInfoDismissed),
+        }),
       };
     });
   };

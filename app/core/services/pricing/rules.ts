@@ -824,7 +824,10 @@ export function createSurgeStep(
   rules: readonly SurgeRule[] = DEFAULT_SURGE_RULES
 ): PricingPipelineStep {
   return (context) => {
-    if (context.input.bypassSurge || rules.length === 0) {
+    const waivedSurge = (context.input.waivedSurchargeIds || []).includes(
+      BUILTIN_SURCHARGE_IDS.PEAK_SURGE
+    );
+    if (context.input.bypassSurge || waivedSurge || rules.length === 0) {
       return context;
     }
 
@@ -899,37 +902,58 @@ export const applyConditionSurcharges: PricingPipelineStep = (context) => {
   const extras = context.config.universalExtras || DEFAULT_UNIVERSAL_EXTRAS;
   const overrules = context.overruleExtras || {};
   const extraDirectives = context.resolvedExtraActions || {};
+  const waivedExtraSet = new Set(
+    (context.input.waivedExtraKeys || []).map((k) => String(k || '').trim()).filter(Boolean)
+  );
   let runningAdditions = 0;
 
   // 1. Child Safety Seats
   let carSeatFee = 0;
   const carSeatDir = extraDirectives.car_seat;
-  const carSeatRate =
-    carSeatDir?.action === 'waive' || overrules.waiveCarSeatFee
-      ? 0
-      : carSeatDir?.action === 'override' && typeof carSeatDir.overrideAmount === 'number'
+  const baseCarSeatRate =
+    carSeatDir?.action === 'override' && typeof carSeatDir.overrideAmount === 'number'
       ? carSeatDir.overrideAmount
       : overrules.carSeatFeePerUnit ?? extras.carSeatFeePerUnit;
-  if (carSeatRate > 0) {
-    const breakdown = context.input.carSeatsBreakdown;
-    const totalCarSeats = breakdown
-      ? breakdown.total ??
-        (breakdown.rearFacing ?? 0) + (breakdown.frontFacing ?? 0) + (breakdown.booster ?? 0)
-      : context.input.equipment?.carSeats ?? 0;
+  const isCarSeatRuleWaived = Boolean(carSeatDir?.action === 'waive' || overrules.waiveCarSeatFee);
+  const breakdown = context.input.carSeatsBreakdown;
+  const totalCarSeats = breakdown
+    ? breakdown.total ??
+      (breakdown.rearFacing ?? 0) + (breakdown.frontFacing ?? 0) + (breakdown.booster ?? 0)
+    : context.input.equipment?.carSeats ?? 0;
 
-    if (totalCarSeats > 0) {
-      carSeatFee = roundCurrency(totalCarSeats * carSeatRate);
+  if (totalCarSeats > 0 && baseCarSeatRate > 0 && !isCarSeatRuleWaived) {
+    const potentialSeatFee = roundCurrency(totalCarSeats * baseCarSeatRate);
+    if (waivedExtraSet.has('car_seat')) {
+      const waivedLabel = `Child Safety Seats (${totalCarSeats}) (Waived)`;
+      newSurcharges.push({
+        name: waivedLabel,
+        amount: 0,
+        originalAmount: potentialSeatFee,
+        description: `Dispatcher waived child safety seats ($${potentialSeatFee.toFixed(2)})`,
+      });
+      newLineItems.push({
+        id: 'extra-car-seats-waived',
+        category: 'extra',
+        label: waivedLabel,
+        detail: `$${baseCarSeatRate.toFixed(2)}/seat`,
+        amount: 0,
+        isWaived: true,
+        originalAmount: potentialSeatFee,
+        sourceType: 'extra',
+      });
+    } else {
+      carSeatFee = potentialSeatFee;
       const label = `Child Safety Seats (${totalCarSeats})`;
       newSurcharges.push({
         name: label,
         amount: carSeatFee,
-        description: `$${carSeatRate.toFixed(2)} × ${totalCarSeats} seat(s)`,
+        description: `$${baseCarSeatRate.toFixed(2)} × ${totalCarSeats} seat(s)`,
       });
       newLineItems.push({
         id: 'extra-car-seats',
         category: 'extra',
         label,
-        detail: `$${carSeatRate.toFixed(2)}/seat`,
+        detail: `$${baseCarSeatRate.toFixed(2)}/seat`,
         amount: carSeatFee,
         sourceType: 'extra',
       });
@@ -941,49 +965,88 @@ export const applyConditionSurcharges: PricingPipelineStep = (context) => {
   let passengerSurcharge = 0;
   const extraPaxDir = extraDirectives.extra_passenger;
   const allowance = overrules.passengerBaseAllowance ?? extras.passengerBaseAllowance;
-  const perHeadFee =
-    extraPaxDir?.action === 'waive' || overrules.waiveExtraPaxFee
-      ? 0
-      : extraPaxDir?.action === 'override' && typeof extraPaxDir.overrideAmount === 'number'
+  const basePerHeadFee =
+    extraPaxDir?.action === 'override' && typeof extraPaxDir.overrideAmount === 'number'
       ? extraPaxDir.overrideAmount
       : overrules.extraPassengerFeePerHead ?? extras.extraPassengerFeePerHead;
+  const isExtraPaxRuleWaived = Boolean(
+    extraPaxDir?.action === 'waive' || overrules.waiveExtraPaxFee
+  );
   const passengers = Math.max(0, context.input.passengers ?? 1);
-  if (allowance !== undefined && perHeadFee > 0 && passengers > allowance) {
+  if (allowance !== undefined && basePerHeadFee > 0 && !isExtraPaxRuleWaived && passengers > allowance) {
     const extraHeads = passengers - allowance;
-    passengerSurcharge = roundCurrency(extraHeads * perHeadFee);
-    const label = `Additional Passenger (+${extraHeads})`;
-    newSurcharges.push({
-      name: label,
-      amount: passengerSurcharge,
-      description: `$${perHeadFee.toFixed(2)}/head over ${allowance} passenger base`,
-    });
-    newLineItems.push({
-      id: 'extra-passengers',
-      category: 'extra',
-      label,
-      detail: `$${perHeadFee.toFixed(2)} each`,
-      amount: passengerSurcharge,
-      sourceType: 'extra',
-    });
-    runningAdditions = roundCurrency(runningAdditions + passengerSurcharge);
+    const potentialPaxFee = roundCurrency(extraHeads * basePerHeadFee);
+    if (waivedExtraSet.has('extra_passenger')) {
+      const waivedLabel = `Additional Passenger (+${extraHeads}) (Waived)`;
+      newSurcharges.push({
+        name: waivedLabel,
+        amount: 0,
+        originalAmount: potentialPaxFee,
+        description: `Dispatcher waived extra passenger fee ($${potentialPaxFee.toFixed(2)})`,
+      });
+      newLineItems.push({
+        id: 'extra-passengers-waived',
+        category: 'extra',
+        label: waivedLabel,
+        detail: `$${basePerHeadFee.toFixed(2)} each`,
+        amount: 0,
+        isWaived: true,
+        originalAmount: potentialPaxFee,
+        sourceType: 'extra',
+      });
+    } else {
+      passengerSurcharge = potentialPaxFee;
+      const label = `Additional Passenger (+${extraHeads})`;
+      newSurcharges.push({
+        name: label,
+        amount: passengerSurcharge,
+        description: `$${basePerHeadFee.toFixed(2)}/head over ${allowance} passenger base`,
+      });
+      newLineItems.push({
+        id: 'extra-passengers',
+        category: 'extra',
+        label,
+        detail: `$${basePerHeadFee.toFixed(2)} each`,
+        amount: passengerSurcharge,
+        sourceType: 'extra',
+      });
+      runningAdditions = roundCurrency(runningAdditions + passengerSurcharge);
+    }
   }
 
   // 3. Intermediate Waypoints / Stops
   const stopsCount = Math.max(0, context.input.intermediateStopsCount ?? 0);
   if (stopsCount > 0) {
     const stopDir = extraDirectives.intermediate_stop;
-    const stopFeeRate =
-      stopDir?.action === 'waive'
-        ? 0
-        : stopDir?.action === 'override' && typeof stopDir.overrideAmount === 'number'
+    const rawStopRate =
+      stopDir?.action === 'override' && typeof stopDir.overrideAmount === 'number'
         ? stopDir.overrideAmount
         : overrules.intermediateStopFee ?? extras.intermediateStopFee;
-    if (context.input.waiveMultiStopFees || stopFeeRate === 0) {
+    const stopFeeRate = stopDir?.action === 'waive' ? 0 : rawStopRate;
+    const isStopsWaivedByDispatcher = Boolean(
+      context.input.waiveMultiStopFees || waivedExtraSet.has('intermediate_stop')
+    );
+    if (isStopsWaivedByDispatcher || stopFeeRate === 0) {
+      const potentialStopFee = roundCurrency(stopsCount * Math.max(0, rawStopRate || 0));
+      const waivedLabel = `Intermediate Stops (${stopsCount} - Waived)`;
       newSurcharges.push({
-        name: `Intermediate Stops (${stopsCount} - Waived)`,
+        name: waivedLabel,
         amount: 0,
+        originalAmount: potentialStopFee,
         description: 'Intermediate stop fee waived',
       });
+      if (isStopsWaivedByDispatcher && potentialStopFee > 0) {
+        newLineItems.push({
+          id: 'extra-stops-waived',
+          category: 'extra',
+          label: `Intermediate Stops (${stopsCount}) (Waived)`,
+          detail: `$${(rawStopRate || 0).toFixed(2)}/stop`,
+          amount: 0,
+          isWaived: true,
+          originalAmount: potentialStopFee,
+          sourceType: 'extra',
+        });
+      }
     } else {
       const totalStopFee = roundCurrency(stopsCount * stopFeeRate);
       const label = `Intermediate Stops (${stopsCount})`;
@@ -1013,6 +1076,7 @@ export const applyConditionSurcharges: PricingPipelineStep = (context) => {
       : DEFAULT_OVERSIZED_BAG_CATEGORIES;
 
   if (selectedOversized && typeof selectedOversized === 'object') {
+    const waiveOversized = waivedExtraSet.has('oversized_cargo');
     for (const [catId, rawCount] of Object.entries(selectedOversized)) {
       const count = Math.max(0, Math.floor(Number(rawCount) || 0));
       if (count <= 0) continue;
@@ -1020,22 +1084,43 @@ export const applyConditionSurcharges: PricingPipelineStep = (context) => {
       if (cat && cat.fee > 0) {
         const fee = roundCurrency(count * cat.fee);
         const label = count > 1 ? `${cat.label} (×${count})` : cat.label;
-        newSurcharges.push({
-          name: label,
-          amount: fee,
-          description: `Oversized cargo: $${cat.fee.toFixed(2)} × ${count}`,
-        });
-        newLineItems.push({
-          id: `extra-oversized-${cat.id}`,
-          category: 'extra',
-          label,
-          detail: count > 1 ? `$${cat.fee.toFixed(2)} each` : undefined,
-          amount: fee,
-          sourceType: 'extra',
-          sourceId: cat.id,
-        });
-        oversizedLuggageFee = roundCurrency(oversizedLuggageFee + fee);
-        runningAdditions = roundCurrency(runningAdditions + fee);
+        if (waiveOversized) {
+          const waivedLabel = `${label} (Waived)`;
+          newSurcharges.push({
+            name: waivedLabel,
+            amount: 0,
+            originalAmount: fee,
+            description: `Dispatcher waived oversized cargo ($${fee.toFixed(2)})`,
+          });
+          newLineItems.push({
+            id: `extra-oversized-${cat.id}-waived`,
+            category: 'extra',
+            label: waivedLabel,
+            detail: count > 1 ? `$${cat.fee.toFixed(2)} each` : undefined,
+            amount: 0,
+            isWaived: true,
+            originalAmount: fee,
+            sourceType: 'extra',
+            sourceId: cat.id,
+          });
+        } else {
+          newSurcharges.push({
+            name: label,
+            amount: fee,
+            description: `Oversized cargo: $${cat.fee.toFixed(2)} × ${count}`,
+          });
+          newLineItems.push({
+            id: `extra-oversized-${cat.id}`,
+            category: 'extra',
+            label,
+            detail: count > 1 ? `$${cat.fee.toFixed(2)} each` : undefined,
+            amount: fee,
+            sourceType: 'extra',
+            sourceId: cat.id,
+          });
+          oversizedLuggageFee = roundCurrency(oversizedLuggageFee + fee);
+          runningAdditions = roundCurrency(runningAdditions + fee);
+        }
       }
     }
   }
@@ -1049,34 +1134,52 @@ export const applyConditionSurcharges: PricingPipelineStep = (context) => {
     extras.curbWaitingGraceMinutes ??
     extras.pickupGraceMinutes ??
     10;
-  const curbRate =
-    curbDir?.action === 'waive'
-      ? 0
-      : curbDir?.action === 'override' && typeof curbDir.overrideAmount === 'number'
+  const baseCurbRate =
+    curbDir?.action === 'override' && typeof curbDir.overrideAmount === 'number'
       ? curbDir.overrideAmount
       : overrules.curbWaitingRatePerMinute ??
         overrules.waitingRatePerMinute ??
         extras.curbWaitingRatePerMinute ??
         extras.waitingRatePerMinute ??
         0;
-  if (curbWaitMins > graceMins && curbRate > 0) {
+  if (curbWaitMins > graceMins && baseCurbRate > 0 && curbDir?.action !== 'waive') {
     const billableMins = curbWaitMins - graceMins;
-    const curbFee = roundCurrency(billableMins * curbRate);
+    const curbFee = roundCurrency(billableMins * baseCurbRate);
     const label = `Curb Waiting (${billableMins} min)`;
-    newSurcharges.push({
-      name: label,
-      amount: curbFee,
-      description: `${billableMins} min past ${graceMins}m grace @ $${curbRate.toFixed(2)}/min`,
-    });
-    newLineItems.push({
-      id: 'extra-curb-wait',
-      category: 'extra',
-      label,
-      detail: `$${curbRate.toFixed(2)}/min`,
-      amount: curbFee,
-      sourceType: 'extra',
-    });
-    runningAdditions = roundCurrency(runningAdditions + curbFee);
+    if (waivedExtraSet.has('curb_wait')) {
+      const waivedLabel = `${label} (Waived)`;
+      newSurcharges.push({
+        name: waivedLabel,
+        amount: 0,
+        originalAmount: curbFee,
+        description: `Dispatcher waived curb waiting ($${curbFee.toFixed(2)})`,
+      });
+      newLineItems.push({
+        id: 'extra-curb-wait-waived',
+        category: 'extra',
+        label: waivedLabel,
+        detail: `$${baseCurbRate.toFixed(2)}/min`,
+        amount: 0,
+        isWaived: true,
+        originalAmount: curbFee,
+        sourceType: 'extra',
+      });
+    } else {
+      newSurcharges.push({
+        name: label,
+        amount: curbFee,
+        description: `${billableMins} min past ${graceMins}m grace @ $${baseCurbRate.toFixed(2)}/min`,
+      });
+      newLineItems.push({
+        id: 'extra-curb-wait',
+        category: 'extra',
+        label,
+        detail: `$${baseCurbRate.toFixed(2)}/min`,
+        amount: curbFee,
+        sourceType: 'extra',
+      });
+      runningAdditions = roundCurrency(runningAdditions + curbFee);
+    }
   }
 
   // 6. Custom Bookable Fleet Extras (Customer-selected + legacy petCarrier flag)
@@ -1100,22 +1203,43 @@ export const applyConditionSurcharges: PricingPipelineStep = (context) => {
       const units = ce.isPerUnit ? qty : 1;
       const fee = roundCurrency(units * ce.fee);
       const label = units > 1 ? `${ce.name} (×${units})` : ce.name;
-      newSurcharges.push({
-        name: label,
-        amount: fee,
-        description: ce.description || `Extra service: ${ce.name}`,
-      });
-      newLineItems.push({
-        id: `extra-custom-${ce.id}`,
-        category: 'extra',
-        label,
-        detail: units > 1 ? `$${ce.fee.toFixed(2)} each` : undefined,
-        amount: fee,
-        sourceType: 'extra',
-        sourceId: ce.id,
-      });
-      customExtrasFee = roundCurrency(customExtrasFee + fee);
-      runningAdditions = roundCurrency(runningAdditions + fee);
+      if (waivedExtraSet.has(`custom:${ce.id}`)) {
+        const waivedLabel = `${label} (Waived)`;
+        newSurcharges.push({
+          name: waivedLabel,
+          amount: 0,
+          originalAmount: fee,
+          description: `Dispatcher waived ${ce.name} ($${fee.toFixed(2)})`,
+        });
+        newLineItems.push({
+          id: `extra-custom-${ce.id}-waived`,
+          category: 'extra',
+          label: waivedLabel,
+          detail: units > 1 ? `$${ce.fee.toFixed(2)} each` : undefined,
+          amount: 0,
+          isWaived: true,
+          originalAmount: fee,
+          sourceType: 'extra',
+          sourceId: ce.id,
+        });
+      } else {
+        newSurcharges.push({
+          name: label,
+          amount: fee,
+          description: ce.description || `Extra service: ${ce.name}`,
+        });
+        newLineItems.push({
+          id: `extra-custom-${ce.id}`,
+          category: 'extra',
+          label,
+          detail: units > 1 ? `$${ce.fee.toFixed(2)} each` : undefined,
+          amount: fee,
+          sourceType: 'extra',
+          sourceId: ce.id,
+        });
+        customExtrasFee = roundCurrency(customExtrasFee + fee);
+        runningAdditions = roundCurrency(runningAdditions + fee);
+      }
     }
   }
 
@@ -1167,6 +1291,9 @@ export function createSurchargesAndDiscountsStep(
     const catalogItems = getSurchargeCatalogItems(surchargesCatalog);
     const directives = context.resolvedSurchargeActions || {};
     const activeRules = (context.config.namedPricingRules || []).filter((r) => r.isActive);
+    const waivedSurchargeSet = new Set(
+      (context.input.waivedSurchargeIds || []).map((s) => String(s || '').trim()).filter(Boolean)
+    );
 
     const isAirport = Boolean(
       context.input.isAirportPickup ||
@@ -1274,23 +1401,50 @@ export function createSurchargesAndDiscountsStep(
         continue;
       }
 
-      // Explicit Dispatcher Overrides (Surge Bypass / Airport Waiver)
-      if (item.id === BUILTIN_SURCHARGE_IDS.PEAK_SURGE && context.input.bypassSurge) {
-        surchargeDecisions.push({
-          surchargeId: item.id,
-          surchargeName: item.name,
-          defaultPolicy: item.defaultPolicy,
-          status: 'waived',
-          reason: 'Bypassed by dispatcher override',
-          amount: 0,
-        });
-        continue;
-      }
-      if (item.id === BUILTIN_SURCHARGE_IDS.AIRPORT_ACCESS && context.input.waiveAirportFee) {
+      // Explicit Dispatcher Overrides (Dynamic waivedSurchargeIds + legacy bypassSurge / waiveAirportFee)
+      const directiveForFee = directives[item.id];
+      const previewMode =
+        directiveForFee?.action === 'override' && directiveForFee.overrideMode
+          ? directiveForFee.overrideMode
+          : item.mode;
+      const previewRate =
+        directiveForFee?.action === 'override' && typeof directiveForFee.overrideAmount === 'number'
+          ? directiveForFee.overrideAmount
+          : item.amount;
+      const previewOriginalAmount =
+        previewMode === 'multiplier'
+          ? previewRate > 1.0
+            ? roundCurrency(tariffBase * (previewRate - 1.0))
+            : 0
+          : previewMode === 'per_mile'
+          ? roundCurrency(previewRate * context.input.distanceMiles)
+          : previewMode === 'percent'
+          ? roundCurrency(tariffBase * (previewRate / 100))
+          : roundCurrency(previewRate);
+
+      const isExplicitSurchargeWaived = waivedSurchargeSet.has(item.id);
+      const isLegacyPeakSurgeBypass =
+        item.id === BUILTIN_SURCHARGE_IDS.PEAK_SURGE && Boolean(context.input.bypassSurge);
+      const isLegacyAirportWaiver =
+        item.id === BUILTIN_SURCHARGE_IDS.AIRPORT_ACCESS && Boolean(context.input.waiveAirportFee);
+
+      if (isExplicitSurchargeWaived || isLegacyPeakSurgeBypass || isLegacyAirportWaiver) {
+        const waivedLabel = `${item.name} (Waived)`;
         newSurcharges.push({
-          name: `${item.name} (Waived)`,
+          name: waivedLabel,
           amount: 0,
-          description: 'Dispatcher waived airport access fee',
+          originalAmount: previewOriginalAmount,
+          description: `Dispatcher waived ${item.name}`,
+        });
+        newLineItems.push({
+          id: `${item.id}-waived`,
+          category: 'surcharge',
+          label: waivedLabel,
+          amount: 0,
+          isWaived: true,
+          originalAmount: previewOriginalAmount,
+          sourceType: 'surcharge',
+          sourceId: item.id,
         });
         surchargeDecisions.push({
           surchargeId: item.id,

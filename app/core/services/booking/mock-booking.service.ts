@@ -342,6 +342,8 @@ export class MockBookingService implements IBookingService {
       bypassSurge: request.bypassSurge,
       waiveMultiStopFees: request.waiveMultiStopFees,
       waiveAirportFee: request.waiveAirportFee,
+      waivedSurchargeIds: request.waivedSurchargeIds,
+      waivedExtraKeys: request.waivedExtraKeys,
       manualDiscount: request.manualDiscount,
       manualDiscountPercent: request.manualDiscountPercent,
       manualDiscountLabel: request.manualDiscountLabel,

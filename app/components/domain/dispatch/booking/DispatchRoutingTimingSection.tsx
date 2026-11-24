@@ -11,6 +11,7 @@ import {
   type UseBookingWaypointsResult,
 } from '../../../../core/hooks/booking';
 import { DispatchLocationInput } from '../DispatchLocationInput';
+import { AirportCityCombobox } from '../../booking/AirportCityCombobox';
 import { FlightTelemetryCheckPanel } from '../../booking/FlightAssistanceCard';
 import { ModernDatePicker, ModernTimePicker } from '../../../ui/ModernDateTimePicker';
 import { LockIcon, PlaneIcon, PlaneLandingIcon, PlusIcon } from '../../../ui/Icons';
@@ -376,12 +377,13 @@ export function DispatchRoutingTimingSection({
                         <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
                           {airportDetection.isPickupAirport ? 'Origin' : 'Destination'}
                         </span>
-                        <input
-                          type="text"
-                          placeholder="e.g. TEB, VNY, PWK"
+                        <AirportCityCombobox
+                          size="xs"
+                          preferPrivateFbo
                           value={flightOrigin}
-                          onChange={(e) => setFlightOrigin(e.target.value.toUpperCase())}
-                          className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs uppercase"
+                          onChange={setFlightOrigin}
+                          placeholder="e.g. TEB Teterboro"
+                          borderClassName="border-blue-200"
                         />
                       </div>
                     </div>
@@ -447,12 +449,12 @@ export function DispatchRoutingTimingSection({
                           <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
                             {airportDetection.isPickupAirport ? 'Origin' : 'Destination'}
                           </span>
-                          <input
-                            type="text"
-                            placeholder="e.g. ORD, ATL, DEN"
+                          <AirportCityCombobox
+                            size="xs"
                             value={flightOrigin}
-                            onChange={(e) => setFlightOrigin(e.target.value.toUpperCase())}
-                            className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs uppercase"
+                            onChange={setFlightOrigin}
+                            placeholder="e.g. YYZ Toronto"
+                            borderClassName="border-blue-200"
                           />
                         </div>
                       </div>

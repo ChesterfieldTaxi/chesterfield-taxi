@@ -351,7 +351,11 @@ export function CustomerReturnTripSection({
                 detection={returnAirportDetection}
                 provideFlightInfo={form.returnProvideFlightInfo}
                 onToggleProvideFlightInfo={(checked) =>
-                  setForm((prev) => ({ ...prev, returnProvideFlightInfo: checked }))
+                  setForm((prev) => ({
+                    ...prev,
+                    returnProvideFlightInfo: checked,
+                    returnFlightInfoDismissed: !checked,
+                  }))
                 }
                 airline={form.returnAirline}
                 onAirlineChange={(val) => setForm((prev) => ({ ...prev, returnAirline: val }))}

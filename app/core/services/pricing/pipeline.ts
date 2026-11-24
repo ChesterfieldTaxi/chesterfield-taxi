@@ -140,6 +140,7 @@ export function toTripPricing(context: PricingContext): TripPricing {
     itemizedSurcharges: context.surcharges.map((s) => ({
       name: s.name,
       amount: s.amount,
+      ...(s.originalAmount !== undefined ? { originalAmount: s.originalAmount } : {}),
       description: s.description,
     })),
   };

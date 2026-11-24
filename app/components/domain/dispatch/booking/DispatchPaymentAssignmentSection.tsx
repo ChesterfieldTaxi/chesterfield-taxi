@@ -2,7 +2,10 @@ import React from 'react';
 import type {
   CorporateAccountConfig,
   NamedPricingRule,
+  SurchargesConfig,
+  UniversalExtrasConfig,
 } from '../../../../core/types/config';
+import type { TripPricing } from '../../../../core/types/trip';
 import type { PoValidationResult } from '../../../../core/services/corporate-account.service';
 import type { DriverRosterItem } from '../../../../core/services/operator.service';
 import {
@@ -10,6 +13,7 @@ import {
   DEFAULT_DISPATCH_COMPANIES as DEFAULT_COMPANIES,
 } from '../../../../core/hooks/booking';
 import { DriverAssignDropdown } from '../queue/DriverAssignDropdown';
+import { DispatchWaiveFeesDropdown } from './DispatchWaiveFeesDropdown';
 import {
   AlertTriangleIcon,
   CheckIcon,
@@ -58,6 +62,13 @@ export interface DispatchPaymentAssignmentSectionProps {
   setWaiveMultiStopFees: React.Dispatch<React.SetStateAction<boolean>>;
   bypassSurge: boolean;
   setBypassSurge: React.Dispatch<React.SetStateAction<boolean>>;
+  waivedSurchargeIds: string[];
+  setWaivedSurchargeIds: (val: string[]) => void;
+  waivedExtraKeys: string[];
+  setWaivedExtraKeys: (val: string[]) => void;
+  surchargesConfig?: SurchargesConfig | null;
+  universalExtrasConfig?: UniversalExtrasConfig | null;
+  outboundPricing?: TripPricing | null;
   company: string;
   setCompany: (val: string) => void;
   driverId: string;
@@ -112,6 +123,13 @@ export function DispatchPaymentAssignmentSection({
   setWaiveMultiStopFees,
   bypassSurge,
   setBypassSurge,
+  waivedSurchargeIds,
+  setWaivedSurchargeIds,
+  waivedExtraKeys,
+  setWaivedExtraKeys,
+  surchargesConfig,
+  universalExtrasConfig,
+  outboundPricing,
   company,
   setCompany,
   driverId,
@@ -475,42 +493,22 @@ export function DispatchPaymentAssignmentSection({
           </div>
         </div>
 
-        {/* Dispatcher Fee Waivers */}
-        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-          {(
-            [
-              {
-                label: 'Waive Airport Fee',
-                active: waiveAirportFee,
-                toggle: () => setWaiveAirportFee((v) => !v),
-              },
-              {
-                label: 'Waive Stop Fees',
-                active: waiveMultiStopFees,
-                toggle: () => setWaiveMultiStopFees((v) => !v),
-              },
-              {
-                label: 'Bypass Surge',
-                active: bypassSurge,
-                toggle: () => setBypassSurge((v) => !v),
-              },
-            ] as const
-          ).map((chip) => (
-            <button
-              key={chip.label}
-              type="button"
-              onClick={chip.toggle}
-              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
-                chip.active
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                  : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
-              }`}
-            >
-              {chip.active ? '✓ ' : '+ '}
-              {chip.label}
-            </button>
-          ))}
-        </div>
+        {/* Dynamic Dispatcher Fee Waivers Dropdown */}
+        <DispatchWaiveFeesDropdown
+          surchargesConfig={surchargesConfig}
+          universalExtrasConfig={universalExtrasConfig}
+          outboundPricing={outboundPricing}
+          waivedSurchargeIds={waivedSurchargeIds}
+          onWaivedSurchargeIdsChange={setWaivedSurchargeIds}
+          waivedExtraKeys={waivedExtraKeys}
+          onWaivedExtraKeysChange={setWaivedExtraKeys}
+          waiveAirportFee={waiveAirportFee}
+          setWaiveAirportFee={setWaiveAirportFee}
+          waiveMultiStopFees={waiveMultiStopFees}
+          setWaiveMultiStopFees={setWaiveMultiStopFees}
+          bypassSurge={bypassSurge}
+          setBypassSurge={setBypassSurge}
+        />
       </div>
 
       {/* Assignment (Company & Driver) */}

@@ -9,6 +9,11 @@ import {
   SpinnerIcon,
 } from '../../ui/Icons';
 import { Select } from '../../ui/Select';
+import { AirportCityCombobox } from './AirportCityCombobox';
+import {
+  extractAirportIataCode,
+  resolveAirportDisplayValue,
+} from '../../../core/config/airport-catalog';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
 import { normalizeFlightTrackingPolicy } from '../../../core/types/config';
 import {
@@ -128,8 +133,8 @@ export function FlightTelemetryCheckPanel({
         airline: parsedIdent.airlineCode,
         flightNumber: parsedIdent.flightNumber,
         serviceDate: effectiveDate,
-        destinationIata: airportIataCode || 'STL',
-        originIata: flightOrigin.trim() || undefined,
+        destinationIata: extractAirportIataCode(airportIataCode) || 'STL',
+        originIata: extractAirportIataCode(flightOrigin) || undefined,
         scheduledPickupIso,
       });
 
@@ -140,7 +145,7 @@ export function FlightTelemetryCheckPanel({
 
       onFlightTelemetryChange?.(res.snapshot);
       if (res.snapshot.originIata && !flightOrigin.trim()) {
-        onFlightOriginChange(res.snapshot.originIata);
+        onFlightOriginChange(resolveAirportDisplayValue(res.snapshot.originIata));
       }
     } finally {
       setIsChecking(false);
@@ -581,12 +586,12 @@ export function FlightAssistanceCard({
                 <label className="block text-[11px] text-slate-700 font-semibold mb-1">
                   {detection.isPickupAirport ? 'Origin Airport (Optional)' : 'Destination (Optional)'}
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. TEB, VNY, PWK"
+                <AirportCityCombobox
                   value={flightOrigin}
-                  onChange={(e) => onFlightOriginChange(e.target.value.toUpperCase())}
-                  className={`w-full px-3 py-2 bg-white border ${inputBorder} rounded-lg text-base sm:text-sm uppercase text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/25`}
+                  onChange={onFlightOriginChange}
+                  placeholder="e.g. TEB Teterboro, VNY, PWK"
+                  preferPrivateFbo
+                  borderClassName={inputBorder}
                 />
               </div>
             </div>
@@ -640,12 +645,11 @@ export function FlightAssistanceCard({
                   <label className="block text-[11px] text-slate-700 font-semibold mb-1">
                     {detection.isPickupAirport ? 'Departing From (Origin)' : 'Destination (Optional)'}
                   </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. ORD, ATL, DEN"
+                  <AirportCityCombobox
                     value={flightOrigin}
-                    onChange={(e) => onFlightOriginChange(e.target.value.toUpperCase())}
-                    className={`w-full px-3 py-2 bg-white border ${inputBorder} rounded-lg text-base sm:text-sm uppercase text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/25`}
+                    onChange={onFlightOriginChange}
+                    placeholder="e.g. YYZ Toronto, ORD, ATL"
+                    borderClassName={inputBorder}
                   />
                 </div>
               </div>

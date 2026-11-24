@@ -13,7 +13,10 @@ import {
   getUniversalExtrasService,
   getUniversalExtrasConfig,
 } from '../../../core/services/pricing/extras.service';
-import { getSurchargesService } from '../../../core/services/pricing/surcharges.service';
+import {
+  getSurchargesConfig,
+  getSurchargesService,
+} from '../../../core/services/pricing/surcharges.service';
 import { formatLocalDateStr } from '../../../core/services/pricing/vehicle-matching';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
@@ -246,6 +249,8 @@ function DispatchBookingEngineComponent({
   const [waiveAirportFee, setWaiveAirportFee] = useState(false);
   const [waiveMultiStopFees, setWaiveMultiStopFees] = useState(false);
   const [bypassSurge, setBypassSurge] = useState(false);
+  const [waivedSurchargeIds, setWaivedSurchargeIds] = useState<string[]>([]);
+  const [waivedExtraKeys, setWaivedExtraKeys] = useState<string[]>([]);
   const [company, setCompany] = useState(DEFAULT_COMPANIES[0]);
   const [driverId, setDriverId] = useState('unassigned');
   const [driverAssignmentMode, setDriverAssignmentMode] = useState<
@@ -283,6 +288,7 @@ function DispatchBookingEngineComponent({
   const [returnVehicles, setReturnVehicles] = useState<Array<VehicleChoice>>(['any']);
   const [autoCreateReturnTrip, setAutoCreateReturnTrip] = useState(true);
   const [returnProvideFlightInfo, setReturnProvideFlightInfo] = useState(false);
+  const [returnFlightInfoDismissed, setReturnFlightInfoDismissed] = useState(false);
   const [returnAirline, setReturnAirline] = useState('');
   const [returnFlightNumber, setReturnFlightNumber] = useState('');
   const [returnFlightOrigin, setReturnFlightOrigin] = useState('');
@@ -323,7 +329,7 @@ function DispatchBookingEngineComponent({
     } catch {}
     const cachedSettings = getAdminConfigService().getCachedSettings();
     if (cachedSettings?.vehicles && cachedSettings.vehicles.length > 0) {
-      setVehicleTiers(cachedSettings.vehicles.filter((v) => !v.isArchived));
+      setVehicleTiers(cachedSettings.vehicles.filter((v) => !v.isArchived && v.isActive !== false));
     }
 
     const unsubRules = getPricingRulesService().subscribeToRules((rules) => {
@@ -344,7 +350,7 @@ function DispatchBookingEngineComponent({
         });
       }
       if (settings?.vehicles && settings.vehicles.length > 0) {
-        setVehicleTiers(settings.vehicles.filter((v) => !v.isArchived));
+        setVehicleTiers(settings.vehicles.filter((v) => !v.isArchived && v.isActive !== false));
       }
     });
 
@@ -383,6 +389,8 @@ function DispatchBookingEngineComponent({
     boosterCount
   );
 
+  const surchargesConfig = useMemo(() => getSurchargesConfig(), [surchargesVersion]);
+
   const { airportDetection, returnAirportDetection } = useBookingAirportDetection({
     pickupAddress,
     dropoffAddress,
@@ -390,6 +398,7 @@ function DispatchBookingEngineComponent({
     returnDropoffAddress,
     returnTrip,
     clearWhenNoAirport: false,
+    returnFlightInfoDismissed,
     onSyncOutboundFlightInfo: (shouldEnable) => {
       if (shouldEnable) setProvideFlightInfo(true);
     },
@@ -678,6 +687,8 @@ function DispatchBookingEngineComponent({
     waiveAirportFee,
     waiveMultiStopFees,
     bypassSurge,
+    waivedSurchargeIds,
+    waivedExtraKeys,
     company,
     driverId,
     driverAssignmentMode,
@@ -826,6 +837,8 @@ function DispatchBookingEngineComponent({
       setWaiveAirportFee,
       setWaiveMultiStopFees,
       setBypassSurge,
+      setWaivedSurchargeIds,
+      setWaivedExtraKeys,
       setCompany,
       setDriverId,
       setDriverAssignmentMode: (m: 'send_to_driver' | 'stage_hold') => {
@@ -943,6 +956,8 @@ function DispatchBookingEngineComponent({
       waiveAirportFee,
       waiveMultiStopFees,
       bypassSurge,
+      waivedSurchargeIds,
+      waivedExtraKeys,
       company,
       driverId,
       driverAssignmentMode,
@@ -1038,8 +1053,14 @@ function DispatchBookingEngineComponent({
           returnDropoffAddress,
           returnDropoffCoordinates,
         },
-        { preserveCoordsWhenAddressPresent: true }
+        {
+          preserveCoordsWhenAddressPresent: true,
+          returnFlightInfoDismissed,
+        }
       );
+      if (seeded.returnProvideFlightInfo) {
+        setReturnProvideFlightInfo(true);
+      }
       if (!returnPickupAddress && dropoffAddress) {
         setReturnPickupAddress(seeded.returnPickupAddress);
         setReturnPickupCoordinates(seeded.returnPickupCoordinates);
@@ -1397,6 +1418,13 @@ function DispatchBookingEngineComponent({
           setWaiveMultiStopFees={setWaiveMultiStopFees}
           bypassSurge={bypassSurge}
           setBypassSurge={setBypassSurge}
+          waivedSurchargeIds={waivedSurchargeIds}
+          setWaivedSurchargeIds={setWaivedSurchargeIds}
+          waivedExtraKeys={waivedExtraKeys}
+          setWaivedExtraKeys={setWaivedExtraKeys}
+          surchargesConfig={surchargesConfig}
+          universalExtrasConfig={universalExtrasConfig}
+          outboundPricing={outboundPricing}
           company={company}
           setCompany={setCompany}
           driverId={driverId}
@@ -1452,7 +1480,10 @@ function DispatchBookingEngineComponent({
           returnEstimatedDistanceMiles={returnEstimatedDistanceMiles}
           returnAirportDetection={returnAirportDetection}
           returnProvideFlightInfo={returnProvideFlightInfo}
-          setReturnProvideFlightInfo={setReturnProvideFlightInfo}
+          setReturnProvideFlightInfo={(checked) => {
+            setReturnProvideFlightInfo(checked);
+            setReturnFlightInfoDismissed(!checked);
+          }}
           returnAirline={returnAirline}
           setReturnAirline={setReturnAirline}
           returnFlightNumber={returnFlightNumber}

@@ -103,6 +103,10 @@ export interface PricingInput {
   waiveAirportFee?: boolean;
   /** Dispatcher override: bypass surge multiplier (force 1.0x) */
   bypassSurge?: boolean;
+  /** Dispatcher dynamic multi-select: catalog surcharge IDs to waive */
+  waivedSurchargeIds?: string[];
+  /** Dispatcher dynamic multi-select: universal extra keys to waive ('car_seat' | 'extra_passenger' | 'intermediate_stop' | 'oversized_cargo' | 'curb_wait' | 'custom:<id>') */
+  waivedExtraKeys?: string[];
   /** Dispatcher override: manual courtesy dollar discount */
   manualDiscount?: number;
   /** Dispatcher/corporate percentage discount (0-100, e.g., 10 for 10% off) */
@@ -169,9 +173,12 @@ export interface PricingInput {
 }
 
 
+export type PricingCalculationInput = PricingInput;
+
 export interface SurchargeEntry {
   name: string;
   amount: number;
+  originalAmount?: number;
   description?: string;
 }
 

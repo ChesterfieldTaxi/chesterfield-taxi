@@ -199,6 +199,22 @@ export function detectAirportInAddresses(
   };
 }
 
+/**
+ * Pure single-endpoint airport detector (`STL`, `SUS`, `CPS`, or private FBO).
+ */
+export function detectAirportEndpoint(address: string): {
+  isAirport: boolean;
+  airport: RegionalAirport | null;
+  isPrivateAviation: boolean;
+} {
+  const res = detectAirportInAddresses(address || '', '');
+  return {
+    isAirport: res.isPickupAirport,
+    airport: res.isPickupAirport ? res.airport : null,
+    isPrivateAviation: res.isPickupAirport ? res.isPrivateAviation : false,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Major Airlines
 // ---------------------------------------------------------------------------

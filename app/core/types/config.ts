@@ -483,6 +483,7 @@ export interface VehicleTierConfig {
   badge?: string;
   iconType?: 'standard' | 'premium' | 'xl' | 'wheelchair';
   imageUrl?: string; // Optional vehicle photo / illustration URL
+  isActive?: boolean;
   isArchived?: boolean;
   archivedAt?: string;
   archiveReason?: string;

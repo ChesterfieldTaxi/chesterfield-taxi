@@ -1,7 +1,9 @@
 import React from 'react';
 import type { Trip } from '../../../../core/types/trip';
+import type { FleetCarConfig, VehicleTierConfig } from '../../../../core/types/config';
 import type { DriverRosterItem } from '../../../../core/services/operator.service';
 import type { DisplayLayout } from '../../../../core/hooks/useDisplayLayout';
+import { formatTripVehicleColumnDisplay } from '../../../../core/utils/vehicle-tier-format.util';
 import {
   canAdminCompleteTrip,
   type ClassifiedAdminTripException,
@@ -23,6 +25,8 @@ import { CarIcon, CheckIcon, ClockIcon, SpinnerIcon } from '../../../ui/Icons';
 export interface AdminTripsTablePanelProps {
   trips: Trip[];
   drivers: DriverRosterItem[];
+  vehicles?: VehicleTierConfig[];
+  fleetCars?: FleetCarConfig[];
   exceptionByTripId: Record<string, ClassifiedAdminTripException>;
   isLoading: boolean;
   displayLayout: DisplayLayout;
@@ -61,30 +65,11 @@ function isTerminalStatus(status: string): boolean {
 }
 
 export function AdminTripsTablePanel({
-  trips,
-  drivers,
-  exceptionByTripId,
-  isLoading,
-  displayLayout,
-  assignMode,
-  selectedTripId,
-  actionLoadingId,
-  openActionTripId,
-  searchTerm,
-  showArchiveActions,
-  isArchivedTrip,
-  onSelectTrip,
-  onOpenActionChange,
-  onDriverDropdownChange,
-  onSendStaged,
-  onClearStaged,
-  onStagePrompt,
-  onConfirmTrip,
-  onCompleteTrip,
-  onCancelTrip,
-  onReactivateTrip,
-  onAuditTrip,
-  onToggleArchive,
+  trips, drivers, vehicles, fleetCars, exceptionByTripId, isLoading, displayLayout, assignMode,
+  selectedTripId, actionLoadingId, openActionTripId, searchTerm, showArchiveActions,
+  isArchivedTrip, onSelectTrip, onOpenActionChange, onDriverDropdownChange, onSendStaged,
+  onClearStaged, onStagePrompt, onConfirmTrip, onCompleteTrip, onCancelTrip, onReactivateTrip,
+  onAuditTrip, onToggleArchive,
 }: AdminTripsTablePanelProps) {
   const renderExceptionPills = (trip: Trip) => {
     const ex = exceptionByTripId[trip.id];
@@ -399,8 +384,8 @@ export function AdminTripsTablePanel({
                       <span className="font-black text-slate-900 font-mono block">
                         ${Number(trip.pricing?.totalFare || trip.payment?.amount || 0).toFixed(2)}
                       </span>
-                      <span className="text-[10px] text-slate-400 capitalize block">
-                        {trip.vehicleTier || 'standard'} · {trip.payment?.method || 'card'}
+                      <span className="text-[10px] text-slate-500 font-semibold block">
+                        {formatTripVehicleColumnDisplay(trip, vehicles, drivers, fleetCars)} · {trip.payment?.method || 'card'}
                       </span>
                     </td>
                     <td className="px-4 py-3 align-top text-right whitespace-nowrap">

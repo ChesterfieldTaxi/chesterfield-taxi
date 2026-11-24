@@ -129,6 +129,8 @@ export interface PriceLineItem {
   label: string;
   detail?: string;
   amount: number; // Positive for charges, negative for discounts
+  isWaived?: boolean;
+  originalAmount?: number;
   sourceType?:
     | 'tariff'
     | 'corridor'
@@ -176,6 +178,7 @@ export interface TripPricing {
   itemizedSurcharges?: Array<{
     name: string;
     amount: number;
+    originalAmount?: number;
     description?: string;
   }>;
   // Phase 24: In-Vehicle Taximeter & Extra Fees

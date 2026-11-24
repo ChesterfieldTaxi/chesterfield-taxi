@@ -186,6 +186,7 @@ export interface CustomerBookingFormState {
   returnTailNumber?: string;
   returnFboFacility?: string;
   returnHasCheckedLuggage: boolean;
+  returnFlightInfoDismissed?: boolean;
 
   // Special Requests & Notes
   specialRequests: Record<SpecialRequestKey, boolean>;

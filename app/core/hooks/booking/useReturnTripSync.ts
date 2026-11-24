@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { GeoPoint } from '../../types';
 import {
+  detectAirportEndpoint,
   detectAirportInAddresses,
   type AirportDetectionResult,
 } from '../../config/airports';
@@ -119,6 +120,23 @@ export interface SeededReturnLegState<TVehicle extends string = string> {
   returnBooster: number;
   returnVehicleChoice: TVehicle;
   returnSelectedVehicles: TVehicle[];
+  returnProvideFlightInfo?: boolean;
+}
+
+export function shouldAutoEnableReturnFlightInfo(params: {
+  returnTrip: boolean;
+  outboundDropoffAddress: string;
+  returnPickupAddress?: string;
+  returnDropoffAddress?: string;
+  manuallyDismissed?: boolean;
+}): boolean {
+  if (!params.returnTrip || params.manuallyDismissed) return false;
+  if (detectAirportEndpoint(params.outboundDropoffAddress).isAirport) {
+    return true;
+  }
+  const effectivePickup = params.returnPickupAddress || params.outboundDropoffAddress;
+  const effectiveDropoff = params.returnDropoffAddress || '';
+  return detectAirportInAddresses(effectivePickup, effectiveDropoff).isAirportTrip;
 }
 
 export function buildReturnLegSeedFromOutbound<TVehicle extends string = string>(
@@ -129,7 +147,10 @@ export function buildReturnLegSeedFromOutbound<TVehicle extends string = string>
     returnDropoffAddress?: string;
     returnDropoffCoordinates?: GeoPoint;
   },
-  options?: { preserveCoordsWhenAddressPresent?: boolean }
+  options?: {
+    preserveCoordsWhenAddressPresent?: boolean;
+    returnFlightInfoDismissed?: boolean;
+  }
 ): SeededReturnLegState<TVehicle> {
   const hasExistingPickup = Boolean(existingReturn?.returnPickupAddress);
   const hasExistingDropoff = Boolean(existingReturn?.returnDropoffAddress);
@@ -150,10 +171,20 @@ export function buildReturnLegSeedFromOutbound<TVehicle extends string = string>
     outbound.selectedVehicles[0] ??
     ('any' as TVehicle)) as TVehicle;
 
+  const seededReturnPickup = existingReturn?.returnPickupAddress || outbound.dropoffAddress;
+  const seededReturnDropoff = existingReturn?.returnDropoffAddress || outbound.pickupAddress;
+  const autoFlight = shouldAutoEnableReturnFlightInfo({
+    returnTrip: true,
+    outboundDropoffAddress: outbound.dropoffAddress,
+    returnPickupAddress: seededReturnPickup,
+    returnDropoffAddress: seededReturnDropoff,
+    manuallyDismissed: options?.returnFlightInfoDismissed,
+  });
+
   return {
-    returnPickupAddress: existingReturn?.returnPickupAddress || outbound.dropoffAddress,
+    returnPickupAddress: seededReturnPickup,
     returnPickupCoordinates,
-    returnDropoffAddress: existingReturn?.returnDropoffAddress || outbound.pickupAddress,
+    returnDropoffAddress: seededReturnDropoff,
     returnDropoffCoordinates,
     returnPassengers: outbound.passengers,
     returnCarryOnBags: outbound.carryOnBags,
@@ -169,6 +200,7 @@ export function buildReturnLegSeedFromOutbound<TVehicle extends string = string>
     returnBooster: outbound.boosterCount,
     returnVehicleChoice: fallbackVehicle,
     returnSelectedVehicles: [...outbound.selectedVehicles],
+    ...(autoFlight ? { returnProvideFlightInfo: true } : {}),
   };
 }
 
@@ -445,6 +477,7 @@ export function useBookingAirportDetection(params: {
   returnDropoffAddress?: string;
   returnTrip: boolean;
   clearWhenNoAirport: boolean;
+  returnFlightInfoDismissed?: boolean;
   onSyncOutboundFlightInfo: (shouldEnable: boolean) => void;
   onSyncReturnFlightInfo: (shouldEnable: boolean) => void;
 }): {
@@ -458,6 +491,7 @@ export function useBookingAirportDetection(params: {
     returnDropoffAddress,
     returnTrip,
     clearWhenNoAirport,
+    returnFlightInfoDismissed = false,
     onSyncOutboundFlightInfo,
     onSyncReturnFlightInfo,
   } = params;
@@ -473,8 +507,10 @@ export function useBookingAirportDetection(params: {
   }, [pickupAddress, dropoffAddress]);
 
   const returnAirportDetection = useMemo(() => {
-    return detectAirportInAddresses(returnPickupAddress || '', returnDropoffAddress || '');
-  }, [returnPickupAddress, returnDropoffAddress]);
+    const effectiveRetPickup = returnPickupAddress || (returnTrip ? dropoffAddress : '');
+    const effectiveRetDropoff = returnDropoffAddress || (returnTrip ? pickupAddress : '');
+    return detectAirportInAddresses(effectiveRetPickup, effectiveRetDropoff);
+  }, [returnPickupAddress, returnDropoffAddress, returnTrip, dropoffAddress, pickupAddress]);
 
   useEffect(() => {
     if (clearWhenNoAirport) {
@@ -485,12 +521,16 @@ export function useBookingAirportDetection(params: {
   }, [airportDetection.isAirportTrip, clearWhenNoAirport]);
 
   useEffect(() => {
-    if (clearWhenNoAirport) {
-      returnSyncRef.current(Boolean(returnTrip && returnAirportDetection.isAirportTrip));
-    } else if (returnAirportDetection.isAirportTrip) {
+    if (!returnAirportDetection.isAirportTrip || !returnTrip) {
+      if (clearWhenNoAirport) {
+        returnSyncRef.current(false);
+      }
+      return;
+    }
+    if (!returnFlightInfoDismissed) {
       returnSyncRef.current(true);
     }
-  }, [returnTrip, returnAirportDetection.isAirportTrip, clearWhenNoAirport]);
+  }, [returnTrip, returnAirportDetection.isAirportTrip, clearWhenNoAirport, returnFlightInfoDismissed]);
 
   return {
     airportDetection,

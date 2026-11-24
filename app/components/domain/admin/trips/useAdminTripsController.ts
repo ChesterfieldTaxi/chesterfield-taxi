@@ -37,6 +37,7 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
   );
   const [trips, setTrips] = useState<Trip[]>([]);
   const [drivers, setDrivers] = useState<DriverRosterItem[]>([]);
+  const [appSettings, setAppSettings] = useState(() => getAdminConfigService().getCachedSettings());
   const [assignMode, setAssignMode] = useState<'send_to_driver' | 'stage_hold'>('send_to_driver');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +57,12 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
   useEffect(() => {
     const opSvc = getOperatorService();
     setDrivers(opSvc.getDriverRoster());
-    return opSvc.subscribeToDrivers((roster) => setDrivers(roster));
+    const unsubDrivers = opSvc.subscribeToDrivers((roster) => setDrivers(roster));
+    const unsubSettings = getAdminConfigService().subscribeToSettings((next) => setAppSettings(next));
+    return () => {
+      unsubDrivers();
+      unsubSettings();
+    };
   }, []);
 
   useEffect(() => {
@@ -400,6 +406,8 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
     activeSub,
     trips,
     drivers,
+    vehicles: appSettings.vehicles,
+    fleetCars: appSettings.fleet,
     assignMode,
     setAssignMode,
     isLoading,
