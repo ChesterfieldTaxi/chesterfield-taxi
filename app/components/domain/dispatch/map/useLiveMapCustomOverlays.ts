@@ -3,36 +3,40 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { DispatchMapPreferences } from '../../../../core/hooks/dispatch/useDispatchMapPreferences';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
-import {
-  getZoneService,
-  isCoordinateInZone,
-  calculateHaversineDistanceMiles,
-} from '../../../../core/services/zones/zone.service';
+import type { CompanyInfoConfig } from '../../../../core/types/config';
+import { getZoneService, isCoordinateInZone } from '../../../../core/services/zones/zone.service';
 import {
   getSpecialPlacesService,
   type SpecialPlace,
 } from '../../../../core/services/places/special-places.service';
 import { getWorkspaceBus } from '../../../../core/services/workspace-bus.service';
-import type {
-  BlacklistedLocation,
-  ZoneCoordinate,
-  ZoneGeofence,
-} from '../../../../core/types/zone';
+import type { BlacklistedLocation, ZoneGeofence } from '../../../../core/types/zone';
+import {
+  DEFAULT_HEADQUARTERS_FALLBACK_COORDS,
+  buildHeadquartersPinDataUrl,
+  buildPlaceMarkerDataUrl,
+  buildStarredPlacesOverlayItems,
+  disposeGoogleOverlayList,
+  isValidCoord,
+  resolveHeadquartersCoordinates,
+  resolveHeadquartersOverlayPlace,
+  useHeadquartersMapPin,
+  type CustomPlaceMarkerCategory,
+  type MapOverlayPlaceItem,
+} from './hq-place-marker.util';
+
+export {
+  DEFAULT_HEADQUARTERS_FALLBACK_COORDS,
+  buildHeadquartersPinDataUrl,
+  buildPlaceMarkerDataUrl,
+  buildStarredPlacesOverlayItems,
+  resolveHeadquartersCoordinates,
+  resolveHeadquartersOverlayPlace,
+  type CustomPlaceMarkerCategory,
+  type MapOverlayPlaceItem,
+};
 
 const MILES_TO_METERS = 1609.344;
-
-export type CustomPlaceMarkerCategory = 'airport' | 'hotel' | 'hospital' | 'venue';
-
-export interface MapOverlayPlaceItem {
-  id: string;
-  name: string;
-  address: string;
-  coordinates: ZoneCoordinate;
-  category: CustomPlaceMarkerCategory;
-  categoryLabel: string;
-  flatFee?: number;
-  notes?: string;
-}
 
 export type SelectedCustomOverlayItem =
   | { kind: 'zone'; zone: ZoneGeofence }
@@ -46,96 +50,12 @@ export interface PopulateBookingEndpointPayload {
   dropoffCoordinates?: { lat: number; lng: number };
 }
 
-const PLACE_CATEGORY_META: Record<
-  CustomPlaceMarkerCategory,
-  { label: string; glyph: string; hex: string; darkHex: string }
-> = {
-  airport: { label: '✈️ Airports / FBOs', glyph: 'AIR', hex: '#0284c7', darkHex: '#0369a1' },
-  hotel: { label: '🏨 Hotels', glyph: 'HTL', hex: '#d97706', darkHex: '#b45309' },
-  hospital: { label: '🏥 Hospitals', glyph: 'MED', hex: '#e11d48', darkHex: '#be123c' },
-  venue: { label: '🏢 Venues / Corporate', glyph: 'HUB', hex: '#4f46e5', darkHex: '#3730a3' },
-};
-
-const placePinSvgCache = new Map<CustomPlaceMarkerCategory, string>();
-
-function buildPlaceMarkerDataUrl(category: CustomPlaceMarkerCategory): string {
-  const cached = placePinSvgCache.get(category);
-  if (cached) return cached;
-  const meta = PLACE_CATEGORY_META[category];
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="42" viewBox="0 0 36 42"><path d="M18 40 C18 40 31 26.5 31 16 A13 13 0 1 0 5 16 C5 26.5 18 40 18 40 Z" fill="${meta.hex}" stroke="#ffffff" stroke-width="2.2"/><circle cx="18" cy="15.5" r="9.2" fill="${meta.darkHex}"/><text x="18" y="18.6" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="7.5" font-weight="900" fill="#ffffff">${meta.glyph}</text></svg>`;
-  const url = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-  placePinSvgCache.set(category, url);
-  return url;
-}
-
-function normalizePlaceCategory(raw?: string): CustomPlaceMarkerCategory {
-  const c = String(raw || '').trim().toLowerCase();
-  if (c === 'airport' || c === 'hotel' || c === 'hospital') return c;
-  return 'venue';
-}
-
-function isValidCoord(c?: ZoneCoordinate | null): c is ZoneCoordinate {
-  return Boolean(
-    c &&
-      typeof c.lat === 'number' &&
-      typeof c.lng === 'number' &&
-      Number.isFinite(c.lat) &&
-      Number.isFinite(c.lng) &&
-      (c.lat !== 0 || c.lng !== 0)
-  );
-}
-
-/**
- * Pure filter/mapper for the Dispatch Map `Places` overlay:
- * Renders strictly active Starred (`isPopular`) non-archived Admin `SpecialPlace` entries.
- */
-export function buildStarredPlacesOverlayItems(
-  specialPlaces: readonly SpecialPlace[] | null | undefined
-): MapOverlayPlaceItem[] {
-  const merged: MapOverlayPlaceItem[] = [];
-  for (const sp of specialPlaces || []) {
-    if (!sp.isActive || !sp.isPopular || sp.isArchived) continue;
-    if (!isValidCoord(sp.coordinates) || !sp.address) continue;
-    const candidateName = (sp.shortName || sp.name || '').trim();
-    if (!candidateName) continue;
-    const dup = merged.some(
-      (ex) =>
-        ex.name.trim().toLowerCase() === candidateName.toLowerCase() ||
-        calculateHaversineDistanceMiles(ex.coordinates, sp.coordinates) < 0.05
-    );
-    if (dup) continue;
-    const cat = normalizePlaceCategory(sp.category);
-    merged.push({
-      id: `sp-${sp.id}`,
-      name: candidateName,
-      address: sp.address,
-      coordinates: sp.coordinates,
-      category: cat,
-      categoryLabel: PLACE_CATEGORY_META[cat].label,
-      notes: sp.notes,
-    });
-  }
-  return merged;
-}
-
-function disposeGoogleOverlayList(
-  items: Array<{ setMap: (map: google.maps.Map | null) => void }>
-): void {
-  for (const item of items) {
-    try {
-      if (typeof google !== 'undefined' && google?.maps?.event) {
-        google.maps.event.clearInstanceListeners(item);
-      }
-      item.setMap(null);
-    } catch {}
-  }
-}
-
 export interface UseLiveMapCustomOverlaysParams {
   mapReady: boolean;
   mapInstanceRef: React.RefObject<google.maps.Map | null>;
   preferences: DispatchMapPreferences;
   fleet: LiveFleetDriver[];
+  companyInfo?: Partial<CompanyInfoConfig> | null;
   onPopulateBooking?: (payload: PopulateBookingEndpointPayload) => void;
 }
 
@@ -144,6 +64,7 @@ export function useLiveMapCustomOverlays({
   mapInstanceRef,
   preferences,
   fleet,
+  companyInfo,
   onPopulateBooking,
 }: UseLiveMapCustomOverlaysParams) {
   const trafficLayerRef = useRef<google.maps.TrafficLayer | null>(null);
@@ -158,6 +79,25 @@ export function useLiveMapCustomOverlays({
     setSelectedOverlay(null);
     setAppliedEndpointFeedback(null);
   }, []);
+
+  const handleSelectHqPlace = useCallback((hqPlace: MapOverlayPlaceItem) => {
+    setAppliedEndpointFeedback(null);
+    setSelectedOverlay({ kind: 'place', place: hqPlace });
+  }, []);
+
+  const handleSyncHqPlace = useCallback((hqPlace: MapOverlayPlaceItem) => {
+    setSelectedOverlay((prev) =>
+      prev?.kind === 'place' && prev.place.id === 'company-hq' ? { kind: 'place', place: hqPlace } : prev
+    );
+  }, []);
+
+  useHeadquartersMapPin({
+    mapReady,
+    mapInstanceRef,
+    companyInfoOverride: companyInfo,
+    onSelectPlace: handleSelectHqPlace,
+    onSyncPlaceIfSelected: handleSyncHqPlace,
+  });
 
   // 1. Live Google TrafficLayer lifecycle
   useEffect(() => {
@@ -176,11 +116,9 @@ export function useLiveMapCustomOverlays({
       }
       return;
     }
-
     const layer = new window.google.maps.TrafficLayer();
     layer.setMap(mapInstanceRef.current);
     trafficLayerRef.current = layer;
-
     return () => {
       try {
         layer.setMap(null);
@@ -258,7 +196,9 @@ export function useLiveMapCustomOverlays({
     disposeGoogleOverlayList(placeMarkersRef.current);
     placeMarkersRef.current = [];
     if (!preferences.showPlacesOverlay) {
-      setSelectedOverlay((prev) => (prev?.kind === 'place' ? null : prev));
+      setSelectedOverlay((prev) =>
+        prev?.kind === 'place' && prev.place.id !== 'company-hq' ? null : prev
+      );
       return;
     }
     if (!mapReady || !mapInstanceRef.current || typeof window === 'undefined' || !window.google?.maps?.Marker) {
@@ -275,7 +215,7 @@ export function useLiveMapCustomOverlays({
       disposeGoogleOverlayList(placeMarkersRef.current);
       const starredItems = buildStarredPlacesOverlayItems(specialPlaces);
       setSelectedOverlay((prev) => {
-        if (prev?.kind !== 'place') return prev;
+        if (prev?.kind !== 'place' || prev.place.id === 'company-hq') return prev;
         const updated = starredItems.find((p) => p.id === prev.place.id);
         return updated ? { kind: 'place', place: updated } : null;
       });

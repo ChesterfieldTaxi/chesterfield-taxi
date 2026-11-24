@@ -259,11 +259,22 @@ export function CustomerPaymentSection({
 
       {/* Cash Sub-panel */}
       {!corporatePortalContext && form.paymentMethod === 'cash' && (
-        <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs text-emerald-950 flex items-center gap-2.5">
-          <DollarSignIcon className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>
-            Pay cash directly to your driver at the end of your ride. Exact change is appreciated.
-          </span>
+        <div className="space-y-2.5 animate-in fade-in duration-150">
+          <div className="text-xs text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex items-start gap-2.5">
+            <DollarSignIcon className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="font-bold text-slate-900 flex flex-wrap items-center gap-2">
+                <span>Pay Driver in Cash at Dropoff</span>
+                <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                  No Upfront Charge
+                </span>
+              </div>
+              <p className="text-slate-600 text-[11px] leading-relaxed">
+                Pay cash directly to your driver at the end of your ride. Exact change is
+                appreciated.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

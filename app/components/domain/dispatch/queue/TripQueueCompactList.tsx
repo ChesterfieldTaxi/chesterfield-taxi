@@ -25,6 +25,7 @@ import {
   DispatchSlaBadge,
   getTripCascadeExhaustedTooltip,
 } from '../DispatchCascadeSlaBadges';
+import { useLiveClockNowMs } from '../../../../core/hooks/dispatch/dispatch-workspace.util';
 import { DriverAssignDropdown } from './DriverAssignDropdown';
 import { getDispatchStatusBadge } from './TripQueueToolbar';
 
@@ -83,6 +84,7 @@ export function TripQueueCompactList({
   onOpenDriverPickerForTrip,
   stagedPlanner,
 }: TripQueueCompactListProps) {
+  const nowMs = useLiveClockNowMs(30_000);
   return (
     <div className="flex-1 overflow-auto divide-y divide-slate-100 text-xs">
       {filteredTrips.map((trip) => {
@@ -236,7 +238,7 @@ export function TripQueueCompactList({
                 ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
               </span>
               <div className="flex items-center gap-1">
-                {getDispatchStatusBadge(trip.status)}
+                {getDispatchStatusBadge(trip.status, { trip, nowMs })}
                 {hasPendingGuestChangeRequest(trip) && (
                   <button
                     type="button"

@@ -14,7 +14,10 @@ import type {
 import type { GeoPoint, Trip, TripStatus, VehicleTier } from '../core/types/trip';
 import type { VehicleTierConfig } from '../core/types/config';
 import { COMPANY_CONFIG } from '../config/companyConfig';
+import { isLocalhostDevHost } from '../core/utils/security-sanitizer.util';
 import { formatLocalDateStr } from '../core/services/pricing/vehicle-matching';
+
+export { isLocalhostDevHost };
 import {
   MapPinIcon,
   CarIcon,
@@ -85,7 +88,14 @@ export default function PassengerAppRoute() {
     () => (getAdminConfigService().getCachedSettings().vehicles || []).filter((v) => !v.isArchived)
   );
 
+  const [isLocalhost, setIsLocalhost] = useState<boolean>(
+    () => typeof window !== 'undefined' && isLocalhostDevHost(window.location.hostname)
+  );
+
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsLocalhost(isLocalhostDevHost(window.location.hostname));
+    }
     const configService = getAdminConfigService();
     if (configService.subscribeToSettings) {
       const unsub = configService.subscribeToSettings((settings) => {
@@ -334,7 +344,7 @@ export default function PassengerAppRoute() {
     );
   }
 
-  if (constructionMode && !(isPreview && isStaff)) {
+  if (constructionMode && !(isPreview && isStaff) && !isLocalhost) {
     return <UnderConstruction />;
   }
 
@@ -697,6 +707,16 @@ export default function PassengerAppRoute() {
         '--btn-radius': '12px',
       } as React.CSSProperties}
     >
+      {constructionMode && isLocalhost && (
+        <div
+          role="status"
+          className="fixed bottom-20 md:bottom-4 right-3 z-50 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-950/95 text-amber-200 border border-amber-500/60 shadow-lg text-[11px] font-bold backdrop-blur-xs pointer-events-none print:hidden"
+        >
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+          <span>Live Site: Maintenance ON</span>
+        </div>
+      )}
+
       {/* Toast Notification (offset above mobile Help FAB) */}
       {toastMessage && (
         <div className="fixed bottom-36 md:bottom-20 right-4 left-4 sm:left-auto sm:right-6 sm:w-96 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-5 print:hidden">

@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   normalizeCompanyConfig,
   type AppSettings,
-  type CompanyConfig,
+  type NormalizedCompanyConfig,
 } from '../../../../core/types/config';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
+import { LocationAutocomplete } from '../../LocationAutocomplete';
 import { Button } from '../../../ui/Button';
 import {
   Card,
@@ -30,7 +31,7 @@ export function CompanyProfilePanel({
   onSave,
   isLoading = false,
 }: CompanyProfilePanelProps) {
-  const [company, setCompany] = useState<Required<CompanyConfig>>(() =>
+  const [company, setCompany] = useState<NormalizedCompanyConfig>(() =>
     normalizeCompanyConfig(settings.company)
   );
   const [isSaving, setIsSaving] = useState(false);
@@ -47,7 +48,35 @@ export function CompanyProfilePanel({
       setIsSaving(true);
       setSaveSuccess(null);
       setSaveError(null);
-      const normalized = normalizeCompanyConfig(company);
+      let candidate = company;
+      if (
+        !candidate.headquartersCoordinates &&
+        candidate.address.trim() &&
+        typeof window !== 'undefined' &&
+        (window as any).google?.maps?.Geocoder
+      ) {
+        try {
+          const geocoder = new (window as any).google.maps.Geocoder();
+          const geocoded = await new Promise<{ lat: number; lng: number } | null>((resolve) => {
+            geocoder.geocode(
+              { address: candidate.address.trim() },
+              (results: any[] | null, status: string) => {
+                if (status === 'OK' && results?.[0]?.geometry?.location) {
+                  const loc = results[0].geometry.location;
+                  resolve({ lat: loc.lat(), lng: loc.lng() });
+                } else {
+                  resolve(null);
+                }
+              }
+            );
+          });
+          if (geocoded) {
+            candidate = { ...candidate, headquartersCoordinates: geocoded };
+          }
+        } catch {}
+      }
+
+      const normalized = normalizeCompanyConfig(candidate);
       setCompany(normalized);
 
       await onSave({
@@ -164,14 +193,40 @@ export function CompanyProfilePanel({
                 />
               </div>
 
-              <Input
-                label="Physical Headquarters Address"
-                value={company.address}
-                onChange={(e) => setCompany((prev) => ({ ...prev, address: e.target.value }))}
-                placeholder={COMPANY_CONFIG.address.formatted}
-                helperText="Displayed on Contact & Support page, structured LocalBusiness JSON-LD, and receipts"
-                required
-              />
+              <div className="space-y-1.5">
+                <LocationAutocomplete
+                  label="Physical Headquarters Address"
+                  icon="map-pin"
+                  value={company.address}
+                  onChange={(val) =>
+                    setCompany((prev) => ({
+                      ...prev,
+                      address: val,
+                      headquartersCoordinates: undefined,
+                    }))
+                  }
+                  onPlaceSelected={(details) =>
+                    setCompany((prev) => ({
+                      ...prev,
+                      address: details.formattedAddress || details.address,
+                      headquartersCoordinates: details.coordinates,
+                    }))
+                  }
+                  placeholder={COMPANY_CONFIG.address.formatted}
+                  required
+                />
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+                  <span>
+                    Displayed on Contact &amp; Support page, structured LocalBusiness JSON-LD, receipts, and Dispatch HQ Map Pin.
+                  </span>
+                  {company.headquartersCoordinates && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900 text-amber-300 font-mono text-[10px] font-bold">
+                      HQ Pin: {company.headquartersCoordinates.lat.toFixed(4)},{' '}
+                      {company.headquartersCoordinates.lng.toFixed(4)}
+                    </span>
+                  )}
+                </div>
+              </div>
             </CardContent>
             <CardFooter className="bg-slate-50/50 px-5 py-3.5 border-t border-slate-100 flex justify-end">
               <Button

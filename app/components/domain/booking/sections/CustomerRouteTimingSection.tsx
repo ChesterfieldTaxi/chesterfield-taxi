@@ -13,6 +13,7 @@ import {
   type PlaceSelectedDetails,
 } from '../../dispatch/DispatchLocationInput';
 import { FlightAssistanceCard } from '../FlightAssistanceCard';
+import { CollapsibleSection } from '../../../ui/CollapsibleSection';
 import { ModernDatePicker, ModernTimePicker } from '../../../ui/ModernDateTimePicker';
 import {
   BoltIcon,
@@ -215,7 +216,12 @@ export function CustomerRouteTimingSection({
                 value={form.pickupAddress}
                 variant="pickup"
                 onChange={(addr) => {
-                  setForm((prev) => ({ ...prev, pickupAddress: addr }));
+                  setForm((prev) => ({
+                    ...prev,
+                    pickupAddress: addr,
+                    pickupCoordinates: undefined,
+                    pickupPlaceId: undefined,
+                  }));
                   if (errors.pickupAddress) {
                     setErrors((prev) => {
                       const next = { ...prev };
@@ -289,7 +295,12 @@ export function CustomerRouteTimingSection({
                 value={form.dropoffAddress}
                 variant="dropoff"
                 onChange={(addr) => {
-                  setForm((prev) => ({ ...prev, dropoffAddress: addr }));
+                  setForm((prev) => ({
+                    ...prev,
+                    dropoffAddress: addr,
+                    dropoffCoordinates: undefined,
+                    dropoffPlaceId: undefined,
+                  }));
                   if (errors.dropoffAddress) {
                     setErrors((prev) => {
                       const next = { ...prev };
@@ -364,7 +375,7 @@ export function CustomerRouteTimingSection({
       </div>
 
       {/* Outbound Airport Assistance Card (Only shown when an airport is detected in pickup/dropoff) */}
-      {airportDetection.isAirportTrip && (
+      <CollapsibleSection isOpen={airportDetection.isAirportTrip}>
         <FlightAssistanceCard
           variant="outbound"
           detection={airportDetection}
@@ -436,7 +447,7 @@ export function CustomerRouteTimingSection({
             }));
           }}
         />
-      )}
+      </CollapsibleSection>
     </div>
   );
 }

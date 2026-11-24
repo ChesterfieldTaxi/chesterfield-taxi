@@ -21,41 +21,20 @@ import type { DriverRosterItem } from '../core/services/operator.service';
 import { DriverQueueWindow } from '../components/domain/dispatch/DriverQueueWindow';
 import type { DispatchUniversalTripActions } from '../components/domain/dispatch/TripActionDropdown';
 import { DispatchStagedPlannerModals } from '../components/domain/dispatch/StagedDriverConflictModal';
-import {
-  useDispatchFleet,
-  type LiveFleetDriver,
-} from '../core/hooks/useDispatchFleet';
+import { useDispatchFleet, type LiveFleetDriver } from '../core/hooks/useDispatchFleet';
 import { useBottomSheetDragToClose } from '../core/hooks/useBottomSheetDragToClose';
 import { DispatchLiveMapPane } from '../components/domain/dispatch/DispatchLiveMapPane';
-import {
-  DispatchTripQueuePane,
-  DispatchTripQueueSheets,
-  type QueueFilterType,
-} from '../components/domain/dispatch/DispatchTripQueuePane';
-import {
-  DispatchDriverRosterPane,
-  DispatchDriverSheets,
-} from '../components/domain/dispatch/DispatchDriverRosterPane';
+import { DispatchTripQueuePane, DispatchTripQueueSheets, type QueueFilterType } from '../components/domain/dispatch/DispatchTripQueuePane';
+import { DispatchDriverRosterPane, DispatchDriverSheets } from '../components/domain/dispatch/DispatchDriverRosterPane';
 import { sendDispatchContextualTripEmail } from '../core/services/dispatch/dispatch-trip-email.util';
 import { DEFAULT_ZONES } from '../core/services/zones/zone.service';
 import type { ZoneGeofence } from '../core/types/zone';
 import {
-  DEFAULT_ACTIVE_ONLY_STATUS_FILTER,
-  cloneTripToDispatchFormValues,
-  filterDispatchQueueTrips,
-  getDateRangeButtonLabel,
-  mergePopulateBookingIntoDraftForm,
-  useDispatchFleetAlerts,
-  useDispatchPanelResize,
-  useDispatchSlaCascadeLoop,
-  useDispatchStagedPlanner,
-  useDispatchTripTriageActions,
-  useDispatchWorkspaceSync,
-  useSyncDraftLocationsToMap,
-  type ConfirmModalConfigState,
-  type DesktopDockTab,
-  type DispatchMobileTab,
-  type DraftTab,
+  DEFAULT_ACTIVE_ONLY_STATUS_FILTER, cloneTripToDispatchFormValues, filterDispatchQueueTrips,
+  getDateRangeButtonLabel, mergePopulateBookingIntoDraftForm, useDispatchFleetAlerts,
+  useDispatchPanelResize, useDispatchSlaCascadeLoop, useDispatchStagedPlanner,
+  useDispatchTripTriageActions, useDispatchWorkspaceSync, useLiveClockNowMs, useSyncDraftLocationsToMap,
+  type ConfirmModalConfigState, type DesktopDockTab, type DispatchMobileTab, type DraftTab,
 } from '../core/hooks/dispatch';
 import {
   DispatchDesktopTopHeader,
@@ -598,6 +577,7 @@ export default function DispatchRoute() {
     setCompleteModalOpenSeq((seq) => seq + 1);
   }, []);
 
+  const clockNowMs = useLiveClockNowMs(30_000);
   const filteredTrips = useMemo(
     () =>
       filterDispatchQueueTrips({
@@ -616,6 +596,7 @@ export default function DispatchRoute() {
         searchTerm,
         slaUrgentOnlyFilter,
         slaSummary,
+        nowMs: clockNowMs,
       }),
     [
       trips,
@@ -633,6 +614,7 @@ export default function DispatchRoute() {
       searchTerm,
       slaUrgentOnlyFilter,
       slaSummary,
+      clockNowMs,
     ]
   );
 

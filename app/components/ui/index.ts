@@ -12,3 +12,4 @@ export * from './Badge';
 export * from './Alert';
 export * from './FloatingWindow';
 export * from './SegmentedControl';
+export * from './CollapsibleSection';

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { FleetCarConfig, VehicleTierConfig } from '../../types/config';
 import type { GeoPoint, Trip } from '../../types/trip';
 import type { SlaScanSummary } from '../../services/dispatch/sla-monitor.service';
@@ -252,7 +252,81 @@ export function cloneTripToDispatchFormValues(trip: Trip): DispatchFormValues {
   };
 }
 
+export type DriverLateEvalTrip = Pick<
+  Trip,
+  'status' | 'assignedDriverId' | 'scheduledPickupTime' | 'bookingType' | 'flightTelemetry' | 'metadata'
+>;
+
+export interface DriverLateStatusEvaluation {
+  isLate: boolean;
+  lateMinutes: number;
+}
+
+const PRE_ARRIVAL_ASSIGNED_STATUS_SET = new Set<string>(['assigned', 'accepted', 'en_route']);
+
+/**
+ * Pure derived `Late` pickup evaluator:
+ * - Active ONLY when `Boolean(trip?.assignedDriverId)` AND `status` is pre-arrival
+ *   (`'assigned' | 'accepted' | 'en_route'`) AND `scheduledPickupTime` is valid with
+ *   `nowMs > pickupMs + 60_000`.
+ * - Flight-Delay Exemption: returns `{ isLate: false, lateMinutes: 0 }` whenever the
+ *   pickup flight is delayed (`flightTelemetry?.status === 'delayed'`,
+ *   `Boolean((trip?.metadata as any)?.flightDelayed)`, or positive `delayMinutes` before
+ *   post-delay arrival buffer).
+ */
+export function evaluateTripDriverLateStatus(
+  trip: Partial<DriverLateEvalTrip> | null | undefined,
+  nowMs: number = Date.now()
+): DriverLateStatusEvaluation {
+  if (!trip || !Boolean(trip.assignedDriverId)) {
+    return { isLate: false, lateMinutes: 0 };
+  }
+  const normalizedStatus = String(trip.status || '').trim().toLowerCase();
+  if (!PRE_ARRIVAL_ASSIGNED_STATUS_SET.has(normalizedStatus)) {
+    return { isLate: false, lateMinutes: 0 };
+  }
+  if (!trip.scheduledPickupTime) {
+    return { isLate: false, lateMinutes: 0 };
+  }
+  const pickupMs = Date.parse(trip.scheduledPickupTime);
+  if (!Number.isFinite(pickupMs) || nowMs <= pickupMs + 60_000) {
+    return { isLate: false, lateMinutes: 0 };
+  }
+
+  const ft = trip.flightTelemetry;
+  const meta = (trip.metadata || {}) as Record<string, unknown>;
+  const delayMinutes = typeof ft?.delayMinutes === 'number' ? ft.delayMinutes : 0;
+  const isFlightDelayedExempt =
+    ft?.status === 'delayed' ||
+    Boolean(meta.flightDelayed) ||
+    (delayMinutes > 0 &&
+      (ft?.status !== 'landed' || nowMs <= pickupMs + delayMinutes * 60_000 + 60_000));
+
+  if (isFlightDelayedExempt) {
+    return { isLate: false, lateMinutes: 0 };
+  }
+
+  return {
+    isLate: true,
+    lateMinutes: Math.max(1, Math.round((nowMs - pickupMs) / 60_000)),
+  };
+}
+
+/**
+ * Shared live clock tick hook (defaults to 30-second intervals) for derived `Late` status reactivity.
+ */
+export function useLiveClockNowMs(intervalMs: number = 30_000): number {
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  useEffect(() => {
+    setNowMs(Date.now());
+    const id = setInterval(() => setNowMs(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return nowMs;
+}
+
 export type CanonicalQueueStatusKey =
+  | 'late'
   | 'unconfirmed'
   | 'confirmed'
   | 'pending'
@@ -267,6 +341,7 @@ export type CanonicalQueueStatusKey =
   | 'declined';
 
 export const ALL_QUEUE_STATUS_KEYS: ReadonlyArray<CanonicalQueueStatusKey> = [
+  'late',
   'unconfirmed',
   'confirmed',
   'pending',
@@ -282,6 +357,7 @@ export const ALL_QUEUE_STATUS_KEYS: ReadonlyArray<CanonicalQueueStatusKey> = [
 ];
 
 export const ACTIVE_QUEUE_STATUS_KEYS: ReadonlyArray<CanonicalQueueStatusKey> = [
+  'late',
   'unconfirmed',
   'confirmed',
   'pending',
@@ -331,12 +407,23 @@ export function serializeStatusFilterSelection(
 export const DEFAULT_ACTIVE_ONLY_STATUS_FILTER: string =
   serializeStatusFilterSelection(ACTIVE_QUEUE_STATUS_KEYS);
 
-export function matchesQueueStatusFilter(tripStatus: string | undefined, statusFilter: string): boolean {
+export function matchesQueueStatusFilter(
+  tripOrStatus: Partial<DriverLateEvalTrip> | string | null | undefined,
+  statusFilter: string,
+  nowMs: number = Date.now()
+): boolean {
   const cleanFilter = String(statusFilter || '').trim().toLowerCase();
   if (!cleanFilter || cleanFilter === 'all') return true;
   if (cleanFilter === 'none') return false;
   const selectedSet = parseStatusFilterSelection(cleanFilter);
-  const normalizedTripStatus = String(tripStatus || '').trim().toLowerCase();
+  if (typeof tripOrStatus === 'object' && tripOrStatus !== null) {
+    if (evaluateTripDriverLateStatus(tripOrStatus, nowMs).isLate) {
+      return selectedSet.has('late');
+    }
+    const normalizedObjStatus = String(tripOrStatus.status || '').trim().toLowerCase();
+    return selectedSet.has(normalizedObjStatus as CanonicalQueueStatusKey);
+  }
+  const normalizedTripStatus = String(tripOrStatus || '').trim().toLowerCase();
   return selectedSet.has(normalizedTripStatus as CanonicalQueueStatusKey);
 }
 
@@ -397,7 +484,8 @@ export function resolveTripEffectiveTimeMs(trip: Trip): number {
  */
 export function sortDispatchQueueTrips(
   list: ReadonlyArray<Trip>,
-  sortMode: QueueSortMode = 'smart'
+  sortMode: QueueSortMode = 'smart',
+  nowMs: number = Date.now()
 ): Trip[] {
   const copy = [...list];
 
@@ -417,7 +505,7 @@ export function sortDispatchQueueTrips(
     });
   }
 
-  // Default: 'smart' operational dispatch order
+  // Default: 'smart' operational dispatch order (Late pre-arrival trips prioritized at top)
   return copy.sort((a, b) => {
     const termA = TERMINAL_QUEUE_STATUS_SET.has(String(a.status || ''));
     const termB = TERMINAL_QUEUE_STATUS_SET.has(String(b.status || ''));
@@ -430,6 +518,20 @@ export function sortDispatchQueueTrips(
       const diff = resolveTripEffectiveTimeMs(b) - resolveTripEffectiveTimeMs(a);
       if (diff !== 0) return diff;
       return (b.id || '').localeCompare(a.id || '');
+    }
+
+    // Prioritize derived Late pre-arrival trips at the very top of Live smart order
+    const lateA = evaluateTripDriverLateStatus(a, nowMs);
+    const lateB = evaluateTripDriverLateStatus(b, nowMs);
+    if (lateA.isLate !== lateB.isLate) {
+      return lateA.isLate ? -1 : 1;
+    }
+    if (lateA.isLate && lateB.isLate) {
+      const lateDiff = lateB.lateMinutes - lateA.lateMinutes;
+      if (lateDiff !== 0) return lateDiff;
+      const schedDiff = resolveTripEffectiveTimeMs(a) - resolveTripEffectiveTimeMs(b);
+      if (schedDiff !== 0) return schedDiff;
+      return (a.id || '').localeCompare(b.id || '');
     }
 
     // Both open/live operational trips: ASAP rides first (newest request first), then scheduled chronological ascending
@@ -508,13 +610,19 @@ export function sortQueueTripsByColumn(
     }>;
     vehicles?: VehicleTierConfig[];
     fleetCars?: ReadonlyArray<FleetCarConfig>;
+    nowMs?: number;
   }
 ): Trip[] {
+  const effectiveNowMs = options?.nowMs ?? Date.now();
   if (!sort || sort.column === 'smart') {
-    return sortDispatchQueueTrips(list, 'smart');
+    return sortDispatchQueueTrips(list, 'smart', effectiveNowMs);
   }
   if (sort.column === 'date') {
-    return sortDispatchQueueTrips(list, sort.direction === 'desc' ? 'date_desc' : 'date_asc');
+    return sortDispatchQueueTrips(
+      list,
+      sort.direction === 'desc' ? 'date_desc' : 'date_asc',
+      effectiveNowMs
+    );
   }
 
   const driverLabelById = new Map<string, string>();
@@ -546,8 +654,12 @@ export function sortQueueTripsByColumn(
     return raw || 'cash';
   };
 
-  const resolveStatusSortRank = (status?: string): number =>
-    QUEUE_STATUS_SORT_RANK.get(String(status || '').trim().toLowerCase()) ?? 99;
+  const resolveStatusSortRank = (trip: Trip): number => {
+    if (evaluateTripDriverLateStatus(trip, effectiveNowMs).isLate) {
+      return QUEUE_STATUS_SORT_RANK.get('late') ?? 0;
+    }
+    return QUEUE_STATUS_SORT_RANK.get(String(trip.status || '').trim().toLowerCase()) ?? 99;
+  };
 
   const dir = sort.direction === 'desc' ? -1 : 1;
   const copy = [...list];
@@ -617,7 +729,7 @@ export function sortQueueTripsByColumn(
         });
         break;
       case 'status':
-        cmp = resolveStatusSortRank(a.status) - resolveStatusSortRank(b.status);
+        cmp = resolveStatusSortRank(a) - resolveStatusSortRank(b);
         break;
     }
 
@@ -649,6 +761,7 @@ export interface FilterDispatchQueueTripsInput {
   slaUrgentOnlyFilter: boolean;
   slaSummary: SlaScanSummary;
   sortMode?: QueueSortMode;
+  nowMs?: number;
 }
 
 export function filterDispatchQueueTrips({
@@ -668,6 +781,7 @@ export function filterDispatchQueueTrips({
   slaUrgentOnlyFilter,
   slaSummary,
   sortMode = 'smart',
+  nowMs = Date.now(),
 }: FilterDispatchQueueTripsInput): Trip[] {
   const normSearchDigits = searchTerm.replace(/\D/g, '');
   const term = searchTerm.trim().toLowerCase();
@@ -689,7 +803,7 @@ export function filterDispatchQueueTrips({
       if (!sla || !sla.isEligible || sla.level === 'normal') return false;
     }
 
-    if (!matchesQueueStatusFilter(trip.status, statusFilter)) {
+    if (!matchesQueueStatusFilter(trip, statusFilter, nowMs)) {
       return false;
     }
 
@@ -861,7 +975,7 @@ export function filterDispatchQueueTrips({
     return true;
   });
 
-  return sortDispatchQueueTrips(matched, sortMode);
+  return sortDispatchQueueTrips(matched, sortMode, nowMs);
 }
 
 export interface ActiveDraftLocationState {

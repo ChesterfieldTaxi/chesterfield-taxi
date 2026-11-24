@@ -3,7 +3,7 @@ import type { AppSettings } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import {
-  DEFAULT_QUEUE_COLUMN_SORT, cycleQueueColumnSort, sortQueueTripsByColumn, type QueueColumnSortState,
+  DEFAULT_QUEUE_COLUMN_SORT, cycleQueueColumnSort, sortQueueTripsByColumn, useLiveClockNowMs, type QueueColumnSortState,
 } from '../../../../core/hooks/dispatch/dispatch-workspace.util';
 import type { DispatchStagedPlannerController } from '../../../../core/hooks/dispatch/useDispatchStagedPlanner';
 import { hasStagedDriver, isTripEligibleForStaging } from '../../../../core/services/dispatch/staged-driver-planner.service';
@@ -81,6 +81,7 @@ export function TripQueueTableView({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const tableRef = useRef<HTMLTableElement | null>(null);
   const [columnSort, setColumnSort] = useState<QueueColumnSortState>(DEFAULT_QUEUE_COLUMN_SORT);
+  const nowMs = useLiveClockNowMs(30_000);
   const internalCols = useQueueTableColumns();
   const activeColumns = externalColumns ?? internalCols.visibleColumns;
   const activeMinWidthPx = externalMinWidthPx ?? computeQueueTableMinWidthPx(activeColumns);
@@ -99,8 +100,9 @@ export function TripQueueTableView({
             drivers,
             vehicles: settings.vehicles,
             fleetCars: settings.fleet,
+            nowMs,
           }),
-    [filteredTrips, columnSort, drivers, settings.vehicles, settings.fleet]
+    [filteredTrips, columnSort, drivers, settings.vehicles, settings.fleet, nowMs]
   );
 
   useIsomorphicLayoutEffect(() => {
@@ -489,7 +491,7 @@ export function TripQueueTableView({
                 {visibleColSet.has('status') && (
                   <td className="py-2 px-2 whitespace-nowrap">
                     <div className="flex items-center gap-1">
-                      {getDispatchStatusBadge(trip.status)}
+                      {getDispatchStatusBadge(trip.status, { trip, nowMs })}
                       {hasGuestReq && (
                         <button
                           type="button"

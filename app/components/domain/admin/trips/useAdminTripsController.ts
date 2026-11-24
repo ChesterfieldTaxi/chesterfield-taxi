@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Trip, TripStatus } from '../../../../core/types/trip';
+import {
+  evaluateTripDriverLateStatus,
+  useLiveClockNowMs,
+} from '../../../../core/hooks/dispatch/dispatch-workspace.util';
 import { getBookingService } from '../../../../core/services/booking';
 import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
 import { getAdminAuthService } from '../../../../core/services/auth/admin-auth.service';
@@ -43,6 +47,7 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const nowMs = useLiveClockNowMs(30_000);
   const [includeArchivedInHistory, setIncludeArchivedInHistory] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [auditModalTrip, setAuditModalTrip] = useState<Trip | null>(null);
@@ -365,9 +370,13 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
   const historyTrips = useMemo(() => {
     const base = trips.filter((t) => (includeArchivedInHistory ? true : !isArchivedTrip(t)));
     const statusFiltered =
-      statusFilter === 'all' ? base : base.filter((t) => t.status === statusFilter);
+      statusFilter === 'all'
+        ? base
+        : statusFilter === 'late'
+        ? base.filter((t) => evaluateTripDriverLateStatus(t, nowMs).isLate)
+        : base.filter((t) => t.status === statusFilter);
     return filterBySearch(statusFiltered);
-  }, [trips, includeArchivedInHistory, statusFilter, searchTerm]);
+  }, [trips, includeArchivedInHistory, statusFilter, searchTerm, nowMs]);
 
   const handleExportCSV = () => {
     const sourceTrips =

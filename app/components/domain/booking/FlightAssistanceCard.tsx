@@ -9,6 +9,7 @@ import {
   SpinnerIcon,
 } from '../../ui/Icons';
 import { Select } from '../../ui/Select';
+import { CollapsibleSection } from '../../ui/CollapsibleSection';
 import { AirportCityCombobox } from './AirportCityCombobox';
 import {
   extractAirportIataCode,
@@ -540,7 +541,7 @@ export function FlightAssistanceCard({
         </div>
       )}
 
-      {provideFlightInfo && (
+      <CollapsibleSection isOpen={provideFlightInfo}>
         <div className="space-y-3 pt-0.5">
           {detection.isPrivateAviation ? (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -716,7 +717,7 @@ export function FlightAssistanceCard({
             )}
           </div>
         </div>
-      )}
+      </CollapsibleSection>
     </div>
   );
 }

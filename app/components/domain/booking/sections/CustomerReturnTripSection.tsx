@@ -25,6 +25,7 @@ import {
   type PlaceSelectedDetails,
 } from '../../dispatch/DispatchLocationInput';
 import { FlightAssistanceCard } from '../FlightAssistanceCard';
+import { CollapsibleSection } from '../../../ui/CollapsibleSection';
 import { ModernDatePicker, ModernTimePicker } from '../../../ui/ModernDateTimePicker';
 import {
   ArrowLeftRightIcon,
@@ -231,7 +232,13 @@ export function CustomerReturnTripSection({
                     placeholder="Return Pickup Location"
                     value={form.returnPickupAddress}
                     variant="pickup"
-                    onChange={(addr) => setForm((prev) => ({ ...prev, returnPickupAddress: addr }))}
+                    onChange={(addr) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        returnPickupAddress: addr,
+                        returnPickupCoordinates: undefined,
+                      }))
+                    }
                     onPlaceSelected={(p: PlaceSelectedDetails) => {
                       setForm((prev) => ({
                         ...prev,
@@ -288,7 +295,11 @@ export function CustomerReturnTripSection({
                     value={form.returnDropoffAddress}
                     variant="dropoff"
                     onChange={(addr) =>
-                      setForm((prev) => ({ ...prev, returnDropoffAddress: addr }))
+                      setForm((prev) => ({
+                        ...prev,
+                        returnDropoffAddress: addr,
+                        returnDropoffCoordinates: undefined,
+                      }))
                     }
                     onPlaceSelected={(p: PlaceSelectedDetails) => {
                       setForm((prev) => ({
@@ -345,7 +356,7 @@ export function CustomerReturnTripSection({
             </div>
 
             {/* 2. Return Airport Assistance (Immediately under Return Route — strictly gated on airport detection) */}
-            {returnAirportDetection.isAirportTrip && (
+            <CollapsibleSection isOpen={returnAirportDetection.isAirportTrip}>
               <FlightAssistanceCard
                 variant="return"
                 detection={returnAirportDetection}
@@ -424,7 +435,7 @@ export function CustomerReturnTripSection({
                   }));
                 }}
               />
-            )}
+            </CollapsibleSection>
           </div>
 
           {/* 3. Return Passengers, Carry-on & Checked Bags (Identical 3-col compact steppers) */}
@@ -680,8 +691,10 @@ export function CustomerReturnTripSection({
             </div>
 
             {/* Expanded Return Oversized Items Panel */}
-            {bookingConfig.allowOversizedLuggage !== false && form.returnHasOversizedLuggage && (
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 animate-in fade-in duration-150">
+            <CollapsibleSection
+              isOpen={bookingConfig.allowOversizedLuggage !== false && form.returnHasOversizedLuggage}
+            >
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
                 <div className="text-[11px] text-slate-600 font-medium">
                   Select return oversized items so we send a car with enough space:
                 </div>
@@ -765,11 +778,13 @@ export function CustomerReturnTripSection({
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-base sm:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
                 />
               </div>
-            )}
+            </CollapsibleSection>
 
             {/* Expanded Return Car Seats Panel */}
-            {bookingConfig.allowChildSafetySeats && form.returnCarSeats && (
-              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2 animate-in fade-in duration-150">
+            <CollapsibleSection
+              isOpen={Boolean(bookingConfig.allowChildSafetySeats && form.returnCarSeats)}
+            >
+              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
                 <div className="p-2 bg-amber-100/80 border border-amber-300/80 rounded-lg text-[11px] text-amber-950 leading-snug">
                   <span className="font-bold">
                     Missouri Child Passenger Safety Law (RSMo § 307.179):{' '}
@@ -874,7 +889,7 @@ export function CustomerReturnTripSection({
                   </div>
                 ))}
               </div>
-            )}
+            </CollapsibleSection>
 
             {/* Return Admin-Configured Optional Bookable Extras */}
             {bookableCustomExtras.length > 0 && (

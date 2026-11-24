@@ -22,6 +22,7 @@ import { DispatchLocationInput } from '../DispatchLocationInput';
 import { AirportCityCombobox } from '../../booking/AirportCityCombobox';
 import { FlightTelemetryCheckPanel } from '../../booking/FlightAssistanceCard';
 import { ModernDatePicker, ModernTimePicker } from '../../../ui/ModernDateTimePicker';
+import { CollapsibleSection } from '../../../ui/CollapsibleSection';
 import {
   LockIcon,
   LuggageIcon,
@@ -435,8 +436,10 @@ export function DispatchReturnRepeatSection({
                   </div>
 
                   {/* Return Flight / Aviation Details Box */}
-                  {(returnAirportDetection.isAirportTrip || returnProvideFlightInfo) && (
-                    <div className="p-3 bg-white/90 border border-indigo-200 rounded-lg space-y-2.5 animate-in fade-in duration-150">
+                  <CollapsibleSection
+                    isOpen={returnAirportDetection.isAirportTrip || returnProvideFlightInfo}
+                  >
+                    <div className="p-3 bg-white/90 border border-indigo-200 rounded-lg space-y-2.5">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-indigo-950 font-bold text-xs">
                           <PlaneLandingIcon
@@ -493,7 +496,7 @@ export function DispatchReturnRepeatSection({
                         </div>
                       </div>
 
-                      {returnProvideFlightInfo && (
+                      <CollapsibleSection isOpen={returnProvideFlightInfo}>
                         <div className="space-y-2 pt-0.5">
                           {returnAirportDetection.isPrivateAviation ? (
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -673,9 +676,9 @@ export function DispatchReturnRepeatSection({
                             </label>
                           </div>
                         </div>
-                      )}
+                      </CollapsibleSection>
                     </div>
-                  )}
+                  </CollapsibleSection>
                 </div>
 
                 {/* Return Date & Time */}
@@ -881,8 +884,8 @@ export function DispatchReturnRepeatSection({
                     )}
                   </label>
 
-                  {returnHasOversizedLuggage && (
-                    <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5 animate-in fade-in duration-150">
+                  <CollapsibleSection isOpen={returnHasOversizedLuggage}>
+                    <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5">
                       {oversizedCategories.map((cat) => {
                         const count = returnOversizedBags[cat.id] || 0;
                         return (
@@ -940,7 +943,7 @@ export function DispatchReturnRepeatSection({
                         className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-[11px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                       />
                     </div>
-                  )}
+                  </CollapsibleSection>
                 </div>
 
                 {/* Return Car Seats Toggle & Counters */}
@@ -955,7 +958,7 @@ export function DispatchReturnRepeatSection({
                     <span>Return Car Seats Required</span>
                   </label>
 
-                  {returnCarSeats && (
+                  <CollapsibleSection isOpen={returnCarSeats}>
                     <div className="grid grid-cols-3 gap-1 pt-1 text-[10px]">
                       <div className="p-1 bg-indigo-50/50 rounded border border-indigo-100 text-center">
                         <div className="text-slate-600 font-semibold mb-0.5">Rear-Facing</div>
@@ -1026,7 +1029,7 @@ export function DispatchReturnRepeatSection({
                         </div>
                       </div>
                     </div>
-                  )}
+                  </CollapsibleSection>
                 </div>
 
                 {/* Return Vehicles Section */}

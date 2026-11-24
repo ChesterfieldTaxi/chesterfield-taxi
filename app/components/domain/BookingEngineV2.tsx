@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation } from 'react-router';
 import type { Trip } from '../../core/types';
 import {
@@ -110,6 +110,10 @@ export function BookingEngineV2({
   corporatePortalContext,
 }: BookingEngineV2Props) {
   const location = useLocation();
+  const mountedAtMsRef = useRef<number>(Date.now());
+  useEffect(() => {
+    mountedAtMsRef.current = Date.now();
+  }, []);
 
   // Defer local-timezone default date/time computation to client mount so SSR (UTC)
   // and browser hydration always match without React Hydration Error #418.
@@ -461,6 +465,8 @@ export function BookingEngineV2({
     surchargesVersion,
     editingTripId,
     corporatePortalContext,
+    mountedAtMsRef,
+    isPublicWebForm: !embeddedInApp && !corporatePortalContext && !editingTripId,
     onBookingSuccess,
     setErrors,
   });
@@ -1046,21 +1052,33 @@ export function BookingEngineV2({
   return (
     <div className={`relative max-w-6xl mx-auto ${className}`}>
       <form onSubmit={handleBookRide} noValidate>
-        {/* Invisible Honeypot Anti-Bot Trap */}
+        {/* Offscreen Accessible-Safe Honeypot Anti-Bot Trap (clip-path: inset(50%)) */}
         <div
-          style={{ display: 'none', position: 'absolute', left: '-9999px', opacity: 0 }}
+          style={{
+            clipPath: 'inset(50%)',
+            width: '1px',
+            height: '1px',
+            overflow: 'hidden',
+            position: 'absolute',
+          }}
           aria-hidden="true"
-          tabIndex={-1}
         >
-          <label htmlFor="hp_company_sec_field">Leave this field blank</label>
+          <label htmlFor="websiteUrl">Website URL</label>
           <input
-            id="hp_company_sec_field"
+            id="websiteUrl"
             type="text"
-            name="hp_company_sec_field"
-            value={form.botTrapField || ''}
-            onChange={(e) => setForm((prev) => ({ ...prev, botTrapField: e.target.value }))}
+            name="websiteUrl"
+            value={form.websiteUrl ?? form.botTrapField ?? ''}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                websiteUrl: e.target.value,
+                botTrapField: e.target.value,
+              }))
+            }
             tabIndex={-1}
-            autoComplete="off"
+            aria-hidden="true"
+            autoComplete="new-password"
           />
         </div>
 

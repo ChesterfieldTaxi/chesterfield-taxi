@@ -1107,4 +1107,25 @@
 - [x] 67.5 Automated Verification Suite (`scripts/test-vehicles-places-flights-and-waivers-phase67.ts`) & Build Gate:
   - [x] 67.5.1 Create `scripts/test-vehicles-places-flights-and-waivers-phase67.ts` and pass `npm run typecheck`, Phases 63–67 verification suites, and `npm run build` with `0` errors.
 
+## Phase 68 (Wave 6 Phase 3): Derived `Late` Pickup Status (Flight-Delay Exempt), Localhost Maintenance Bypass + `/book` Anti-Spam Shield, Inline STL Airport Text Autocomplete, Headquarters `HQ` Map Pin, `/track` Custom Pickers + Pulsing Button, `<CollapsibleSection>` & `Card`/`Cash` Symmetry
+- [x] 68.0 Baseline Commit & Spec-Driven Documentation:
+  - [x] 68.0.1 Stage and commit clean Phase 67 baseline on `main` (`feat(phase-67): unify active Admin vehicles, fix Starred Places overlay, add YYZ Toronto airport catalog, and wire dynamic Waive Fees dropdown`).
+  - [x] 68.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 68 scope and checklist.
+- [x] 68.1 Derived `Late` Driver Pickup Status (Flight-Delay Exempt):
+  - [x] 68.1.1 Export pure `evaluateTripDriverLateStatus` in `dispatch-workspace.util.ts` (pre-arrival assigned trips >60s past scheduled pickup, exempting delayed inbound flights), include `'late'` in `ACTIVE_QUEUE_STATUS_KEYS` & `ALL_QUEUE_STATUS_KEYS`, update `matchesQueueStatusFilter(tripOrStatus, statusFilter, nowMs?)`, and prioritize `'late'` in `Status` & `smart` (`Live`) sorting.
+  - [x] 68.1.2 Add `'late'` (`bg-rose-600 text-white border-rose-700 animate-pulse` + alarm-clock SVG + `"Late (+Nm) — <Assigned/Accepted/En Route>"` tooltip) to `DispatchStatusBadge.tsx`, and wire `trip` + 30s live clock tick across `dispatch.tsx`, `TripQueueTableView.tsx`, `DispatchLeftBookingSidebar.tsx`, and `AdminTripsTablePanel.tsx`.
+- [x] 68.2 Localhost Maintenance Auto-Bypass + Multi-Layer `/book` Anti-Spam Shield:
+  - [x] 68.2.1 Export pure `isLocalhostDevHost` in `layout.tsx` & `app.tsx` (`localhost`, `127.0.0.1`, `[::1]`) auto-bypassing `<UnderConstruction />` with a compact bottom-right `"Live Site: Maintenance ON"` pill.
+  - [x] 68.2.2 Upgrade `BookingEngineV2.tsx` honeypot to offscreen `clip-path: inset(50%)` `websiteUrl` (`autoComplete="new-password"`) + `< 4000ms` dwell-time bot trap, block non-staff non-localhost `handleBookRide` during maintenance, require autocomplete `pickupCoordinates` & `dropoffCoordinates`, and reject numeric / consonant-mash names (`isLikelyGibberishOrNumericName` & `hasSpamConsonantMash` in `security-sanitizer.util.ts`).
+- [x] 68.3 Inline Text Autocomplete `AirportCityCombobox` (STL Connections) + `HQ` Map Pin:
+  - [x] 68.3.1 Convert `AirportCityCombobox.tsx` (`< 280`L) into a direct inline `<input>` with portaled suggestions, `onBlur` 3–4 char code normalization, and free-text support, and expand `MAJOR_AIRPORTS` in `airport-catalog.ts` (`< 320`L) to `>= 145` STL-connected commercial, regional, leisure, international & FBO airports.
+  - [x] 68.3.2 Add `headquartersCoordinates?: { lat: number; lng: number }` on `CompanyInfoConfig` (`config.ts`), wire `LocationAutocomplete` in `CompanyProfilePanel.tsx`, and render a distinct navy/gold `HQ` pin + 1-click Set Pickup/Dropoff popover on the Dispatch map (`useLiveMapCustomOverlays.ts < 430`L).
+- [x] 68.4 `/track` Custom Pickers + Pulsing Button, `<CollapsibleSection>` & `Card`/`Cash` Symmetry:
+  - [x] 68.4.1 Replace raw `type="date"` & `type="time"` in `GuestManageRidePanel.tsx` with `<ModernDatePicker />` & `<ModernTimePicker />`, and restyle `"Request Dispatch Confirmation"` + `Time / Address` approval indicator in amber-orange (`bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold ring-2 ring-amber-400/60`) with pulsing attention badge.
+  - [x] 68.4.2 Create `app/components/ui/CollapsibleSection.tsx` (`< 90`L) with smooth CSS grid height transition and wrap Oversized Cargo, Child Safety Seats, and Flight Info sections across `/book` & Dispatch booking forms.
+  - [x] 68.4.3 Match `Cash (In Car)` banner in `CustomerPaymentSection.tsx` to the exact 2-line height & shell of `Card (In Car)` (`"Pay Driver in Cash at Dropoff"` + `"No Upfront Charge"` pill).
+- [x] 68.5 Verification Suite (`scripts/test-late-status-antispam-hq-and-polish-phase68.ts < 420`L) & Full Build Gate:
+  - [x] 68.5.1 Create `scripts/test-late-status-antispam-hq-and-polish-phase68.ts` (`< 420`L) and pass `npm run typecheck`, Phases 63–68 test suites, and `npm run build` with exit code `0`.
+
+
 

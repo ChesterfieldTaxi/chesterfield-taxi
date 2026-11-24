@@ -112,6 +112,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                     onChange={(e) => ctrl.setStatusFilter(e.target.value)}
                   >
                     <option value="all">All Lifecycles ({ctrl.trips.length})</option>
+                    <option value="late">Late (Past Pickup)</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                     <option value="assigned">Assigned / Active</option>

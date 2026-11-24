@@ -295,8 +295,8 @@ function testUnconfirmedQuickFilterAndRedCounter(): void {
     savedPreviousFilter: 'all',
   });
 
-  // STATUS_FILTER_OPTIONS has 11 lifecycle items (excluding 'unconfirmed')
-  assert.equal(STATUS_FILTER_OPTIONS.length, 11);
+  // STATUS_FILTER_OPTIONS has 12 lifecycle/derived items (including 'late', excluding 'unconfirmed')
+  assert.equal(STATUS_FILTER_OPTIONS.length, 12);
   assert.equal(
     STATUS_FILTER_OPTIONS.some((o) => o.key === 'unconfirmed'),
     false,

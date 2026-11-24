@@ -15,6 +15,7 @@ import {
   type BookingVehicleChoice as CustomerVehicleChoice,
   type CustomerBookingFormState,
 } from '../../../../core/hooks/booking';
+import { CollapsibleSection } from '../../../ui/CollapsibleSection';
 import { CheckIcon, LuggageIcon, PlusIcon, UserIcon } from '../../../ui/Icons';
 
 export interface CustomerVehicleExtrasSectionProps {
@@ -300,8 +301,10 @@ export function CustomerVehicleExtrasSection({
         </div>
 
         {/* Expanded Oversized Items Panel */}
-        {bookingConfig.allowOversizedLuggage !== false && form.hasOversizedLuggage && (
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 animate-in fade-in duration-150">
+        <CollapsibleSection
+          isOpen={bookingConfig.allowOversizedLuggage !== false && form.hasOversizedLuggage}
+        >
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
             <div className="text-[11px] text-slate-600 font-medium">
               Select oversized items so we send a car with enough space:
             </div>
@@ -382,11 +385,11 @@ export function CustomerVehicleExtrasSection({
               className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-base sm:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25"
             />
           </div>
-        )}
+        </CollapsibleSection>
 
         {/* Expanded Car Seats Panel (Single deduplicated Missouri statutory notice) */}
-        {bookingConfig.allowChildSafetySeats && form.carSeats && (
-          <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2.5 animate-in fade-in duration-150">
+        <CollapsibleSection isOpen={Boolean(bookingConfig.allowChildSafetySeats && form.carSeats)}>
+          <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2.5">
             <div className="p-2.5 bg-amber-100/80 border border-amber-300/80 rounded-lg text-[11px] text-amber-950 leading-snug">
               <span className="font-bold">
                 Missouri Child Passenger Safety Law (RSMo § 307.179):{' '}
@@ -490,7 +493,7 @@ export function CustomerVehicleExtrasSection({
               </div>
             ))}
           </div>
-        )}
+        </CollapsibleSection>
 
         {/* Admin-Configured Optional Bookable Extras */}
         {bookableCustomExtras.length > 0 && (

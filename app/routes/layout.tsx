@@ -5,13 +5,17 @@ import UnderConstruction from '../components/UnderConstruction';
 import { getAdminConfigService } from '../core/services/config/admin-config.service';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { COMPANY_CONFIG } from '../config/companyConfig';
+import { isLocalhostDevHost } from '../core/utils/security-sanitizer.util';
 import type { BrandingConfig } from '../core/types/config';
+
+export { isLocalhostDevHost };
 
 export default function PublicLayout() {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const previewParam = searchParams.get('preview') === 'true';
   const [isStaffUser, setIsStaffUser] = useState(false);
+  const [isLocalhost, setIsLocalhost] = useState(false);
 
   useEffect(() => {
     const unsub = getAdminAuthService().onAuthStateChanged((user) => {
@@ -44,6 +48,9 @@ export default function PublicLayout() {
   });
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsLocalhost(isLocalhostDevHost(window.location.hostname));
+    }
     const configService = getAdminConfigService();
     try {
       const cached = configService.getCachedSettings();
@@ -68,7 +75,7 @@ export default function PublicLayout() {
     }
   }, []);
 
-  if (constructionMode && !isPreview) {
+  if (constructionMode && !isPreview && !isLocalhost) {
     return <UnderConstruction />;
   }
 
@@ -99,6 +106,15 @@ export default function PublicLayout() {
         <Outlet />
       </main>
       <Footer />
+      {constructionMode && isLocalhost && (
+        <div
+          role="status"
+          className="fixed bottom-3 right-3 z-50 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-950/95 text-amber-200 border border-amber-500/60 shadow-lg text-[11px] font-bold backdrop-blur-xs pointer-events-none print:hidden"
+        >
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+          <span>Live Site: Maintenance ON</span>
+        </div>
+      )}
     </div>
   );
 }

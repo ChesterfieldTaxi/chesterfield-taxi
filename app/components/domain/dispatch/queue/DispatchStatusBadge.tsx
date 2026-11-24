@@ -1,9 +1,15 @@
 import React from 'react';
 import type { TripStatus } from '../../../../core/types/trip';
+import {
+  evaluateTripDriverLateStatus,
+  type DriverLateEvalTrip,
+} from '../../../../core/hooks/dispatch/dispatch-workspace.util';
 
 export interface DispatchStatusBadgeOptions {
   compact?: boolean;
   className?: string;
+  trip?: Partial<DriverLateEvalTrip> | null;
+  nowMs?: number;
 }
 
 export interface DispatchStatusMeta {
@@ -14,6 +20,7 @@ export interface DispatchStatusMeta {
 }
 
 const STATUS_META_BY_KEY: Record<string, DispatchStatusMeta> = {
+  late: { key: 'late', label: 'Late', tooltip: 'Late — Past scheduled pickup time', pillClass: 'bg-rose-600 text-white border-rose-700 animate-pulse' },
   unconfirmed: { key: 'unconfirmed', label: 'Unconfirmed', tooltip: 'Unconfirmed — Awaiting dispatch review', pillClass: 'bg-amber-100 text-amber-900 border-amber-300 animate-pulse' },
   confirmed: { key: 'confirmed', label: 'Confirmed', tooltip: 'Confirmed — Ready for dispatch', pillClass: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
   pending: { key: 'pending', label: 'Pending', tooltip: 'Pending — Queued', pillClass: 'bg-amber-50 text-amber-800 border-amber-300' },
@@ -28,8 +35,22 @@ const STATUS_META_BY_KEY: Record<string, DispatchStatusMeta> = {
   declined: { key: 'declined', label: 'Declined', tooltip: 'Declined', pillClass: 'bg-slate-200 text-slate-700 border-slate-300' },
 };
 
-export function resolveDispatchStatusMeta(status: TripStatus | string): DispatchStatusMeta {
-  const normalized = String(status || '').trim().toLowerCase();
+export function resolveDispatchStatusMeta(
+  status: TripStatus | string,
+  trip?: Partial<DriverLateEvalTrip> | null,
+  nowMs?: number
+): DispatchStatusMeta {
+  const normalized = String(trip?.status || status || '').trim().toLowerCase();
+  if (trip) {
+    const lateEval = evaluateTripDriverLateStatus(trip, nowMs);
+    if (lateEval.isLate) {
+      const underlying = STATUS_META_BY_KEY[normalized]?.label || 'Assigned';
+      return {
+        ...STATUS_META_BY_KEY.late,
+        tooltip: `Late (+${lateEval.lateMinutes}m) — ${underlying}`,
+      };
+    }
+  }
   const matched = STATUS_META_BY_KEY[normalized];
   if (matched) return matched;
   const fallbackLabel = String(status || 'Unknown').replace(/_/g, ' ');
@@ -54,6 +75,15 @@ function renderStatusSvgIcon(key: string): React.ReactElement {
   };
 
   switch (key) {
+    case 'late':
+      return (
+        <svg {...svgProps}>
+          <circle cx="12" cy="13" r="8" />
+          <path d="M12 9v4l2.5 2.5" />
+          <path d="M5 3 2 6" />
+          <path d="m22 6-3-3" />
+        </svg>
+      );
     case 'unconfirmed':
       return (
         <svg {...svgProps}>
@@ -158,12 +188,16 @@ export function DispatchStatusBadge({
   status,
   compact = true,
   className = '',
+  trip,
+  nowMs,
 }: {
   status: TripStatus | string;
   compact?: boolean;
   className?: string;
+  trip?: Partial<DriverLateEvalTrip> | null;
+  nowMs?: number;
 }): React.ReactElement {
-  const meta = resolveDispatchStatusMeta(status);
+  const meta = resolveDispatchStatusMeta(status, trip, nowMs);
   const baseClass = compact
     ? 'inline-flex items-center justify-center h-6 min-w-[26px] px-1.5 rounded-full border shadow-2xs'
     : 'inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full text-[11px] font-bold border shadow-2xs whitespace-nowrap';
@@ -194,6 +228,8 @@ export function getDispatchStatusBadge(
       status={status}
       compact={options?.compact ?? true}
       className={options?.className}
+      trip={options?.trip}
+      nowMs={options?.nowMs}
     />
   );
 }

@@ -421,6 +421,7 @@ function LiveFleetMapComponent({
     mapInstanceRef,
     preferences: mapPreferences,
     fleet,
+    companyInfo: adminSettings.company,
     onPopulateBooking,
   });
   clearSelectedOverlayRef.current = clearSelectedOverlay;

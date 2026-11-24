@@ -20,6 +20,7 @@ import {
   type PublicTripTrackingProjection,
 } from '../../../core/utils/tracking-token.util';
 import { LocationAutocomplete } from '../LocationAutocomplete';
+import { ModernDatePicker, ModernTimePicker } from '../../ui/ModernDateTimePicker';
 import {
   AlertTriangleIcon,
   BanIcon,
@@ -808,11 +809,22 @@ export function GuestManageRidePanel({
                   }}
                   className={`py-2.5 px-2 rounded-xl text-[11.5px] sm:text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     activeTab === 'time_route'
-                      ? 'bg-white text-slate-950 shadow-xs'
+                      ? eligibility.routeTimeMode === 'request_approval'
+                        ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400/60 shadow-xs'
+                        : 'bg-white text-slate-950 shadow-xs'
+                      : eligibility.routeTimeMode === 'request_approval'
+                      ? 'text-amber-900 bg-amber-100/70 hover:bg-amber-100 border border-amber-300/80'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <CalendarIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0 hidden sm:inline" />
+                  {eligibility.routeTimeMode === 'request_approval' ? (
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-80" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-600" />
+                    </span>
+                  ) : (
+                    <CalendarIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0 hidden sm:inline" />
+                  )}
                   <span>Time / Address</span>
                 </button>
               )}
@@ -983,13 +995,13 @@ export function GuestManageRidePanel({
                       </div>
                     </div>
                   ) : (
-                    <div className="p-3 rounded-2xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-950 flex items-start gap-2">
-                      <ClockIcon className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                    <div className="p-3 rounded-2xl bg-amber-50 border border-amber-300 text-xs text-amber-950 flex items-start gap-2">
+                      <ClockIcon className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                       <div>
                         <strong className="font-extrabold block">
                           Requires Quick Dispatch Confirmation (Driver Assigned)
                         </strong>
-                        <span className="text-[11px] text-indigo-800">
+                        <span className="text-[11px] text-amber-900">
                           Your driver is already assigned. Submitting sends a 1-tap approval alert to
                           Dispatch so we can verify driver schedule &amp; notify your driver.
                         </span>
@@ -1005,12 +1017,10 @@ export function GuestManageRidePanel({
                       >
                         Pickup Date
                       </label>
-                      <input
+                      <ModernDatePicker
                         id="guest-pickup-date"
-                        type="date"
                         value={schedDate}
-                        onChange={(e) => setSchedDate(e.target.value)}
-                        className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
+                        onChange={(val) => setSchedDate(val)}
                       />
                     </div>
                     <div>
@@ -1020,12 +1030,10 @@ export function GuestManageRidePanel({
                       >
                         Pickup Time
                       </label>
-                      <input
+                      <ModernTimePicker
                         id="guest-pickup-time"
-                        type="time"
                         value={schedTime}
-                        onChange={(e) => setSchedTime(e.target.value)}
-                        className="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
+                        onChange={(val) => setSchedTime(val)}
                       />
                     </div>
                   </div>
@@ -1083,10 +1091,10 @@ export function GuestManageRidePanel({
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className={`w-full min-h-[44px] py-2.5 px-4 rounded-xl font-bold text-sm text-white transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 ${
+                    className={`w-full min-h-[44px] py-2.5 px-4 rounded-xl text-sm transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 ${
                       eligibility.routeTimeMode === 'auto_apply'
-                        ? 'bg-blue-600 hover:bg-blue-700'
-                        : 'bg-indigo-600 hover:bg-indigo-700'
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white font-bold'
+                        : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold ring-2 ring-amber-400/60 shadow-md'
                     }`}
                   >
                     {isSubmitting ? (
@@ -1097,7 +1105,16 @@ export function GuestManageRidePanel({
                     ) : eligibility.routeTimeMode === 'auto_apply' ? (
                       <span>Apply New Time &amp; Route</span>
                     ) : (
-                      <span>Request Dispatch Confirmation</span>
+                      <>
+                        <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-950/60 opacity-80" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-slate-950" />
+                        </span>
+                        <span>Request Dispatch Confirmation</span>
+                        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-950/15 text-slate-950 font-black animate-pulse">
+                          Driver Assigned
+                        </span>
+                      </>
                     )}
                   </button>
                 </form>

@@ -16,6 +16,7 @@ import {
 } from '../../../../core/services/dispatch/staged-driver-planner.service';
 import {
   getDraftTabLabel,
+  useLiveClockNowMs,
   type DispatchMobileTab,
   type DispatchResizeHandle,
   type DraftTab,
@@ -89,6 +90,7 @@ export function DispatchLeftBookingSidebar({
   onQuickAssignDriver,
   tripActions,
 }: DispatchLeftBookingSidebarProps) {
+  const nowMs = useLiveClockNowMs(30_000);
   const activeDraft = drafts.find((d) => d.id === activeDraftId) || null;
   const activeEditTrip =
     activeDraft && !activeDraft.isNew
@@ -387,7 +389,7 @@ export function DispatchLeftBookingSidebar({
               >
                 #{activeEditTrip.id.slice(-6).toUpperCase()}
               </button>
-              {getDispatchStatusBadge(activeEditTrip.status)}
+              {getDispatchStatusBadge(activeEditTrip.status, { trip: activeEditTrip, nowMs })}
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">

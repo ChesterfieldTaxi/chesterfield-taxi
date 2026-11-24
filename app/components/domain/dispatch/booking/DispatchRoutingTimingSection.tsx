@@ -14,6 +14,7 @@ import { DispatchLocationInput } from '../DispatchLocationInput';
 import { AirportCityCombobox } from '../../booking/AirportCityCombobox';
 import { FlightTelemetryCheckPanel } from '../../booking/FlightAssistanceCard';
 import { ModernDatePicker, ModernTimePicker } from '../../../ui/ModernDateTimePicker';
+import { CollapsibleSection } from '../../../ui/CollapsibleSection';
 import { LockIcon, PlaneIcon, PlaneLandingIcon, PlusIcon } from '../../../ui/Icons';
 import { Select } from '../../../ui/Select';
 
@@ -285,8 +286,8 @@ export function DispatchRoutingTimingSection({
           </div>
 
           {/* Outbound Flight / Aviation Details Box */}
-          {(airportDetection.isAirportTrip || provideFlightInfo) && (
-            <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-lg space-y-2.5 animate-in fade-in duration-150">
+          <CollapsibleSection isOpen={airportDetection.isAirportTrip || provideFlightInfo}>
+            <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-lg space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-blue-900 font-bold text-xs">
                   <PlaneLandingIcon
@@ -339,7 +340,7 @@ export function DispatchRoutingTimingSection({
                 </div>
               </div>
 
-              {provideFlightInfo && (
+              <CollapsibleSection isOpen={provideFlightInfo}>
                 <div className="space-y-2 pt-0.5">
                   {airportDetection.isPrivateAviation ? (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -512,9 +513,9 @@ export function DispatchRoutingTimingSection({
                     </label>
                   </div>
                 </div>
-              )}
+              </CollapsibleSection>
             </div>
-          )}
+          </CollapsibleSection>
         </div>
       </div>
     </>

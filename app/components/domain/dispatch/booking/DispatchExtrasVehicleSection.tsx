@@ -12,6 +12,7 @@ import {
   type DispatchVehicleOption,
   type VehicleCapacityInfo,
 } from '../../../../core/hooks/booking';
+import { CollapsibleSection } from '../../../ui/CollapsibleSection';
 import {
   LuggageIcon,
   MusicNoteIcon,
@@ -320,8 +321,8 @@ export function DispatchExtrasVehicleSection({
               </label>
 
               {/* Expanded Oversized Cargo Panel */}
-              {hasOversizedLuggage && (
-                <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5 animate-in fade-in duration-150">
+              <CollapsibleSection isOpen={hasOversizedLuggage}>
+                <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5">
                   <div className="text-[10px] text-slate-500 font-medium">
                     Select oversized equipment so the right cargo space is dispatched:
                   </div>
@@ -389,7 +390,7 @@ export function DispatchExtrasVehicleSection({
                     className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-[11px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
-              )}
+              </CollapsibleSection>
 
               <label
                 className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border cursor-pointer select-none transition-colors ${
@@ -416,8 +417,8 @@ export function DispatchExtrasVehicleSection({
             </div>
 
             {/* 3 Car Seat Counters: Rear-Facing, Front-Facing, Booster */}
-            {carSeats && (
-              <div className="p-2 bg-amber-50/60 border border-amber-200 rounded-lg space-y-1.5 animate-in fade-in duration-150">
+            <CollapsibleSection isOpen={carSeats}>
+              <div className="p-2 bg-amber-50/60 border border-amber-200 rounded-lg space-y-1.5">
                 <div className="flex items-center justify-between text-[11px]">
                   <div className="text-slate-700">
                     <span className="font-semibold">Rear-Facing</span> (Infant)
@@ -518,7 +519,7 @@ export function DispatchExtrasVehicleSection({
                   </div>
                 </div>
               </div>
-            )}
+            </CollapsibleSection>
 
             {/* Admin Custom Bookable Extras */}
             {universalExtrasConfig?.customExtras &&

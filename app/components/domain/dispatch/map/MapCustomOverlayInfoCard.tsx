@@ -92,7 +92,13 @@ export const MapCustomOverlayInfoCard = React.memo(function MapCustomOverlayInfo
       <div className="absolute top-15 left-2.5 right-2.5 sm:left-3 sm:right-auto sm:w-80 z-30 bg-white/98 backdrop-blur-md rounded-2xl border border-slate-200 shadow-2xl p-3 space-y-2.5 text-xs animate-in fade-in zoom-in-95 duration-150 select-text">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-0.5 min-w-0">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200 text-[10px] font-extrabold">
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-extrabold ${
+                place.category === 'hq'
+                  ? 'bg-slate-900 text-amber-300 border-amber-500/60'
+                  : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+              }`}
+            >
               {place.categoryLabel}
             </span>
             <div className="font-extrabold text-slate-900 text-xs leading-snug break-words pt-0.5">

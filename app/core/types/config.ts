@@ -13,12 +13,21 @@ export interface CompanyConfig {
   phone: string;
   email: string;
   address: string;
+  headquartersCoordinates?: { lat: number; lng: number };
   legalEntityName?: string; // e.g. 'Chesterfield Taxi LLC'
   dispatchEmail?: string; // e.g. 'dispatch@chesterfieldtaxi.com'
   operatingHoursLabel?: string; // e.g. 'Monday – Sunday: Open 24 Hours'
   is24x7?: boolean; // default true
   advanceBookingMaxDays?: number; // default 90
 }
+
+export type CompanyInfoConfig = CompanyConfig;
+
+export type NormalizedCompanyConfig = Required<
+  Omit<CompanyConfig, 'headquartersCoordinates'>
+> & {
+  headquartersCoordinates?: { lat: number; lng: number };
+};
 
 export type DistanceUnit = 'mi' | 'km';
 export type SpeedUnit = 'mph' | 'kmh';
@@ -36,7 +45,7 @@ export interface LocalizationConfig {
   defaultServiceRegion?: string; // default 'Chesterfield & St. Louis Metro, MO'
 }
 
-export const DEFAULT_COMPANY_CONFIG_VALUES: Required<CompanyConfig> = {
+export const DEFAULT_COMPANY_CONFIG_VALUES: NormalizedCompanyConfig = {
   name: 'Chesterfield Taxi',
   legalEntityName: 'Chesterfield Taxi & Transportation LLC',
   phone: '(314) 738-0100',
@@ -62,7 +71,7 @@ export const DEFAULT_LOCALIZATION_CONFIG: Required<LocalizationConfig> = {
 
 export function normalizeCompanyConfig(
   raw?: Partial<CompanyConfig> | null
-): Required<CompanyConfig> {
+): NormalizedCompanyConfig {
   const cleanStr = (val: unknown, fallback: string): string => {
     const trimmed = typeof val === 'string' ? val.trim() : '';
     return trimmed || fallback;
@@ -74,6 +83,16 @@ export function normalizeCompanyConfig(
   const advanceBookingMaxDays = Number.isFinite(rawDays) && rawDays > 0
     ? Math.min(365, Math.max(1, Math.round(rawDays)))
     : DEFAULT_COMPANY_CONFIG_VALUES.advanceBookingMaxDays;
+
+  const hq = raw?.headquartersCoordinates;
+  const hasValidHqCoords = Boolean(
+    hq &&
+      typeof hq.lat === 'number' &&
+      typeof hq.lng === 'number' &&
+      Number.isFinite(hq.lat) &&
+      Number.isFinite(hq.lng) &&
+      (hq.lat !== 0 || hq.lng !== 0)
+  );
 
   return {
     name,
@@ -87,6 +106,9 @@ export function normalizeCompanyConfig(
     email: cleanStr(raw?.email, DEFAULT_COMPANY_CONFIG_VALUES.email),
     dispatchEmail: cleanStr(raw?.dispatchEmail, DEFAULT_COMPANY_CONFIG_VALUES.dispatchEmail),
     address: cleanStr(raw?.address, DEFAULT_COMPANY_CONFIG_VALUES.address),
+    ...(hasValidHqCoords && hq
+      ? { headquartersCoordinates: { lat: hq.lat, lng: hq.lng } }
+      : {}),
     operatingHoursLabel: cleanStr(
       raw?.operatingHoursLabel,
       DEFAULT_COMPANY_CONFIG_VALUES.operatingHoursLabel

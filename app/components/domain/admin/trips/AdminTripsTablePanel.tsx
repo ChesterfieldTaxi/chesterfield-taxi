@@ -3,6 +3,7 @@ import type { Trip } from '../../../../core/types/trip';
 import type { FleetCarConfig, VehicleTierConfig } from '../../../../core/types/config';
 import type { DriverRosterItem } from '../../../../core/services/operator.service';
 import type { DisplayLayout } from '../../../../core/hooks/useDisplayLayout';
+import { useLiveClockNowMs } from '../../../../core/hooks/dispatch/dispatch-workspace.util';
 import { formatTripVehicleColumnDisplay } from '../../../../core/utils/vehicle-tier-format.util';
 import {
   canAdminCompleteTrip,
@@ -71,6 +72,7 @@ export function AdminTripsTablePanel({
   onClearStaged, onStagePrompt, onConfirmTrip, onCompleteTrip, onCancelTrip, onReactivateTrip,
   onAuditTrip, onToggleArchive,
 }: AdminTripsTablePanelProps) {
+  const nowMs = useLiveClockNowMs(30_000);
   const renderExceptionPills = (trip: Trip) => {
     const ex = exceptionByTripId[trip.id];
     if (!ex) return null;
@@ -247,7 +249,7 @@ export function AdminTripsTablePanel({
                         #{trip.id.slice(-6).toUpperCase()}
                       </span>
                     </span>
-                    <DispatchStatusBadge status={trip.status} compact />
+                    <DispatchStatusBadge status={trip.status} trip={trip} nowMs={nowMs} compact />
                   </div>
                   <div>
                     <div className="font-bold text-xs text-slate-900">{passengerFullName}</div>
@@ -301,7 +303,7 @@ export function AdminTripsTablePanel({
                   <span className="font-bold font-mono text-slate-900">
                     ${Number(trip.pricing?.totalFare || 0).toFixed(2)}
                   </span>
-                  <DispatchStatusBadge status={trip.status} compact />
+                  <DispatchStatusBadge status={trip.status} trip={trip} nowMs={nowMs} compact />
                   {renderActionMenu(trip)}
                 </div>
               </div>
@@ -372,7 +374,7 @@ export function AdminTripsTablePanel({
                       {renderDriverControl(trip)}
                     </td>
                     <td className="px-4 py-3 align-top whitespace-nowrap">
-                      <DispatchStatusBadge status={trip.status} compact />
+                      <DispatchStatusBadge status={trip.status} trip={trip} nowMs={nowMs} compact />
                       {isArchivedTrip(trip) && (
                         <Badge variant="neutral" size="sm" className="ml-1 text-[9px] font-bold">
                           ARCHIVED

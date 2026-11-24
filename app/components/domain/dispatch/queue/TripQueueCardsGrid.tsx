@@ -43,6 +43,7 @@ import {
   MapPinIcon,
   CarIcon,
 } from '../../../ui/Icons';
+import { useLiveClockNowMs } from '../../../../core/hooks/dispatch/dispatch-workspace.util';
 import { computeResponsiveTripCardColumns } from './trip-queue-layout.util';
 import { DriverAssignDropdown } from './DriverAssignDropdown';
 import { getDispatchStatusBadge } from './TripQueueToolbar';
@@ -112,6 +113,7 @@ export function TripQueueCardsGrid({
   onCancelAutoOffer,
   stagedPlanner,
 }: TripQueueCardsGridProps) {
+  const nowMs = useLiveClockNowMs(30_000);
   const [longPressingTripId, setLongPressingTripId] = useState<string | null>(null);
   const [expandedStopTripIds, setExpandedStopTripIds] = useState<Set<string>>(() => new Set());
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -296,7 +298,7 @@ export function TripQueueCardsGrid({
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    {getDispatchStatusBadge(trip.status)}
+                    {getDispatchStatusBadge(trip.status, { trip, nowMs })}
                     {hasPendingGuestChangeRequest(trip) &&
                       (() => {
                         const guestReq = getPendingGuestChangeRequest(trip);

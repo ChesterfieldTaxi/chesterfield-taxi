@@ -67,9 +67,9 @@ function testActiveOnlyStatusFilterDefault(): void {
 
   assert.equal(
     DEFAULT_ACTIVE_ONLY_STATUS_FILTER,
-    'unconfirmed,confirmed,pending,offered,assigned,accepted,en_route,arrived,in_progress'
+    'late,unconfirmed,confirmed,pending,offered,assigned,accepted,en_route,arrived,in_progress'
   );
-  assert.equal(ACTIVE_QUEUE_STATUS_KEYS.length, 9);
+  assert.equal(ACTIVE_QUEUE_STATUS_KEYS.length, 10);
 
   for (const openStatus of [
     'UNCONFIRMED', 'unconfirmed', 'CONFIRMED', 'confirmed', 'pending',

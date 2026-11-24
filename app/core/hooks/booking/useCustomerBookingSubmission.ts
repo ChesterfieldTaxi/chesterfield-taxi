@@ -29,7 +29,16 @@ import { getFirebaseAuth, isFirebaseConfigured } from '../../services/firebase';
 import { getPaymentService } from '../../services/payment.service';
 import { getEmailDispatchService } from '../../services/email';
 import { formatVehicleTier } from '../../utils/trip-id.util';
-import { sanitizeTextInput, isBotHoneypotTriggered } from '../../utils/security-sanitizer.util';
+import { getAdminConfigService } from '../../services/config/admin-config.service';
+import { getAdminAuthService } from '../../services/auth/admin-auth.service';
+import {
+  sanitizeTextInput,
+  VERIFIED_ADDRESS_AUTOCOMPLETE_ERROR,
+  hasValidResolvedCoordinates,
+  isLikelyGibberishOrNumericName,
+  isPublicBookingBotSubmission,
+  shouldBlockBookingUnderMaintenance,
+} from '../../utils/security-sanitizer.util';
 import { hasValidRoutePair } from '../useDebounceRoute';
 import {
   DEFAULT_BOOKER_ROLES,
@@ -212,6 +221,7 @@ export interface CustomerBookingFormState {
   authorizedBy: string;
   costCenter: string;
   invoicingTerms: string;
+  websiteUrl?: string;
   botTrapField?: string;
 }
 
@@ -349,6 +359,7 @@ export function createInitialCustomerBookingFormState(
     invoicingTerms: corporatePortalContext?.billingCycle
       ? `${corporatePortalContext.billingCycle.toUpperCase()} Direct Bill`
       : 'Net 30 Direct Bill',
+    websiteUrl: '',
     botTrapField: '',
   };
 }
@@ -358,8 +369,12 @@ export function buildBookAnotherCustomerResetState(
 ): CustomerBookingFormState {
   return {
     ...prev,
-    pickupAddress: '',
-    dropoffAddress: '',
+  pickupAddress: '',
+  pickupCoordinates: undefined,
+  pickupPlaceId: undefined,
+  dropoffAddress: '',
+  dropoffCoordinates: undefined,
+  dropoffPlaceId: undefined,
     intermediateStops: [],
     returnTrip: false,
     returnPickupAddress: '',
@@ -428,6 +443,8 @@ export interface UseCustomerBookingSubmissionParams {
   surchargesVersion: number;
   editingTripId?: string;
   corporatePortalContext?: CorporatePortalBookingContext;
+  mountedAtMsRef?: React.RefObject<number>;
+  isPublicWebForm?: boolean;
   onBookingSuccess?: (trip: Trip) => void;
   setErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
 }
@@ -474,6 +491,8 @@ export function useCustomerBookingSubmission({
   surchargesVersion,
   editingTripId,
   corporatePortalContext,
+  mountedAtMsRef,
+  isPublicWebForm = true,
   onBookingSuccess,
   setErrors,
 }: UseCustomerBookingSubmissionParams): UseCustomerBookingSubmissionResult {
@@ -896,9 +915,13 @@ export function useCustomerBookingSubmission({
 
     if (!form.pickupAddress.trim()) {
       newErrors.pickupAddress = 'Pickup location is required.';
+    } else if (!hasValidResolvedCoordinates(form.pickupCoordinates)) {
+      newErrors.pickupAddress = VERIFIED_ADDRESS_AUTOCOMPLETE_ERROR;
     }
     if (!form.dropoffAddress.trim()) {
       newErrors.dropoffAddress = 'Dropoff destination is required.';
+    } else if (!hasValidResolvedCoordinates(form.dropoffCoordinates)) {
+      newErrors.dropoffAddress = VERIFIED_ADDRESS_AUTOCOMPLETE_ERROR;
     }
 
     if (form.timingType === 'later') {
@@ -927,6 +950,8 @@ export function useCustomerBookingSubmission({
 
     if (!form.passengerName.trim()) {
       newErrors.passengerName = 'Passenger full name is required.';
+    } else if (isLikelyGibberishOrNumericName(form.passengerName)) {
+      newErrors.passengerName = 'Please enter a valid passenger first and last name.';
     }
     if (!form.passengerPhone.trim()) {
       newErrors.passengerPhone = 'Passenger mobile phone number is required.';
@@ -938,6 +963,8 @@ export function useCustomerBookingSubmission({
     if (form.isBookerDifferent) {
       if (!form.contactName.trim()) {
         newErrors.contactName = 'Booker / Contact person name is required.';
+      } else if (isLikelyGibberishOrNumericName(form.contactName)) {
+        newErrors.contactName = 'Please enter a valid booker / contact name.';
       }
       if (!form.contactPhone.trim()) {
         newErrors.contactPhone = 'Booker phone number is required.';
@@ -977,9 +1004,13 @@ export function useCustomerBookingSubmission({
     if (form.returnTrip) {
       if (!form.returnPickupAddress.trim()) {
         newErrors.returnPickupAddress = 'Return pickup address is required.';
+      } else if (!hasValidResolvedCoordinates(form.returnPickupCoordinates)) {
+        newErrors.returnPickupAddress = VERIFIED_ADDRESS_AUTOCOMPLETE_ERROR;
       }
       if (!form.returnDropoffAddress.trim()) {
         newErrors.returnDropoffAddress = 'Return dropoff address is required.';
+      } else if (!hasValidResolvedCoordinates(form.returnDropoffCoordinates)) {
+        newErrors.returnDropoffAddress = VERIFIED_ADDRESS_AUTOCOMPLETE_ERROR;
       }
       if (!form.returnDate) {
         newErrors.returnDate = 'Return date is required.';
@@ -1077,12 +1108,39 @@ export function useCustomerBookingSubmission({
   const handleBookRide = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmittingRef.current || isSubmitting) return;
-    if (!validateForm()) return;
 
-    // Security Guard: Invisible Honeypot Anti-Bot Trap
-    if (isBotHoneypotTriggered(form.botTrapField)) {
+    // Security Guard 1: Block submissions when global Maintenance Mode is ON for non-staff non-localhost browsers
+    try {
+      const cachedSettings = getAdminConfigService().getCachedSettings();
+      const currentUser = getAdminAuthService().getCurrentUser();
+      const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+      if (
+        shouldBlockBookingUnderMaintenance({
+          constructionMode: cachedSettings?.constructionMode,
+          hostname,
+          userRole: currentUser?.role,
+          userRoles: currentUser?.roles,
+        })
+      ) {
+        setSubmitError(
+          'Online booking is temporarily paused for scheduled maintenance. Please call 24/7 Dispatch directly.'
+        );
+        return;
+      }
+    } catch {}
+
+    // Security Guard 2: Offscreen Honeypot (`websiteUrl`) & < 4000ms Dwell-Time Bot Trap
+    if (
+      isPublicBookingBotSubmission({
+        honeypotValue: form.botTrapField,
+        websiteUrl: form.websiteUrl,
+        mountedAtMs: mountedAtMsRef?.current ?? null,
+        submittedAtMs: Date.now(),
+        isPublicWebForm,
+      })
+    ) {
       console.warn(
-        '[BookingEngineV2] Bot honeypot triggered. Suppressing automated spam submission.'
+        '[BookingEngineV2] Bot honeypot or sub-4s dwell trap triggered. Suppressing automated spam submission.'
       );
       setIsSubmitting(false);
       isSubmittingRef.current = false;
@@ -1119,6 +1177,8 @@ export function useCustomerBookingSubmission({
       } as Trip);
       return;
     }
+
+    if (!validateForm()) return;
 
     isSubmittingRef.current = true;
     setIsSubmitting(true);
