@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/Card';
 import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
 import { Badge } from '../../../ui/Badge';
+import { Select } from '../../../ui/Select';
 import {
   CheckIcon,
   CompassIcon,
@@ -13,6 +14,7 @@ import {
 import type {
   DispatchAutomationConfig,
   DispatchConsoleSettingsConfig,
+  DispatchDefaultQueueStatusFilter,
   DispatchQueueLayoutMode,
 } from '../../../../core/types/config';
 
@@ -207,7 +209,7 @@ export function DispatchConsoleSettingsPanel({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <label className="flex items-start justify-between gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer">
               <div>
                 <span className="font-bold text-slate-900 block">
@@ -224,6 +226,27 @@ export function DispatchConsoleSettingsPanel({
                 className="w-4 h-4 mt-0.5 rounded text-blue-600 cursor-pointer"
               />
             </label>
+
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <label className="font-bold text-slate-900 block mb-1">
+                Default Queue Status Filter
+              </label>
+              <Select
+                size="sm"
+                value={consoleConfig.defaultQueueStatusFilter || 'active_only'}
+                onValueChange={(val) =>
+                  updateConsole({
+                    defaultQueueStatusFilter: val as DispatchDefaultQueueStatusFilter,
+                  })
+                }
+              >
+                <option value="active_only">Active Only (Hide Closed)</option>
+                <option value="all">All Statuses (Include Closed)</option>
+              </Select>
+              <span className="text-[10px] text-slate-500 mt-1 block">
+                Active Only hides Completed, Cancelled &amp; Declined on initial load.
+              </span>
+            </div>
 
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
               <label className="font-bold text-slate-900 block mb-1">

@@ -11,14 +11,7 @@ import type { Trip } from '../core/types/trip';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import type { DispatchFormValues } from '../components/domain/dispatch/DispatchBookingEngine';
 import type { DateTimeRange } from '../components/domain/dispatch/CustomDateTimePicker';
-import {
-  SpinnerIcon,
-  MapIcon,
-  AlertTriangleIcon,
-  CheckIcon,
-  InfoIcon,
-  XIcon,
-} from '../components/ui/Icons';
+import { SpinnerIcon, MapIcon, AlertTriangleIcon, CheckIcon, InfoIcon, XIcon } from '../components/ui/Icons';
 import { useDisplayLayout } from '../core/hooks/useDisplayLayout';
 import { useWakeLock } from '../core/hooks/useWakeLock';
 import { usePushNotifications } from '../core/hooks/usePushNotifications';
@@ -47,6 +40,7 @@ import { sendDispatchContextualTripEmail } from '../core/services/dispatch/dispa
 import { DEFAULT_ZONES } from '../core/services/zones/zone.service';
 import type { ZoneGeofence } from '../core/types/zone';
 import {
+  DEFAULT_ACTIVE_ONLY_STATUS_FILTER,
   cloneTripToDispatchFormValues,
   filterDispatchQueueTrips,
   getDateRangeButtonLabel,
@@ -104,12 +98,15 @@ export default function DispatchRoute() {
   const [settings, setSettings] = useState<AppSettings>(() =>
     getAdminConfigService().getCachedSettings()
   );
+  const consoleCfg = normalizeDispatchConsoleConfig(settings.dispatchConsoleConfig, settings.enableRealtimeRouting);
 
   // Trips & Geofence Zones real-time state
   const [trips, setTrips] = useState<Trip[]>([]);
   const [dispatchZones, setDispatchZones] = useState<ZoneGeofence[]>(() => [...DEFAULT_ZONES]);
   const [slaUrgentOnlyFilter, setSlaUrgentOnlyFilter] = useState<boolean>(false);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>(() =>
+    consoleCfg.defaultQueueStatusFilter === 'all' ? 'all' : DEFAULT_ACTIVE_ONLY_STATUS_FILTER
+  );
   const [filterStartDate, setFilterStartDate] = useState<string>('');
   const [filterEndDate, setFilterEndDate] = useState<string>('');
   const [pillFilter] = useState<
@@ -169,7 +166,6 @@ export default function DispatchRoute() {
   const [selectedTariffFilter, setSelectedTariffFilter] = useState<string>('all');
 
   // Draft Tabs & Mobile Navigation State
-  const consoleCfg = normalizeDispatchConsoleConfig(settings.dispatchConsoleConfig, settings.enableRealtimeRouting);
   const maxDrafts = consoleCfg.maxConcurrentDraftTabs;
   const hasHydratedClientTabsRef = useRef(false);
   const [drafts, setDrafts] = useState<DraftTab[]>([{ id: 'new-1', isNew: true }]);
@@ -831,6 +827,10 @@ export default function DispatchRoute() {
     setSelectedMapTrip(null);
     setSelectedQueueTripId(null);
   }, []);
+  const stableOpenTripDetailsById = useCallback((tripId: string) => {
+    const found = panelCallbacksRef.current.trips.find((t) => t.id === tripId);
+    if (found) handleOpenReviewModal(found, 'details');
+  }, [handleOpenReviewModal]);
 
   const stableCommsTabChange = useCallback((tab: any) => setCommsActiveTab(tab), []);
   const stableCommsPopOut = useCallback(() => getWorkspaceBus().popOutModule('comms'), []);
@@ -1109,6 +1109,7 @@ export default function DispatchRoute() {
             onChangeDriverDutyStatus={stableChangeDriverDutyStatus}
             onSelectTrip={stableSelectMapTrip}
             onClearSelectedTrip={stableClearSelectedMapTrip}
+            onOpenTripDetails={stableOpenTripDetailsById}
             onSwitchToRoster={stableSwitchToRoster}
           />
 

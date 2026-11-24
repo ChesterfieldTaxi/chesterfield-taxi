@@ -11,6 +11,7 @@ import {
   isTripEligibleForStaging,
 } from '../../../../core/services/dispatch/staged-driver-planner.service';
 import { getTripCascadeExhaustedTooltip } from '../../dispatch/DispatchCascadeSlaBadges';
+import { DispatchStatusBadge } from '../../dispatch/queue/DispatchStatusBadge';
 import { DriverAssignDropdown } from '../../dispatch/queue/DriverAssignDropdown';
 import { TripActionDropdown } from '../../dispatch/TripActionDropdown';
 import { Card } from '../../../ui/Card';
@@ -44,25 +45,6 @@ export interface AdminTripsTablePanelProps {
   onReactivateTrip: (trip: Trip) => void;
   onAuditTrip: (trip: Trip) => void;
   onToggleArchive: (trip: Trip, currentlyArchived: boolean) => void;
-}
-
-function getStatusBadgeVariant(
-  status: string
-): 'success' | 'error' | 'primary' | 'info' | 'warning' {
-  if (status === 'completed') return 'success';
-  if (status === 'cancelled' || status === 'declined' || status === 'DECLINED') return 'error';
-  if (
-    status === 'assigned' ||
-    status === 'accepted' ||
-    status === 'en_route' ||
-    status === 'arrived' ||
-    status === 'in_progress' ||
-    status === 'offered'
-  ) {
-    return 'primary';
-  }
-  if (status === 'confirmed' || status === 'CONFIRMED') return 'info';
-  return 'warning';
 }
 
 function isUnconfirmedStatus(status: string): boolean {
@@ -280,9 +262,7 @@ export function AdminTripsTablePanel({
                         #{trip.id.slice(-6).toUpperCase()}
                       </span>
                     </span>
-                    <Badge variant={getStatusBadgeVariant(trip.status)} size="sm" className="text-[10px] font-bold uppercase">
-                      {trip.status.replace('_', ' ')}
-                    </Badge>
+                    <DispatchStatusBadge status={trip.status} compact />
                   </div>
                   <div>
                     <div className="font-bold text-xs text-slate-900">{passengerFullName}</div>
@@ -336,6 +316,7 @@ export function AdminTripsTablePanel({
                   <span className="font-bold font-mono text-slate-900">
                     ${Number(trip.pricing?.totalFare || 0).toFixed(2)}
                   </span>
+                  <DispatchStatusBadge status={trip.status} compact />
                   {renderActionMenu(trip)}
                 </div>
               </div>
@@ -406,9 +387,7 @@ export function AdminTripsTablePanel({
                       {renderDriverControl(trip)}
                     </td>
                     <td className="px-4 py-3 align-top whitespace-nowrap">
-                      <Badge variant={getStatusBadgeVariant(trip.status)} size="sm" className="font-bold uppercase text-[10px]">
-                        {trip.status.replace('_', ' ')}
-                      </Badge>
+                      <DispatchStatusBadge status={trip.status} compact />
                       {isArchivedTrip(trip) && (
                         <Badge variant="neutral" size="sm" className="ml-1 text-[9px] font-bold">
                           ARCHIVED

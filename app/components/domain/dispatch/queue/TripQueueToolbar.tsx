@@ -3,7 +3,7 @@ import {
   normalizeDispatchAutomationConfig,
   type AppSettings,
 } from '../../../../core/types/config';
-import type { Trip, TripStatus } from '../../../../core/types/trip';
+import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import type { DisplayLayout } from '../../../../core/hooks/useDisplayLayout';
 import type { SlaScanSummary } from '../../../../core/services/dispatch/sla-monitor.service';
@@ -11,20 +11,17 @@ import type { DispatchStagedPlannerController } from '../../../../core/hooks/dis
 import { formatDriverAssignmentLabel } from '../../../../core/services/operator.service';
 import { CustomDateTimePicker, type DateTimeRange } from '../CustomDateTimePicker';
 import { canTripTriggerAutoOffer } from '../DispatchCascadeSlaBadges';
-import { Badge } from '../../../ui/Badge';
 import { Select } from '../../../ui/Select';
 import {
   MagnifyingGlassIcon,
   CalendarIcon,
   ChevronDownIcon,
   FunnelIcon,
-  ClockIcon,
-  MapPinIcon,
-  CarIcon,
   AlertTriangleIcon,
   RadarBroadcastIcon,
 } from '../../../ui/Icons';
 import {
+  DEFAULT_ACTIVE_ONLY_STATUS_FILTER,
   computeNextStatusFilterOnUnconfirmedToggle,
   isUnconfirmedQuickFilterActive,
 } from '../../../../core/hooks/dispatch/dispatch-workspace.util';
@@ -37,74 +34,21 @@ import {
   TripQueueLayoutDropdown,
   TripStatusMultiSelectDropdown,
 } from './TripQueueFilterPopovers';
+import { TripQueueColumnsDropdown } from './TripQueueColumnsDropdown';
 import { TripQueueBatchActionBar } from './TripQueueBatchActionBar';
+import {
+  DispatchStatusBadge,
+  getDispatchStatusBadge,
+  resolveDispatchStatusMeta,
+  type DispatchStatusBadgeOptions,
+} from './DispatchStatusBadge';
 
-export function getDispatchStatusBadge(status: TripStatus) {
-  switch (status) {
-    case 'UNCONFIRMED':
-    case 'unconfirmed':
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-          Unconfirmed
-        </span>
-      );
-    case 'CONFIRMED':
-    case 'confirmed':
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-          Confirmed
-        </span>
-      );
-    case 'DECLINED':
-    case 'declined':
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
-          Declined
-        </span>
-      );
-    case 'pending':
-      return <Badge variant="warning">Pending</Badge>;
-    case 'offered':
-      return <Badge variant="info">Offered</Badge>;
-    case 'assigned':
-      return <Badge variant="primary">Assigned</Badge>;
-    case 'accepted':
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-300">
-          Accepted
-        </span>
-      );
-    case 'en_route':
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
-          <CarIcon className="w-3 h-3 text-blue-700 shrink-0" />
-          <span>En Route</span>
-        </span>
-      );
-    case 'arrived':
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-          <MapPinIcon className="w-3 h-3 text-amber-700 shrink-0" />
-          <span>Arrived</span>
-        </span>
-      );
-    case 'in_progress':
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-400 animate-pulse">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-          <ClockIcon className="w-3 h-3 text-emerald-700 shrink-0" />
-          <span>In Progress</span>
-        </span>
-      );
-    case 'completed':
-      return <Badge variant="success">Completed</Badge>;
-    case 'cancelled':
-      return <Badge variant="danger">Cancelled</Badge>;
-  default:
-      return <Badge variant="neutral">{status}</Badge>;
-  }
-}
+export {
+  DispatchStatusBadge,
+  getDispatchStatusBadge,
+  resolveDispatchStatusMeta,
+  type DispatchStatusBadgeOptions,
+};
 
 export interface TripQueueToolbarProps {
   isDesktop?: boolean;
@@ -261,7 +205,7 @@ export function TripQueueToolbar({
       ? autoConfig.dispatchMode
       : autoConfig.sweepExecutionMode;
 
-  const prevNonUnconfirmedStatusRef = React.useRef<string>('all');
+  const prevNonUnconfirmedStatusRef = React.useRef<string>(DEFAULT_ACTIVE_ONLY_STATUS_FILTER);
   const isUnconfirmedOnly = isUnconfirmedQuickFilterActive(statusFilter);
   React.useEffect(() => {
     if (!isUnconfirmedOnly && statusFilter) {
@@ -679,6 +623,11 @@ export function TripQueueToolbar({
                 </span>
               )}
             </button>
+
+            {/* Table Columns Selector + Presets (Desktop Only when Table / Auto is active) */}
+            {(effectiveDisplayLayout === 'table' ||
+              displayLayout === 'table' ||
+              displayLayout === 'auto') && <TripQueueColumnsDropdown />}
 
             {/* Queue Display Layout Dropdown (Desktop Only — Mobile always uses Cards view) */}
             <TripQueueLayoutDropdown

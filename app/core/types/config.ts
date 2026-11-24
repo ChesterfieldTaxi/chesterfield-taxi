@@ -1420,6 +1420,7 @@ export function canOperatorConfigureLeadWindows(
 }
 
 export type DispatchQueueLayoutMode = 'auto' | 'table' | 'cards' | 'compact';
+export type DispatchDefaultQueueStatusFilter = 'active_only' | 'all';
 
 export interface DispatchConsoleSettingsConfig {
   conflictGuardEnabled: boolean; // default true
@@ -1427,6 +1428,7 @@ export interface DispatchConsoleSettingsConfig {
   tightTurnaroundMinutes: number; // default 15, clamped 5..120
   autoClearFormAfterCreate: boolean; // default true
   defaultQueueLayout: DispatchQueueLayoutMode; // default 'auto'
+  defaultQueueStatusFilter?: DispatchDefaultQueueStatusFilter; // default 'active_only'
   maxConcurrentDraftTabs: number; // default 8, clamped 2..20
   enableRealtimeRouting: boolean; // synced with top-level AppSettings.enableRealtimeRouting
   defaultShowZonesOverlay?: boolean; // default false
@@ -1441,6 +1443,7 @@ export const DEFAULT_DISPATCH_CONSOLE_CONFIG: DispatchConsoleSettingsConfig = {
   tightTurnaroundMinutes: 15,
   autoClearFormAfterCreate: true,
   defaultQueueLayout: 'auto',
+  defaultQueueStatusFilter: 'active_only',
   maxConcurrentDraftTabs: 8,
   enableRealtimeRouting: false,
   defaultShowZonesOverlay: false,
@@ -1464,6 +1467,9 @@ export function normalizeDispatchConsoleConfig(
     raw?.defaultQueueLayout && validLayouts.includes(raw.defaultQueueLayout)
       ? raw.defaultQueueLayout
       : DEFAULT_DISPATCH_CONSOLE_CONFIG.defaultQueueLayout;
+
+  const defaultQueueStatusFilter: DispatchDefaultQueueStatusFilter =
+    raw?.defaultQueueStatusFilter === 'all' ? 'all' : 'active_only';
 
   const syncedRealtimeRouting =
     typeof enableRealtimeRouting === 'boolean'
@@ -1494,6 +1500,7 @@ export function normalizeDispatchConsoleConfig(
         ? Boolean(raw.autoClearFormAfterCreate)
         : DEFAULT_DISPATCH_CONSOLE_CONFIG.autoClearFormAfterCreate,
     defaultQueueLayout,
+    defaultQueueStatusFilter,
     maxConcurrentDraftTabs: clampInt(
       raw?.maxConcurrentDraftTabs,
       DEFAULT_DISPATCH_CONSOLE_CONFIG.maxConcurrentDraftTabs,

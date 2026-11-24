@@ -1,8 +1,10 @@
 import React, { useEffect, useRef } from 'react';
+import type { VehicleTierConfig } from '../../types/config';
 import type { GeoPoint, Trip } from '../../types/trip';
 import type { SlaScanSummary } from '../../services/dispatch/sla-monitor.service';
 import { formatLocalDateStr } from '../../services/pricing/vehicle-matching';
 import { getTripIntermediateStopCount } from '../../utils/route-markers.util';
+import { formatVehicleTierDisplay } from '../../utils/vehicle-tier-format.util';
 import type { DispatchFormValues } from '../../../components/domain/dispatch/DispatchBookingEngine';
 import type { DateTimeRange } from '../../../components/domain/dispatch/CustomDateTimePicker';
 import type { QueueFilterType } from '../../../components/domain/dispatch/DispatchTripQueuePane';
@@ -326,6 +328,9 @@ export function serializeStatusFilterSelection(
   return ordered.join(',');
 }
 
+export const DEFAULT_ACTIVE_ONLY_STATUS_FILTER: string =
+  serializeStatusFilterSelection(ACTIVE_QUEUE_STATUS_KEYS);
+
 export function matchesQueueStatusFilter(tripStatus: string | undefined, statusFilter: string): boolean {
   const cleanFilter = String(statusFilter || '').trim().toLowerCase();
   if (!cleanFilter || cleanFilter === 'all') return true;
@@ -444,6 +449,174 @@ export function sortDispatchQueueTrips(
     const diff = resolveTripEffectiveTimeMs(a) - resolveTripEffectiveTimeMs(b);
     if (diff !== 0) return diff;
     return (a.id || '').localeCompare(b.id || '');
+  });
+}
+
+export type QueueSortColumn =
+  | 'smart'
+  | 'trip_id'
+  | 'date'
+  | 'passenger'
+  | 'pickup'
+  | 'dropoff'
+  | 'driver'
+  | 'vehicle'
+  | 'price'
+  | 'payment'
+  | 'status';
+
+export interface QueueColumnSortState {
+  column: QueueSortColumn;
+  direction: 'asc' | 'desc';
+}
+
+export const DEFAULT_QUEUE_COLUMN_SORT: QueueColumnSortState = {
+  column: 'smart',
+  direction: 'asc',
+};
+
+const QUEUE_STATUS_SORT_RANK = new Map<string, number>(
+  ALL_QUEUE_STATUS_KEYS.map((key, idx) => [key, idx])
+);
+
+export function cycleQueueColumnSort(
+  current: QueueColumnSortState,
+  clickedColumn: Exclude<QueueSortColumn, 'smart'>
+): QueueColumnSortState {
+  if (current.column !== clickedColumn) {
+    return { column: clickedColumn, direction: 'asc' };
+  }
+  if (current.direction === 'asc') {
+    return { column: clickedColumn, direction: 'desc' };
+  }
+  return { column: 'smart', direction: 'asc' };
+}
+
+export function sortQueueTripsByColumn(
+  list: ReadonlyArray<Trip>,
+  sort: QueueColumnSortState,
+  options?: {
+    drivers?: ReadonlyArray<{ id: string; name?: string; formattedLabel?: string }>;
+    vehicles?: VehicleTierConfig[];
+  }
+): Trip[] {
+  if (!sort || sort.column === 'smart') {
+    return sortDispatchQueueTrips(list, 'smart');
+  }
+  if (sort.column === 'date') {
+    return sortDispatchQueueTrips(list, sort.direction === 'desc' ? 'date_desc' : 'date_asc');
+  }
+
+  const driverLabelById = new Map<string, string>();
+  for (const d of options?.drivers || []) {
+    driverLabelById.set(d.id, String(d.formattedLabel || d.name || d.id).trim());
+  }
+
+  const resolveDriverSortKey = (trip: Trip): string => {
+    if (trip.assignedDriverId) {
+      const mapped = driverLabelById.get(trip.assignedDriverId);
+      const fallback = String(
+        (trip.metadata as Record<string, unknown> | undefined)?.assignedDriverName ||
+          trip.plannedDriverLabel ||
+          trip.assignedDriverId
+      ).trim();
+      return (mapped || fallback || '\uffff').toLowerCase();
+    }
+    if (trip.plannedDriverId || trip.plannedDriverLabel) {
+      const mapped = trip.plannedDriverId ? driverLabelById.get(trip.plannedDriverId) : undefined;
+      const fallback = String(trip.plannedDriverLabel || trip.plannedDriverId || '').trim();
+      return (mapped || fallback || '\uffff').toLowerCase();
+    }
+    return '\uffff';
+  };
+
+  const resolvePaymentSortKey = (trip: Trip): string => {
+    const raw = String(trip.payment?.method || 'cash').trim().toLowerCase();
+    if (raw === 'corporate' || raw === 'account') return 'account';
+    return raw || 'cash';
+  };
+
+  const resolveStatusSortRank = (status?: string): number =>
+    QUEUE_STATUS_SORT_RANK.get(String(status || '').trim().toLowerCase()) ?? 99;
+
+  const dir = sort.direction === 'desc' ? -1 : 1;
+  const copy = [...list];
+
+  return copy.sort((a, b) => {
+    let cmp = 0;
+    switch (sort.column) {
+      case 'trip_id':
+        cmp = String(a.id || '').localeCompare(String(b.id || ''), undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        });
+        break;
+      case 'passenger': {
+        const nameA = (
+          `${a.passenger?.firstName || ''} ${a.passenger?.lastName || ''}`.trim() || '\uffff'
+        ).toLowerCase();
+        const nameB = (
+          `${b.passenger?.firstName || ''} ${b.passenger?.lastName || ''}`.trim() || '\uffff'
+        ).toLowerCase();
+        cmp = nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+        break;
+      }
+      case 'pickup': {
+        const pickA = (String(a.pickupLocation?.address || '').trim() || '\uffff').toLowerCase();
+        const pickB = (String(b.pickupLocation?.address || '').trim() || '\uffff').toLowerCase();
+        cmp = pickA.localeCompare(pickB, undefined, { numeric: true, sensitivity: 'base' });
+        break;
+      }
+      case 'dropoff': {
+        const dropA = (String(a.dropoffLocation?.address || '').trim() || '\uffff').toLowerCase();
+        const dropB = (String(b.dropoffLocation?.address || '').trim() || '\uffff').toLowerCase();
+        cmp = dropA.localeCompare(dropB, undefined, { numeric: true, sensitivity: 'base' });
+        break;
+      }
+      case 'driver':
+        cmp = resolveDriverSortKey(a).localeCompare(resolveDriverSortKey(b), undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        });
+        break;
+      case 'vehicle': {
+        const vehA = formatVehicleTierDisplay(
+          (a.metadata as any)?.vehicleTypeId || a.vehicleTier,
+          options?.vehicles,
+          (a.metadata as any)?.vehicleDisplayName
+        ).toLowerCase();
+        const vehB = formatVehicleTierDisplay(
+          (b.metadata as any)?.vehicleTypeId || b.vehicleTier,
+          options?.vehicles,
+          (b.metadata as any)?.vehicleDisplayName
+        ).toLowerCase();
+        cmp = vehA.localeCompare(vehB, undefined, { numeric: true, sensitivity: 'base' });
+        break;
+      }
+      case 'price': {
+        const fareA = Number(a.pricing?.totalFare ?? a.payment?.amount ?? 0);
+        const fareB = Number(b.pricing?.totalFare ?? b.payment?.amount ?? 0);
+        cmp = (Number.isFinite(fareA) ? fareA : 0) - (Number.isFinite(fareB) ? fareB : 0);
+        break;
+      }
+      case 'payment':
+        cmp = resolvePaymentSortKey(a).localeCompare(resolvePaymentSortKey(b), undefined, {
+          sensitivity: 'base',
+        });
+        break;
+      case 'status':
+        cmp = resolveStatusSortRank(a.status) - resolveStatusSortRank(b.status);
+        break;
+    }
+
+    if (cmp !== 0) return cmp * dir;
+    return (
+      dir *
+      String(a.id || '').localeCompare(String(b.id || ''), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    );
   });
 }
 

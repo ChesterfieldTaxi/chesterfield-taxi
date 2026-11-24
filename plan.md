@@ -1512,7 +1512,16 @@ export interface PassengerAccount {
 - **Full Admin Console `<Select />` Sweep & Global Zero-Native-`<select>` Gate (`27` Admin `.tsx` Files & `scripts/test-unified-dropdowns-and-admin-sweep-phase65.ts`)**:
   - Replace all `73` native `<select>` elements across `27` Admin Console `.tsx` files with `<Select />` (`size="sm"` / `size="xs"`), replace the adjacent `Include Archived` raw checkbox in `AdminTripsSubpage.tsx` with `<Checkbox />`, update any restyled class assertions in `test-design-system-and-dispatch-persistence-phase64.ts`, and enforce `0` `/<select\b/` across all `app/**/*.tsx` files (`>= 200` files, zero exclusions) in `scripts/test-unified-dropdowns-and-admin-sweep-phase65.ts`.
 
-
-
-
+## Phase 66 Architecture (Wave 6 Phase 1): Trips Queue `Active Only` Default, Pure Icon Status Pills, `Columns ▾` Selector + Presets, Multi-Column Sorting & Clickable `#TRIP_ID` Links
+- **`Active Only` Status Filter Default & Console Policy (`dispatch-workspace.util.ts`, `config.ts`, `DispatchConsoleSettingsPanel.tsx < 400`L, `dispatch.tsx < 1,600`L)**:
+  - Export `DEFAULT_ACTIVE_ONLY_STATUS_FILTER = serializeStatusFilterSelection(ACTIVE_QUEUE_STATUS_KEYS)` while preserving `computeNextStatusFilterOnUnconfirmedToggle` fallback to `'all'` strictly when `previousNonUnconfirmedFilter` is omitted/empty.
+  - Add `defaultQueueStatusFilter?: 'active_only' | 'all'` (default `'active_only'`) to `DispatchConsoleSettingsConfig` + `normalizeDispatchConsoleConfig` + `DispatchConsoleSettingsPanel.tsx` (`<Select size="sm">`), seed `dispatch.tsx` `statusFilter` and `TripQueueToolbar.tsx` `prevNonUnconfirmedStatusRef`, and style `Active Only` calmly in `TripStatusMultiSelectDropdown`.
+- **Pure Inline SVG Status Pills (`DispatchStatusBadge.tsx < 240`L)**:
+  - Extract `DispatchStatusBadge` & `getDispatchStatusBadge(status, options?)` out of `TripQueueToolbar.tsx` (`< 1,150`L, re-exporting for backward compatibility) rendering crisp `w-3.5 h-3.5` inline SVG icon pills (`compact = true` default) with semantic badge colors and `title` tooltips across all 12 statuses across `TripQueueTableView.tsx`, `TripQueueCompactList.tsx`, `TripQueueCardsGrid.tsx`, `AdminTripsTablePanel.tsx`, and `DispatchLeftBookingSidebar.tsx`.
+- **Table Column Visibility, Presets & Dynamic `minWidth` (`trip-queue-columns.util.ts < 240`L, `TripQueueColumnsDropdown.tsx < 260`L & `trip-queue-layout.util.ts`)**:
+  - Centralize pure `parseStoredQueueColumns`, `serializeQueueColumns`, `toggleQueueColumnSelection`, `computeQueueTableMinWidthPx`, and `DEFAULT_QUEUE_COLUMNS` / `FULL_DESK_QUEUE_COLUMNS` / `COMPACT_DOCK_QUEUE_COLUMNS` in `trip-queue-columns.util.ts` (`'action'` pinned, `>= 1` data column enforced).
+  - Build portal `TripQueueColumnsDropdown.tsx` (`createPortal` on `document.body`, `z-[99999]`, `data-ui-select-portal="true"`, synchronous `computeCoords` + `coords !== null`, `0` raw `<input type="checkbox">`, `ct_dispatch_table_columns_v1` + custom sync event) and pass `baseMinTableWidthPx` into `useResponsiveQueueLayout` so hiding columns dynamically lowers the `'auto'` table threshold.
+- **Multi-Column Sorting & Clickable `#TRIP_ID` Deep-Links (`dispatch-workspace.util.ts`, `TripQueueTableView.tsx < 615`L, `DispatchLeftBookingSidebar.tsx`, `MapRouteOverlayHud.tsx`, `LiveFleetMap.tsx < 1,200`L)**:
+  - Add pure `cycleQueueColumnSort` and `sortQueueTripsByColumn` across all 10 data columns (`trip_id`, `date`, `passenger`, `pickup`, `dropoff`, `driver`, `vehicle`, `price`, `payment`, `status` rank) and extract compact header/cell helpers so `TripQueueTableView.tsx` stays `< 615`L with `▲` / `▼` indicators, `Live`, and `Live ↺` reset.
+  - Wire clickable `#TRIP_ID` buttons opening `DispatchTripDetailsDrawer` (`'details'`) across `DispatchLeftBookingSidebar.tsx`, `MapRouteOverlayHud.tsx` (`onOpenTripDetails`), and the `TripQueueTableView.tsx` `TRIP #` cell.
 

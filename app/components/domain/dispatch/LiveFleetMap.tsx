@@ -71,6 +71,7 @@ export interface LiveFleetMapProps {
   onChangeDriverDutyStatus?: (driverId: string, dutyStatus: DriverDutyStatus) => void | Promise<void>;
   onSelectTrip?: (trip: Trip) => void;
   onClearSelectedTrip?: () => void;
+  onOpenTripDetails?: (tripId: string) => void;
   onPopulateBooking?: (payload: PopulateBookingEndpointPayload) => void;
   onSwitchToRoster?: () => void;
   className?: string;
@@ -92,6 +93,7 @@ function LiveFleetMapComponent({
   onChangeDriverDutyStatus,
   onSelectTrip,
   onClearSelectedTrip,
+  onOpenTripDetails,
   onPopulateBooking,
   onSwitchToRoster,
   className = '',
@@ -1179,6 +1181,7 @@ function LiveFleetMapComponent({
         onCloseWaypointPopover={clearSelectedWaypoint}
         onPanToWaypoint={handlePanToWaypoint}
         onClearSelectedTrip={handleDismissRouteOverlay}
+        onOpenTripDetails={onOpenTripDetails}
       />
     </div>
   );

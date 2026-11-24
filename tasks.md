@@ -1072,7 +1072,19 @@
   - [x] 65.4.1 Create `scripts/test-unified-dropdowns-and-admin-sweep-phase65.ts` verifying `0` `/<select\b/` across all `app/**/*.tsx`, unified `Actions ▾` visual/portal/zero-fly-in invariants, `Unconfirmed` toggle helpers & badge UI, preserved `DriverAssignDropdown`, monolith line ceilings, untouched `firestore.rules` & `vercel.json`, and terminology guardrails.
   - [x] 65.4.2 Pass `npm run typecheck`, Phase 65 + Phase 64 + Phase 63 + Phase 62 + Phase 59 test suites, and `npm run build` with `0` errors.
 
-
-
-
+## Phase 66 (Wave 6 Phase 1): Trips Queue `Active Only` Default, Pure Icon Status Pills, `Columns ▾` Selector + Presets, Multi-Column Sorting & Clickable `#TRIP_ID` Links
+- [x] 66.1 Specification & Architecture Sync:
+  - [x] 66.1.1 Append Platform Phase 66 sections to `spec.md`, `plan.md`, and `tasks.md`.
+- [x] 66.2 Default `Status ▾` Filter to `Active Only`:
+  - [x] 66.2.1 Export `DEFAULT_ACTIVE_ONLY_STATUS_FILTER` in `dispatch-workspace.util.ts` (keeping `computeNextStatusFilterOnUnconfirmedToggle` backward-compatible), add `defaultQueueStatusFilter?: 'active_only' | 'all'` (default `'active_only'`) to `config.ts` & `DispatchConsoleSettingsPanel.tsx` (`<Select size="sm">`), and wire `dispatch.tsx`, `TripQueueToolbar.tsx`, & `TripQueueFilterPopovers.tsx`.
+- [x] 66.3 Pure Inline SVG Icon Status Pills (`DispatchStatusBadge.tsx < 240`L):
+  - [x] 66.3.1 Create `app/components/domain/dispatch/queue/DispatchStatusBadge.tsx` (`< 240`L) with semantic colors, crisp inline SVGs, and `title` tooltips across all 12 statuses, re-export `getDispatchStatusBadge` from `TripQueueToolbar.tsx`, and wire across `TripQueueTableView.tsx`, `TripQueueCompactList.tsx`, `AdminTripsTablePanel.tsx`, and `DispatchLeftBookingSidebar.tsx`.
+- [x] 66.4 `Columns ▾` Portal Selector + Presets & Dynamic Overflow Width:
+  - [x] 66.4.1 Create pure `app/components/domain/dispatch/queue/trip-queue-columns.util.ts` (`< 240`L) and portal `TripQueueColumnsDropdown.tsx` (`< 260`L) with `Full Desk` / `Standard` / `Compact Dock` presets, `ct_dispatch_table_columns_v1` sync, and dynamic `computeQueueTableMinWidthPx` wired into `DispatchTripQueuePane.tsx` & `TripQueueToolbar.tsx`.
+- [x] 66.5 Multi-Column Sorting (`dispatch-workspace.util.ts` & `TripQueueTableView.tsx < 615`L):
+  - [x] 66.5.1 Export pure `cycleQueueColumnSort` & `sortQueueTripsByColumn` in `dispatch-workspace.util.ts` and wire clickable column headers, `▲`/`▼` indicators, `Live`, and `Live ↺` reset in `TripQueueTableView.tsx` (`< 615`L).
+- [x] 66.6 Clickable `#TRIP_ID` Links to Open Trip Details Modal:
+  - [x] 66.6.1 Wire clickable `#TRIP_ID` buttons opening Trip Details across `DispatchLeftBookingSidebar.tsx`, `MapRouteOverlayHud.tsx` (`LiveFleetMap.tsx < 1,200`L + `DispatchLiveMapPane.tsx` + `dispatch.tsx < 1,600`L), and `TripQueueTableView.tsx` `TRIP #` column.
+- [x] 66.7 Automated Verification Suite (`scripts/test-queue-columns-sorting-and-icons-phase66.ts`) & Build Gate:
+  - [x] 66.7.1 Create `scripts/test-queue-columns-sorting-and-icons-phase66.ts` and pass `npm run typecheck`, Phases 63–66 verification suites, and `npm run build` with `0` errors.
 

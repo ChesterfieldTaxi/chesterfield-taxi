@@ -53,7 +53,7 @@ const PORTAL_MENU_SHELL_CLASS =
 const PORTAL_HEADER_STRIP_CLASS =
   'px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/60 rounded-t-xl min-h-[28px]';
 
-function MenuCheckIndicator({ checked, indeterminate = false }: { checked: boolean; indeterminate?: boolean }) {
+export function MenuCheckIndicator({ checked, indeterminate = false }: { checked: boolean; indeterminate?: boolean }) {
   return (
     <span
       aria-hidden="true"
@@ -66,7 +66,7 @@ function MenuCheckIndicator({ checked, indeterminate = false }: { checked: boole
   );
 }
 
-function usePortalDropdownPosition(params: {
+export function usePortalDropdownPosition(params: {
   isOpen: boolean;
   onClose: () => void;
   menuWidth: number;
@@ -202,11 +202,15 @@ export function TripStatusMultiSelectDropdown({
         ref={triggerRef} type="button" onClick={handleTriggerClick}
         className={`h-7 px-2.5 border rounded-lg text-xs shadow-2xs cursor-pointer flex items-center gap-1.5 max-w-[145px] sm:max-w-[175px] transition-all ${
           isOpen ? 'bg-blue-50 border-blue-400 text-blue-700 font-bold ring-2 ring-blue-500/20'
+            : isActivePresetSelected ? 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700 font-semibold'
             : !isNeutral ? 'bg-blue-50 border-blue-500 text-blue-800 font-bold'
             : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700 font-semibold'
         }`}
         title="Filter trips by lifecycle status" aria-haspopup="true" aria-expanded={isOpen}
       >
+        {isActivePresetSelected && (
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
+        )}
         <span className="truncate">{buttonLabel}</span>
         <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`} />
       </button>

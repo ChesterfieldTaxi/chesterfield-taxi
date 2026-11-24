@@ -8,6 +8,7 @@ import type { DispatchStagedPlannerController } from '../../../core/hooks/dispat
 import type { DisplayLayout } from '../../../core/hooks/useDisplayLayout';
 import {
   useResponsiveQueueLayout,
+  useQueueTableColumns,
   getDispatchStatusBadge,
   TripQueueToolbar,
   TripQueueCardsGrid,
@@ -202,9 +203,11 @@ export function DispatchTripQueuePane({
   onRunAutoDispatchSweep,
   stagedPlanner,
 }: DispatchTripQueuePaneProps) {
+  const { visibleColumns, tableMinWidthPx } = useQueueTableColumns();
+
   const filterSignature = `${statusFilter}:${slaUrgentOnlyFilter ? '1' : '0'}:${searchTerm}:${
     filteredTrips.length === 0 ? 'empty' : 'rows'
-  }`;
+  }:${visibleColumns.join(',')}`;
 
   const {
     queueContainerRef,
@@ -218,6 +221,7 @@ export function DispatchTripQueuePane({
     isDesktop,
     activeMobileTab,
     filterSignature,
+    baseMinTableWidthPx: tableMinWidthPx,
   });
 
   return (
@@ -397,6 +401,8 @@ export function DispatchTripQueuePane({
           onCancelAutoOffer={onCancelAutoOffer}
           onOpenDriverPickerForTrip={onOpenDriverPickerForTrip}
           stagedPlanner={stagedPlanner}
+          visibleColumns={visibleColumns}
+          tableMinWidthPx={tableMinWidthPx}
           onTableOverflowDetected={
             displayLayout === 'auto' ? handleTableOverflowDetected : undefined
           }

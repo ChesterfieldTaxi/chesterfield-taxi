@@ -18,6 +18,7 @@ export interface MapRouteOverlayHudProps {
   onCloseWaypointPopover: () => void;
   onPanToWaypoint?: (waypoint: ResolvedRouteWaypoint) => void;
   onClearSelectedTrip?: () => void;
+  onOpenTripDetails?: (tripId: string) => void;
 }
 
 export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
@@ -30,6 +31,7 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
   onCloseWaypointPopover,
   onPanToWaypoint,
   onClearSelectedTrip,
+  onOpenTripDetails,
 }: MapRouteOverlayHudProps) {
   if (!activeRoute) return null;
 
@@ -155,9 +157,20 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
             {(shortTripTag || activeRoute.passengerLabel) && (
               <div className="hidden md:flex items-center gap-1 min-w-0 border-l border-slate-700 pl-2 text-slate-200">
                 {shortTripTag && (
-                  <span className="font-mono text-[10px] font-black text-blue-300 shrink-0">
-                    {shortTripTag}
-                  </span>
+                  activeRoute.tripId && onOpenTripDetails ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenTripDetails(activeRoute.tripId!)}
+                      className="font-mono text-[10px] font-black text-blue-300 hover:text-white hover:underline cursor-pointer shrink-0"
+                      title="Open Trip Details & Audit"
+                    >
+                      {shortTripTag}
+                    </button>
+                  ) : (
+                    <span className="font-mono text-[10px] font-black text-blue-300 shrink-0">
+                      {shortTripTag}
+                    </span>
+                  )
                 )}
                 {activeRoute.passengerLabel && (
                   <span className="truncate max-w-[120px] font-semibold">

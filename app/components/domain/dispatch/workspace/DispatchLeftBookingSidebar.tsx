@@ -379,9 +379,14 @@ export function DispatchLeftBookingSidebar({
         {activeEditTrip && tripActions && (
           <div className="px-2.5 py-1.5 bg-blue-50/90 border-b border-blue-200/80 flex items-center justify-between gap-1.5 shrink-0 text-xs">
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="font-mono font-extrabold text-[11px] text-blue-900 shrink-0">
+              <button
+                type="button"
+                onClick={() => tripActions.onReview(activeEditTrip, 'details')}
+                className="font-mono font-extrabold text-[11px] text-blue-800 hover:text-blue-600 hover:underline cursor-pointer shrink-0"
+                title="Open Trip Details & Audit"
+              >
                 #{activeEditTrip.id.slice(-6).toUpperCase()}
-              </span>
+              </button>
               {getDispatchStatusBadge(activeEditTrip.status)}
             </div>
 

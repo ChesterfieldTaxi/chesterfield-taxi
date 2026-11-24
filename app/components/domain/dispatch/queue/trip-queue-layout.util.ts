@@ -36,6 +36,7 @@ export interface ResolveEffectiveQueueLayoutParams {
   isDesktop: boolean;
   queueWidthPx: number;
   requiredTableWidthPx?: number;
+  baseMinTableWidthPx?: number;
 }
 
 export interface ResolvedEffectiveQueueLayout {
@@ -63,14 +64,22 @@ export function resolveEffectiveQueueDisplayLayout({
   isDesktop,
   queueWidthPx,
   requiredTableWidthPx,
+  baseMinTableWidthPx,
 }: ResolveEffectiveQueueLayoutParams): ResolvedEffectiveQueueLayout {
+  const baselineFloorPx =
+    typeof baseMinTableWidthPx === 'number' &&
+    Number.isFinite(baseMinTableWidthPx) &&
+    baseMinTableWidthPx > 0
+      ? Math.ceil(baseMinTableWidthPx)
+      : TABLE_OVERFLOW_MIN_WIDTH_PX;
+
   const effectiveMinTableWidthPx = Math.max(
-    TABLE_OVERFLOW_MIN_WIDTH_PX,
+    baselineFloorPx,
     typeof requiredTableWidthPx === 'number' &&
       Number.isFinite(requiredTableWidthPx) &&
       requiredTableWidthPx > 0
       ? Math.ceil(requiredTableWidthPx)
-      : TABLE_OVERFLOW_MIN_WIDTH_PX
+      : baselineFloorPx
   );
 
   if (!isDesktop) {
@@ -140,6 +149,7 @@ export interface UseResponsiveQueueLayoutOptions {
   isDesktop: boolean;
   activeMobileTab: string;
   filterSignature: string;
+  baseMinTableWidthPx?: number;
 }
 
 export interface UseResponsiveQueueLayoutResult extends ResolvedEffectiveQueueLayout {
@@ -159,6 +169,7 @@ export function useResponsiveQueueLayout({
   isDesktop,
   activeMobileTab,
   filterSignature,
+  baseMinTableWidthPx,
 }: UseResponsiveQueueLayoutOptions): UseResponsiveQueueLayoutResult {
   const queueContainerRef = useRef<HTMLDivElement | null>(null);
   const queueWidthRef = useRef<number>(0);
@@ -227,6 +238,7 @@ export function useResponsiveQueueLayout({
     isDesktop,
     queueWidthPx,
     requiredTableWidthPx,
+    baseMinTableWidthPx,
   });
 
   return {

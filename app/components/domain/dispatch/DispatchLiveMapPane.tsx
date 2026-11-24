@@ -26,6 +26,7 @@ export interface DispatchLiveMapPaneProps {
   onChangeDriverDutyStatus: (driverId: string, dutyStatus: DriverDutyStatus) => void | Promise<void>;
   onSelectTrip: (trip: Trip) => void;
   onClearSelectedTrip?: () => void;
+  onOpenTripDetails?: (tripId: string) => void;
   onSwitchToRoster?: () => void;
 }
 
@@ -48,6 +49,7 @@ export const DispatchLiveMapPane = React.memo(function DispatchLiveMapPane({
   onChangeDriverDutyStatus,
   onSelectTrip,
   onClearSelectedTrip,
+  onOpenTripDetails,
   onSwitchToRoster,
 }: DispatchLiveMapPaneProps) {
   return (
@@ -77,6 +79,7 @@ export const DispatchLiveMapPane = React.memo(function DispatchLiveMapPane({
           onChangeDriverDutyStatus={onChangeDriverDutyStatus}
           onSelectTrip={onSelectTrip}
           onClearSelectedTrip={onClearSelectedTrip}
+          onOpenTripDetails={onOpenTripDetails}
           onSwitchToRoster={activeMobileTab === 'map' ? onSwitchToRoster : undefined}
         />
       </div>
