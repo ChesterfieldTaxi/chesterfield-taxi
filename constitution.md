@@ -1,5 +1,11 @@
 # Constitution: Chesterfield Taxi Web Booking Portal
 
+## Agent & Cost Guardrails
+- **Scope:** Work ONLY on the phase/task explicitly requested in the user's prompt. Do not refactor unrelated phases or files.
+- **Targeted Reading:** Never read `plan.md`, `tasks.md`, or `spec.md` in full. Search for the specific Phase heading first (`rg -n "## Phase X"`) and read only that section.
+- **Targeted Verification:** Run `npm run typecheck` and only the specific test/build command needed for this phase. Do not dump full build logs unless a check fails.
+- **End-of-Phase Handoff:** When done, check off completed items in `tasks.md` and output a 5-line summary (files changed, checks run, any open items) so this chat can be closed.
+
 ## 1. Tech Stack
 - **Framework:** React Router v7 (Framework Mode) via Vite
 - **Styling:** Tailwind CSS v4
