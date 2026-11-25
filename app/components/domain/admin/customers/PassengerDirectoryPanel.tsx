@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../../ui/Card';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
 import {
+  BanIcon,
   CheckIcon,
   ExternalLinkIcon,
   MailIcon,
@@ -11,6 +12,7 @@ import {
   PlusIcon,
   SpinnerIcon,
   StarIcon,
+  TrashIcon,
   UsersIcon,
   XIcon,
 } from '../../../ui/Icons';
@@ -22,6 +24,7 @@ export interface PassengerDirectoryPanelProps {
   allCount: number;
   activeCount: number;
   archivedCount: number;
+  blacklistCount: number;
   vipCount: number;
   displayedCustomers: CustomerProfile[];
   searchTerm: string;
@@ -30,6 +33,9 @@ export interface PassengerDirectoryPanelProps {
   setArchiveFilter: (val: CustomerArchiveFilter) => void;
   onOpenCustomer: (cust: CustomerProfile, editMode?: boolean) => void;
   onToggleArchiveCustomer: (cust: CustomerProfile) => Promise<void>;
+  onRestoreCustomer: (cust: CustomerProfile) => Promise<void>;
+  onPurgeCustomer: (cust: CustomerProfile) => Promise<void>;
+  onPurgeAllBlacklisted: () => Promise<void>;
 }
 
 export function PassengerDirectoryPanel({
@@ -37,6 +43,7 @@ export function PassengerDirectoryPanel({
   allCount,
   activeCount,
   archivedCount,
+  blacklistCount,
   vipCount,
   displayedCustomers,
   searchTerm,
@@ -45,8 +52,14 @@ export function PassengerDirectoryPanel({
   setArchiveFilter,
   onOpenCustomer,
   onToggleArchiveCustomer,
+  onRestoreCustomer,
+  onPurgeCustomer,
+  onPurgeAllBlacklisted,
 }: PassengerDirectoryPanelProps) {
   const [vipOnly, setVipOnly] = useState(false);
+  const [confirmPurgeAll, setConfirmPurgeAll] = useState(false);
+  const [confirmPurgeId, setConfirmPurgeId] = useState<string | null>(null);
+  const [isPurging, setIsPurging] = useState(false);
 
   const filteredCustomers = displayedCustomers.filter((c) => {
     if (vipOnly && !c.isVip) return false;
@@ -85,10 +98,13 @@ export function PassengerDirectoryPanel({
             )}
           </div>
 
-          <div className="grid grid-cols-3 sm:inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold w-full sm:w-auto">
+          <div className="grid grid-cols-2 sm:inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold w-full sm:w-auto">
             <button
               type="button"
-              onClick={() => setArchiveFilter('active')}
+              onClick={() => {
+                setArchiveFilter('active');
+                setConfirmPurgeAll(false);
+              }}
               className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-all text-center whitespace-nowrap cursor-pointer ${
                 archiveFilter === 'active'
                   ? 'bg-white text-slate-900 shadow-xs font-bold'
@@ -99,7 +115,10 @@ export function PassengerDirectoryPanel({
             </button>
             <button
               type="button"
-              onClick={() => setArchiveFilter('archived')}
+              onClick={() => {
+                setArchiveFilter('archived');
+                setConfirmPurgeAll(false);
+              }}
               className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer ${
                 archiveFilter === 'archived'
                   ? 'bg-white text-slate-900 shadow-xs font-bold'
@@ -111,7 +130,29 @@ export function PassengerDirectoryPanel({
             </button>
             <button
               type="button"
-              onClick={() => setArchiveFilter('all')}
+              onClick={() => {
+                setArchiveFilter('blacklist');
+                setConfirmPurgeAll(false);
+              }}
+              className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer ${
+                archiveFilter === 'blacklist'
+                  ? 'bg-rose-600 text-white shadow-xs font-bold'
+                  : 'text-slate-500 hover:text-rose-700'
+              }`}
+            >
+              <BanIcon
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  archiveFilter === 'blacklist' ? 'text-white' : 'text-rose-500'
+                }`}
+              />
+              <span>Blacklist ({blacklistCount})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setArchiveFilter('all');
+                setConfirmPurgeAll(false);
+              }}
               className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-all text-center whitespace-nowrap cursor-pointer ${
                 archiveFilter === 'all'
                   ? 'bg-white text-slate-900 shadow-xs font-bold'
@@ -136,31 +177,82 @@ export function PassengerDirectoryPanel({
           </button>
         </div>
 
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          leftIcon={<PlusIcon className="w-4 h-4" />}
-          onClick={() =>
-            onOpenCustomer(
-              {
-                id: `cust_new_${Date.now()}`,
-                name: '',
-                email: '',
-                phone: '',
-                tripCount: 0,
-                totalSpend: 0,
-                lastRideDate: 'New',
-                isVip: false,
-                preferredVehicle: 'Standard Sedan',
-              },
-              true
+        <div className="flex flex-wrap items-center gap-2 shrink-0 w-full lg:w-auto justify-end">
+          {archiveFilter === 'blacklist' && blacklistCount > 0 && (
+            confirmPurgeAll ? (
+              <div className="inline-flex items-center gap-1.5 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-xl">
+                <span className="text-[11px] font-bold text-rose-800">
+                  Purge all {blacklistCount}?
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={isPurging}
+                  onClick={async () => {
+                    setIsPurging(true);
+                    try {
+                      await onPurgeAllBlacklisted();
+                      setConfirmPurgeAll(false);
+                    } finally {
+                      setIsPurging(false);
+                    }
+                  }}
+                  className="text-[11px] font-bold px-2 py-1 h-auto bg-rose-600 hover:bg-rose-700 text-white border-rose-600 cursor-pointer"
+                >
+                  {isPurging ? 'Purging...' : 'Confirm'}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={isPurging}
+                  onClick={() => setConfirmPurgeAll(false)}
+                  className="text-[11px] font-bold px-2 py-1 h-auto text-slate-600 border-slate-200 cursor-pointer"
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                leftIcon={<TrashIcon className="w-3.5 h-3.5 text-rose-600" />}
+                onClick={() => setConfirmPurgeAll(true)}
+                className="text-xs font-bold text-rose-700 border-rose-300 bg-rose-50/70 hover:bg-rose-100 cursor-pointer"
+              >
+                Purge All Blacklisted
+              </Button>
             )
-          }
-          className="text-xs font-bold w-full lg:w-auto justify-center shrink-0"
-        >
-          Add Client
-        </Button>
+          )}
+
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            leftIcon={<PlusIcon className="w-4 h-4" />}
+            onClick={() =>
+              onOpenCustomer(
+                {
+                  id: `cust_new_${Date.now()}`,
+                  name: '',
+                  email: '',
+                  phone: '',
+                  tripCount: 0,
+                  totalSpend: 0,
+                  lastRideDate: 'New',
+                  isVip: false,
+                  preferredVehicle: 'Standard Sedan',
+                },
+                true
+              )
+            }
+            className="text-xs font-bold w-full sm:w-auto justify-center shrink-0"
+          >
+            Add Client
+          </Button>
+        </div>
       </div>
 
       {/* ─── Passenger Directory Grid ─── */}
@@ -295,7 +387,7 @@ export function PassengerDirectoryPanel({
                     )}
 
                     <div
-                      className="flex items-center gap-1.5 pt-2 border-t border-slate-100"
+                      className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Button
@@ -306,36 +398,92 @@ export function PassengerDirectoryPanel({
                       >
                         Details
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onOpenCustomer(cust, true)}
-                        className="text-[11px] font-bold flex-1 py-1.5 h-auto text-blue-700 border-blue-200 bg-blue-50/50 hover:bg-blue-100/70 cursor-pointer"
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onToggleArchiveCustomer(cust)}
-                        className={`text-[11px] px-2.5 py-1.5 h-auto font-bold flex items-center gap-1 cursor-pointer ${
-                          cust.isArchived
-                            ? 'text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100'
-                            : 'text-slate-600 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {cust.isArchived ? (
-                          <>
+                      {cust.isBlacklisted ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onRestoreCustomer(cust)}
+                            className="text-[11px] px-2.5 py-1.5 h-auto font-bold flex items-center gap-1 text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 cursor-pointer"
+                          >
                             <CheckIcon className="w-3 h-3 text-emerald-600" />
                             <span>Restore</span>
-                          </>
-                        ) : (
-                          <>
-                            <ArchiveBoxIcon className="w-3 h-3 text-slate-500" />
-                            <span>Archive</span>
-                          </>
-                        )}
-                      </Button>
+                          </Button>
+                          {confirmPurgeId === cust.id ? (
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isPurging}
+                                onClick={async () => {
+                                  setIsPurging(true);
+                                  try {
+                                    await onPurgeCustomer(cust);
+                                    setConfirmPurgeId(null);
+                                  } finally {
+                                    setIsPurging(false);
+                                  }
+                                }}
+                                className="text-[11px] px-2 py-1.5 h-auto font-bold bg-rose-600 hover:bg-rose-700 text-white border-rose-600 cursor-pointer"
+                              >
+                                {isPurging ? '...' : 'Confirm'}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isPurging}
+                                onClick={() => setConfirmPurgeId(null)}
+                                className="text-[11px] px-2 py-1.5 h-auto font-bold text-slate-600 border-slate-200 cursor-pointer"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setConfirmPurgeId(cust.id)}
+                              className="text-[11px] px-2.5 py-1.5 h-auto font-bold flex items-center gap-1 text-rose-700 border-rose-300 bg-rose-50 hover:bg-rose-100 cursor-pointer"
+                            >
+                              <TrashIcon className="w-3 h-3 text-rose-600" />
+                              <span>Purge</span>
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onOpenCustomer(cust, true)}
+                            className="text-[11px] font-bold flex-1 py-1.5 h-auto text-blue-700 border-blue-200 bg-blue-50/50 hover:bg-blue-100/70 cursor-pointer"
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onToggleArchiveCustomer(cust)}
+                            className={`text-[11px] px-2.5 py-1.5 h-auto font-bold flex items-center gap-1 cursor-pointer ${
+                              cust.isArchived
+                                ? 'text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100'
+                                : 'text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {cust.isArchived ? (
+                              <>
+                                <CheckIcon className="w-3 h-3 text-emerald-600" />
+                                <span>Restore</span>
+                              </>
+                            ) : (
+                              <>
+                                <ArchiveBoxIcon className="w-3 h-3 text-slate-500" />
+                                <span>Archive</span>
+                              </>
+                            )}
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 </div>

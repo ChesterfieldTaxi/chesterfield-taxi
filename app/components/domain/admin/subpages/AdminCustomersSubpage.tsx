@@ -113,14 +113,81 @@ export function AdminCustomersSubpage({
     return buildCustomerProfilesList(trips, settings.invoices || []);
   }, [trips, settings.invoices, governanceRefreshKey]);
 
-  const activeCustomers = allCustomers.filter((c) => !c.isArchived);
-  const archivedCustomers = allCustomers.filter((c) => Boolean(c.isArchived));
+  const blacklistedCustomers = allCustomers.filter((c) => Boolean(c.isBlacklisted));
+  const nonBlacklistedCustomers = allCustomers.filter((c) => !c.isBlacklisted);
+  const activeCustomers = nonBlacklistedCustomers.filter((c) => !c.isArchived);
+  const archivedCustomers = nonBlacklistedCustomers.filter((c) => Boolean(c.isArchived));
   const displayedCustomers =
     archiveFilter === 'active'
       ? activeCustomers
       : archiveFilter === 'archived'
       ? archivedCustomers
-      : allCustomers;
+      : archiveFilter === 'blacklist'
+      ? blacklistedCustomers
+      : nonBlacklistedCustomers;
+
+  const deleteContactForProfile = (cust: CustomerProfile) => {
+    const contactService = getContactService();
+    if (cust.id && !cust.id.startsWith('cust-')) {
+      contactService.deleteContact(cust.id);
+      return;
+    }
+    const byPhone =
+      cust.phone && cust.phone !== 'No phone'
+        ? contactService.getContactByPhone(cust.phone)
+        : null;
+    const byEmail =
+      cust.email && cust.email !== 'N/A'
+        ? contactService.getContactByEmail(cust.email)
+        : null;
+    const match = byPhone || byEmail;
+    if (match) {
+      contactService.deleteContact(match.id);
+    }
+  };
+
+  const handleRestoreCustomer = async (cust: CustomerProfile) => {
+    const gov = getUniversalGovernanceService();
+    if (cust.phone && cust.phone !== 'No phone') {
+      await gov.setBlacklistStatus('passenger', cust.phone, false);
+    }
+    if (cust.email && cust.email !== 'N/A') {
+      await gov.setBlacklistStatus('passenger', cust.email, false);
+    }
+    setGovernanceRefreshKey((k) => k + 1);
+  };
+
+  const handlePurgeCustomer = async (cust: CustomerProfile) => {
+    deleteContactForProfile(cust);
+    await getUniversalGovernanceService().purgePassenger({
+      phone: cust.phone,
+      email: cust.email,
+      name: cust.name,
+    });
+    if (selectedCustomer?.id === cust.id) {
+      setSelectedCustomer(null);
+      setIsEditingCustomer(false);
+    }
+    setGovernanceRefreshKey((k) => k + 1);
+  };
+
+  const handlePurgeAllBlacklisted = async () => {
+    for (const cust of blacklistedCustomers) {
+      deleteContactForProfile(cust);
+    }
+    await getUniversalGovernanceService().purgeAllBlacklistedPassengers(
+      blacklistedCustomers.map((c) => ({
+        phone: c.phone,
+        email: c.email,
+        name: c.name,
+      }))
+    );
+    if (selectedCustomer?.isBlacklisted) {
+      setSelectedCustomer(null);
+      setIsEditingCustomer(false);
+    }
+    setGovernanceRefreshKey((k) => k + 1);
+  };
 
   const corporateClients = settings.corporateAccounts || [];
   const portalPolicy = normalizeCorporatePortalPolicy(settings.corporatePortalPolicy);
@@ -184,9 +251,10 @@ export function AdminCustomersSubpage({
       {activeSub === 'directory' && (
         <PassengerDirectoryPanel
           isLoading={isLoading}
-          allCount={allCustomers.length}
+          allCount={nonBlacklistedCustomers.length}
           activeCount={activeCustomers.length}
           archivedCount={archivedCustomers.length}
+          blacklistCount={blacklistedCustomers.length}
           vipCount={displayedCustomers.filter((c) => c.isVip).length}
           displayedCustomers={displayedCustomers}
           searchTerm={searchTerm}
@@ -201,6 +269,9 @@ export function AdminCustomersSubpage({
             if (cust.phone) await gov.setArchiveStatus('passenger', cust.phone, nextArchived);
             setGovernanceRefreshKey((k) => k + 1);
           }}
+          onRestoreCustomer={handleRestoreCustomer}
+          onPurgeCustomer={handlePurgeCustomer}
+          onPurgeAllBlacklisted={handlePurgeAllBlacklisted}
         />
       )}
 
@@ -264,6 +335,7 @@ export function AdminCustomersSubpage({
           setSelectedCustomer(updated);
           setGovernanceRefreshKey((k) => k + 1);
         }}
+        onPurgeCustomer={handlePurgeCustomer}
       />
 
       <CorporateAccountDirectoryDrawer

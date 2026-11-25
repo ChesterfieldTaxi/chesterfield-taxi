@@ -8,7 +8,7 @@ import { Button } from '../../../ui/Button';
 import { Select } from '../../../ui/Select';
 import {
   AlertTriangleIcon, BanIcon, CarIcon, CheckIcon, EditIcon,
-  ExternalLinkIcon, PlusIcon, ShieldIcon, StarIcon, UserIcon,
+  ExternalLinkIcon, PlusIcon, ShieldIcon, StarIcon, TrashIcon, UserIcon,
 } from '../../../ui/Icons';
 import type { CustomerProfile } from './types';
 
@@ -19,6 +19,7 @@ export interface CustomerProfileDrawerProps {
   onClose: () => void;
   onCustomerSaved: (updated: CustomerProfile) => void;
   onGovernanceMutated: (updated: CustomerProfile) => void;
+  onPurgeCustomer?: (cust: CustomerProfile) => Promise<void>;
 }
 
 export function CustomerProfileDrawer({
@@ -28,12 +29,15 @@ export function CustomerProfileDrawer({
   onClose,
   onCustomerSaved,
   onGovernanceMutated,
+  onPurgeCustomer,
 }: CustomerProfileDrawerProps) {
   const [editForm, setEditForm] = useState<Partial<CustomerProfile>>({});
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [showBlacklistInput, setShowBlacklistInput] = useState(false);
   const [blacklistReasonDraft, setBlacklistReasonDraft] = useState('');
+  const [confirmPurge, setConfirmPurge] = useState(false);
+  const [isPurging, setIsPurging] = useState(false);
 
   useEffect(() => {
     if (!selectedCustomer) return;
@@ -50,6 +54,8 @@ export function CustomerProfileDrawer({
     setFormError(null);
     setShowBlacklistInput(false);
     setBlacklistReasonDraft('');
+    setConfirmPurge(false);
+    setIsPurging(false);
   }, [selectedCustomer?.id, isEditingCustomer]);
 
   if (!selectedCustomer) return null;
@@ -385,7 +391,60 @@ export function CustomerProfileDrawer({
                 >
                   {selectedCustomer.isArchived ? 'Unarchive' : 'Archive'}
                 </Button>
+
+                {selectedCustomer.isBlacklisted && onPurgeCustomer && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConfirmPurge((v) => !v)}
+                    className="text-xs font-bold text-rose-700 border-rose-300 bg-rose-50 hover:bg-rose-100 cursor-pointer"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <TrashIcon className="w-3.5 h-3.5" />
+                      <span>Purge</span>
+                    </span>
+                  </Button>
+                )}
               </div>
+
+              {confirmPurge && selectedCustomer.isBlacklisted && onPurgeCustomer && (
+                <div className="p-3 rounded-xl bg-rose-50/80 border border-rose-200 space-y-2">
+                  <p className="text-[11px] font-semibold text-rose-800">
+                    Purging removes saved contact PII and hides this passenger from the directory while keeping historical trip records intact.
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isPurging}
+                      onClick={() => setConfirmPurge(false)}
+                      className="text-xs font-bold text-slate-600 border-slate-300 cursor-pointer"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={isPurging}
+                      onClick={async () => {
+                        setIsPurging(true);
+                        try {
+                          await onPurgeCustomer(selectedCustomer);
+                          setConfirmPurge(false);
+                          onClose();
+                        } finally {
+                          setIsPurging(false);
+                        }
+                      }}
+                      className="text-xs bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
+                    >
+                      {isPurging ? 'Purging...' : 'Confirm Purge'}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {showBlacklistInput && !selectedCustomer.isBlacklisted && (
                 <div className="p-3 rounded-xl bg-rose-50/80 border border-rose-200 space-y-2">

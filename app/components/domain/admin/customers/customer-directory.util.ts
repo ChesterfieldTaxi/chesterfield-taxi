@@ -80,8 +80,11 @@ export function buildCustomerProfilesList(
   }
 
   const govService = getUniversalGovernanceService();
-  return Array.from(customerMap.values()).map((c) => {
+  const profiles: CustomerProfile[] = [];
+  for (const c of customerMap.values()) {
     const gov = govService.isPassengerBlacklistedSync(c.phone, c.email);
+    if (gov.isPurged) continue;
+
     const score = govService.calculateCustomerScore({
       completedTrips: c.tripCount,
       cancelledTrips: 0,
@@ -93,13 +96,14 @@ export function buildCustomerProfilesList(
       (c.email !== 'N/A' && invoiceEmailsSet.has(c.email.toLowerCase())) ||
       invoiceEmailsSet.has(c.name.toLowerCase());
 
-    return {
+    profiles.push({
       ...c,
       hasInvoicesOrCorporate: hasInv,
       customerScore: score,
       isBlacklisted: gov.isBlacklisted,
       blacklistReason: gov.reason,
       isArchived: gov.isArchived,
-    };
-  });
+    });
+  }
+  return profiles;
 }

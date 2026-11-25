@@ -32,6 +32,8 @@ export interface EntityGovernanceRecord {
   isArchived: boolean;
   archivedAt?: string;
   archiveReason?: string;
+  isPurged?: boolean;
+  purgedAt?: string;
   displayName?: string;
   updatedAt: string;
   updatedBy?: string;
@@ -187,19 +189,31 @@ export class UniversalGovernanceService {
   public async isPassengerBlacklisted(
     phone?: string,
     email?: string
-  ): Promise<{ isBlacklisted: boolean; reason?: string; isArchived?: boolean }> {
+  ): Promise<{ isBlacklisted: boolean; reason?: string; isArchived?: boolean; isPurged?: boolean }> {
     if (phone) {
       const normalizedPhone = phone.replace(/\D/g, '');
-      const rec = this.cache.get(this.getKey('passenger', normalizedPhone)) || this.cache.get(this.getKey('passenger', phone));
-      if (rec?.isBlacklisted) {
-        return { isBlacklisted: true, reason: rec.blacklistReason, isArchived: rec.isArchived };
+      const rec =
+        (normalizedPhone ? this.cache.get(this.getKey('passenger', normalizedPhone)) : undefined) ||
+        this.cache.get(this.getKey('passenger', phone));
+      if (rec?.isBlacklisted || rec?.isPurged) {
+        return {
+          isBlacklisted: !!rec.isBlacklisted,
+          reason: rec.blacklistReason,
+          isArchived: rec.isArchived,
+          isPurged: !!rec.isPurged,
+        };
       }
     }
     if (email) {
       const normalizedEmail = email.toLowerCase().trim();
-      const rec = this.cache.get(this.getKey('passenger', normalizedEmail));
-      if (rec?.isBlacklisted) {
-        return { isBlacklisted: true, reason: rec.blacklistReason, isArchived: rec.isArchived };
+      const rec = normalizedEmail ? this.cache.get(this.getKey('passenger', normalizedEmail)) : undefined;
+      if (rec?.isBlacklisted || rec?.isPurged) {
+        return {
+          isBlacklisted: !!rec.isBlacklisted,
+          reason: rec.blacklistReason,
+          isArchived: rec.isArchived,
+          isPurged: !!rec.isPurged,
+        };
       }
     }
 
@@ -209,11 +223,13 @@ export class UniversalGovernanceService {
         if (email) {
           const docRef = doc(db, 'customerGovernance', email.toLowerCase().trim());
           const snap = await getDoc(docRef);
-          if (snap.exists() && snap.data()?.isBlacklisted) {
+          const data = snap.data();
+          if (snap.exists() && (data?.isBlacklisted || data?.isPurged)) {
             return {
-              isBlacklisted: true,
-              reason: snap.data()?.blacklistReason,
-              isArchived: snap.data()?.isArchived
+              isBlacklisted: !!data?.isBlacklisted,
+              reason: data?.blacklistReason,
+              isArchived: data?.isArchived,
+              isPurged: !!data?.isPurged,
             };
           }
         }
@@ -228,22 +244,34 @@ export class UniversalGovernanceService {
   public isPassengerBlacklistedSync(
     phone?: string,
     email?: string
-  ): { isBlacklisted: boolean; reason?: string; isArchived?: boolean } {
+  ): { isBlacklisted: boolean; reason?: string; isArchived?: boolean; isPurged?: boolean } {
     if (phone) {
       const normalizedPhone = phone.replace(/\D/g, '');
-      const rec = this.cache.get(this.getKey('passenger', normalizedPhone)) || this.cache.get(this.getKey('passenger', phone));
-      if (rec?.isBlacklisted || rec?.isArchived) {
-        return { isBlacklisted: !!rec.isBlacklisted, reason: rec.blacklistReason, isArchived: !!rec.isArchived };
+      const rec =
+        (normalizedPhone ? this.cache.get(this.getKey('passenger', normalizedPhone)) : undefined) ||
+        this.cache.get(this.getKey('passenger', phone));
+      if (rec?.isBlacklisted || rec?.isArchived || rec?.isPurged) {
+        return {
+          isBlacklisted: !!rec.isBlacklisted,
+          reason: rec.blacklistReason,
+          isArchived: !!rec.isArchived,
+          isPurged: !!rec.isPurged,
+        };
       }
     }
     if (email) {
       const normalizedEmail = email.toLowerCase().trim();
-      const rec = this.cache.get(this.getKey('passenger', normalizedEmail));
-      if (rec?.isBlacklisted || rec?.isArchived) {
-        return { isBlacklisted: !!rec.isBlacklisted, reason: rec.blacklistReason, isArchived: !!rec.isArchived };
+      const rec = normalizedEmail ? this.cache.get(this.getKey('passenger', normalizedEmail)) : undefined;
+      if (rec?.isBlacklisted || rec?.isArchived || rec?.isPurged) {
+        return {
+          isBlacklisted: !!rec.isBlacklisted,
+          reason: rec.blacklistReason,
+          isArchived: !!rec.isArchived,
+          isPurged: !!rec.isPurged,
+        };
       }
     }
-    return { isBlacklisted: false, isArchived: false };
+    return { isBlacklisted: false, isArchived: false, isPurged: false };
   }
 
   public isDriverBlacklistedSync(
@@ -363,6 +391,107 @@ export class UniversalGovernanceService {
         console.warn('[UniversalGovernanceService] Error persisting blacklist to Firestore:', e);
       }
     }
+  }
+
+  /**
+   * Purge a blacklisted passenger's governance state while setting an `isPurged` tombstone
+   * so historical trip ledger entries do not re-synthesize a directory profile.
+   */
+  public async purgePassenger(
+    identifiers: { phone?: string; email?: string; name?: string },
+    actorRole = 'admin',
+    actorId = 'admin'
+  ): Promise<void> {
+    const keys = new Set<string>();
+    const rawPhone = identifiers.phone?.trim();
+    if (rawPhone && rawPhone !== 'No phone') {
+      keys.add(rawPhone);
+      const digits = rawPhone.replace(/\D/g, '');
+      if (digits) keys.add(digits);
+    }
+    const rawEmail = identifiers.email?.trim().toLowerCase();
+    if (rawEmail && rawEmail !== 'n/a') {
+      keys.add(rawEmail);
+    }
+    if (keys.size === 0) return;
+
+    const now = new Date().toISOString();
+    const updatedRecords: EntityGovernanceRecord[] = [];
+    for (const entityId of keys) {
+      const cacheKey = this.getKey('passenger', entityId);
+      const existing = this.cache.get(cacheKey);
+      const updated: EntityGovernanceRecord = {
+        entityId,
+        entityType: 'passenger',
+        isBlacklisted: false,
+        isArchived: false,
+        isPurged: true,
+        purgedAt: now,
+        updatedAt: now,
+        updatedBy: actorId,
+        ...(existing?.displayName ? { displayName: existing.displayName } : {}),
+      };
+      this.cache.set(cacheKey, updated);
+      updatedRecords.push(updated);
+    }
+
+    this.persistToStorage();
+
+    const primaryId = rawEmail && rawEmail !== 'n/a' ? rawEmail : Array.from(keys)[0];
+    this.recordSecurityAudit({
+      action: 'GOVERNANCE_STATUS_CHANGED',
+      entityType: 'passenger',
+      entityId: primaryId,
+      actorRole,
+      actorId,
+      reason: `Purged blacklisted passenger PII & governance state${identifiers.name ? ` (${identifiers.name})` : ''}`,
+      metadata: { isPurged: true, purgedAt: now },
+    });
+
+    if (isFirebaseConfigured()) {
+      try {
+        const db = getFirestore(getFirebaseApp());
+        for (const rec of updatedRecords) {
+          await setDoc(
+            doc(db, 'customerGovernance', rec.entityId.toLowerCase().trim()),
+            {
+              ...rec,
+              blacklistReason: null,
+            },
+            { merge: true }
+          );
+        }
+      } catch (e) {
+        console.warn('[UniversalGovernanceService] Error persisting passenger purge to Firestore:', e);
+      }
+    }
+  }
+
+  /**
+   * Purge all blacklisted passengers (provided list + any remaining blacklisted passenger cache records).
+   */
+  public async purgeAllBlacklistedPassengers(
+    passengers: ReadonlyArray<{ phone?: string; email?: string; name?: string }> = [],
+    actorRole = 'admin',
+    actorId = 'admin'
+  ): Promise<number> {
+    let purgedCount = 0;
+    for (const p of passengers) {
+      await this.purgePassenger(p, actorRole, actorId);
+      purgedCount += 1;
+    }
+
+    const remainingBlacklisted = this.getBlacklistedEntities('passenger');
+    for (const rec of remainingBlacklisted) {
+      await this.purgePassenger(
+        { phone: rec.entityId, email: rec.entityId.includes('@') ? rec.entityId : undefined, name: rec.displayName },
+        actorRole,
+        actorId
+      );
+      purgedCount += 1;
+    }
+
+    return purgedCount;
   }
 
   /**

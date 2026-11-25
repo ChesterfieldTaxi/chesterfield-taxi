@@ -1,7 +1,7 @@
 import type { AppSettings } from '../../../../core/types/config';
 
 export type CustomersSubTab = 'directory' | 'corporate';
-export type CustomerArchiveFilter = 'active' | 'archived' | 'all';
+export type CustomerArchiveFilter = 'active' | 'archived' | 'blacklist' | 'all';
 
 export interface AdminCustomersSubpageProps {
   settings: AppSettings;

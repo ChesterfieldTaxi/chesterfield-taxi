@@ -7,7 +7,7 @@
  * Persists custom updates in localStorage with cross-tab synchronization via WorkspaceBus.
  */
 
-import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, setDoc } from 'firebase/firestore';
 import type {
   CommsChannel,
   CommsContactType,
@@ -1507,6 +1507,16 @@ class ContactService {
 
     this.removeContactIndexes(existing);
     this.saveToStorage();
+    if (isFirebaseConfigured()) {
+      try {
+        const db = getFirestoreDb();
+        void deleteDoc(doc(db, 'contacts', existing.id)).catch((err) => {
+          console.warn('[ContactService] Failed to delete contact from Firestore:', err);
+        });
+      } catch (err) {
+        console.warn('[ContactService] Firestore delete skipped:', err);
+      }
+    }
     this.notifyListeners({ action: 'deleted', contact: existing });
     return true;
   }
