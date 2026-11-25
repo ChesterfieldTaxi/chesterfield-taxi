@@ -1,4 +1,5 @@
 import React from 'react';
+import type { DispatchAutomationConfig } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import type { DispatchFormValues } from '../DispatchBookingEngine';
@@ -54,6 +55,7 @@ export interface DispatchLeftBookingSidebarProps {
   // Booking pane callbacks
   trips: Trip[];
   drivers: LiveFleetDriver[];
+  dispatchAutomation?: DispatchAutomationConfig;
   onValuesChangeByDraft: (draftId: string, vals: DispatchFormValues) => void;
   onBookingSuccessByDraft: (
     draftId: string,
@@ -88,6 +90,7 @@ export function DispatchLeftBookingSidebar({
   dragHandlers,
   trips,
   drivers,
+  dispatchAutomation,
   onValuesChangeByDraft,
   onBookingSuccessByDraft,
   onClearDraftById,
@@ -409,6 +412,8 @@ export function DispatchLeftBookingSidebar({
                       : 'unassigned')
                   }
                   drivers={drivers}
+                  trip={activeEditTrip}
+                  slaConfig={dispatchAutomation}
                   mode={
                     !activeEditTrip.assignedDriverId &&
                     stagedPlanner?.queueAssignMode === 'stage_hold'

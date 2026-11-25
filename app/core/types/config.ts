@@ -1173,10 +1173,14 @@ export interface DispatchAutomationConfig {
   fallbackOnExhaustion: DispatchExhaustionFallbackMode;
   /** Minutes before scheduled pickup to enter SLA warning window (default 60) */
   slaWarningMinutes: number;
-  /** Minutes before scheduled pickup to enter SLA critical window (default 30) */
+  /** Minutes before scheduled pickup to enter SLA critical window (default 15) */
   slaCriticalMinutes: number;
   /** Extra lead minutes added automatically when detectAirportInAddresses matches STL/SUS/CPS (default 15) */
   airportExtraLeadMinutes: number;
+  /** Post-arrival pickup buffer in minutes for airport trips with flightTelemetry arrival timestamps (default 30, clamped 0–180) */
+  airportPickupBufferMinutes: number;
+  /** Grace window in minutes from createdAt before an unassigned ASAP trip turns critical red (default 15, clamped 1–120) */
+  asapUnassignedGraceMinutes: number;
 }
 
 export const DEFAULT_DISPATCH_AUTOMATION_CONFIG: DispatchAutomationConfig = {
@@ -1203,8 +1207,10 @@ export const DEFAULT_DISPATCH_AUTOMATION_CONFIG: DispatchAutomationConfig = {
   windowEndHour: 6,
   fallbackOnExhaustion: 'alert_dispatch',
   slaWarningMinutes: 60,
-  slaCriticalMinutes: 30,
+  slaCriticalMinutes: 15,
   airportExtraLeadMinutes: 15,
+  airportPickupBufferMinutes: 30,
+  asapUnassignedGraceMinutes: 15,
 };
 
 export function normalizeDispatchAutomationConfig(
@@ -1396,6 +1402,18 @@ export function normalizeDispatchAutomationConfig(
       DEFAULT_DISPATCH_AUTOMATION_CONFIG.airportExtraLeadMinutes,
       0,
       180
+    ),
+    airportPickupBufferMinutes: clampInt(
+      raw?.airportPickupBufferMinutes,
+      DEFAULT_DISPATCH_AUTOMATION_CONFIG.airportPickupBufferMinutes,
+      0,
+      180
+    ),
+    asapUnassignedGraceMinutes: clampInt(
+      raw?.asapUnassignedGraceMinutes,
+      DEFAULT_DISPATCH_AUTOMATION_CONFIG.asapUnassignedGraceMinutes,
+      1,
+      120
     ),
   };
 }

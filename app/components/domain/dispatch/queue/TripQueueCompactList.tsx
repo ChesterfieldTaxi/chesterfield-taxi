@@ -27,11 +27,13 @@ import {
 } from '../DispatchCascadeSlaBadges';
 import { useLiveClockNowMs } from '../../../../core/hooks/dispatch/dispatch-workspace.util';
 import { DriverAssignDropdown } from './DriverAssignDropdown';
+import type { DispatchAutomationConfig } from '../../../../core/types/config';
 import { getDispatchStatusBadge } from './TripQueueToolbar';
 
 export interface TripQueueCompactListProps {
   isDesktop: boolean;
   drivers: LiveFleetDriver[];
+  dispatchAutomation?: DispatchAutomationConfig;
   filteredTrips: Trip[];
   selectedTripIds: string[];
   selectedQueueTripId: string | null;
@@ -60,6 +62,7 @@ export interface TripQueueCompactListProps {
 export function TripQueueCompactList({
   isDesktop,
   drivers,
+  dispatchAutomation,
   filteredTrips,
   selectedTripIds,
   selectedQueueTripId,
@@ -189,6 +192,8 @@ export function TripQueueCompactList({
                     : 'unassigned')
                 }
                 drivers={drivers}
+                trip={trip}
+                slaConfig={dispatchAutomation}
                 mode={
                   !trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
                     ? 'stage_hold'

@@ -16,7 +16,6 @@ import {
   MagnifyingGlassIcon,
   CalendarIcon,
   ChevronDownIcon,
-  FunnelIcon,
   AlertTriangleIcon,
   RadarBroadcastIcon,
 } from '../../../ui/Icons';
@@ -27,14 +26,16 @@ import {
 } from '../../../../core/hooks/dispatch/dispatch-workspace.util';
 import {
   TABLE_OVERFLOW_MIN_WIDTH_PX,
+  resolveTripQueueToolbarInlineTiers,
   type QueueFilterType,
 } from './trip-queue-layout.util';
 import {
   TripAddFilterDropdown,
-  TripQueueLayoutDropdown,
+  TripQueueAssignmentDropdown,
   TripStatusMultiSelectDropdown,
 } from './TripQueueFilterPopovers';
 import { TripQueueColumnsDropdown } from './TripQueueColumnsDropdown';
+import { TripQueueOverflowMenu } from './TripQueueOverflowMenu';
 import { TripQueueBatchActionBar } from './TripQueueBatchActionBar';
 import {
   DispatchStatusBadge,
@@ -205,6 +206,42 @@ export function TripQueueToolbar({
       ? autoConfig.dispatchMode
       : autoConfig.sweepExecutionMode;
 
+  const toolbarRef = React.useRef<HTMLDivElement | null>(null);
+  const [measuredToolbarWidthPx, setMeasuredToolbarWidthPx] = React.useState<number>(0);
+
+  React.useEffect(() => {
+    if (queueWidthPx > 0 || typeof window === 'undefined') return;
+    const el = toolbarRef.current;
+    if (!el) return;
+
+    const commitWidth = (rawWidth: number) => {
+      const rounded = Math.round(rawWidth);
+      if (rounded > 0) {
+        setMeasuredToolbarWidthPx((prev) => (prev === rounded ? prev : rounded));
+      }
+    };
+
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0) commitWidth(rect.width);
+
+    if (typeof ResizeObserver === 'undefined') {
+      const onResize = () => commitWidth(el.getBoundingClientRect().width);
+      window.addEventListener('resize', onResize);
+      return () => window.removeEventListener('resize', onResize);
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        commitWidth(entry.contentRect?.width || el.getBoundingClientRect().width);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [queueWidthPx]);
+
+  const effectiveToolbarWidthPx = queueWidthPx > 0 ? queueWidthPx : measuredToolbarWidthPx;
+  const tiers = resolveTripQueueToolbarInlineTiers(effectiveToolbarWidthPx);
+
   const prevNonUnconfirmedStatusRef = React.useRef<string>(DEFAULT_ACTIVE_ONLY_STATUS_FILTER);
   const isUnconfirmedOnly = isUnconfirmedQuickFilterActive(statusFilter);
   React.useEffect(() => {
@@ -229,500 +266,173 @@ export function TripQueueToolbar({
 
   return (
     <>
-      {/* ─── Modern Filter & Trips Control Bar ─── */}
-      <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-1.5 sm:gap-2 shrink-0 min-w-0 h-11 relative z-30 overflow-visible">
-        {/* Mobile-Only Expanded Search (takes full width on small screens) */}
-        {isSearchExpanded ? (
-          <div className="md:hidden flex-1 flex items-center gap-2 animate-in fade-in duration-150 min-w-0">
-            <div className="relative flex-1 min-w-0">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                <MagnifyingGlassIcon className="w-3.5 h-3.5" />
-              </span>
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search trips by ID, passenger, phone..."
-                value={searchTerm}
-                onChange={(e) => onSearchTermChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') onSearchExpandedChange(false);
-                }}
-                className="w-full pl-8 pr-8 py-1 bg-white border border-blue-500 rounded-lg text-slate-800 text-xs shadow-2xs focus:ring-1 focus:ring-blue-500 focus:outline-hidden h-7"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => onSearchTermChange('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
-                  title="Clear search text"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                onSearchExpandedChange(false);
-                onSearchTermChange('');
-              }}
-              className="px-2.5 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-200/80 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer shrink-0 h-7 flex items-center gap-1"
-              title="Close search and show filters"
-            >
-              <span>✕</span>
-            </button>
-          </div>
-        ) : null}
+      {/* ─── Primary Control Bar: Core Controls + Progressive Priority Tiers ─── */}
+      <div
+        ref={toolbarRef}
+        className={`px-2.5 sm:px-3 py-1.5 bg-slate-50 border-b border-slate-200 flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0 h-11 relative z-30 ${
+          isDatePickerOpen ? 'overflow-visible' : 'overflow-hidden'
+        }`}
+      >
+        {/* 1. Calendar Date Range Trigger */}
+        <div className="relative shrink-0" ref={datePickerTriggerRef}>
+          <button
+            type="button"
+            onClick={() => onDatePickerOpenChange(!isDatePickerOpen)}
+            className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 bg-white border rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer h-7 shrink-0 ${
+              dateTimeRange.presetKey && dateTimeRange.presetKey !== 'all_time'
+                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
+            title="Filter trips by date range"
+          >
+            <CalendarIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span className="truncate max-w-[80px] sm:max-w-[120px] md:max-w-[150px]">
+              {dateRangeButtonLabel}
+            </span>
+            <ChevronDownIcon className="w-3 h-3 text-slate-400 shrink-0" />
+          </button>
 
-        {/* Standard Control Bar: Always displayed on Desktop; visible on mobile when search is NOT expanded */}
-        <div className={`${isSearchExpanded ? 'hidden md:flex' : 'flex'} items-center justify-between gap-1.5 sm:gap-2 flex-1 min-w-0`}>
-          {/* Left Controls: Date Range, Status Dropdown, and (on Desktop) Filter Add & Pills */}
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 overflow-visible">
-            {/* 1. Select Date Range Popover Button */}
-            <div className="relative shrink-0" ref={datePickerTriggerRef}>
-              <button
-                type="button"
-                onClick={() => onDatePickerOpenChange(!isDatePickerOpen)}
-                className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 bg-white border rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer h-7 shrink-0 ${
-                  dateTimeRange.presetKey && dateTimeRange.presetKey !== 'all_time'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-slate-300 text-slate-700 hover:bg-slate-50'
-                }`}
-                title="Filter trips by date range"
-              >
-                <CalendarIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                <span className="truncate max-w-[90px] sm:max-w-[130px] md:max-w-[160px]">{dateRangeButtonLabel}</span>
-                <ChevronDownIcon className="w-3 h-3 text-slate-400 shrink-0" />
-              </button>
-
-              <CustomDateTimePicker
-                isOpen={isDatePickerOpen}
-                onClose={() => onDatePickerOpenChange(false)}
-                value={dateTimeRange}
-                placement="top"
-                onChange={onDateTimeRangeChange}
-              />
-            </div>
-
-            {/* 2. Dedicated Unconfirmed Quick-Filter Button + Red Circle Counter */}
-            <button
-              type="button"
-              onClick={handleToggleUnconfirmedQuickFilter}
-              aria-pressed={isUnconfirmedOnly}
-              title={
-                isUnconfirmedOnly
-                  ? 'Showing Unconfirmed bookings only — click to return to previous queue filter'
-                  : `Filter queue to Unconfirmed bookings (${unconfirmedCount} awaiting review)`
-              }
-              className={`h-7 px-2.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs shrink-0 ${
-                isUnconfirmedOnly
-                  ? 'bg-rose-50 border-rose-400 text-rose-800 ring-2 ring-rose-500/20'
-                  : unconfirmedCount > 0
-                  ? 'bg-white hover:bg-rose-50/50 border-rose-200 text-slate-800'
-                  : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-600'
-              }`}
-            >
-              <span>Unconfirmed</span>
-              <span
-                className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums inline-flex items-center justify-center leading-none ${
-                  unconfirmedCount > 0 || isUnconfirmedOnly
-                    ? 'bg-rose-600 text-white'
-                    : 'bg-slate-200 text-slate-600'
-                }`}
-              >
-                {unconfirmedCount}
-              </span>
-            </button>
-
-            {/* 3. Multi-Select Lifecycle Status Dropdown */}
-            <TripStatusMultiSelectDropdown
-              statusFilter={statusFilter}
-              onStatusFilterChange={onStatusFilterChange}
-            />
-
-            {/* Desktop Only: Add Filter & Active Filter Pills */}
-            <div className="hidden md:flex items-center gap-2 min-w-0 flex-1">
-              {/* 3. Portal Filter Checkboxes Dropdown (never clipped by overflow) */}
-              <TripAddFilterDropdown
-                activeFilterKeys={activeFilterKeys}
-                onActiveFilterKeysChange={onActiveFilterKeysChange}
-              />
-
-              {/* Active Filter Pills on Desktop */}
-              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none min-w-0 py-0.5">
-                {activeFilterKeys.includes('driver') && (
-                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
-                    <span className="font-semibold text-slate-500 text-[11px]">Driver:</span>
-                    <Select
-                      size="xs"
-                      variant="subtle"
-                      fullWidth={false}
-                      value={selectedDriverFilter}
-                      onChange={(e) => onSelectedDriverFilterChange(e.target.value)}
-                      triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
-                    >
-                      <option value="all">All Drivers</option>
-                      {drivers.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.formattedLabel || formatDriverAssignmentLabel(d)}
-                        </option>
-                      ))}
-                    </Select>
-                    <button
-                      type="button"
-                      onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'driver'))}
-                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                      title="Remove Driver filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-
-                {activeFilterKeys.includes('has_car_seat') && (
-                  <div className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 text-xs font-bold text-blue-800 shadow-2xs shrink-0 h-6">
-                    <span className="text-[11px]">Has Car Seat</span>
-                    <button
-                      type="button"
-                      onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'has_car_seat'))}
-                      className="text-blue-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                      title="Remove Car Seat filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-
-                {activeFilterKeys.includes('has_stops') && (
-                  <div className="inline-flex items-center gap-1 bg-amber-50 border border-amber-300 rounded-full px-2 py-0.5 text-xs font-bold text-amber-900 shadow-2xs shrink-0 h-6">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                    <span className="text-[11px]">Has Stops</span>
-                    <button
-                      type="button"
-                      onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'has_stops'))}
-                      className="text-amber-600 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                      title="Remove Has Stops filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-
-                {activeFilterKeys.includes('has_staged_driver') && (
-                  <div className="inline-flex items-center gap-1 bg-indigo-50 border border-dashed border-indigo-400 rounded-full px-2 py-0.5 text-xs font-extrabold text-indigo-900 shadow-2xs shrink-0 h-6">
-                    <span className="text-[11px]">📌 Staged Only</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onActiveFilterKeysChange(
-                          activeFilterKeys.filter((k) => k !== 'has_staged_driver')
-                        )
-                      }
-                      className="text-indigo-500 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                      title="Remove Staged Only filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-
-                {activeFilterKeys.includes('vehicle') && (
-                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
-                    <span className="font-semibold text-slate-500 text-[11px]">Vehicle:</span>
-                    <Select
-                      size="xs"
-                      variant="subtle"
-                      fullWidth={false}
-                      value={selectedVehicleFilter}
-                      onChange={(e) => onSelectedVehicleFilterChange(e.target.value)}
-                      triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
-                    >
-                      <option value="all">All Vehicles</option>
-                      <option value="any">Any</option>
-                      {activeAdminVehicles.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.name}
-                        </option>
-                      ))}
-                    </Select>
-                    <button
-                      type="button"
-                      onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'vehicle'))}
-                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                      title="Remove Vehicle filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-
-                {activeFilterKeys.includes('company') && (
-                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
-                    <span className="font-semibold text-slate-500 text-[11px]">Company:</span>
-                    <Select
-                      size="xs"
-                      variant="subtle"
-                      fullWidth={false}
-                      value={selectedCompanyFilter}
-                      onChange={(e) => onSelectedCompanyFilterChange(e.target.value)}
-                      triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
-                    >
-                      <option value="all">All Companies</option>
-                      <option value="Chesterfield">Chesterfield Corporate</option>
-                      <option value="Medical">Medical Express</option>
-                    </Select>
-                    <button
-                      type="button"
-                      onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'company'))}
-                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                      title="Remove Company filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-
-                {activeFilterKeys.includes('payment_type') && (
-                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
-                    <span className="font-semibold text-slate-500 text-[11px]">Payment:</span>
-                    <Select
-                      size="xs"
-                      variant="subtle"
-                      fullWidth={false}
-                      value={selectedPaymentFilter}
-                      onChange={(e) => onSelectedPaymentFilterChange(e.target.value)}
-                      triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
-                    >
-                      <option value="all">All Methods</option>
-                      <option value="card">Credit Card</option>
-                      <option value="cash">Cash (In Car)</option>
-                      <option value="account">Corporate Account</option>
-                    </Select>
-                    <button
-                      type="button"
-                      onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'payment_type'))}
-                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                      title="Remove Payment filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-
-                {activeFilterKeys.includes('tariff') && (
-                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
-                    <span className="font-semibold text-slate-500 text-[11px]">Tariff:</span>
-                    <Select
-                      size="xs"
-                      variant="subtle"
-                      fullWidth={false}
-                      value={selectedTariffFilter}
-                      onChange={(e) => onSelectedTariffFilterChange(e.target.value)}
-                      triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
-                    >
-                      <option value="all">Standard Tariff</option>
-                      <option value="surge">Surge Rate</option>
-                      <option value="airport">Flat Airport Rate</option>
-                    </Select>
-                    <button
-                      type="button"
-                      onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'tariff'))}
-                      className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
-                      title="Remove Tariff filter"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Displaying X trips text */}
-              <span className="text-[11px] text-slate-500 font-medium shrink-0 whitespace-nowrap ml-1 hidden xl:inline">
-                Displaying {filteredTripsCount} {filteredTripsCount === 1 ? 'trip' : 'trips'}
-              </span>
-            </div>
-          </div>
-
-          {/* Right Side: Non-Table Stage Mode Pill, Auto-Stage Open, Auto-Dispatch Ready Sweep, Mobile Filter Toggle, Layout Dropdown, Search */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {stagedPlanner && effectiveDisplayLayout !== 'table' && (
-              <div
-                className="hidden sm:inline-flex items-center rounded-lg border border-slate-300 bg-white p-0.5 h-7 shadow-2xs"
-                title="Choose whether driver dropdowns send immediately or stage (hold in Dispatch)"
-              >
-                <button
-                  type="button"
-                  onClick={() => stagedPlanner.setQueueAssignMode('send_to_driver')}
-                  className={`px-2 py-0.5 rounded-md text-[10.5px] font-extrabold cursor-pointer transition-colors ${
-                    stagedPlanner.queueAssignMode === 'send_to_driver'
-                      ? 'bg-slate-900 text-white'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Send
-                </button>
-                <button
-                  type="button"
-                  onClick={() => stagedPlanner.setQueueAssignMode('stage_hold')}
-                  className={`px-2 py-0.5 rounded-md text-[10.5px] font-extrabold cursor-pointer transition-colors ${
-                    stagedPlanner.queueAssignMode === 'stage_hold'
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-slate-600 hover:text-indigo-700'
-                  }`}
-                >
-                  📌 Hold
-                </button>
-              </div>
-            )}
-
-            {stagedPlanner && stagedPlanner.openScheduledUnstagedCount > 0 && (
-              <button
-                type="button"
-                disabled={stagedPlanner.isAutoStaging}
-                onClick={() => stagedPlanner.openAutoStagePreview()}
-                className="h-7 px-2.5 rounded-lg border border-dashed border-indigo-400 bg-indigo-50/90 hover:bg-indigo-100 text-indigo-800 text-[11px] font-extrabold tracking-tight hidden sm:flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs disabled:opacity-50"
-                title="Preview non-overlapping staged driver placeholders for open scheduled rides (held in Dispatch)"
-              >
-                <span>
-                  {stagedPlanner.isAutoStaging
-                    ? '📌 Staging...'
-                    : `📌 Auto-Stage Open (${stagedPlanner.openScheduledUnstagedCount})`}
-                </span>
-              </button>
-            )}
-
-            {readyAutoDispatchCount > 0 && onRunAutoDispatchSweep && (
-              <button
-                type="button"
-                disabled={isRunningAutoDispatchSweep}
-                onClick={() => void onRunAutoDispatchSweep()}
-                className={`h-7 px-2.5 rounded-lg border text-[11px] font-extrabold tracking-tight flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs disabled:opacity-50 ${
-                  isManualOrPaused
-                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700'
-                    : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border-indigo-300'
-                }`}
-                title={`Run ${effectiveSweepMode.replace(/_/g, ' ')} for ${readyAutoDispatchCount} open trip(s) inside the ${autoConfig.scheduledDispatchLeadMinutes}m Pre-Pickup Lead Window`}
-              >
-                <span>
-                  {isRunningAutoDispatchSweep
-                    ? '⚡ Dispatching...'
-                    : `⚡ Auto-Dispatch Ready (${readyAutoDispatchCount})`}
-                </span>
-              </button>
-            )}
-
-            {/* Mobile Filters Toggle Button */}
-            <button
-              type="button"
-              onClick={() => onMobileFiltersOpenChange(!isMobileFiltersOpen)}
-              className={`md:hidden flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-bold transition-all cursor-pointer h-7 shadow-2xs ${
-                activeFilterKeys.length > 0 || isMobileFiltersOpen
-                  ? 'bg-blue-50 border-blue-400 text-blue-700'
-                  : 'bg-white border-slate-300 hover:bg-slate-50 text-slate-700'
-              }`}
-              title="Filter Trips"
-            >
-              <FunnelIcon className="w-3.5 h-3.5" />
-              {activeFilterKeys.length > 0 && (
-                <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-black flex items-center justify-center">
-                  {activeFilterKeys.length}
-                </span>
-              )}
-            </button>
-
-            {/* Table Columns Selector + Presets (Desktop Only when Table / Auto is active) */}
-            {(effectiveDisplayLayout === 'table' ||
-              displayLayout === 'table' ||
-              displayLayout === 'auto') && <TripQueueColumnsDropdown />}
-
-            {/* Queue Display Layout Dropdown (Desktop Only — Mobile always uses Cards view) */}
-            <TripQueueLayoutDropdown
-              displayLayout={displayLayout}
-              effectiveDisplayLayout={effectiveDisplayLayout}
-              isAutoCardsFallback={isAutoCardsFallback}
-              effectiveMinTableWidthPx={effectiveMinTableWidthPx}
-              isOpen={isLayoutDropdownOpen}
-              onOpenChange={onLayoutDropdownOpenChange}
-              onDisplayLayoutChange={onDisplayLayoutChange}
-              containerRef={layoutDropdownRef}
-            />
-
-            {/* Search Component: Desktop inline bar with max-width or compact button */}
-            {isSearchExpanded ? (
-              <div className="hidden md:flex items-center gap-1.5 w-60 lg:w-72 max-w-[320px] animate-in fade-in duration-150">
-                <div className="relative flex-1 min-w-0">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                    <MagnifyingGlassIcon className="w-3.5 h-3.5" />
-                  </span>
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    placeholder="Search trips (/ or Ctrl+K)..."
-                    value={searchTerm}
-                    onChange={(e) => onSearchTermChange(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        if (searchTerm) {
-                          onSearchTermChange('');
-                        } else {
-                          onSearchExpandedChange(false);
-                        }
-                      }
-                    }}
-                    className="w-full pl-8 pr-7 py-1 bg-white border border-blue-500 rounded-lg text-slate-800 text-xs shadow-2xs focus:ring-1 focus:ring-blue-500 focus:outline-hidden h-7"
-                  />
-                  {searchTerm && (
-                    <button
-                      type="button"
-                      onClick={() => onSearchTermChange('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
-                      title="Clear search text"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSearchExpandedChange(false);
-                  }}
-                  className="px-2 py-1 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer shrink-0 h-7 flex items-center justify-center"
-                  title="Close search (Esc)"
-                >
-                  ✕
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  onSearchExpandedChange(true);
-                  setTimeout(() => searchInputRef.current?.focus(), 50);
-                }}
-                className={`p-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer flex items-center justify-center shrink-0 h-7 w-7 shadow-2xs ${
-                  searchTerm
-                    ? 'bg-blue-50 border-blue-400 text-blue-700 ring-1 ring-blue-300'
-                    : 'bg-white border-slate-300 hover:bg-slate-50 text-slate-700'
-                }`}
-                title={searchTerm ? `Searching "${searchTerm}" - Click to edit` : 'Search trips (/ or Ctrl+K)'}
-              >
-                <MagnifyingGlassIcon className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+          <CustomDateTimePicker
+            isOpen={isDatePickerOpen}
+            onClose={() => onDatePickerOpenChange(false)}
+            value={dateTimeRange}
+            placement="top"
+            onChange={onDateTimeRangeChange}
+          />
         </div>
-      </div>
 
-      {/* Mobile Sub-Toolbar: Filter Controls & Active Pills (visible if filters active or expanded on mobile) */}
-      {!isSearchExpanded && (activeFilterKeys.length > 0 || isMobileFiltersOpen) && (
-        <div className="md:hidden px-3 py-1.5 bg-slate-100 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0 animate-in fade-in duration-100">
+        {/* 2. Multi-Select Lifecycle Status Dropdown (badge hidden when Tier 1 Unconfirmed pill is inline) */}
+        <TripStatusMultiSelectDropdown
+          statusFilter={statusFilter}
+          unconfirmedCount={unconfirmedCount}
+          showTriggerUnconfirmedBadge={!tiers.showUnconfirmedPill}
+          onStatusFilterChange={onStatusFilterChange}
+        />
+
+        {/* Tier 1 (>= 540px): Dedicated Unconfirmed Quick-Filter Pill + Counter */}
+        {tiers.showUnconfirmedPill && (
+          <button
+            type="button"
+            onClick={handleToggleUnconfirmedQuickFilter}
+            aria-pressed={isUnconfirmedOnly}
+            title={
+              isUnconfirmedOnly
+                ? 'Showing Unconfirmed bookings only — click to return to previous queue filter'
+                : `Filter queue to Unconfirmed bookings (${unconfirmedCount} awaiting review)`
+            }
+            className={`h-7 px-2.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs shrink-0 ${
+              isUnconfirmedOnly
+                ? 'bg-rose-50 border-rose-400 text-rose-800 ring-2 ring-rose-500/20'
+                : unconfirmedCount > 0
+                ? 'bg-white hover:bg-rose-50/50 border-rose-200 text-slate-800'
+                : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-600'
+            }`}
+          >
+            <span>Unconfirmed</span>
+            <span
+              className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums inline-flex items-center justify-center leading-none ${
+                unconfirmedCount > 0 || isUnconfirmedOnly
+                  ? 'bg-rose-600 text-white'
+                  : 'bg-slate-200 text-slate-600'
+              }`}
+            >
+              {unconfirmedCount}
+            </span>
+          </button>
+        )}
+
+        {/* 3. Always-Visible Capped Search Input */}
+        <div className="relative flex-1 min-w-[140px] max-w-[260px]">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+            <MagnifyingGlassIcon className="w-3.5 h-3.5" />
+          </span>
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search trips (/ or Ctrl+K)..."
+            value={searchTerm}
+            onChange={(e) => onSearchTermChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                if (searchTerm) {
+                  onSearchTermChange('');
+                } else {
+                  e.currentTarget.blur();
+                }
+              }
+            }}
+            className={`w-full pl-8 pr-7 py-1 bg-white border rounded-lg text-slate-800 text-xs shadow-2xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-hidden h-7 transition-colors ${
+              searchTerm ? 'border-blue-400' : 'border-slate-300'
+            }`}
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => onSearchTermChange('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+              title="Clear search text"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Tier 2 (>= 660px): Inline Filter Dropdown */}
+        {tiers.showFilterInline && (
           <TripAddFilterDropdown
             activeFilterKeys={activeFilterKeys}
             onActiveFilterKeysChange={onActiveFilterKeysChange}
-            compactMobile
           />
+        )}
 
+        {/* Right-Aligned Group: Tier 3 (Assignment Dropdown), Tier 4 (Columns) & Overflow Menu */}
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Tier 3 (>= 840px): Compact Assignment Dropdown (Send|Hold, Auto-Stage Open, Auto-Dispatch Ready) */}
+          {tiers.showAssignmentInline && (
+            <TripQueueAssignmentDropdown
+              effectiveDisplayLayout={effectiveDisplayLayout}
+              stagedPlanner={stagedPlanner}
+              readyAutoDispatchCount={readyAutoDispatchCount}
+              isRunningAutoDispatchSweep={isRunningAutoDispatchSweep}
+              onRunAutoDispatchSweep={onRunAutoDispatchSweep}
+              isManualOrPaused={isManualOrPaused}
+              effectiveSweepMode={effectiveSweepMode}
+              scheduledDispatchLeadMinutes={autoConfig.scheduledDispatchLeadMinutes}
+            />
+          )}
+
+          {/* Tier 4 (>= 980px): Inline Columns Dropdown (when Table or Auto is active) */}
+          {tiers.showColumnsInline &&
+            (effectiveDisplayLayout === 'table' ||
+              displayLayout === 'table' ||
+              displayLayout === 'auto') && <TripQueueColumnsDropdown />}
+
+          {/* 4. Consolidated Overflow Menu (omits controls currently promoted inline) */}
+          <TripQueueOverflowMenu
+            filteredTripsCount={filteredTripsCount}
+            activeFilterKeys={activeFilterKeys}
+            onActiveFilterKeysChange={onActiveFilterKeysChange}
+            displayLayout={displayLayout}
+            effectiveDisplayLayout={effectiveDisplayLayout}
+            isAutoCardsFallback={isAutoCardsFallback}
+            onDisplayLayoutChange={onDisplayLayoutChange}
+            stagedPlanner={stagedPlanner}
+            readyAutoDispatchCount={readyAutoDispatchCount}
+            isRunningAutoDispatchSweep={isRunningAutoDispatchSweep}
+            onRunAutoDispatchSweep={onRunAutoDispatchSweep}
+            isManualOrPaused={isManualOrPaused}
+            effectiveSweepMode={effectiveSweepMode}
+            scheduledDispatchLeadMinutes={autoConfig.scheduledDispatchLeadMinutes}
+            showFiltersInMenu={!tiers.showFilterInline}
+            showAssignmentInMenu={!tiers.showAssignmentInline}
+            showColumnsInMenu={!tiers.showColumnsInline}
+          />
+        </div>
+      </div>
+
+      {/* ─── Conditional Active Filter Pills Sub-Row ─── */}
+      {activeFilterKeys.length > 0 && (
+        <div className="px-2.5 sm:px-3 py-1.5 bg-slate-100/80 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0 min-w-0 animate-in fade-in duration-100">
           {activeFilterKeys.includes('driver') && (
             <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
               <span className="font-semibold text-slate-500 text-[11px]">Driver:</span>
@@ -734,7 +444,7 @@ export function TripQueueToolbar({
                 onChange={(e) => onSelectedDriverFilterChange(e.target.value)}
                 triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
               >
-                <option value="all">All</option>
+                <option value="all">All Drivers</option>
                 {drivers.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.formattedLabel || formatDriverAssignmentLabel(d)}
@@ -745,6 +455,7 @@ export function TripQueueToolbar({
                 type="button"
                 onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'driver'))}
                 className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                title="Remove Driver filter"
               >
                 ✕
               </button>
@@ -753,11 +464,14 @@ export function TripQueueToolbar({
 
           {activeFilterKeys.includes('has_car_seat') && (
             <div className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 text-xs font-bold text-blue-800 shadow-2xs shrink-0 h-6">
-              <span className="text-[11px]">Car Seat</span>
+              <span className="text-[11px]">Has Car Seat</span>
               <button
                 type="button"
-                onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'has_car_seat'))}
+                onClick={() =>
+                  onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'has_car_seat'))
+                }
                 className="text-blue-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                title="Remove Car Seat filter"
               >
                 ✕
               </button>
@@ -770,8 +484,11 @@ export function TripQueueToolbar({
               <span className="text-[11px]">Has Stops</span>
               <button
                 type="button"
-                onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'has_stops'))}
+                onClick={() =>
+                  onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'has_stops'))
+                }
                 className="text-amber-600 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                title="Remove Has Stops filter"
               >
                 ✕
               </button>
@@ -787,6 +504,7 @@ export function TripQueueToolbar({
                   onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'has_staged_driver'))
                 }
                 className="text-indigo-500 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                title="Remove Staged Only filter"
               >
                 ✕
               </button>
@@ -795,7 +513,7 @@ export function TripQueueToolbar({
 
           {activeFilterKeys.includes('vehicle') && (
             <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
-              <span className="font-semibold text-slate-500 text-[11px]">Veh:</span>
+              <span className="font-semibold text-slate-500 text-[11px]">Vehicle:</span>
               <Select
                 size="xs"
                 variant="subtle"
@@ -804,7 +522,7 @@ export function TripQueueToolbar({
                 onChange={(e) => onSelectedVehicleFilterChange(e.target.value)}
                 triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
               >
-                <option value="all">All</option>
+                <option value="all">All Vehicles</option>
                 <option value="any">Any</option>
                 {activeAdminVehicles.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -816,6 +534,7 @@ export function TripQueueToolbar({
                 type="button"
                 onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'vehicle'))}
                 className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                title="Remove Vehicle filter"
               >
                 ✕
               </button>
@@ -824,7 +543,7 @@ export function TripQueueToolbar({
 
           {activeFilterKeys.includes('company') && (
             <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
-              <span className="font-semibold text-slate-500 text-[11px]">Co:</span>
+              <span className="font-semibold text-slate-500 text-[11px]">Company:</span>
               <Select
                 size="xs"
                 variant="subtle"
@@ -833,14 +552,15 @@ export function TripQueueToolbar({
                 onChange={(e) => onSelectedCompanyFilterChange(e.target.value)}
                 triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
               >
-                <option value="all">All</option>
-                <option value="Chesterfield">Chesterfield</option>
-                <option value="Medical">Medical</option>
+                <option value="all">All Companies</option>
+                <option value="Chesterfield">Chesterfield Corporate</option>
+                <option value="Medical">Medical Express</option>
               </Select>
               <button
                 type="button"
                 onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'company'))}
                 className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                title="Remove Company filter"
               >
                 ✕
               </button>
@@ -849,7 +569,7 @@ export function TripQueueToolbar({
 
           {activeFilterKeys.includes('payment_type') && (
             <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs text-slate-700 shadow-2xs shrink-0 h-6">
-              <span className="font-semibold text-slate-500 text-[11px]">Pay:</span>
+              <span className="font-semibold text-slate-500 text-[11px]">Payment:</span>
               <Select
                 size="xs"
                 variant="subtle"
@@ -858,15 +578,18 @@ export function TripQueueToolbar({
                 onChange={(e) => onSelectedPaymentFilterChange(e.target.value)}
                 triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
               >
-                <option value="all">All</option>
-                <option value="card">Card</option>
-                <option value="cash">Cash</option>
-                <option value="account">Account</option>
+                <option value="all">All Methods</option>
+                <option value="card">Credit Card</option>
+                <option value="cash">Cash (In Car)</option>
+                <option value="account">Corporate Account</option>
               </Select>
               <button
                 type="button"
-                onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'payment_type'))}
+                onClick={() =>
+                  onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'payment_type'))
+                }
                 className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                title="Remove Payment filter"
               >
                 ✕
               </button>
@@ -884,29 +607,28 @@ export function TripQueueToolbar({
                 onChange={(e) => onSelectedTariffFilterChange(e.target.value)}
                 triggerClassName="h-5 px-1 text-[11px] font-bold hover:bg-transparent"
               >
-                <option value="all">All</option>
-                <option value="surge">Surge</option>
-                <option value="airport">Airport</option>
+                <option value="all">Standard Tariff</option>
+                <option value="surge">Surge Rate</option>
+                <option value="airport">Flat Airport Rate</option>
               </Select>
               <button
                 type="button"
                 onClick={() => onActiveFilterKeysChange(activeFilterKeys.filter((k) => k !== 'tariff'))}
                 className="ml-1 text-slate-400 hover:text-red-600 font-bold text-[11px] cursor-pointer"
+                title="Remove Tariff filter"
               >
                 ✕
               </button>
             </div>
           )}
 
-          {activeFilterKeys.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onActiveFilterKeysChange([])}
-              className="text-[10px] text-red-600 hover:underline font-bold shrink-0 ml-1 cursor-pointer"
-            >
-              Clear All
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => onActiveFilterKeysChange([])}
+            className="text-[10.5px] text-red-600 hover:underline font-bold shrink-0 ml-1 cursor-pointer"
+          >
+            Clear All
+          </button>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Trip } from '../../../../core/types/trip';
+import type { DispatchAutomationConfig } from '../../../../core/types/config';
 import type { DriverRosterItem } from '../../../../core/services/operator.service';
 import {
   canAdminCompleteTrip,
@@ -16,6 +17,7 @@ import { CheckIcon, HistoryIcon, MailIcon, PhoneIcon, XIcon } from '../../../ui/
 export interface AdminTripDetailsSlideOverProps {
   trip: Trip | null;
   drivers: DriverRosterItem[];
+  dispatchAutomation?: DispatchAutomationConfig;
   exception?: ClassifiedAdminTripException;
   assignMode: 'send_to_driver' | 'stage_hold';
   onAssignModeChange: (mode: 'send_to_driver' | 'stage_hold') => void;
@@ -36,6 +38,7 @@ export interface AdminTripDetailsSlideOverProps {
 export function AdminTripDetailsSlideOver({
   trip,
   drivers,
+  dispatchAutomation,
   exception,
   assignMode,
   onAssignModeChange,
@@ -228,6 +231,8 @@ export function AdminTripDetailsSlideOver({
               <DriverAssignDropdown
                 value={trip.assignedDriverId || 'unassigned'}
                 drivers={drivers}
+                trip={trip}
+                slaConfig={dispatchAutomation}
                 mode={trip.assignedDriverId ? 'send_to_driver' : assignMode}
                 isAssigned={Boolean(trip.assignedDriverId)}
                 fallbackAssignedLabel={(trip.metadata as any)?.assignedDriverName || null}

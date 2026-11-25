@@ -1284,6 +1284,8 @@ export function TripDrawerOverviewSection({
                   : 'unassigned')
               }
               drivers={drivers}
+              trip={reviewTrip}
+              slaConfig={settings.dispatchAutomation}
               mode={
                 !reviewTrip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
                   ? 'stage_hold'

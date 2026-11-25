@@ -536,7 +536,7 @@ export function recomputeCommsThreadRollups(
   nowIso: string = new Date().toISOString()
 ): CommsThread {
   const activeEvents = events
-    .filter((e) => !e.isArchived)
+    .filter((e) => !e.isArchived && !e.isDeleted)
     .sort((a, b) => (a.timestampMs || 0) - (b.timestampMs || 0));
 
   const unreadByChannel: CommsUnreadByChannel = {

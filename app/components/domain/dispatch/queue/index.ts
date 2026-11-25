@@ -3,6 +3,7 @@ export * from './trip-queue-columns.util';
 export * from './DispatchStatusBadge';
 export * from './DriverAssignDropdown';
 export * from './TripQueueFilterPopovers';
+export * from './TripQueueOverflowMenu';
 export * from './TripQueueColumnsDropdown';
 export * from './TripQueueBatchActionBar';
 export * from './TripQueueToolbar';

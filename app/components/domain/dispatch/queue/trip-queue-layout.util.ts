@@ -26,6 +26,36 @@ export const CARD_GRID_TWO_COL_MIN_PX = 580;
 export const CARD_GRID_THREE_COL_MIN_PX = 900;
 export const CARD_GRID_FOUR_COL_MIN_PX = 1220;
 
+export const TOOLBAR_TIER_WIDTH_THRESHOLDS = {
+  unconfirmedPill: 560,
+  filterDropdown: 680,
+  assignmentDropdown: 840,
+  columnsDropdown: 980,
+} as const;
+
+export interface TripQueueToolbarInlineTiers {
+  showUnconfirmedPill: boolean;
+  showFilterInline: boolean;
+  showAssignmentInline: boolean;
+  showColumnsInline: boolean;
+}
+
+/**
+ * Resolves which progressive toolbar tiers fit inline for a given queue width (px).
+ * Priority order: Tier 1 (Unconfirmed pill) -> Tier 2 (Filter) -> Tier 3 (Assignment) -> Tier 4 (Columns).
+ */
+export function resolveTripQueueToolbarInlineTiers(
+  toolbarWidthPx: number
+): TripQueueToolbarInlineTiers {
+  const width = Number.isFinite(toolbarWidthPx) ? toolbarWidthPx : 0;
+  return {
+    showUnconfirmedPill: width >= TOOLBAR_TIER_WIDTH_THRESHOLDS.unconfirmedPill,
+    showFilterInline: width >= TOOLBAR_TIER_WIDTH_THRESHOLDS.filterDropdown,
+    showAssignmentInline: width >= TOOLBAR_TIER_WIDTH_THRESHOLDS.assignmentDropdown,
+    showColumnsInline: width >= TOOLBAR_TIER_WIDTH_THRESHOLDS.columnsDropdown,
+  };
+}
+
 export type EffectiveQueueDisplayLayout = Exclude<DisplayLayout, 'auto'>;
 
 const useIsomorphicLayoutEffect =

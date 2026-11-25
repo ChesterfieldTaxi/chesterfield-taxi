@@ -50,6 +50,8 @@ export interface InteractionEvent {
   tripId?: string;
   actorName?: string;
   isUnread?: boolean;
+  isArchived?: boolean;
+  isDeleted?: boolean;
   deliveryStatus?: string;
   errorCode?: number | string;
   errorMessage?: string;

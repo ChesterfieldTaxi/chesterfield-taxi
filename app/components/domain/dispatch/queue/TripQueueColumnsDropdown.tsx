@@ -143,7 +143,7 @@ export function TripQueueColumnsDropdown({
   };
 
   return (
-    <div className="hidden lg:block relative shrink-0">
+    <div className="relative shrink-0">
       <button
         ref={triggerRef}
         type="button"

@@ -1253,7 +1253,7 @@ export function buildUnifiedCommsThreadSummaries(
     : interactions;
   const threadById = new Map<string, CommsThread>();
   for (const t of threads) {
-    if (t && t.id && !t.mergedIntoThreadId && !t.isArchived) {
+    if (t && t.id && !t.mergedIntoThreadId && !t.isDeleted) {
       threadById.set(t.id, t);
     }
   }

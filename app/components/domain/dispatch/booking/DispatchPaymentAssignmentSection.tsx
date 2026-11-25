@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type {
   CorporateAccountConfig,
   CorporateAuthorizedRider,
+  DispatchAutomationConfig,
   NamedPricingRule,
   SurchargesConfig,
   UniversalExtrasConfig,
 } from '../../../../core/types/config';
-import type { TripPricing } from '../../../../core/types/trip';
+import type { Trip, TripPricing } from '../../../../core/types/trip';
 import type { PoValidationResult } from '../../../../core/services/corporate-account.service';
 import {
   formatCardBrandLabel,
@@ -103,6 +104,8 @@ export interface DispatchPaymentAssignmentSectionProps {
   onChangeDriverAssignmentMode?: (mode: 'send_to_driver' | 'stage_hold') => void;
   isDriverAssigned?: boolean;
   fallbackAssignedLabel?: string | null;
+  trip?: Partial<Trip> | null;
+  dispatchAutomation?: Partial<DispatchAutomationConfig> | null;
   driverOptions: DriverRosterItem[];
   notesForAll: string;
   setNotesForAll: (val: string) => void;
@@ -176,6 +179,8 @@ export function DispatchPaymentAssignmentSection({
   onChangeDriverAssignmentMode,
   isDriverAssigned = false,
   fallbackAssignedLabel = null,
+  trip = null,
+  dispatchAutomation = null,
   driverOptions,
   notesForAll,
   setNotesForAll,
@@ -550,6 +555,8 @@ export function DispatchPaymentAssignmentSection({
             <DriverAssignDropdown
               value={driverId}
               drivers={driverOptions}
+              trip={trip}
+              slaConfig={dispatchAutomation}
               onChange={(nextId) => setDriverId(nextId)}
               mode={driverAssignmentMode}
               isAssigned={isDriverAssigned}

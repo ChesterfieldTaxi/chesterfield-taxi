@@ -2,7 +2,7 @@ import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { toggleCommsMultiFilter } from '../../../../core/services/comms/comms-templates.service';
-import { CheckIcon, ChevronDownIcon, RefreshCwIcon, SearchIcon, XIcon } from '../../../ui/Icons';
+import { ArchiveBoxIcon, CheckIcon, ChevronDownIcon, MailIcon, MailOpenIcon, RefreshCwIcon, SearchIcon, TrashIcon, XIcon } from '../../../ui/Icons';
 import { Switch } from '../../../ui/Switch';
 import type { ChannelFilter, CommsAllViewMode, ContactFilter, MultiChannelKey, MultiContactKey } from './comms-types';
 
@@ -30,18 +30,30 @@ export interface CommsFilterToolbarProps {
   contactFilter?: ContactFilter; onChangeContactFilter?: (val: ContactFilter) => void;
   contactFilters?: ReadonlyArray<MultiContactKey>; onChangeContactFilters?: (next: MultiContactKey[]) => void;
   filterUnreadOnly: boolean; onToggleUnreadOnly: () => void; unreadCount: number;
+  showArchived?: boolean; onToggleShowArchived?: () => void;
   onMarkAllRead: () => void; onRefresh: () => void;
   allViewMode?: CommsAllViewMode; onChangeAllViewMode?: (mode: CommsAllViewMode) => void; showAllViewModeToggle?: boolean;
   placeholder?: string; leadingSlot?: React.ReactNode;
+  selectedCount?: number;
+  allSelected?: boolean;
+  selectedHasUnread?: boolean;
+  selectedAllArchived?: boolean;
+  onToggleSelectAll?: () => void;
+  onBulkMarkReadUnread?: () => void;
+  onBulkArchive?: () => void;
+  onBulkDelete?: () => void;
+  onClearSelection?: () => void;
 }
 
 export function CommsFilterToolbar({
   searchQuery, onChangeSearchQuery, searchInputRef,
   channelFilter = 'all', onChangeChannelFilter, channelFilters = [], onChangeChannelFilters,
   showChannelFilter = true, contactFilter = 'all', onChangeContactFilter, contactFilters = [], onChangeContactFilters,
-  filterUnreadOnly, onToggleUnreadOnly, unreadCount, onMarkAllRead, onRefresh,
+  filterUnreadOnly, onToggleUnreadOnly, unreadCount, showArchived = false, onToggleShowArchived, onMarkAllRead, onRefresh,
   allViewMode = 'grouped', onChangeAllViewMode, showAllViewModeToggle = false,
   placeholder = 'Search comms...', leadingSlot,
+  selectedCount = 0, allSelected = false, selectedHasUnread = false, selectedAllArchived = false,
+  onToggleSelectAll, onBulkMarkReadUnread, onBulkArchive, onBulkDelete, onClearSelection,
 }: CommsFilterToolbarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -86,9 +98,66 @@ export function CommsFilterToolbar({
   const activeFilterCount =
     (showChannelFilter ? (channelFilters.length || (channelFilter !== 'all' ? 1 : 0)) : 0) +
     (contactFilters.length || (contactFilter !== 'all' ? 1 : 0)) +
-    (filterUnreadOnly ? 1 : 0);
+    (filterUnreadOnly ? 1 : 0) +
+    (showArchived ? 1 : 0);
 
   const headerStripCls = 'px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/60';
+
+  if (selectedCount > 0) {
+    return (
+      <div data-comms-row="toolbar" data-comms-selection-bar="true" className="h-9 px-2.5 border-b border-blue-200 bg-blue-50/90 flex items-center justify-between gap-1.5 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={onToggleSelectAll}
+            title={allSelected ? 'Deselect All' : 'Select All'}
+            className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-blue-900 hover:text-blue-700 cursor-pointer shrink-0"
+          >
+            <MenuCheckBox checked={allSelected} />
+            <span>{selectedCount} selected</span>
+          </button>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={onBulkMarkReadUnread}
+            title={selectedHasUnread ? 'Mark Read' : 'Mark Unread'}
+            className="h-7 px-2 rounded-md bg-white hover:bg-blue-100 border border-blue-200 text-blue-800 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+          >
+            {selectedHasUnread ? <MailOpenIcon className="w-3.5 h-3.5" /> : <MailIcon className="w-3.5 h-3.5" />}
+            <span className="hidden @[360px]/commshub:inline">{selectedHasUnread ? 'Read' : 'Unread'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onBulkArchive}
+            title={selectedAllArchived ? 'Unarchive' : 'Archive'}
+            className="h-7 px-2 rounded-md bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+          >
+            <ArchiveBoxIcon className="w-3.5 h-3.5" />
+            <span className="hidden @[400px]/commshub:inline">{selectedAllArchived ? 'Unarchive' : 'Archive'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onBulkDelete}
+            title="Delete"
+            className="h-7 px-2 rounded-md bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+          >
+            <TrashIcon className="w-3.5 h-3.5" />
+            <span className="hidden @[430px]/commshub:inline">Delete</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClearSelection}
+            title="Clear selection (Esc)"
+            aria-label="Clear selection"
+            className="h-7 w-7 rounded-md hover:bg-blue-100 text-blue-700 inline-flex items-center justify-center cursor-pointer"
+          >
+            <XIcon className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div data-comms-row="toolbar" className="h-9 px-2.5 border-b border-slate-200/80 bg-slate-50/80 flex items-center gap-1.5 shrink-0">
@@ -165,8 +234,11 @@ export function CommsFilterToolbar({
             </div>
           </div>
 
-          <div className="px-3 py-1.5">
+          <div className="px-3 py-1.5 space-y-1">
             <Switch size="sm" checked={filterUnreadOnly} onChange={() => onToggleUnreadOnly()} label={<span className="text-xs font-bold text-slate-800">Unread Only ({unreadCount})</span>} className="py-0.5" />
+            {onToggleShowArchived && (
+              <Switch size="sm" checked={showArchived} onChange={() => onToggleShowArchived()} label={<span className="text-xs font-bold text-slate-800">Show Archived</span>} className="py-0.5" />
+            )}
           </div>
 
           <div className="p-2 flex items-center justify-between gap-1.5">

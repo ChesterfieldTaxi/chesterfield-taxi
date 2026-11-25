@@ -773,7 +773,7 @@ export function AdminAutoDispatchControlPanel({
               )}
             </div>
 
-            <div className="p-3.5 rounded-xl border border-amber-200/80 bg-amber-50/30 grid grid-cols-2 gap-3">
+            <div className="p-3.5 rounded-xl border border-amber-200/80 bg-amber-50/30 grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-800 block">
                   SLA Warning (Minutes)
@@ -799,16 +799,56 @@ export function AdminAutoDispatchControlPanel({
                 </label>
                 <Input
                   type="number"
-                  min="5"
+                  min="1"
                   max="720"
                   value={config.slaCriticalMinutes}
                   onChange={(e) =>
-                    update({ slaCriticalMinutes: parseInt(e.target.value, 10) || 30 })
+                    update({ slaCriticalMinutes: parseInt(e.target.value, 10) || 15 })
                   }
                   className="text-xs h-8 bg-white"
                 />
                 <span className="text-[10px] text-slate-500 block">
-                  Acoustic + SMS/Email alert (default 30m).
+                  Acoustic + SMS/Email alert (default 15m).
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-blue-900 block">
+                  Airport Arrival Buffer (Min)
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="180"
+                  value={config.airportPickupBufferMinutes}
+                  onChange={(e) =>
+                    update({
+                      airportPickupBufferMinutes: Math.max(0, parseInt(e.target.value, 10) || 0),
+                    })
+                  }
+                  className="text-xs h-8 bg-white"
+                />
+                <span className="text-[10px] text-slate-500 block">
+                  Post-arrival buffer (default 30m).
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-amber-900 block">
+                  ASAP Grace (Minutes)
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="120"
+                  value={config.asapUnassignedGraceMinutes}
+                  onChange={(e) =>
+                    update({ asapUnassignedGraceMinutes: parseInt(e.target.value, 10) || 15 })
+                  }
+                  className="text-xs h-8 bg-white"
+                />
+                <span className="text-[10px] text-slate-500 block">
+                  Orange before red (default 15m).
                 </span>
               </div>
             </div>

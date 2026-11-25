@@ -521,6 +521,8 @@ function StandingOrderSeriesCard({
               unassignedValue=""
               unassignedLabel="Unassigned (Open Dispatch Queue)"
               drivers={drivers.filter((d) => !d.isArchived)}
+              trip={null}
+              slaConfig={getAdminConfigService().getCachedSettings().dispatchAutomation}
               mode={draftDriverId ? draftDriverMode : 'send_to_driver'}
               isAssigned={Boolean(draftDriverId && draftDriverMode === 'send_to_driver')}
               fallbackAssignedLabel={series.preferredDriverLabel || null}

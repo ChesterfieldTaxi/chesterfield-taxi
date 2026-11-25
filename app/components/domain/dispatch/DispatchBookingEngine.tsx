@@ -1513,6 +1513,8 @@ function DispatchBookingEngineComponent({
                 ''
             ).trim() || null
           }
+          trip={initialTrip || null}
+          dispatchAutomation={getAdminConfigService().getCachedSettings().dispatchAutomation}
           driverOptions={driverOptions}
           notesForAll={notesForAll}
           setNotesForAll={setNotesForAll}

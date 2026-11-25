@@ -1,6 +1,10 @@
 import React from 'react';
 import type { Trip } from '../../../../core/types/trip';
-import type { FleetCarConfig, VehicleTierConfig } from '../../../../core/types/config';
+import type {
+  DispatchAutomationConfig,
+  FleetCarConfig,
+  VehicleTierConfig,
+} from '../../../../core/types/config';
 import type { DriverRosterItem } from '../../../../core/services/operator.service';
 import type { DisplayLayout } from '../../../../core/hooks/useDisplayLayout';
 import { useLiveClockNowMs } from '../../../../core/hooks/dispatch/dispatch-workspace.util';
@@ -28,6 +32,7 @@ export interface AdminTripsTablePanelProps {
   drivers: DriverRosterItem[];
   vehicles?: VehicleTierConfig[];
   fleetCars?: FleetCarConfig[];
+  dispatchAutomation?: DispatchAutomationConfig;
   exceptionByTripId: Record<string, ClassifiedAdminTripException>;
   isLoading: boolean;
   displayLayout: DisplayLayout;
@@ -66,7 +71,7 @@ function isTerminalStatus(status: string): boolean {
 }
 
 export function AdminTripsTablePanel({
-  trips, drivers, vehicles, fleetCars, exceptionByTripId, isLoading, displayLayout, assignMode,
+  trips, drivers, vehicles, fleetCars, dispatchAutomation, exceptionByTripId, isLoading, displayLayout, assignMode,
   selectedTripId, actionLoadingId, openActionTripId, searchTerm, showArchiveActions,
   isArchivedTrip, onSelectTrip, onOpenActionChange, onDriverDropdownChange, onSendStaged,
   onClearStaged, onStagePrompt, onConfirmTrip, onCompleteTrip, onCancelTrip, onReactivateTrip,
@@ -118,6 +123,8 @@ export function AdminTripsTablePanel({
       <DriverAssignDropdown
         value={trip.assignedDriverId || 'unassigned'}
         drivers={drivers}
+        trip={trip}
+        slaConfig={dispatchAutomation}
         mode={trip.assignedDriverId ? 'send_to_driver' : assignMode}
         isAssigned={Boolean(trip.assignedDriverId)}
         fallbackAssignedLabel={(trip.metadata as any)?.assignedDriverName || null}

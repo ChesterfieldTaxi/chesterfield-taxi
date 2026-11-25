@@ -65,6 +65,7 @@ export interface CommsThread {
   unreadByChannel: CommsUnreadByChannel;
   isStarred?: boolean;
   isArchived?: boolean;
+  isDeleted?: boolean;
   mergedIntoThreadId?: string;
   createdAt: string;
   updatedAt: string;
@@ -107,6 +108,7 @@ export interface CommsEvent {
   suggestedBooking?: CommsSuggestedBooking;
   isUnread: boolean;
   isArchived?: boolean;
+  isDeleted?: boolean;
   actorId?: string;
   actorName?: string;
   timestampIso: string;
@@ -158,6 +160,7 @@ export interface RecordCommsEventInput {
   suggestedBooking?: CommsSuggestedBooking;
   isUnread?: boolean;
   isArchived?: boolean;
+  isDeleted?: boolean;
   actorId?: string;
   actorName?: string;
   timestampIso?: string;

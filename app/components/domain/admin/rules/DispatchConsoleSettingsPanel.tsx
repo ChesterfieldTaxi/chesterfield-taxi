@@ -325,7 +325,7 @@ export function DispatchConsoleSettingsPanel({
           </div>
 
           {/* SLA Thresholds */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-2 border-t border-slate-100">
             <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
               <label className="font-bold text-slate-800 block mb-1">SLA Warning Lead (Minutes)</label>
               <Input
@@ -354,7 +354,7 @@ export function DispatchConsoleSettingsPanel({
                 onChange={(e) =>
                   onChangeAutomation({
                     ...dispatchAutomation,
-                    slaCriticalMinutes: parseInt(e.target.value, 10) || 30,
+                    slaCriticalMinutes: parseInt(e.target.value, 10) || 15,
                   })
                 }
                 className="bg-white h-9 text-xs font-mono"
@@ -378,6 +378,42 @@ export function DispatchConsoleSettingsPanel({
                 className="bg-white h-9 text-xs font-mono"
               />
               <span className="text-[10px] text-slate-500 mt-1 block">Added for STL / SUS / CPS pickups</span>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+              <label className="font-bold text-slate-800 block mb-1">Airport Arrival Buffer (Minutes)</label>
+              <Input
+                type="number"
+                min={0}
+                max={180}
+                value={dispatchAutomation.airportPickupBufferMinutes}
+                onChange={(e) =>
+                  onChangeAutomation({
+                    ...dispatchAutomation,
+                    airportPickupBufferMinutes: Math.max(0, parseInt(e.target.value, 10) || 0),
+                  })
+                }
+                className="bg-white h-9 text-xs font-mono"
+              />
+              <span className="text-[10px] text-slate-500 mt-1 block">Added after flight arrival (default 30m)</span>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+              <label className="font-bold text-slate-800 block mb-1">ASAP Unassigned Grace (Minutes)</label>
+              <Input
+                type="number"
+                min={1}
+                max={120}
+                value={dispatchAutomation.asapUnassignedGraceMinutes}
+                onChange={(e) =>
+                  onChangeAutomation({
+                    ...dispatchAutomation,
+                    asapUnassignedGraceMinutes: parseInt(e.target.value, 10) || 15,
+                  })
+                }
+                className="bg-white h-9 text-xs font-mono"
+              />
+              <span className="text-[10px] text-slate-500 mt-1 block">Orange grace before red (default 15m)</span>
             </div>
           </div>
         </CardContent>

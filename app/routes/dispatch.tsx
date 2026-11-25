@@ -1052,6 +1052,7 @@ export default function DispatchRoute() {
           dragHandlers={dispatchSheetDrag.dragHandlers}
           trips={trips}
           drivers={drivers}
+          dispatchAutomation={settings.dispatchAutomation}
           onValuesChangeByDraft={stableDraftValuesChange}
           onBookingSuccessByDraft={stableDraftBookingSuccess}
           onClearDraftById={stableClearDraftById}

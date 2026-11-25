@@ -345,6 +345,7 @@ export function DispatchTripQueuePane({
         <TripQueueCompactList
           isDesktop={isDesktop}
           drivers={drivers}
+          dispatchAutomation={settings.dispatchAutomation}
           filteredTrips={filteredTrips}
           selectedTripIds={selectedTripIds}
           selectedQueueTripId={selectedQueueTripId}

@@ -151,6 +151,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
             <AdminTripsExceptionsPanel
               trips={ctrl.exceptionTrips}
               drivers={ctrl.drivers}
+              dispatchAutomation={ctrl.appSettings.dispatchAutomation}
               exceptionByTripId={ctrl.exceptionByTripId}
               assignMode={ctrl.assignMode}
               actionLoadingId={ctrl.actionLoadingId}
@@ -180,6 +181,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
               drivers={ctrl.drivers}
               vehicles={ctrl.vehicles}
               fleetCars={ctrl.fleetCars}
+              dispatchAutomation={ctrl.appSettings.dispatchAutomation}
               exceptionByTripId={ctrl.exceptionByTripId}
               isLoading={ctrl.isLoading}
               displayLayout={displayLayout}
@@ -217,6 +219,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
       <AdminTripDetailsSlideOver
         trip={ctrl.selectedTrip}
         drivers={ctrl.drivers}
+        dispatchAutomation={ctrl.appSettings.dispatchAutomation}
         exception={ctrl.selectedTrip ? ctrl.exceptionByTripId[ctrl.selectedTrip.id] : undefined}
         assignMode={ctrl.assignMode}
         onAssignModeChange={ctrl.setAssignMode}

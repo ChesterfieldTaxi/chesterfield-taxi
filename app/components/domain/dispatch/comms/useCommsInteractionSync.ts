@@ -74,16 +74,22 @@ function readStoredInteractionsClientOnly(): InteractionEvent[] {
 function mergeAdaptedEventsWithInteractions(
   prev: InteractionEvent[],
   threads: CommsThread[],
-  events: CommsEvent[]
+  events: CommsEvent[],
+  commsService = getCommsThreadService()
 ): InteractionEvent[] {
-  if (events.length === 0) return prev;
   const threadMap = new Map(threads.map((t) => [t.id, t]));
-  const adapted = events.map((evt) =>
-    commsEventToInteractionEvent(evt, threadMap.get(evt.threadId))
-  );
+  const adapted = events
+    .filter((evt) => !evt.isDeleted)
+    .map((evt) => commsEventToInteractionEvent(evt, threadMap.get(evt.threadId)));
 
   const mergedById = new Map<string, InteractionEvent>();
   for (const item of prev) {
+    if (
+      commsService.isEventDeleted(item.id) ||
+      (item.threadId && commsService.isThreadDeleted(item.threadId))
+    ) {
+      continue;
+    }
     const prefixedSms = `sms_${item.id}`;
     const prefixedCall = `call_${item.id}`;
     const prefixedVm = `vm_${item.id}`;
@@ -128,6 +134,7 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
 
   // Filter state
   const [filterUnreadOnly, setFilterUnreadOnly] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
   const [channelFilters, setChannelFilters] = useState<MultiChannelKey[]>([]);
   const [callTypeFilter, setCallTypeFilter] = useState<CallTypeFilter>('all');
@@ -179,8 +186,8 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
       commsService.hydrateFromServerSync({ events: seeded });
     }
 
-    const initialThreads = commsService.getThreads();
-    const initialEvents = commsService.getAllEvents();
+    const initialThreads = commsService.getThreads({ includeArchived: true });
+    const initialEvents = commsService.getAllEvents({ includeArchived: true });
     setCommsThreads(initialThreads);
 
     if (storedItems.length > 0 || initialEvents.length > 0) {
@@ -192,14 +199,13 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
                 Array.from(new Map([...storedItems, ...prev].map((i) => [i.id, i])).values())
               )
             : sortInteractionsDesc(base);
-        return mergeAdaptedEventsWithInteractions(combined, initialThreads, initialEvents);
+        return mergeAdaptedEventsWithInteractions(combined, initialThreads, initialEvents, commsService);
       });
     }
 
     const unsubComms = commsService.subscribe(({ threads, events }) => {
       setCommsThreads(threads);
-      if (events.length === 0) return;
-      setInteractions((prev) => mergeAdaptedEventsWithInteractions(prev, threads, events));
+      setInteractions((prev) => mergeAdaptedEventsWithInteractions(prev, threads, events, commsService));
     });
 
     // Mirror DispatchEmailService (`dispatch@chesterfieldtaxi.com`) into CommsThreadService even before EmailDock opens
@@ -458,6 +464,23 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
     }
   }, [isVisible]);
 
+  // Exclude soft-deleted items and respect showArchived filter across all derived lists & unread counts
+  const visibleInteractions = useMemo(
+    () =>
+      interactions.filter(
+        (item) => !item.isDeleted && (showArchived || !item.isArchived)
+      ),
+    [interactions, showArchived]
+  );
+
+  const visibleCommsThreads = useMemo(
+    () =>
+      commsThreads.filter(
+        (thread) => !thread.isDeleted && (showArchived || !thread.isArchived)
+      ),
+    [commsThreads, showArchived]
+  );
+
   // Pure domain filtering & multi-channel conversation list grouping
   const filterOptionsBase = useMemo(
     () => ({
@@ -470,35 +493,35 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
   );
 
   const allHistoryCalls = useMemo(
-    () => interactions.filter((item) => item.type.startsWith('call_')),
-    [interactions]
+    () => visibleInteractions.filter((item) => item.type.startsWith('call_')),
+    [visibleInteractions]
   );
   const allMissedCalls = useMemo(
-    () => interactions.filter((item) => item.type === 'call_missed'),
-    [interactions]
+    () => visibleInteractions.filter((item) => item.type === 'call_missed'),
+    [visibleInteractions]
   );
   const allVoicemails = useMemo(
-    () => interactions.filter((item) => item.type === 'voicemail'),
-    [interactions]
+    () => visibleInteractions.filter((item) => item.type === 'voicemail'),
+    [visibleInteractions]
   );
   const allMessages = useMemo(
     () =>
-      interactions.filter(
+      visibleInteractions.filter(
         (item) =>
           item.type.startsWith('sms_') &&
           !item.snippet?.includes('Thank you for contacting our dispatch desk')
       ),
-    [interactions]
+    [visibleInteractions]
   );
 
   const filteredAllInteractions = useMemo(
     () =>
-      filterCommsInteractionEvents(interactions, {
+      filterCommsInteractionEvents(visibleInteractions, {
         channelFilter,
         channelFilters,
         ...filterOptionsBase,
       }),
-    [interactions, channelFilter, channelFilters, filterOptionsBase]
+    [visibleInteractions, channelFilter, channelFilters, filterOptionsBase]
   );
 
   const filteredHistoryCalls = useMemo(() => {
@@ -527,18 +550,18 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
 
   // Unified multi-channel conversation rows (phone, email, and merged phone+email threads)
   const conversationRows = useMemo(
-    () => buildUnifiedCommsThreadSummaries(interactions, commsThreads, filterOptionsBase),
-    [interactions, commsThreads, filterOptionsBase]
+    () => buildUnifiedCommsThreadSummaries(visibleInteractions, visibleCommsThreads, filterOptionsBase),
+    [visibleInteractions, visibleCommsThreads, filterOptionsBase]
   );
 
   const filteredAllConversationRows = useMemo(
     () =>
-      buildUnifiedCommsThreadSummaries(interactions, commsThreads, {
+      buildUnifiedCommsThreadSummaries(visibleInteractions, visibleCommsThreads, {
         channelFilter,
         channelFilters,
         ...filterOptionsBase,
       }),
-    [interactions, commsThreads, channelFilter, channelFilters, filterOptionsBase]
+    [visibleInteractions, visibleCommsThreads, channelFilter, channelFilters, filterOptionsBase]
   );
 
   const threadUnreadCountMap = useMemo(() => {
@@ -563,8 +586,8 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
   );
 
   const unreadCountAll = useMemo(
-    () => interactions.filter((i) => i.isUnread).length,
-    [interactions]
+    () => visibleInteractions.filter((i) => i.isUnread).length,
+    [visibleInteractions]
   );
   const unreadCountHistory = useMemo(
     () => allHistoryCalls.filter((i) => i.isUnread).length,
@@ -620,6 +643,8 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
     fetchTelephonyData,
     filterUnreadOnly,
     setFilterUnreadOnly,
+    showArchived,
+    setShowArchived,
     channelFilter,
     setChannelFilter,
     channelFilters,

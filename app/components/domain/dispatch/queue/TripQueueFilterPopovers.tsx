@@ -2,12 +2,15 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ACTIVE_QUEUE_STATUS_KEYS,
+  DEFAULT_ACTIVE_ONLY_STATUS_FILTER,
+  computeNextStatusFilterOnUnconfirmedToggle,
   isUnconfirmedQuickFilterActive,
   parseStatusFilterSelection,
   serializeStatusFilterSelection,
   type CanonicalQueueStatusKey,
 } from '../../../../core/hooks/dispatch/dispatch-workspace.util';
 import type { DisplayLayout } from '../../../../core/hooks/useDisplayLayout';
+import type { DispatchStagedPlannerController } from '../../../../core/hooks/dispatch/useDispatchStagedPlanner';
 import {
   BoltIcon,
   CheckIcon,
@@ -138,20 +141,39 @@ export function usePortalDropdownPosition(params: {
 export interface TripStatusMultiSelectDropdownProps {
   statusFilter: string;
   unconfirmedCount?: number;
+  showTriggerUnconfirmedBadge?: boolean;
   onStatusFilterChange: (nextStatusFilter: string) => void;
 }
 
 export function TripStatusMultiSelectDropdown({
   statusFilter,
+  unconfirmedCount = 0,
+  showTriggerUnconfirmedBadge = true,
   onStatusFilterChange,
 }: TripStatusMultiSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const closeMenu = useCallback(() => setIsOpen(false), []);
   const { triggerRef, menuRef, coords, setCoords, computeCoords } = usePortalDropdownPosition({
-    isOpen, onClose: closeMenu, menuWidth: 232, estimatedHeight: 336, align: 'left',
+    isOpen, onClose: closeMenu, menuWidth: 232, estimatedHeight: 372, align: 'left',
   });
 
+  const prevNonUnconfirmedStatusRef = useRef<string>(DEFAULT_ACTIVE_ONLY_STATUS_FILTER);
   const isUnconfirmedOnly = isUnconfirmedQuickFilterActive(statusFilter);
+  useEffect(() => {
+    if (!isUnconfirmedOnly && statusFilter) {
+      prevNonUnconfirmedStatusRef.current = statusFilter;
+    }
+  }, [isUnconfirmedOnly, statusFilter]);
+
+  const handleToggleUnconfirmedQuickFilter = () => {
+    const { nextStatusFilter, savedPreviousFilter } = computeNextStatusFilterOnUnconfirmedToggle(
+      statusFilter,
+      prevNonUnconfirmedStatusRef.current
+    );
+    prevNonUnconfirmedStatusRef.current = savedPreviousFilter;
+    onStatusFilterChange(nextStatusFilter);
+  };
+
   const selectedSet = parseStatusFilterSelection(statusFilter);
   const lifecycleSelectedCount = isUnconfirmedOnly
     ? 0
@@ -159,14 +181,16 @@ export function TripStatusMultiSelectDropdown({
   const allSelected = !isUnconfirmedOnly && lifecycleSelectedCount === STATUS_FILTER_OPTIONS.length;
   const noneSelected = !isUnconfirmedOnly && lifecycleSelectedCount === 0;
   const someSelected = !isUnconfirmedOnly && lifecycleSelectedCount > 0 && !allSelected;
-  const isNeutral = allSelected || isUnconfirmedOnly;
+  const isNeutral = allSelected;
 
   const isActivePresetSelected =
     !isUnconfirmedOnly &&
     selectedSet.size === ACTIVE_QUEUE_STATUS_KEYS.length &&
     ACTIVE_QUEUE_STATUS_KEYS.every((k) => selectedSet.has(k));
 
-  const buttonLabel = isNeutral
+  const buttonLabel = isUnconfirmedOnly
+    ? 'Unconfirmed'
+    : isNeutral
     ? 'All Status'
     : isActivePresetSelected
     ? 'Active Only'
@@ -200,18 +224,32 @@ export function TripStatusMultiSelectDropdown({
     <div className="relative shrink-0">
       <button
         ref={triggerRef} type="button" onClick={handleTriggerClick}
-        className={`h-7 px-2.5 border rounded-lg text-xs shadow-2xs cursor-pointer flex items-center gap-1.5 max-w-[145px] sm:max-w-[175px] transition-all ${
+        className={`h-7 px-2 sm:px-2.5 border rounded-lg text-xs shadow-2xs cursor-pointer flex items-center gap-1.5 max-w-[155px] sm:max-w-[185px] transition-all ${
           isOpen ? 'bg-blue-50 border-blue-400 text-blue-700 font-bold ring-2 ring-blue-500/20'
+            : isUnconfirmedOnly ? 'bg-rose-50 border-rose-400 text-rose-800 font-bold'
             : isActivePresetSelected ? 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700 font-semibold'
             : !isNeutral ? 'bg-blue-50 border-blue-500 text-blue-800 font-bold'
             : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700 font-semibold'
         }`}
-        title="Filter trips by lifecycle status" aria-haspopup="true" aria-expanded={isOpen}
+        title={
+          unconfirmedCount > 0
+            ? `Filter trips by lifecycle status (${unconfirmedCount} unconfirmed awaiting review)`
+            : 'Filter trips by lifecycle status'
+        }
+        aria-haspopup="true" aria-expanded={isOpen}
       >
         {isActivePresetSelected && (
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
         )}
         <span className="truncate">{buttonLabel}</span>
+        {showTriggerUnconfirmedBadge && unconfirmedCount > 0 && (
+          <span
+            className="min-w-[16px] h-4 px-1 rounded-full bg-rose-600 text-white text-[9.5px] font-black tabular-nums inline-flex items-center justify-center leading-none shrink-0"
+            aria-label={`${unconfirmedCount} unconfirmed`}
+          >
+            {unconfirmedCount}
+          </span>
+        )}
         <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`} />
       </button>
 
@@ -242,7 +280,28 @@ export function TripStatusMultiSelectDropdown({
               </button>
             </div>
 
-            <div className="max-h-64 overflow-y-auto py-1">
+            <div className="max-h-72 overflow-y-auto py-1">
+              <button
+                type="button"
+                onClick={handleToggleUnconfirmedQuickFilter}
+                className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer border-b border-slate-100 mb-0.5 ${
+                  isUnconfirmedOnly
+                    ? 'font-bold text-rose-700 bg-rose-50/90 hover:bg-rose-100/70'
+                    : 'font-semibold text-slate-700 hover:bg-rose-50/60 hover:text-rose-700'
+                }`}
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  <MenuCheckIndicator checked={isUnconfirmedOnly} />
+                  <span className="w-2 h-2 rounded-full shrink-0 bg-rose-600" />
+                  <span className="truncate">Unconfirmed</span>
+                </span>
+                {unconfirmedCount > 0 && (
+                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-black tabular-nums inline-flex items-center justify-center leading-none shrink-0">
+                    {unconfirmedCount}
+                  </span>
+                )}
+              </button>
+
               {STATUS_FILTER_OPTIONS.map((opt) => {
                 const checked = !isUnconfirmedOnly && selectedSet.has(opt.key);
                 return (
@@ -504,6 +563,199 @@ export function TripQueueLayoutDropdown({
                   </button>
                 );
               })}
+            </div>
+          </div>,
+          document.body
+        )}
+    </div>
+  );
+}
+
+export interface TripQueueAssignmentDropdownProps {
+  effectiveDisplayLayout: DisplayLayout;
+  stagedPlanner?: DispatchStagedPlannerController;
+  readyAutoDispatchCount?: number;
+  isRunningAutoDispatchSweep?: boolean;
+  onRunAutoDispatchSweep?: () => void | Promise<void>;
+  isManualOrPaused?: boolean;
+  effectiveSweepMode?: string;
+  scheduledDispatchLeadMinutes?: number;
+}
+
+/**
+ * Compact `Assign: Send/Hold ▾` trigger + portal popover consolidating
+ * Queue Assign Mode (`Send | 📌 Hold`), `📌 Auto-Stage Open (N)`, and `⚡ Auto-Dispatch Ready (N)`.
+ */
+export function TripQueueAssignmentDropdown({
+  effectiveDisplayLayout,
+  stagedPlanner,
+  readyAutoDispatchCount = 0,
+  isRunningAutoDispatchSweep = false,
+  onRunAutoDispatchSweep,
+  isManualOrPaused = false,
+  effectiveSweepMode = 'manual_1tap',
+  scheduledDispatchLeadMinutes = 45,
+}: TripQueueAssignmentDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const closeMenu = useCallback(() => setIsOpen(false), []);
+  const { triggerRef, menuRef, coords, setCoords, computeCoords } = usePortalDropdownPosition({
+    isOpen,
+    onClose: closeMenu,
+    menuWidth: 252,
+    estimatedHeight: 172,
+    align: 'right',
+  });
+
+  const openStagedCount = stagedPlanner?.openScheduledUnstagedCount ?? 0;
+  const hasAutoStageReady = Boolean(stagedPlanner && openStagedCount > 0);
+  const hasAutoDispatchReady = Boolean(readyAutoDispatchCount > 0 && onRunAutoDispatchSweep);
+  const hasAssignModeToggle = Boolean(stagedPlanner && effectiveDisplayLayout !== 'table');
+  const totalActionCount = (hasAutoStageReady ? openStagedCount : 0) + (hasAutoDispatchReady ? readyAutoDispatchCount : 0);
+
+  if (!hasAssignModeToggle && !hasAutoStageReady && !hasAutoDispatchReady) {
+    return null;
+  }
+
+  const isHoldMode = stagedPlanner?.queueAssignMode === 'stage_hold';
+  const triggerLabel = hasAssignModeToggle
+    ? isHoldMode
+      ? 'Assign: Hold'
+      : 'Assign: Send'
+    : 'Assign';
+
+  const handleTriggerClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isOpen) {
+      setCoords(null);
+      setIsOpen(false);
+    } else {
+      const initial = computeCoords();
+      if (initial) setCoords(initial);
+      setIsOpen(true);
+    }
+  };
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={handleTriggerClick}
+        className={`h-7 px-2 sm:px-2.5 border rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+          isOpen
+            ? 'bg-indigo-50 border-indigo-400 text-indigo-800 ring-2 ring-indigo-500/20'
+            : isHoldMode || totalActionCount > 0
+            ? 'bg-indigo-50/80 hover:bg-indigo-100/70 border-indigo-300 text-indigo-800'
+            : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700'
+        }`}
+        title="Assignment mode, auto-staging & auto-dispatch sweep"
+        aria-haspopup="true"
+        aria-expanded={isOpen}
+      >
+        <span className="truncate">{triggerLabel}</span>
+        {totalActionCount > 0 && (
+          <span className="min-w-[16px] h-4 px-1 rounded-full bg-indigo-600 text-white text-[9.5px] font-black tabular-nums inline-flex items-center justify-center leading-none shrink-0">
+            {totalActionCount}
+          </span>
+        )}
+        <ChevronDownIcon
+          className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${
+            isOpen ? 'rotate-180 text-indigo-600' : 'text-slate-400'
+          }`}
+        />
+      </button>
+
+      {isOpen &&
+        coords !== null &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={menuRef}
+            data-ui-select-portal="true"
+            style={{
+              position: 'fixed',
+              top: `${coords.top}px`,
+              left: `${coords.left}px`,
+              width: '252px',
+              zIndex: 99999,
+              transformOrigin: coords.openUpward ? 'bottom right' : 'top right',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            className={PORTAL_MENU_SHELL_CLASS}
+          >
+            <div className={PORTAL_HEADER_STRIP_CLASS}>
+              <span>Assignment &amp; Dispatch</span>
+            </div>
+
+            <div className="p-2 space-y-2">
+              {hasAssignModeToggle && stagedPlanner && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-slate-600">Queue Mode</span>
+                  <div className="inline-flex items-center rounded-lg border border-slate-300 bg-white p-0.5 shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => stagedPlanner.setQueueAssignMode('send_to_driver')}
+                      className={`px-2 py-0.5 rounded-md text-[10.5px] font-extrabold cursor-pointer transition-colors ${
+                        stagedPlanner.queueAssignMode === 'send_to_driver'
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Send
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => stagedPlanner.setQueueAssignMode('stage_hold')}
+                      className={`px-2 py-0.5 rounded-md text-[10.5px] font-extrabold cursor-pointer transition-colors ${
+                        stagedPlanner.queueAssignMode === 'stage_hold'
+                          ? 'bg-indigo-600 text-white'
+                          : 'text-slate-600 hover:text-indigo-700'
+                      }`}
+                    >
+                      📌 Hold
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {hasAutoStageReady && stagedPlanner && (
+                <button
+                  type="button"
+                  disabled={stagedPlanner.isAutoStaging}
+                  onClick={() => {
+                    closeMenu();
+                    stagedPlanner.openAutoStagePreview();
+                  }}
+                  className="w-full h-7 px-2.5 rounded-lg border border-dashed border-indigo-400 bg-indigo-50/90 hover:bg-indigo-100 text-indigo-800 text-[11px] font-extrabold tracking-tight flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                >
+                  {stagedPlanner.isAutoStaging
+                    ? '📌 Staging...'
+                    : `📌 Auto-Stage Open (${openStagedCount})`}
+                </button>
+              )}
+
+              {hasAutoDispatchReady && onRunAutoDispatchSweep && (
+                <button
+                  type="button"
+                  disabled={isRunningAutoDispatchSweep}
+                  onClick={() => {
+                    closeMenu();
+                    void onRunAutoDispatchSweep();
+                  }}
+                  className={`w-full h-7 px-2.5 rounded-lg border text-[11px] font-extrabold tracking-tight flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs disabled:opacity-50 ${
+                    isManualOrPaused
+                      ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700'
+                      : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border-indigo-300'
+                  }`}
+                  title={`Run ${effectiveSweepMode.replace(/_/g, ' ')} for ${readyAutoDispatchCount} open trip(s) inside the ${scheduledDispatchLeadMinutes}m Pre-Pickup Lead Window`}
+                >
+                  {isRunningAutoDispatchSweep
+                    ? '⚡ Dispatching...'
+                    : `⚡ Auto-Dispatch Ready (${readyAutoDispatchCount})`}
+                </button>
+              )}
             </div>
           </div>,
           document.body

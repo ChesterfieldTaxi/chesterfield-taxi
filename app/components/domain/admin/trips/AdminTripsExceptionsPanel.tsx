@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Trip } from '../../../../core/types/trip';
+import type { DispatchAutomationConfig } from '../../../../core/types/config';
 import type { DriverRosterItem } from '../../../../core/services/operator.service';
 import {
   canAdminCompleteTrip,
@@ -21,6 +22,7 @@ import { AlertTriangleIcon, CheckIcon, ClockIcon, XIcon } from '../../../ui/Icon
 export interface AdminTripsExceptionsPanelProps {
   trips: Trip[];
   drivers: DriverRosterItem[];
+  dispatchAutomation?: DispatchAutomationConfig;
   exceptionByTripId: Record<string, ClassifiedAdminTripException>;
   assignMode: 'send_to_driver' | 'stage_hold';
   actionLoadingId: string | null;
@@ -41,6 +43,7 @@ export interface AdminTripsExceptionsPanelProps {
 export function AdminTripsExceptionsPanel({
   trips,
   drivers,
+  dispatchAutomation,
   exceptionByTripId,
   assignMode,
   actionLoadingId,
@@ -216,6 +219,8 @@ export function AdminTripsExceptionsPanel({
                       <DriverAssignDropdown
                         value={trip.assignedDriverId || 'unassigned'}
                         drivers={drivers}
+                        trip={trip}
+                        slaConfig={dispatchAutomation}
                         mode={trip.assignedDriverId ? 'send_to_driver' : assignMode}
                         isAssigned={Boolean(trip.assignedDriverId)}
                         fallbackAssignedLabel={(trip.metadata as any)?.assignedDriverName || null}

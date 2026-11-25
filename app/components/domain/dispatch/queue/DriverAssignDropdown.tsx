@@ -1,7 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { FLEET_STATUS_COLORS } from '../../../../core/hooks/useDispatchFleet';
+import {
+  resolveAssignmentDropdownTone,
+  type AssignmentDropdownTone,
+} from '../../../../core/services/dispatch/assignment-urgency.service';
+import type { DispatchAutomationConfig } from '../../../../core/types/config';
 import type { LiveDriverMapStatus } from '../../../../core/types/driver';
+import type { Trip } from '../../../../core/types/trip';
 import {
   AlertTriangleIcon,
   CheckIcon,
@@ -167,10 +173,22 @@ export function extractDriverCabAndName(driver: DriverDropdownOptionItem): {
   };
 }
 
+const ASSIGNMENT_TONE_CLASSES: Record<AssignmentDropdownTone, string> = {
+  staged_white: 'bg-white text-slate-900 border-slate-900 font-bold hover:bg-slate-50',
+  offered_purple: 'bg-purple-50 text-purple-900 border-purple-400 font-bold hover:bg-purple-100/80',
+  assigned_green:
+    'bg-emerald-50 text-emerald-900 border-emerald-400 font-semibold hover:bg-emerald-100/80',
+  unassigned_blue: 'bg-blue-50/90 text-blue-800 border-blue-300 font-bold hover:bg-blue-100/80',
+  warning_orange: 'bg-amber-50 text-amber-900 border-amber-400 font-bold hover:bg-amber-100/80',
+  critical_red: 'bg-rose-50 text-rose-800 border-rose-400 font-bold hover:bg-rose-100/80',
+};
+
 export interface DriverAssignDropdownProps {
   value: string;
   drivers: ReadonlyArray<DriverDropdownOptionItem>;
   onChange: (driverId: string) => void;
+  trip?: Partial<Trip> | null;
+  slaConfig?: Partial<DispatchAutomationConfig> | null;
   mode?: 'send_to_driver' | 'stage_hold';
   isAssigned?: boolean;
   fallbackAssignedLabel?: string | null;
@@ -196,6 +214,8 @@ export function DriverAssignDropdown({
   value,
   drivers,
   onChange,
+  trip,
+  slaConfig,
   mode = 'send_to_driver',
   isAssigned = false,
   fallbackAssignedLabel,
@@ -218,12 +238,20 @@ export function DriverAssignDropdown({
 }: DriverAssignDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [coords, setCoords] = useState<{
     top: number;
     left: number;
     width: number;
     openUpward: boolean;
   } | null>(null);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setNowMs(Date.now());
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -401,15 +429,18 @@ export function DriverAssignDropdown({
       ? `py-1.5 px-2.5 text-xs ${showSplitSend ? 'rounded-l-lg rounded-r-none' : 'rounded-lg'} gap-2 min-h-[34px]`
       : `py-1.5 px-2.5 text-[11.5px] ${showSplitSend ? 'rounded-l-lg rounded-r-none' : 'rounded-lg'} gap-1.5`;
 
-  const stateClasses = isSelected
-    ? hasStaged || isStageMode
-      ? 'bg-indigo-50/90 text-indigo-950 border-dashed border-indigo-400 font-bold hover:bg-indigo-100/80'
-      : 'bg-white text-slate-900 border-slate-300 font-semibold hover:bg-slate-50 shadow-2xs'
-    : isStageMode
-    ? 'bg-indigo-50/90 text-indigo-900 border-dashed border-indigo-400 font-bold hover:bg-indigo-100/80'
-    : showExhaustedAlert
-    ? 'bg-rose-50 text-rose-800 border-rose-400 font-bold hover:bg-rose-100/80'
-    : 'bg-blue-50/90 text-blue-800 border-blue-300 font-bold hover:bg-blue-100/80';
+  const toneResolution = useMemo(
+    () =>
+      resolveAssignmentDropdownTone(trip, slaConfig, nowMs, {
+        hasStaged,
+        isStageMode,
+        isAssigned,
+        isCascadeExhausted,
+      }),
+    [trip, slaConfig, nowMs, hasStaged, isStageMode, isAssigned, isCascadeExhausted]
+  );
+
+  const stateClasses = ASSIGNMENT_TONE_CLASSES[toneResolution.tone];
 
   const resolvedTriggerText = isSelected
     ? selectedParsed?.triggerLabel ||

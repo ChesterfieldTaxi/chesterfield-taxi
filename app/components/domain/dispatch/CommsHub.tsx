@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getCommsThreadService } from '../../../core/services/comms/comms-thread.service';
 import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
 import { ExternalLinkIcon, KeypadGridIcon, PlusIcon, SpinnerIcon, XIcon } from '../../ui/Icons';
@@ -25,6 +25,7 @@ function CommsHubComponent({
 }: CommsHubProps) {
   const [activeTab, setActiveTab] = useState<CommsTab>(initialTab);
   const [allViewMode, setAllViewMode] = useState<CommsAllViewMode>(initialAllViewMode);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Set<string>>(() => new Set());
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -96,11 +97,163 @@ function CommsHubComponent({
   }, [activeTab, softphone.callsSubTab, isThreadOpen]);
 
   const handleMarkAllRead = () => {
-    const unreadIds = sync.interactions.filter((i) => i.isUnread).map((i) => i.id);
+    const unreadIds = sync.interactions.filter((i) => i.isUnread && !i.isDeleted).map((i) => i.id);
     if (unreadIds.length === 0) return;
     sync.setInteractions((prev) => prev.map((i) => (i.isUnread ? { ...i, isUnread: false } : i)));
     void getCommsThreadService().markEventsRead(unreadIds);
   };
+
+  const isGroupedView = activeTab === 'messages' || (activeTab === 'all' && allViewMode === 'grouped');
+  const activeGroupedRows = activeTab === 'all' ? sync.filteredAllConversationRows : sync.conversationRows;
+  const activeEventRows =
+    activeTab === 'voicemail'
+      ? sync.filteredVoicemails
+      : activeTab === 'phone'
+      ? softphone.callsSubTab === 'missed'
+        ? sync.filteredMissedCalls
+        : sync.filteredHistoryCalls
+      : sync.filteredAllInteractions;
+
+  const visibleRowKeys = useMemo(() => {
+    if (isThreadOpen || (activeTab === 'phone' && softphone.callsSubTab === 'keypad')) return [];
+    return isGroupedView
+      ? activeGroupedRows.map((r) => r.threadId)
+      : activeEventRows.map((e) => e.id);
+  }, [isThreadOpen, activeTab, softphone.callsSubTab, isGroupedView, activeGroupedRows, activeEventRows]);
+
+  useEffect(() => {
+    setSelectedRowKeys(new Set());
+  }, [activeTab, allViewMode, softphone.callsSubTab, isThreadOpen]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedRowKeys(new Set());
+  }, []);
+
+  const handleToggleSelectRow = useCallback((key: string) => {
+    setSelectedRowKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const allSelected = useMemo(
+    () => visibleRowKeys.length > 0 && visibleRowKeys.every((k) => selectedRowKeys.has(k)),
+    [visibleRowKeys, selectedRowKeys]
+  );
+
+  const handleToggleSelectAll = useCallback(() => {
+    setSelectedRowKeys((prev) => {
+      if (visibleRowKeys.length > 0 && visibleRowKeys.every((k) => prev.has(k))) {
+        return new Set();
+      }
+      return new Set(visibleRowKeys);
+    });
+  }, [visibleRowKeys]);
+
+  const selectedHasUnread = useMemo(() => {
+    if (selectedRowKeys.size === 0) return false;
+    if (isGroupedView) {
+      return activeGroupedRows.some(
+        (r) => selectedRowKeys.has(r.threadId) && (r.unreadCountTotal > 0 || Boolean(r.latestEvent.isUnread))
+      );
+    }
+    return activeEventRows.some((e) => selectedRowKeys.has(e.id) && Boolean(e.isUnread));
+  }, [selectedRowKeys, isGroupedView, activeGroupedRows, activeEventRows]);
+
+  const selectedAllArchived = useMemo(() => {
+    if (selectedRowKeys.size === 0) return false;
+    const svc = getCommsThreadService();
+    if (isGroupedView) {
+      return Array.from(selectedRowKeys).every((tid) => Boolean(svc.getThreadById(tid)?.isArchived));
+    }
+    return activeEventRows
+      .filter((e) => selectedRowKeys.has(e.id))
+      .every((e) => Boolean(e.isArchived));
+  }, [selectedRowKeys, isGroupedView, activeEventRows]);
+
+  const handleBulkMarkReadUnread = useCallback(() => {
+    const keys = Array.from(selectedRowKeys);
+    if (keys.length === 0) return;
+    const svc = getCommsThreadService();
+    if (isGroupedView) {
+      if (selectedHasUnread) {
+        keys.forEach((tid) => void svc.markThreadRead(tid));
+      } else {
+        void svc.markThreadsUnread(keys);
+      }
+    } else {
+      const keySet = new Set(keys);
+      sync.setInteractions((prev) =>
+        prev.map((i) => (keySet.has(i.id) ? { ...i, isUnread: !selectedHasUnread } : i))
+      );
+      if (selectedHasUnread) {
+        void svc.markEventsRead(keys);
+      } else {
+        void svc.markEventsUnread(keys);
+      }
+    }
+    setSelectedRowKeys(new Set());
+  }, [selectedRowKeys, isGroupedView, selectedHasUnread, sync]);
+
+  const handleBulkArchive = useCallback(() => {
+    const keys = Array.from(selectedRowKeys);
+    if (keys.length === 0) return;
+    const svc = getCommsThreadService();
+    if (isGroupedView) {
+      if (selectedAllArchived) void svc.unarchiveThreads(keys);
+      else void svc.archiveThreads(keys);
+    } else {
+      const keySet = new Set(keys);
+      sync.setInteractions((prev) =>
+        prev.map((i) =>
+          keySet.has(i.id)
+            ? { ...i, isArchived: !selectedAllArchived, isUnread: selectedAllArchived ? i.isUnread : false }
+            : i
+        )
+      );
+      if (selectedAllArchived) void svc.unarchiveEvents(keys);
+      else void svc.archiveEvents(keys);
+    }
+    setSelectedRowKeys(new Set());
+  }, [selectedRowKeys, isGroupedView, selectedAllArchived, sync]);
+
+  const handleBulkDelete = useCallback(() => {
+    const keys = Array.from(selectedRowKeys);
+    if (keys.length === 0) return;
+    const svc = getCommsThreadService();
+    const keySet = new Set(keys);
+    if (isGroupedView) {
+      sync.setInteractions((prev) =>
+        prev.filter((i) => !i.threadId || !keySet.has(i.threadId))
+      );
+      void svc.deleteThreads(keys);
+    } else {
+      sync.setInteractions((prev) => prev.filter((i) => !keySet.has(i.id)));
+      void svc.deleteEvents(keys);
+    }
+    setSelectedRowKeys(new Set());
+  }, [selectedRowKeys, isGroupedView, sync]);
+
+  const handleToggleRowReadStatus = useCallback(
+    (key: string, currentlyUnread: boolean) => {
+      const svc = getCommsThreadService();
+      if (isGroupedView) {
+        if (currentlyUnread) {
+          void svc.markThreadRead(key);
+        } else {
+          void svc.markThreadsUnread([key]);
+        }
+      } else {
+        sync.setInteractions((prev) =>
+          prev.map((i) => (i.id === key ? { ...i, isUnread: !currentlyUnread } : i))
+        );
+        void svc.toggleEventReadStatus(key);
+      }
+    },
+    [isGroupedView, sync]
+  );
 
   const keyboardRef = useRef({
     sendSms: messaging.handleSendSms, addNote: messaging.handleAddThreadInternalNote, sendNew: messaging.handleSendNewMessage,
@@ -126,6 +279,7 @@ function CommsHubComponent({
         if (messaging.isNewMessageModalOpen) { e.preventDefault(); messaging.setIsNewMessageModalOpen(false); }
         else if (softphone.showAgentSetupModal) { e.preventDefault(); softphone.handleCloseAgentSetupModal(); }
         else if (messaging.selectedContactPhone) { e.preventDefault(); messaging.setSelectedContactPhone(null); }
+        else if (selectedRowKeys.size > 0) { e.preventDefault(); setSelectedRowKeys(new Set()); }
         return;
       }
       if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey && !editable && searchInputRef.current?.offsetParent) {
@@ -134,7 +288,7 @@ function CommsHubComponent({
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [isVisible, messaging.isNewMessageModalOpen, softphone.showAgentSetupModal, messaging.selectedContactPhone, messaging.newMsgBody, messaging.noteDraftText, messaging.smsReplyText]);
+  }, [isVisible, messaging.isNewMessageModalOpen, softphone.showAgentSetupModal, messaging.selectedContactPhone, selectedRowKeys.size, messaging.newMsgBody, messaging.noteDraftText, messaging.smsReplyText]);
 
   const showListToolbar = !isThreadOpen && !(activeTab === 'phone' && softphone.callsSubTab === 'keypad');
   const activeUnreadCount = activeTab === 'messages' ? sync.unreadCountMessages : activeTab === 'voicemail' ? sync.unreadCountVoicemail : activeTab === 'phone' ? sync.unreadCountMissed : sync.unreadCountAll;
@@ -223,8 +377,13 @@ function CommsHubComponent({
           contactFilter={sync.contactFilter} onChangeContactFilter={sync.setContactFilter}
           contactFilters={sync.contactFilters} onChangeContactFilters={sync.setContactFilters}
           filterUnreadOnly={sync.filterUnreadOnly} onToggleUnreadOnly={() => sync.setFilterUnreadOnly((v) => !v)}
+          showArchived={sync.showArchived} onToggleShowArchived={() => sync.setShowArchived((v) => !v)}
           unreadCount={activeUnreadCount} onMarkAllRead={handleMarkAllRead} onRefresh={() => void sync.fetchTelephonyData()}
           allViewMode={allViewMode} onChangeAllViewMode={handleChangeAllViewMode} showAllViewModeToggle={activeTab === 'all'}
+          selectedCount={selectedRowKeys.size} allSelected={allSelected}
+          selectedHasUnread={selectedHasUnread} selectedAllArchived={selectedAllArchived}
+          onToggleSelectAll={handleToggleSelectAll} onBulkMarkReadUnread={handleBulkMarkReadUnread}
+          onBulkArchive={handleBulkArchive} onBulkDelete={handleBulkDelete} onClearSelection={handleClearSelection}
           leadingSlot={activeTab === 'phone' ? (
             <div data-comms-calls-subtoggle="true" className="flex items-center bg-slate-200/80 p-0.5 rounded-lg text-[10.5px] font-bold shrink-0">
               {([
@@ -261,6 +420,8 @@ function CommsHubComponent({
             mode="list" {...sharedSmsProps} selectedInteractions={[]}
             conversationRows={activeTab === 'all' ? sync.filteredAllConversationRows : sync.conversationRows}
             messageConversations={sync.messageConversations} threadUnreadCountMap={sync.threadUnreadCountMap}
+            selectedRowKeys={selectedRowKeys} onToggleSelectRow={handleToggleSelectRow}
+            onToggleRowReadStatus={handleToggleRowReadStatus}
           />
         ) : activeTab === 'phone' && softphone.callsSubTab === 'keypad' ? (
           <SoftphoneDialerPane
@@ -289,6 +450,8 @@ function CommsHubComponent({
             playbackSpeed={sync.playbackSpeed} onCyclePlaybackSpeed={sync.handleCyclePlaybackSpeed}
             onStartCall={softphone.handleStartCall} onSelectContact={messaging.setSelectedContactPhone}
             onConvertVoicemailToBooking={messaging.handleConvertVoicemailToBooking} onOpenEmailInDock={messaging.handleOpenEmailInDock}
+            selectedRowKeys={selectedRowKeys} onToggleSelectRow={handleToggleSelectRow}
+            onToggleRowReadStatus={handleToggleRowReadStatus}
           />
         )}
       </div>

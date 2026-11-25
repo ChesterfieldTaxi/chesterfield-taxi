@@ -35,5 +35,7 @@ Use this skill when the user wants to wrap up a design discussion and prepare a 
 3. **Output a ready-to-copy Execution Prompt** for a fresh coding chat in a fenced code block, including:
    - Instruction to read `constitution.md` and `docs/phases/phase-XX.md` **only** (do NOT read `docs/archive/` or `spec.md`)
    - Instruction to implement only the tasks in `docs/phases/phase-XX.md`
-   - Instruction to run the Verification commands, check off completed `[x]` items in `docs/phases/phase-XX.md`, and stop with a brief summary of files changed and checks run
+   - Instruction to run the Verification commands, check off completed `[x]` items in `docs/phases/phase-XX.md`, and stop with:
+     - A brief summary of files changed and checks run
+     - A concise, ready-to-copy `git commit -m "..."` command (do NOT run `git commit` or `git push` automatically)
    - A **Recommended Model** note (e.g., `Hydrogen Medium` for standard UI/CRUD/wiring, or `Carbon Medium/High` for complex state machines, security rules, or multi-service refactors).

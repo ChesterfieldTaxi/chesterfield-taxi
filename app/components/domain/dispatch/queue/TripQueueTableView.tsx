@@ -421,6 +421,8 @@ export function TripQueueTableView({
                             : 'unassigned')
                         }
                         drivers={drivers}
+                        trip={trip}
+                        slaConfig={settings.dispatchAutomation}
                         mode={
                           !trip.assignedDriverId && stagedPlanner?.queueAssignMode === 'stage_hold'
                             ? 'stage_hold'

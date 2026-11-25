@@ -134,6 +134,8 @@ export function commsEventToInteractionEvent(
     tripId: event.tripId,
     actorName: event.actorName,
     isUnread: event.isUnread,
+    isArchived: event.isArchived,
+    isDeleted: event.isDeleted,
     deliveryStatus: event.deliveryStatus,
     errorCode: event.errorCode,
     errorMessage: event.errorMessage,
@@ -311,8 +313,8 @@ export class CommsThreadService {
   private notifyListeners(): void {
     if (this.listeners.size === 0) return;
     const snap: CommsThreadSnapshot = {
-      threads: this.getThreads(),
-      events: this.getAllEvents(),
+      threads: this.getThreads({ includeArchived: true }),
+      events: this.getAllEvents({ includeArchived: true }),
     };
     this.listeners.forEach((fn) => {
       try {
@@ -420,8 +422,8 @@ export class CommsThreadService {
     this.listeners.add(listener);
     try {
       listener({
-        threads: this.getThreads(),
-        events: this.getAllEvents(),
+        threads: this.getThreads({ includeArchived: true }),
+        events: this.getAllEvents({ includeArchived: true }),
       });
     } catch {}
     return () => {
@@ -665,6 +667,8 @@ export class CommsThreadService {
           : defaultUnread,
       isArchived:
         input.isArchived !== undefined ? input.isArchived : existingEvent?.isArchived ?? false,
+      isDeleted:
+        input.isDeleted !== undefined ? input.isDeleted : existingEvent?.isDeleted ?? false,
       actorId: input.actorId || existingEvent?.actorId,
       actorName: input.actorName || existingEvent?.actorName,
       timestampIso: tsIso,
@@ -968,6 +972,119 @@ export class CommsThreadService {
     }
   }
 
+  public async unarchiveThreads(threadIds: string[]): Promise<void> {
+    let anyChanged = false;
+    for (const tid of threadIds) {
+      const thread = this.threads.get(tid);
+      if (!thread || thread.isDeleted) continue;
+      const changedEvents: CommsEvent[] = [];
+      for (const evt of this.events.values()) {
+        if (evt.threadId === tid && !evt.isDeleted && evt.isArchived) {
+          const updated = { ...evt, isArchived: false };
+          this.events.set(evt.id, updated);
+          changedEvents.push(updated);
+        }
+      }
+      const recomputed: CommsThread = {
+        ...recomputeCommsThreadRollups(thread, this.getThreadEvents(tid, true)),
+        isArchived: false,
+      };
+      this.threads.set(tid, recomputed);
+      anyChanged = true;
+      await this.persistThreadAndEventsToFirestore(recomputed, changedEvents);
+    }
+    if (anyChanged) {
+      this.saveToStorage();
+      this.notifyListeners();
+    }
+  }
+
+  public async unarchiveEvents(eventIds: string[]): Promise<void> {
+    const touchedThreads = new Map<string, CommsEvent[]>();
+    for (const id of eventIds) {
+      const evt = this.events.get(id);
+      if (evt && !evt.isDeleted && evt.isArchived) {
+        const updated = { ...evt, isArchived: false };
+        this.events.set(id, updated);
+        const list = touchedThreads.get(evt.threadId) || [];
+        list.push(updated);
+        touchedThreads.set(evt.threadId, list);
+      }
+    }
+    for (const [tid, evts] of touchedThreads.entries()) {
+      const parent = this.threads.get(tid);
+      if (parent && !parent.isDeleted) {
+        const recomputed: CommsThread = {
+          ...recomputeCommsThreadRollups(parent, this.getThreadEvents(tid, true)),
+          isArchived: false,
+        };
+        this.threads.set(tid, recomputed);
+        await this.persistThreadAndEventsToFirestore(recomputed, evts);
+      }
+    }
+    if (touchedThreads.size > 0) {
+      this.saveToStorage();
+      this.notifyListeners();
+    }
+  }
+
+  public async deleteThreads(threadIds: string[]): Promise<void> {
+    let anyChanged = false;
+    for (const tid of threadIds) {
+      const thread = this.threads.get(tid);
+      if (!thread) continue;
+      const changedEvents: CommsEvent[] = [];
+      for (const evt of this.events.values()) {
+        if (evt.threadId === tid && (!evt.isDeleted || evt.isUnread)) {
+          const updated = { ...evt, isDeleted: true, isUnread: false };
+          this.events.set(evt.id, updated);
+          changedEvents.push(updated);
+        }
+      }
+      const recomputed: CommsThread = {
+        ...recomputeCommsThreadRollups(thread, this.getThreadEvents(tid, true)),
+        isDeleted: true,
+      };
+      this.threads.set(tid, recomputed);
+      anyChanged = true;
+      await this.persistThreadAndEventsToFirestore(recomputed, changedEvents);
+    }
+    if (anyChanged) {
+      this.saveToStorage();
+      this.notifyListeners();
+    }
+  }
+
+  public async deleteEvents(eventIds: string[]): Promise<void> {
+    const touchedThreads = new Map<string, CommsEvent[]>();
+    for (const id of eventIds) {
+      const evt = this.events.get(id);
+      if (evt && !evt.isDeleted) {
+        const updated = { ...evt, isDeleted: true, isUnread: false };
+        this.events.set(id, updated);
+        const list = touchedThreads.get(evt.threadId) || [];
+        list.push(updated);
+        touchedThreads.set(evt.threadId, list);
+      }
+    }
+    for (const [tid, evts] of touchedThreads.entries()) {
+      const parent = this.threads.get(tid);
+      if (parent) {
+        const remainingNonDeleted = this.getThreadEvents(tid, true, false);
+        const recomputed: CommsThread = {
+          ...recomputeCommsThreadRollups(parent, remainingNonDeleted),
+          isDeleted: remainingNonDeleted.length === 0 ? true : parent.isDeleted,
+        };
+        this.threads.set(tid, recomputed);
+        await this.persistThreadAndEventsToFirestore(recomputed, evts);
+      }
+    }
+    if (touchedThreads.size > 0) {
+      this.saveToStorage();
+      this.notifyListeners();
+    }
+  }
+
   /**
    * Links a `Trip` to its unified `CommsThread` and automatically merges any previously
    * separate phone-only and email-only threads when the trip carries both phone & email.
@@ -1148,8 +1265,10 @@ export class CommsThreadService {
           this.events.set(evt.id, {
             ...existing,
             ...evt,
-            // Preserve local read state if user already read it locally
+            // Preserve local read, archive, and soft-delete state
             isUnread: existing && !existing.isUnread ? false : evt.isUnread,
+            isArchived: existing?.isArchived ? true : evt.isArchived,
+            isDeleted: existing?.isDeleted ? true : evt.isDeleted,
           });
           touchedThreadIds.add(evt.threadId);
           changed = true;
@@ -1169,9 +1288,14 @@ export class CommsThreadService {
     }
   }
 
-  public getThreads(options?: { includeArchived?: boolean }): CommsThread[] {
+  public getThreads(options?: { includeArchived?: boolean; includeDeleted?: boolean }): CommsThread[] {
     return Array.from(this.threads.values())
-      .filter((t) => !t.mergedIntoThreadId && (options?.includeArchived || !t.isArchived))
+      .filter(
+        (t) =>
+          !t.mergedIntoThreadId &&
+          (options?.includeDeleted || !t.isDeleted) &&
+          (options?.includeArchived || !t.isArchived)
+      )
       .sort((a, b) => (b.lastEventAtMs || 0) - (a.lastEventAtMs || 0));
   }
 
@@ -1204,22 +1328,46 @@ export class CommsThreadService {
     return matches[0] || null;
   }
 
-  public getThreadEvents(threadId: string, includeArchived = false): CommsEvent[] {
+  public getThreadEvents(
+    threadId: string,
+    includeArchived = false,
+    includeDeleted = false
+  ): CommsEvent[] {
     return Array.from(this.events.values())
-      .filter((e) => e.threadId === threadId && (includeArchived || !e.isArchived))
+      .filter(
+        (e) =>
+          e.threadId === threadId &&
+          (includeDeleted || !e.isDeleted) &&
+          (includeArchived || !e.isArchived)
+      )
       .sort((a, b) => (a.timestampMs || 0) - (b.timestampMs || 0));
   }
 
-  public getAllEvents(options?: { includeArchived?: boolean }): CommsEvent[] {
+  public getAllEvents(options?: { includeArchived?: boolean; includeDeleted?: boolean }): CommsEvent[] {
     return Array.from(this.events.values())
-      .filter((e) => options?.includeArchived || !e.isArchived)
+      .filter(
+        (e) =>
+          (options?.includeDeleted || !e.isDeleted) &&
+          (options?.includeArchived || !e.isArchived)
+      )
       .sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
   }
 
-  public getInteractionEvents(options?: { includeArchived?: boolean }): InteractionEvent[] {
+  public getInteractionEvents(options?: {
+    includeArchived?: boolean;
+    includeDeleted?: boolean;
+  }): InteractionEvent[] {
     return this.getAllEvents(options).map((evt) =>
       commsEventToInteractionEvent(evt, this.threads.get(evt.threadId))
     );
+  }
+
+  public isEventDeleted(eventId: string): boolean {
+    return Boolean(this.events.get(eventId)?.isDeleted);
+  }
+
+  public isThreadDeleted(threadId: string): boolean {
+    return Boolean(this.threads.get(threadId)?.isDeleted);
   }
 
   public resetForTests(): void {

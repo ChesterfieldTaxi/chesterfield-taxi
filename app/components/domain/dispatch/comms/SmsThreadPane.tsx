@@ -7,11 +7,12 @@ import { normalizePhone } from '../../../../core/services/passenger.service';
 import { getWorkspaceBus, type WorkspaceEventMap } from '../../../../core/services/workspace-bus.service';
 import type { Trip } from '../../../../core/types/trip';
 import { formatDisplayPhone } from '../../../../core/utils/phone';
-import { AlertTriangleIcon, CheckIcon, ChevronDownIcon, ExternalLinkIcon, MailIcon, MicIcon, PauseIcon, PencilIcon, PhoneIcon, PlayIcon, RefreshCwIcon, SpinnerIcon, UserIcon } from '../../../ui/Icons';
+import { AlertTriangleIcon, CheckIcon, ChevronDownIcon, ExternalLinkIcon, MailIcon, MailOpenIcon, MicIcon, PauseIcon, PencilIcon, PhoneIcon, PlayIcon, RefreshCwIcon, SpinnerIcon, UserIcon } from '../../../ui/Icons';
 import { DispatchStatusBadge } from '../queue/DispatchStatusBadge';
 import { CommsComposerBar } from './CommsComposerBar';
 import { buildOmnichannelTimelineItems, buildReturnTripDraftPayload, cleanCommsEmailSnippet, formatShortRouteEndpoint, formatShortTripId, formatTripTimelineDateTime, hasPlayableCallAudio, resolveTripCabBadgeLabel } from './comms-timeline.util';
 import { formatMessageTimestamp, type InteractionEvent, type PlaybackSpeed, type ThreadTab, type ThreadTimelineType } from './comms-types';
+import { useLongPressSelection } from './useLongPressSelection';
 
 export { NewSmsMessageModal, type NewSmsMessageModalProps } from './CommsModals';
 
@@ -33,6 +34,8 @@ export interface SmsThreadPaneProps {
   smsReplyText: string; onChangeSmsReplyText: (val: string) => void; isSendingSms: boolean; onSendSms: () => void; smsStatusMessage: string | null;
   conversationRows?: CommsConversationRowSummary[]; messageConversations?: InteractionEvent[]; threadUnreadCountMap?: Map<string, number>;
   onSelectContact: (selectorTarget: string) => void; onOpenFreshNewMessageModal: () => void;
+  selectedRowKeys?: ReadonlySet<string>; onToggleSelectRow?: (threadId: string) => void;
+  onToggleRowReadStatus?: (threadId: string, currentlyUnread: boolean) => void;
 }
 
 function renderTripBadges(trip: Trip, drivers?: any[]) {
@@ -55,7 +58,13 @@ export function SmsThreadPane({
   onCyclePlaybackSpeed, onStartCall, onConvertVoicemailToBooking, onOpenEmailInDock, onRetrySms, retryingSmsId, onInsertTrackingLink, onInsertPayLink, isGeneratingPayLink = false,
   noteDraftText = '', onChangeNoteDraftText, onAddInternalNote, smsReplyText, onChangeSmsReplyText, isSendingSms, onSendSms, smsStatusMessage, conversationRows,
   messageConversations = [], threadUnreadCountMap, onSelectContact, onOpenFreshNewMessageModal,
+  selectedRowKeys, onToggleSelectRow, onToggleRowReadStatus,
 }: SmsThreadPaneProps) {
+  const isSelectionMode = Boolean(selectedRowKeys && selectedRowKeys.size > 0);
+  const { getRowGestureProps } = useLongPressSelection({
+    isSelectionMode,
+    onToggleSelect: (key) => onToggleSelectRow?.(key),
+  });
   const effectivePhone = activeContactSummary?.mobilePhone || threadCrmContext?.primaryPhone || (activeContactSummary?.contactPhone && !activeContactSummary.contactPhone.includes('@') && !activeContactSummary.contactPhone.startsWith('thr_') ? activeContactSummary.contactPhone : '');
   const effectiveEmail = threadCrmContext?.primaryEmail || activeContactRecord?.email || activeContactSummary?.contactEmail || (activeContactSummary?.contactPhone?.includes('@') ? activeContactSummary.contactPhone : '');
 
@@ -323,9 +332,53 @@ export function SmsThreadPane({
         </div>
       ) : rows.map((row) => {
         const isUnread = row.unreadCountTotal > 0 || Boolean(row.latestEvent.isUnread);
+        const isSelected = Boolean(selectedRowKeys?.has(row.threadId));
+        const gestureProps = getRowGestureProps(row.threadId, () => {
+          if (row.selectorTarget) onSelectContact(row.selectorTarget);
+        });
         return (
-          <div key={row.threadId} onClick={() => row.selectorTarget && onSelectContact(row.selectorTarget)} className={`min-h-[52px] px-3 py-1.5 flex items-center gap-2.5 cursor-pointer transition-colors ${isUnread ? 'bg-blue-50/50 hover:bg-blue-50' : 'bg-white hover:bg-slate-50'}`}>
-            <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">{(row.contactName || '#').charAt(0).toUpperCase()}</div>
+          <div
+            key={row.threadId}
+            {...gestureProps}
+            className={`group min-h-[52px] px-3 py-1.5 flex items-center gap-2.5 cursor-pointer transition-colors select-none ${
+              isSelected
+                ? 'bg-blue-100/70 hover:bg-blue-100'
+                : isUnread
+                ? 'bg-blue-50/50 hover:bg-blue-50'
+                : 'bg-white hover:bg-slate-50'
+            }`}
+          >
+            <div className="relative w-8 h-8 shrink-0">
+              <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center">
+                {(row.contactName || '#').charAt(0).toUpperCase()}
+              </div>
+              {onToggleSelectRow && (
+                <button
+                  type="button"
+                  data-row-checkbox={row.threadId}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleSelectRow(row.threadId);
+                  }}
+                  aria-label={isSelected ? 'Deselect conversation' : 'Select conversation'}
+                  className={`absolute inset-0 rounded-full flex items-center justify-center transition-opacity cursor-pointer ${
+                    isSelected || isSelectionMode
+                      ? 'opacity-100 bg-white/95'
+                      : 'opacity-0 group-hover:opacity-100 bg-white/95'
+                  }`}
+                >
+                  <span
+                    className={`w-4 h-4 rounded-[4px] border flex items-center justify-center transition-colors ${
+                      isSelected
+                        ? 'bg-blue-600 border-blue-600 text-white'
+                        : 'bg-white border-slate-400'
+                    }`}
+                  >
+                    {isSelected && <CheckIcon className="w-2.5 h-2.5 stroke-[3]" />}
+                  </span>
+                </button>
+              )}
+            </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-1.5">
                 <div className="flex items-center gap-1 min-w-0">
@@ -340,6 +393,18 @@ export function SmsThreadPane({
               <p className={`text-[11px] truncate ${isUnread ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>{cleanCommsEmailSnippet(row.latestEvent.snippet)}</p>
             </div>
             <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+              {onToggleRowReadStatus && (
+                <button
+                  type="button"
+                  data-row-read-toggle={row.threadId}
+                  onClick={() => onToggleRowReadStatus(row.threadId, isUnread)}
+                  title={isUnread ? 'Mark as Read' : 'Mark as Unread'}
+                  aria-label={isUnread ? 'Mark as Read' : 'Mark as Unread'}
+                  className="p-1.5 rounded-md bg-slate-100 hover:bg-blue-600 text-slate-600 hover:text-white cursor-pointer"
+                >
+                  {isUnread ? <MailOpenIcon className="w-3 h-3" /> : <MailIcon className="w-3 h-3" />}
+                </button>
+              )}
               {row.primaryPhone && <button type="button" onClick={() => onStartCall(row.primaryPhone, row.contactName)} title="Call" className="p-1.5 rounded-md bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white cursor-pointer"><PhoneIcon className="w-3 h-3" /></button>}
               <button type="button" onClick={() => getWorkspaceBus().publish('OPEN_CLIENT_PROFILE', { phone: row.primaryPhone, email: row.primaryEmail, name: row.contactName, source: 'comms_hub' })} title="Profile" className="p-1.5 rounded-md bg-slate-100 hover:bg-indigo-600 text-slate-600 hover:text-white cursor-pointer"><UserIcon className="w-3 h-3" /></button>
             </div>
