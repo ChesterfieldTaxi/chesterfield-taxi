@@ -53,6 +53,7 @@ import {
   type BookingVehicleChoice as VehicleChoice,
 } from '../../../core/hooks/booking';
 import {
+  resolveDispatchConfirmationRecipient,
   useDispatchBookingSubmission,
   useDispatchDraftSync,
   DispatchConvoyBanners,
@@ -243,6 +244,8 @@ function DispatchBookingEngineComponent({
   const [cardholderName, setCardholderName] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [cardExp, setCardExp] = useState('');
+  const [cardBrand, setCardBrand] = useState('visa');
+  const [savedPaymentMethodId, setSavedPaymentMethodId] = useState('');
   const [, setCardCvc] = useState('');
   const [saveCardOnFile, setSaveCardOnFile] = useState(false);
   const [corporateAccount, setCorporateAccount] = useState(DEFAULT_CORPORATE_ACCOUNTS[0]);
@@ -685,6 +688,8 @@ function DispatchBookingEngineComponent({
     cardholderName,
     cardNumber,
     cardExp,
+    cardBrand,
+    savedPaymentMethodId,
     saveCardOnFile,
     corporateAccount,
     corporateAccountList,
@@ -842,6 +847,8 @@ function DispatchBookingEngineComponent({
       setCardholderName,
       setCardNumber,
       setCardExp,
+      setCardBrand,
+      setSavedPaymentMethodId,
       setCardCvc,
       setCorporateAccount,
       setBillingPo,
@@ -1038,9 +1045,24 @@ function DispatchBookingEngineComponent({
     onCloneBooking,
   });
 
+  const resolvedConfirmationRecipient = useMemo(
+    () =>
+      resolveDispatchConfirmationRecipient({
+        email,
+        isBookerDifferent,
+        contactEmail,
+        phone,
+        lookupTrips,
+      }),
+    [email, isBookerDifferent, contactEmail, phone, lookupTrips]
+  );
+
   const handleClear = () => {
     handleClearDraft();
     setEnteredBookingPin('');
+    setCardBrand('visa');
+    setSavedPaymentMethodId('');
+    setSaveCardOnFile(false);
   };
 
   resetAfterCreateRef.current = () => {
@@ -1413,6 +1435,12 @@ function DispatchBookingEngineComponent({
           setCardNumber={setCardNumber}
           cardExp={cardExp}
           setCardExp={setCardExp}
+          cardBrand={cardBrand}
+          setCardBrand={setCardBrand}
+          savedPaymentMethodId={savedPaymentMethodId}
+          setSavedPaymentMethodId={setSavedPaymentMethodId}
+          saveCardOnFile={saveCardOnFile}
+          setSaveCardOnFile={setSaveCardOnFile}
           corporateAccount={corporateAccount}
           setCorporateAccount={setCorporateAccount}
           corporateAccountList={corporateAccountList}
@@ -1613,6 +1641,9 @@ function DispatchBookingEngineComponent({
         manualFare={manualFare}
         setManualFare={setManualFare}
         email={email}
+        contactEmail={isBookerDifferent ? contactEmail : undefined}
+        hasResolvedRecipientEmail={resolvedConfirmationRecipient.source !== 'none'}
+        resolvedRecipientEmail={resolvedConfirmationRecipient.recipientEmail}
         sendEmailConfirmation={sendEmailConfirmation}
         setSendEmailConfirmation={setSendEmailConfirmation}
         isClearModalOpen={isClearModalOpen}

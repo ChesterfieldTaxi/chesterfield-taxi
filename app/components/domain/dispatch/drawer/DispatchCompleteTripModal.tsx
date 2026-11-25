@@ -1,14 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { authorizedFetch } from '../../../../core/services/auth/auth-headers';
 import type { AdminUser } from '../../../../core/services/auth/admin-auth.service';
 import { getBookingService } from '../../../../core/services/booking';
+import {
+  formatCardBrandLabel,
+  resolveCompletableStripeSavedCard,
+} from '../../../../core/services/customer/contact.service';
 import { getEmailDispatchService } from '../../../../core/services/email/resend-email.service';
 import { formatDriverAssignmentLabel, type DriverRosterItem } from '../../../../core/services/operator.service';
 import { getTelephonyService } from '../../../../core/services/telephony.service';
 import type { AppSettings } from '../../../../core/types/config';
-import type { Trip } from '../../../../core/types/trip';
+import type { PaymentStatus, Trip } from '../../../../core/types/trip';
 import { formatVehicleTierDisplay } from '../../../../core/utils/vehicle-tier-format.util';
 import { FloatingWindow } from '../../../ui/FloatingWindow';
-import { BuildingIcon, CashIcon, CheckIcon, CreditCardIcon, DollarSignIcon, SpinnerIcon } from '../../../ui/Icons';
+import { BuildingIcon, CashIcon, CheckIcon, CreditCardIcon, DollarSignIcon, LockIcon, SpinnerIcon } from '../../../ui/Icons';
 import { ModernDatePicker, ModernTimePicker } from '../../../ui/ModernDateTimePicker';
 import { Select, type SelectOption } from '../../../ui/Select';
 
@@ -72,10 +77,26 @@ export function DispatchCompleteTripModal({
   );
   const [completePaymentMethod, setCompletePaymentMethod] = useState<
     'cash' | 'card_terminal' | 'card_on_file' | 'corporate_account'
-  >('cash');
+  >(() => {
+    const raw = completeTripTarget?.payment?.method;
+    const ct = (completeTripTarget?.metadata as any)?.cardDetails?.cardPaymentType;
+    return raw === 'corporate' || raw === 'account' ? 'corporate_account'
+      : raw === 'card' && (ct === 'card_on_file' || Boolean(completeTripTarget?.payment?.vaultedCardId)) ? 'card_on_file'
+      : raw === 'card' ? 'card_terminal' : 'cash';
+  });
   const [completeSendReceipt, setCompleteSendReceipt] = useState<boolean>(true);
   const [completeNotes, setCompleteNotes] = useState<string>('');
+  const [chargeSavedCardNow, setChargeSavedCardNow] = useState<boolean>(true);
   const [isCompletingTrip, setIsCompletingTrip] = useState<boolean>(false);
+
+  const stripeSavedCard = useMemo(
+    () => completeTripTarget ? resolveCompletableStripeSavedCard({
+      tripMetadata: completeTripTarget.metadata as Record<string, any> | undefined,
+      vaultedCardId: completeTripTarget.payment?.vaultedCardId,
+      phone: completeTripTarget.passenger?.phone, email: completeTripTarget.passenger?.email,
+    }) : null,
+    [completeTripTarget]
+  );
 
   useEffect(() => {
     if (!completeTripTarget) return;
@@ -86,9 +107,13 @@ export function DispatchCompleteTripModal({
     setCompleteFareInput((completeTripTarget.pricing?.totalFare ?? 0).toFixed(2));
     setCompleteTipInput((completeTripTarget.payment?.tipAmount ?? 0).toFixed(2));
     const rawMethod = completeTripTarget.payment?.method;
+    const metaCardType = (completeTripTarget.metadata as any)?.cardDetails?.cardPaymentType;
     setCompletePaymentMethod(
-      rawMethod === 'corporate' || rawMethod === 'account' ? 'corporate_account' : rawMethod === 'card' ? 'card_terminal' : 'cash'
+      rawMethod === 'corporate' || rawMethod === 'account' ? 'corporate_account'
+      : rawMethod === 'card' && (metaCardType === 'card_on_file' || Boolean(completeTripTarget.payment?.vaultedCardId)) ? 'card_on_file'
+      : rawMethod === 'card' ? 'card_terminal' : 'cash'
     );
+    setChargeSavedCardNow(true);
     const autoReceipts = settings.billingSettings?.autoEmailReceipts !== false;
     setCompleteSendReceipt(Boolean(completeTripTarget.passenger?.email) && autoReceipts);
     setCompleteNotes('');
@@ -98,11 +123,7 @@ export function DispatchCompleteTripModal({
     const opts: SelectOption[] = [{ value: 'unassigned', label: 'Unassigned / Partner' }];
     for (const drv of drivers) {
       if (!drv?.id || ((drv.isArchived || drv.isBlacklisted) && drv.id !== selectedDriverId)) continue;
-      opts.push({
-        value: drv.id,
-        label: drv.formattedLabel || formatDriverAssignmentLabel(drv),
-        subtitle: drv.name || undefined,
-      });
+      opts.push({ value: drv.id, label: drv.formattedLabel || formatDriverAssignmentLabel(drv), subtitle: drv.name || undefined });
     }
     return opts;
   }, [drivers, selectedDriverId]);
@@ -124,11 +145,34 @@ export function DispatchCompleteTripModal({
     const selectedDriver = resolvedDriverId ? drivers.find((d) => d.id === resolvedDriverId) : undefined;
     const mappedPaymentMethod: 'cash' | 'card' | 'corporate' =
       completePaymentMethod === 'corporate_account' ? 'corporate' : completePaymentMethod === 'cash' ? 'cash' : 'card';
-    const paymentStatus: 'paid' | 'pending' = completePaymentMethod === 'corporate_account' ? 'pending' : 'paid';
+    let paymentStatus: PaymentStatus = completePaymentMethod === 'corporate_account' ? 'pending' : 'settled';
+    let chargedPiId: string | undefined;
+    let settledBrand = trip.payment?.cardBrand || stripeSavedCard?.brand;
+    let settledLast4 = trip.payment?.cardLast4 || stripeSavedCard?.last4;
 
     setIsCompletingTrip(true);
     const bookingService = getBookingService();
     try {
+      if (completePaymentMethod === 'card_on_file' && chargeSavedCardNow && stripeSavedCard && grandTotal >= 5) {
+        const resp = await authorizedFetch('/api/payments', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'charge_saved_method', stripeCustomerId: stripeSavedCard.stripeCustomerId,
+            paymentMethodId: stripeSavedCard.paymentMethodId, amount: grandTotal, currency: 'usd', tripId: trip.id,
+          }),
+        });
+        const chargeJson = (await resp.json().catch(() => ({}))) as Record<string, any>;
+        if (resp.ok && chargeJson.success) {
+          paymentStatus = 'captured';
+          chargedPiId = chargeJson.paymentIntentId;
+          settledBrand = chargeJson.brand || settledBrand;
+          settledLast4 = chargeJson.last4 || settledLast4;
+        } else if (!chargeJson.stripeDisabled) {
+          onShowToast(chargeJson.error || 'Saved card charge declined. Uncheck Charge Saved Card for reference settlement.', 'error');
+          setIsCompletingTrip(false);
+          return;
+        }
+      }
       const updatedPricing = {
         ...(trip.pricing || {
           baseFare: subtotalFare, distanceFare: 0, timeFare: 0, surcharges: 0,
@@ -139,6 +183,9 @@ export function DispatchCompleteTripModal({
       const updatedPayment = {
         ...(trip.payment || {}),
         method: mappedPaymentMethod, status: paymentStatus, amount: grandTotal, tipAmount, paidAt: completedAtIso,
+        ...(chargedPiId ? { paymentIntentId: chargedPiId } : {}),
+        ...(settledBrand ? { cardBrand: settledBrand } : {}),
+        ...(settledLast4 ? { cardLast4: settledLast4 } : {}),
       };
       const nextMeta: Record<string, any> = {
         ...(trip.metadata || {}),
@@ -288,36 +335,16 @@ export function DispatchCompleteTripModal({
         </div>
 
         <div data-complete-trip-driver="true">
-          <Select
-            label="Completing Driver"
-            size="sm"
-            searchable={true}
-            searchPlaceholder="Search driver or cab #..."
-            options={driverOptions}
-            value={selectedDriverId || 'unassigned'}
-            onValueChange={setSelectedDriverId}
-          />
+          <Select label="Completing Driver" size="sm" searchable={true} searchPlaceholder="Search driver or cab #..." options={driverOptions} value={selectedDriverId || 'unassigned'} onValueChange={setSelectedDriverId} />
         </div>
 
         <div data-complete-trip-datetime="true" className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600">Completion Date &amp; Time</label>
             <div className="inline-flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => { const p = toLocalCompletionDateTimeParts(); setCompleteDate(p.date); setCompleteTime(p.time); }}
-                className="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 cursor-pointer"
-              >
-                Now
-              </button>
+              <button type="button" onClick={() => { const p = toLocalCompletionDateTimeParts(); setCompleteDate(p.date); setCompleteTime(p.time); }} className="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 cursor-pointer">Now</button>
               {scheduledDropoffParts && (
-                <button
-                  type="button"
-                  onClick={() => { setCompleteDate(scheduledDropoffParts.date); setCompleteTime(scheduledDropoffParts.time); }}
-                  className="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 cursor-pointer"
-                >
-                  Scheduled Dropoff
-                </button>
+                <button type="button" onClick={() => { setCompleteDate(scheduledDropoffParts.date); setCompleteTime(scheduledDropoffParts.time); }} className="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 cursor-pointer">Scheduled Dropoff</button>
               )}
             </div>
           </div>
@@ -370,6 +397,16 @@ export function DispatchCompleteTripModal({
               );
             })}
           </div>
+          {completePaymentMethod === 'card_on_file' && stripeSavedCard && (
+            <label data-complete-charge-saved-card="true" className="mt-2 flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-emerald-50/80 border border-emerald-200 cursor-pointer">
+              <span className="inline-flex items-center gap-1.5 font-bold text-emerald-900">
+                <input type="checkbox" checked={chargeSavedCardNow} onChange={(e) => setChargeSavedCardNow(e.target.checked)} className="rounded border-emerald-400 text-emerald-600 w-3.5 h-3.5" />
+                <LockIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Charge Saved Card ({formatCardBrandLabel(stripeSavedCard.brand)} •••• {stripeSavedCard.last4})</span>
+              </span>
+              <span className="text-[10px] font-extrabold text-emerald-700 bg-white px-1.5 py-0.5 rounded border border-emerald-200">Stripe Vault</span>
+            </label>
+          )}
         </div>
 
         <div>

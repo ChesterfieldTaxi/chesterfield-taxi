@@ -56,8 +56,11 @@ export interface PublicPayLinkLookupResult {
 export interface CreateCheckoutIntentResult {
   success: boolean;
   stripeConfigured: boolean;
+  mode?: 'payment' | 'setup';
   clientSecret?: string;
   paymentIntentId?: string;
+  setupIntentId?: string;
+  stripeCustomerId?: string;
   amount?: number;
   baseAmount?: number;
   tipAmount?: number;
@@ -267,6 +270,104 @@ class PayLinkService {
       return {
         success: false,
         error: err?.message || 'Network error generating invoice payment link.',
+      };
+    }
+  }
+
+  /**
+   * Creates or reuses an active 1-tap Card Setup Link (`targetType: 'card_setup'`) for a client profile.
+   */
+  async createOrGetCardSetupLink(
+    contact: {
+      contactId: string;
+      contactName?: string;
+      contactPhone?: string;
+      contactEmail?: string;
+      stripeCustomerId?: string;
+    },
+    options?: CreatePayLinkOptions
+  ): Promise<CreatePayLinkResult> {
+    try {
+      const policy = normalizeBillingSettingsConfig(
+        options?.billingSettings ?? getAdminConfigService().getCachedSettings().billingSettings
+      );
+      const resp = await authorizedFetch('/api/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_link',
+          targetType: 'card_setup',
+          targetId: contact.contactId,
+          contactId: contact.contactId,
+          contactName: contact.contactName,
+          contactPhone: contact.contactPhone,
+          contactEmail: contact.contactEmail,
+          stripeCustomerId: contact.stripeCustomerId,
+          expiresInHours: options?.expiresInHours ?? policy.payLinkExpiryHours,
+          allowTip: false,
+          sendSms: options?.sendSms,
+          recipientPhone: options?.recipientPhone || contact.contactPhone,
+          sendEmail: options?.sendEmail,
+          recipientEmail: options?.recipientEmail || contact.contactEmail,
+        }),
+      });
+
+      const data = (await resp.json().catch(() => ({}))) as CreatePayLinkResult;
+      if (!resp.ok || !data.success || !data.payLink) {
+        return {
+          success: false,
+          error: data.error || 'Unable to generate card setup link.',
+        };
+      }
+
+      if (isFirebaseConfigured() && typeof window !== 'undefined' && data.payLink.payToken) {
+        try {
+          const db = getFirestoreDb();
+          if (db) {
+            const cleanProjection = sanitizePayLinkProjection(data.payLink);
+            await setDoc(
+              doc(db, 'payLinks', cleanProjection.payToken),
+              sanitizePayload(cleanProjection),
+              { merge: true }
+            ).catch(() => {});
+          }
+        } catch {}
+      }
+
+      return data;
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || 'Network error generating card setup link.',
+      };
+    }
+  }
+
+  /**
+   * Verifies a completed Stripe `SetupIntent` on the server and saves the vaulted card token.
+   */
+  async confirmCardSetup(
+    payToken: string,
+    setupIntentId: string
+  ): Promise<ConfirmPayLinkResult> {
+    try {
+      const resp = await fetch('/api/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'confirm_card_setup',
+          payToken,
+          setupIntentId,
+        }),
+      });
+      return (await resp.json().catch(() => ({
+        success: false,
+        error: 'Unexpected response confirming card setup.',
+      }))) as ConfirmPayLinkResult;
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || 'Network error confirming card setup.',
       };
     }
   }

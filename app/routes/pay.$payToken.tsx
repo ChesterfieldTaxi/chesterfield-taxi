@@ -131,12 +131,32 @@ export default function PublicPayLinkCheckoutPage() {
   const hasValidPk = Boolean(publishableKey && publishableKey.startsWith('pk_'));
   const canUseLiveStripe = stripeConfigured && hasValidPk;
 
-  // Handle redirect return from 3D Secure / Wallet flows (`?payment_intent=pi_...`)
+  // Handle redirect return from 3D Secure / Wallet flows (`?payment_intent=pi_...` or `?setup_intent=seti_...`)
   useEffect(() => {
     if (typeof window === 'undefined' || !payLink || payLink.status === 'paid') return;
     const params = new URLSearchParams(window.location.search);
+    const redirectedSeti = params.get('setup_intent');
     const redirectedPi = params.get('payment_intent');
     const redirectStatus = params.get('redirect_status');
+    if (
+      payLink.targetType === 'card_setup' &&
+      redirectedSeti &&
+      (!redirectStatus || redirectStatus === 'succeeded')
+    ) {
+      setIsSubmittingPayment(true);
+      getPayLinkService()
+        .confirmCardSetup(payLink.payToken, redirectedSeti)
+        .then((res) => {
+          if (res.success && res.payLink) {
+            setPayLink(res.payLink);
+            setCheckoutError(null);
+          } else if (res.error) {
+            setCheckoutError(res.error);
+          }
+        })
+        .finally(() => setIsSubmittingPayment(false));
+      return;
+    }
     if (redirectedPi && (!redirectStatus || redirectStatus === 'succeeded')) {
       setIsSubmittingPayment(true);
       getPayLinkService()
@@ -213,7 +233,7 @@ export default function PublicPayLinkCheckoutPage() {
 
       if (intentRes.success && intentRes.clientSecret) {
         setClientSecret(intentRes.clientSecret);
-        setActiveIntentId(intentRes.paymentIntentId || null);
+        setActiveIntentId(intentRes.setupIntentId || intentRes.paymentIntentId || null);
         setFallbackNotice(null);
       } else if (intentRes.error) {
         setCheckoutError(intentRes.error);
@@ -294,6 +314,48 @@ export default function PublicPayLinkCheckoutPage() {
         const stripe = stripeInstanceRef.current;
         const elements = elementsInstanceRef.current;
 
+        if (payLink.targetType === 'card_setup') {
+          const setupConfirmResult = await stripe.confirmSetup({
+            elements,
+            confirmParams: {
+              return_url: window.location.href,
+            },
+            redirect: 'if_required',
+          });
+
+          if (setupConfirmResult.error) {
+            setCheckoutError(
+              setupConfirmResult.error.message ||
+                'Card setup could not be completed. Please verify your card details.'
+            );
+            setIsSubmittingPayment(false);
+            return;
+          }
+
+          const confirmedSetiId = setupConfirmResult.setupIntent?.id || activeIntentId;
+          if (!confirmedSetiId) {
+            setCheckoutError('Unable to verify card setup confirmation reference.');
+            setIsSubmittingPayment(false);
+            return;
+          }
+
+          const serverSetup = await getPayLinkService().confirmCardSetup(
+            payLink.payToken,
+            confirmedSetiId
+          );
+
+          if (serverSetup.success && serverSetup.payLink) {
+            setPayLink(serverSetup.payLink);
+          } else {
+            setCheckoutError(
+              serverSetup.error ||
+                'Card setup is processing. Please refresh in a moment to verify.'
+            );
+          }
+          setIsSubmittingPayment(false);
+          return;
+        }
+
         const confirmResult = await stripe.confirmPayment({
           elements,
           confirmParams: {
@@ -347,6 +409,7 @@ export default function PublicPayLinkCheckoutPage() {
   }, [loaderData.payToken]);
 
   const isInvoice = payLink?.targetType === 'invoice';
+  const isCardSetup = payLink?.targetType === 'card_setup';
 
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-900 flex flex-col print:bg-white">
@@ -416,14 +479,22 @@ export default function PublicPayLinkCheckoutPage() {
                 <CheckIcon className="w-6 h-6" />
               </div>
               <div className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-100 print:text-emerald-700">
-                Official Payment Receipt
+                {isCardSetup ? 'Card Vault Confirmation' : 'Official Payment Receipt'}
               </div>
               <h1 className="text-2xl font-black tracking-tight">
-                ${(payLink.totalPaidAmount ?? payLink.baseAmount + (payLink.tipAmount || 0)).toFixed(2)}{' '}
-                <span className="text-sm font-bold opacity-85">{payLink.currency}</span>
+                {isCardSetup ? (
+                  'Card Saved Securely'
+                ) : (
+                  <>
+                    ${(payLink.totalPaidAmount ?? payLink.baseAmount + (payLink.tipAmount || 0)).toFixed(2)}{' '}
+                    <span className="text-sm font-bold opacity-85">{payLink.currency}</span>
+                  </>
+                )}
               </h1>
               <p className="text-xs text-emerald-50 print:text-slate-600">
-                Paid in full &middot; Thank you for choosing {COMPANY_CONFIG.name}
+                {isCardSetup
+                  ? `Saved on file ($0.00 charged today) · Ready for future rides with ${COMPANY_CONFIG.name}`
+                  : `Paid in full · Thank you for choosing ${COMPANY_CONFIG.name}`}
               </p>
             </div>
 
@@ -570,7 +641,11 @@ export default function PublicPayLinkCheckoutPage() {
                   </div>
                   <div className="min-w-0">
                     <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      {isInvoice ? 'Corporate Statement' : 'Chesterfield Taxi Ride'}
+                      {isCardSetup
+                        ? 'Card on File Vault Setup'
+                        : isInvoice
+                        ? 'Corporate Statement'
+                        : 'Chesterfield Taxi Ride'}
                     </div>
                     <div className="font-mono font-black text-sm text-white truncate">
                       {payLink.referenceNumber}
@@ -802,7 +877,9 @@ export default function PublicPayLinkCheckoutPage() {
                       <>
                         <LockIcon className="w-4 h-4" />
                         <span>
-                          Pay ${totalToPay.toFixed(2)} {payLink.currency} Securely
+                          {isCardSetup
+                            ? 'Save Card Securely ($0.00 Today)'
+                            : `Pay $${totalToPay.toFixed(2)} ${payLink.currency} Securely`}
                         </span>
                       </>
                     )}

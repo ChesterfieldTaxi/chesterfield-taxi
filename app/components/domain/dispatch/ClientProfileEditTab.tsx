@@ -16,6 +16,7 @@ import { Select, type SelectOption } from '../../ui/Select';
 import { Switch } from '../../ui/Switch';
 import { LocationAutocomplete } from '../LocationAutocomplete';
 import { ClientDriverPreferencesCard } from './ClientDriverPreferencesCard';
+import { ClientSavedCardsCard } from './ClientSavedCardsCard';
 import type { ResolvedClientProfileData } from './client-trip-history.util';
 
 const PHONE_TYPE_OPTIONS: ReadonlyArray<SelectOption> = [
@@ -66,6 +67,8 @@ function buildInitialDraft(profile: ResolvedClientProfileData): Partial<ContactR
     preferredVehicleTier: c?.preferredVehicleTier || 'standard',
     preferredDriverIds: prefs.preferredDriverIds,
     excludedDriverIds: prefs.excludedDriverIds,
+    stripeCustomerId: c?.stripeCustomerId,
+    savedPaymentMethods: c?.savedPaymentMethods ? c.savedPaymentMethods.map((m) => ({ ...m })) : [],
     accessibilityNeeds: { ...(c?.accessibilityNeeds || {}) },
     notes: c?.notes || profile.dispatcherNotes || '',
   };
@@ -220,6 +223,12 @@ export function ClientProfileEditTab({
         preferredDriverIds={form.preferredDriverIds || []}
         excludedDriverIds={form.excludedDriverIds || []}
         onChange={(next) => setForm((p) => ({ ...p, preferredDriverIds: next.preferredDriverIds, excludedDriverIds: next.excludedDriverIds }))}
+      />
+
+      <ClientSavedCardsCard
+        contactId={form.id} contactName={form.name} contactPhone={form.phone} contactEmail={form.email}
+        stripeCustomerId={form.stripeCustomerId} savedMethods={form.savedPaymentMethods || []}
+        onMethodsChange={(methods, u) => setForm((p) => ({ ...p, id: u?.id || p.id, stripeCustomerId: u?.stripeCustomerId || p.stripeCustomerId, savedPaymentMethods: methods }))}
       />
 
       <div className="bg-white rounded-xl border border-slate-200/90 p-3 space-y-2 shadow-2xs">

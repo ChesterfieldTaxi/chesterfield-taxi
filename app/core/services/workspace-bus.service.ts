@@ -203,6 +203,10 @@ export interface WorkspaceEventMap {
     initialTab?: 'overview' | 'edit' | 'trips' | 'places' | 'contact' | 'profile';
     source?: 'incoming_call' | 'answered_call' | 'outbound_call' | 'passenger_crm' | 'comms_hub' | 'floating_call_pill' | 'header_call_hud';
   };
+  DISPATCH_TOAST: {
+    text: string;
+    type: 'success' | 'error' | 'info';
+  };
 }
 
 export type WorkspaceEventType = keyof WorkspaceEventMap;

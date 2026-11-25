@@ -23,7 +23,7 @@ import { sanitizePublicAddressDisplay } from './tracking-token.util';
 
 export const PAY_TOKEN_PATTERN = /^pay_[a-zA-Z0-9_-]{24,80}$/;
 
-export type PayLinkTargetType = 'trip' | 'invoice';
+export type PayLinkTargetType = 'trip' | 'invoice' | 'card_setup';
 
 export type PayLinkStatus = 'open' | 'paid' | 'expired' | 'cancelled' | 'refunded';
 
@@ -478,6 +478,77 @@ export function buildInvoicePayLinkProjection(
   });
 }
 
+function hashOpaqueVaultId(raw: string): string {
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ (ch + i), 0x85ebca6b) >>> 0;
+  }
+  return `vault_${h1.toString(16).padStart(8, '0')}${h2.toString(16).padStart(8, '0').slice(0, 4)}`;
+}
+
+/**
+ * Builds a Zero-PII `PayLinkProjection` for a `card_setup` Vault Link ($0.00 immediate charge).
+ * Preserves exact `ALLOWED_PAY_LINK_KEYS` compatibility with `firestore.rules` `/payLinks/{payToken}`.
+ */
+export function buildCardSetupPayLinkProjection(
+  contact: {
+    contactId: string;
+    contactName?: string | null;
+    contactPhone?: string | null;
+    contactEmail?: string | null;
+  },
+  options?: {
+    payToken?: string;
+    expiresInHours?: number;
+    billingSettings?: Partial<BillingSettingsConfig> | null;
+    nowMs?: number;
+  }
+): PayLinkProjection {
+  const nowMs = options?.nowMs ?? Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+  const policy = resolvePayLinkPolicyDefaults('card_setup', options?.billingSettings, {
+    expiresInHours: options?.expiresInHours,
+    allowTip: false,
+    nowMs,
+  });
+  const payToken =
+    options?.payToken && isValidPayToken(options.payToken)
+      ? options.payToken.trim()
+      : generatePayToken();
+  const cleanId = String(contact.contactId || 'client').trim();
+  const opaqueTargetId = /\d{5,}|@/.test(cleanId) ? hashOpaqueVaultId(cleanId) : cleanId;
+  const refSuffix = payToken.replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase() || 'VAULT';
+  const referenceNumber = `SETUP-${refSuffix}`;
+  const customerLabel = maskFullNameString(contact.contactName);
+
+  return sanitizePayLinkProjection({
+    payToken,
+    targetType: 'card_setup',
+    targetId: opaqueTargetId,
+    referenceNumber,
+    customerLabel,
+    summaryLabel: 'Save Card on File ($0.00 Charge Today)',
+    serviceDate: nowIso.slice(0, 10),
+    lineItems: [
+      {
+        label: 'Encrypted Card on File Setup',
+        detail: 'Saved via Stripe Vault for future Chesterfield Taxi rides ($0.00 today)',
+        amount: 0,
+      },
+    ],
+    baseAmount: 0,
+    currency: 'USD',
+    allowTip: false,
+    status: 'open',
+    expiresAt: policy.expiresAt,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  });
+}
+
 /**
  * Defense-in-depth output sanitizer guaranteeing that ONLY allowlisted Zero-PII
  * fields exist on a `PayLinkProjection` before Firestore persistence or HTTP response.
@@ -486,7 +557,12 @@ export function sanitizePayLinkProjection(doc: Record<string, any>): PayLinkProj
   const validStatuses: readonly PayLinkStatus[] = ['open', 'paid', 'expired', 'cancelled', 'refunded'];
   const rawStatus = String(doc.status || 'open') as PayLinkStatus;
   const status: PayLinkStatus = validStatuses.includes(rawStatus) ? rawStatus : 'open';
-  const targetType: PayLinkTargetType = doc.targetType === 'invoice' ? 'invoice' : 'trip';
+  const targetType: PayLinkTargetType =
+    doc.targetType === 'invoice'
+      ? 'invoice'
+      : doc.targetType === 'card_setup'
+      ? 'card_setup'
+      : 'trip';
 
   const rawItems = Array.isArray(doc.lineItems) ? doc.lineItems : [];
   const lineItems: PayLinkLineItem[] = rawItems.map((item: any) =>

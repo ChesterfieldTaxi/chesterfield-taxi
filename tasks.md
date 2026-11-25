@@ -1259,3 +1259,17 @@
   - [x] 75.4.2 Create `GuestAccountActivationCard.tsx` (`< 230`L) near the top of `BookingConfirmation.tsx` (replacing bottom CTA box) and wire `customerId` + `shouldRenderGuestSignupCta` across booking request, confirmation, non-cancelled/declined status update, and receipt emails.
 - [x] 75.5 Verification Suite (`scripts/test-hero-quote-rounding-and-guest-claim-phase75.ts < 350`L) & Build Gate:
   - [x] 75.5.1 Create `scripts/test-hero-quote-rounding-and-guest-claim-phase75.ts` (`< 350`L) and verify `test-call-hud-and-driver-prefs-phase74.ts`, `test-pricing-audit-trail.ts`, `npm run typecheck`, and `npm run build` exit `0`.
+
+## Phase 76 (User Phase 77 — Wave 6 Finale): Dispatch Form Direct `CONFIRMED` + Reliable `Email Confirm` Fix & Client Saved Payment Methods Vault
+- [x] 76.0 Baseline Commit & Spec-Driven Documentation:
+  - [x] 76.0.1 Stage and commit verified Phase 75 baseline on `main` (`feat(phase-75): lock hero estimate height, eliminate rounding from all breakdowns, fix frame-1 Call HUD sync, add Complete Trip driver/datetime, and add guest account conversion`).
+  - [x] 76.0.2 Document Platform Phase 76 scope, architecture, and verification tasks in `spec.md`, `plan.md`, and `tasks.md`.
+- [x] 76.1 Dispatch Form Direct `CONFIRMED` Status & Reliable `Email Confirm` Delivery:
+  - [x] 76.1.1 Set `status: 'CONFIRMED'` on dispatcher-created payloads in `useDispatchBookingSubmission.ts` and prevent `REQUIRE_REVIEW -> UNCONFIRMED` downgrades for `isStaffCreated` bookings in `firebase-booking.service.ts` while preserving `BLACKLIST_BLOCK`.
+  - [x] 76.1.2 Export `resolveDispatchConfirmationRecipient`, backfill blank `passenger.email`, `await` `sendBookingConfirmation` before form reset, surface explicit email toast feedback (`success` / `res.error` / `no email on file`), and render `(no email)` indicator in `DispatchBookingFooterBar.tsx`.
+- [x] 76.2 PCI-Safe Client Saved Payment Methods Vault & `/pay/:payToken` Card Setup:
+  - [x] 76.2.1 Extend `ContactRecord` with `stripeCustomerId` + `savedPaymentMethods` (`ClientSavedPaymentMethod`), add `upsertSavedPaymentMethod`, `removeSavedPaymentMethod`, `setDefaultSavedPaymentMethod`, and non-blocking Firestore `/contacts/{contactId}` sync in `contact.service.ts`.
+  - [x] 76.2.2 Create `app/core/services/payments/saved-cards.server.ts` (`create_setup_intent`, `list_saved_methods`, `charge_saved_method`, `create_intent` `saveCardForFuture`) wired into `api.payments.ts`, and extend `pay-token.util.ts`, `pay-link.server.ts`, `pay-link.service.ts`, and `pay.$payToken.tsx` with `targetType: 'card_setup'`.
+  - [x] 76.2.3 Create `ClientSavedCardsCard.tsx` (`< 210`L) in `ClientProfileEditTab.tsx` (`< 285`L), upgrade `DispatchPaymentAssignmentSection.tsx` (`data-dispatch-saved-card-select="true"` + `Save reference to client profile`), and add `Charge Saved Card` settlement in `DispatchCompleteTripModal.tsx` (`< 435`L).
+- [x] 76.3 Verification Suite (`scripts/test-dispatch-confirm-email-and-saved-cards-phase76.ts < 350`L) & Build Gate:
+  - [x] 76.3.1 Create `scripts/test-dispatch-confirm-email-and-saved-cards-phase76.ts` (`< 350`L) and pass Phases 74–76 suites, `npm run typecheck`, and `npm run build` (`0.00 kB` API chunks) with `0` errors.

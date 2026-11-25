@@ -7,6 +7,7 @@
  * Persists custom updates in localStorage with cross-tab synchronization via WorkspaceBus.
  */
 
+import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
 import type {
   CommsChannel,
   CommsContactType,
@@ -15,7 +16,10 @@ import type {
   CommsUnreadByChannel,
 } from '../../types/comms';
 import { formatDisplayPhone, sanitizeToE164 } from '../../utils/phone';
+import { getAdminAuthService } from '../auth/admin-auth.service';
 import { SAMPLE_PASSENGER_PROFILES } from '../booking/passenger-lookup.service';
+import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
+import { sanitizePayload } from '../firestore-sanitizer';
 import { getWorkspaceBus } from '../workspace-bus.service';
 
 export type PhoneType = 'mobile' | 'home' | 'work' | 'other';
@@ -37,6 +41,23 @@ export interface ContactSavedPlace {
   address: string;
   coordinates?: { lat: number; lng: number };
   notes?: string;
+}
+
+/**
+ * PCI-Safe Saved Payment Method Schema.
+ * Strictly tokenized (`pm_...` or `ref_...`) + brand/last4/expiry — NEVER raw PAN or CVC.
+ */
+export interface ClientSavedPaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  cardholderName?: string;
+  isDefault?: boolean;
+  mode: 'stripe_pm' | 'reference_only';
+  stripeCustomerId?: string;
+  addedAt: string;
 }
 
 export interface ContactRecord {
@@ -66,6 +87,8 @@ export interface ContactRecord {
   homeAddress?: string;
   workAddress?: string;
   savedPlaces?: ContactSavedPlace[];
+  stripeCustomerId?: string;
+  savedPaymentMethods?: ClientSavedPaymentMethod[];
   accessibilityNeeds?: {
     wheelchair?: boolean;
     walker?: boolean;
@@ -194,6 +217,218 @@ export function normalizeClientDriverPreferences(
     }
   }
   return { preferredDriverIds, excludedDriverIds };
+}
+
+const STRIPE_CUS_ID_RE = /^cus_[a-zA-Z0-9]{6,64}$/;
+const STRIPE_PM_ID_RE = /^pm_[a-zA-Z0-9]{6,64}$/;
+
+export function formatCardBrandLabel(brand?: string | null): string {
+  const b = String(brand || '').trim().toLowerCase();
+  if (b === 'visa') return 'Visa';
+  if (b === 'mastercard' || b === 'mc') return 'Mastercard';
+  if (b === 'amex' || b === 'american_express') return 'Amex';
+  if (b === 'discover') return 'Discover';
+  if (b === 'diners') return 'Diners';
+  if (b === 'jcb') return 'JCB';
+  return b ? b.charAt(0).toUpperCase() + b.slice(1) : 'Card';
+}
+
+export function parseCardExpiryInput(
+  rawExp?: string | null
+): { expMonth: number; expYear: number } | null {
+  const clean = String(rawExp || '').trim();
+  if (!clean) return null;
+  const parts = clean.split(/[\/\-.\s]+/).filter(Boolean);
+  let mm = 0;
+  let yy = 0;
+  if (parts.length >= 2) {
+    mm = Number.parseInt(parts[0], 10);
+    yy = Number.parseInt(parts[1], 10);
+  } else {
+    const digits = clean.replace(/\D/g, '');
+    if (digits.length === 4) {
+      mm = Number.parseInt(digits.slice(0, 2), 10);
+      yy = Number.parseInt(digits.slice(2, 4), 10);
+    } else if (digits.length === 6) {
+      mm = Number.parseInt(digits.slice(0, 2), 10);
+      yy = Number.parseInt(digits.slice(2, 6), 10);
+    } else {
+      return null;
+    }
+  }
+  if (!Number.isFinite(mm) || mm < 1 || mm > 12 || !Number.isFinite(yy)) return null;
+  const expYear = yy < 100 ? 2000 + yy : yy;
+  if (expYear < 2020 || expYear > 2099) return null;
+  return { expMonth: mm, expYear };
+}
+
+export function formatCardExpiryDisplay(expMonth?: number, expYear?: number): string {
+  const mm = Math.min(12, Math.max(1, Math.round(Number(expMonth) || 12)));
+  const rawYr = Math.round(Number(expYear) || 2030);
+  const fullYr = rawYr < 100 ? 2000 + rawYr : rawYr;
+  return `${String(mm).padStart(2, '0')}/${String(fullYr).slice(-2)}`;
+}
+
+/**
+ * Normalizes a single saved payment method strictly to PCI-safe tokenized fields.
+ * Never retains raw 13–19 digit PANs or CVC values.
+ */
+export function normalizeSavedPaymentMethod(
+  raw: Partial<ClientSavedPaymentMethod> & Record<string, any>
+): ClientSavedPaymentMethod | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const digits = String(raw.last4 ?? '').replace(/\D/g, '');
+  const last4 = digits.slice(-4);
+  if (!/^\d{4}$/.test(last4)) return null;
+
+  const rawBrand = String(raw.brand || 'card')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '');
+  const brand = rawBrand || 'card';
+
+  const rawMonth = Math.round(Number(raw.expMonth));
+  const expMonth = Number.isFinite(rawMonth) && rawMonth >= 1 && rawMonth <= 12 ? rawMonth : 12;
+  const rawYear = Math.round(Number(raw.expYear));
+  const fullYear = Number.isFinite(rawYear) && rawYear > 0
+    ? rawYear < 100
+      ? 2000 + rawYear
+      : rawYear
+    : new Date().getFullYear() + 3;
+  const expYear = Math.min(2099, Math.max(2020, fullYear));
+
+  const rawId = String(raw.id || '').trim();
+  const isStripePm =
+    raw.mode === 'stripe_pm' && STRIPE_PM_ID_RE.test(rawId);
+  const mode: 'stripe_pm' | 'reference_only' = isStripePm ? 'stripe_pm' : 'reference_only';
+
+  // Ensure reference IDs never embed 12+ consecutive digits
+  const safeCustomRefId =
+    rawId.startsWith('ref_') && !/\d{12,}/.test(rawId)
+      ? rawId
+      : `ref_${brand}_${last4}_${String(expMonth).padStart(2, '0')}${String(expYear).slice(-2)}`;
+  const id = isStripePm ? rawId : safeCustomRefId;
+
+  const rawCus = String(raw.stripeCustomerId || '').trim();
+  const stripeCustomerId = STRIPE_CUS_ID_RE.test(rawCus) ? rawCus : undefined;
+  const cardholderName = String(raw.cardholderName || '').trim() || undefined;
+  const addedAt =
+    typeof raw.addedAt === 'string' && raw.addedAt.trim()
+      ? raw.addedAt.trim()
+      : new Date().toISOString();
+
+  return {
+    id,
+    brand,
+    last4,
+    expMonth,
+    expYear,
+    ...(cardholderName ? { cardholderName } : {}),
+    isDefault: Boolean(raw.isDefault),
+    mode,
+    ...(stripeCustomerId ? { stripeCustomerId } : {}),
+    addedAt,
+  };
+}
+
+/**
+ * Normalizes, deduplicates, and enforces single-default invariant on a contact's saved payment methods.
+ */
+export function normalizeSavedPaymentMethods(
+  list?: ReadonlyArray<Partial<ClientSavedPaymentMethod>> | null
+): ClientSavedPaymentMethod[] {
+  if (!Array.isArray(list) || list.length === 0) return [];
+  const out: ClientSavedPaymentMethod[] = [];
+  for (const item of list) {
+    const clean = normalizeSavedPaymentMethod(item as any);
+    if (!clean) continue;
+    const dupIdx = out.findIndex(
+      (m) =>
+        m.id === clean.id ||
+        (m.mode === clean.mode &&
+          m.brand === clean.brand &&
+          m.last4 === clean.last4 &&
+          m.expMonth === clean.expMonth &&
+          m.expYear === clean.expYear)
+    );
+    if (dupIdx >= 0) {
+      out[dupIdx] = {
+        ...out[dupIdx],
+        ...clean,
+        isDefault: Boolean(clean.isDefault || out[dupIdx].isDefault),
+      };
+    } else {
+      out.push(clean);
+    }
+  }
+  if (out.length === 0) return [];
+
+  let defaultIdx = -1;
+  for (let i = out.length - 1; i >= 0; i--) {
+    if (out[i].isDefault) {
+      defaultIdx = i;
+      break;
+    }
+  }
+  if (defaultIdx < 0) defaultIdx = 0;
+
+  return out.map((m, idx) => ({
+    ...m,
+    isDefault: idx === defaultIdx,
+  }));
+}
+
+export function resolveCompletableStripeSavedCard(params: {
+  tripMetadata?: Record<string, any> | null;
+  vaultedCardId?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}): {
+  stripeCustomerId: string;
+  paymentMethodId: string;
+  brand: string;
+  last4: string;
+} | null {
+  const cardMeta = (params.tripMetadata?.cardDetails || {}) as Record<string, any>;
+  const contact =
+    (params.phone ? getContactService().getContactByPhone(params.phone) : null) ||
+    (params.email ? getContactService().getContactByEmail(params.email) : null);
+
+  const candidatePmId = String(
+    cardMeta.savedPaymentMethodId || params.vaultedCardId || ''
+  ).trim();
+  const savedStripeMethods = (contact?.savedPaymentMethods || []).filter(
+    (m) => m.mode === 'stripe_pm' && STRIPE_PM_ID_RE.test(m.id)
+  );
+  const matchedMethod =
+    (STRIPE_PM_ID_RE.test(candidatePmId)
+      ? savedStripeMethods.find((m) => m.id === candidatePmId)
+      : undefined) ||
+    savedStripeMethods.find((m) => m.isDefault) ||
+    savedStripeMethods[0];
+
+  const resolvedPmId =
+    matchedMethod?.id || (STRIPE_PM_ID_RE.test(candidatePmId) ? candidatePmId : '');
+  const resolvedCusId = String(
+    matchedMethod?.stripeCustomerId ||
+      cardMeta.stripeCustomerId ||
+      contact?.stripeCustomerId ||
+      ''
+  ).trim();
+
+  if (!STRIPE_PM_ID_RE.test(resolvedPmId) || !STRIPE_CUS_ID_RE.test(resolvedCusId)) {
+    return null;
+  }
+
+  return {
+    stripeCustomerId: resolvedCusId,
+    paymentMethodId: resolvedPmId,
+    brand: matchedMethod?.brand || String(cardMeta.cardBrand || 'card'),
+    last4:
+      matchedMethod?.last4 ||
+      String(cardMeta.cardLast4 || '').replace(/\D/g, '').slice(-4) ||
+      '0000',
+  };
 }
 
 /**
@@ -896,6 +1131,18 @@ class ContactService {
         profile.homeAddress !== undefined ? profile.homeAddress : mergedExisting.homeAddress || '',
       workAddress:
         profile.workAddress !== undefined ? profile.workAddress : mergedExisting.workAddress || '',
+      savedPlaces:
+        profile.savedPlaces !== undefined ? profile.savedPlaces : mergedExisting.savedPlaces,
+      stripeCustomerId:
+        profile.stripeCustomerId && STRIPE_CUS_ID_RE.test(profile.stripeCustomerId.trim())
+          ? profile.stripeCustomerId.trim()
+          : mergedExisting.stripeCustomerId,
+      savedPaymentMethods:
+        profile.savedPaymentMethods !== undefined
+          ? normalizeSavedPaymentMethods(profile.savedPaymentMethods)
+          : mergedExisting.savedPaymentMethods
+          ? normalizeSavedPaymentMethods(mergedExisting.savedPaymentMethods)
+          : undefined,
       accessibilityNeeds: profile.accessibilityNeeds || mergedExisting.accessibilityNeeds || {},
       smsNotifications: profile.smsNotifications ?? mergedExisting.smsNotifications ?? true,
       notes: profile.notes !== undefined ? profile.notes : mergedExisting.notes || '',
@@ -909,6 +1156,7 @@ class ContactService {
 
     this.indexContactRecord(record);
     this.saveToStorage();
+    this.persistContactToFirestore(record);
 
     try {
       const bus = getWorkspaceBus();
@@ -1011,16 +1259,175 @@ class ContactService {
     };
   }
 
-  /** Persists an already-built record (index + storage + CONTACT_UPDATED + listeners). */
+  /** Persists an already-built record (index + storage + Firestore + CONTACT_UPDATED + listeners). */
   private commitContactRecord(record: ContactRecord): ContactRecord {
     const next: ContactRecord = { ...record, updatedAt: Date.now() };
     this.indexContactRecord(next);
     this.saveToStorage();
+    this.persistContactToFirestore(next);
     try {
       getWorkspaceBus().publish('CONTACT_UPDATED', { contact: next });
     } catch {}
     this.notifyListeners({ action: 'saved', contact: next });
     return next;
+  }
+
+  private isAuthenticatedStaff(): boolean {
+    try {
+      const user = getAdminAuthService().getCurrentUser();
+      if (!user) return false;
+      const roles = Array.isArray(user.roles) ? user.roles : [];
+      return (
+        user.role === 'admin' ||
+        user.role === 'dispatcher' ||
+        roles.includes('admin') ||
+        roles.includes('dispatcher')
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private persistContactToFirestore(record: ContactRecord): void {
+    if (!isFirebaseConfigured() || !record?.id || !this.isAuthenticatedStaff()) return;
+    try {
+      const db = getFirestoreDb();
+      if (!db) return;
+      void setDoc(doc(db, 'contacts', record.id), sanitizePayload(record), { merge: true }).catch(
+        () => {}
+      );
+    } catch {
+      // Non-blocking fallback to localStorage + WorkspaceBus
+    }
+  }
+
+  public async syncContactsFromFirestore(): Promise<number> {
+    if (!isFirebaseConfigured() || !this.isAuthenticatedStaff()) return 0;
+    try {
+      const db = getFirestoreDb();
+      if (!db) return 0;
+      const snap = await getDocs(collection(db, 'contacts'));
+      let synced = 0;
+      snap.forEach((docSnap) => {
+        const data = docSnap.data() as ContactRecord | undefined;
+        if (!data || !docSnap.id) return;
+        const remote: ContactRecord = {
+          ...data,
+          id: data.id || docSnap.id,
+          savedPaymentMethods: data.savedPaymentMethods
+            ? normalizeSavedPaymentMethods(data.savedPaymentMethods)
+            : undefined,
+        };
+        const existing = this.customContacts.get(remote.id);
+        if (!existing || (remote.updatedAt || 0) >= (existing.updatedAt || 0)) {
+          this.indexContactRecord(remote);
+          synced += 1;
+        }
+      });
+      if (synced > 0) {
+        this.saveToStorage();
+        this.notifyListeners({ action: 'saved', contact: {} as ContactRecord });
+      }
+      return synced;
+    } catch {
+      return 0;
+    }
+  }
+
+  public upsertSavedPaymentMethod(
+    contactIdOrQuery:
+      | string
+      | { contactId?: string; phone?: string; email?: string; name?: string },
+    method: Partial<ClientSavedPaymentMethod> & {
+      last4: string;
+      expMonth: number;
+      expYear: number;
+      mode?: 'stripe_pm' | 'reference_only';
+    }
+  ): ContactRecord | null {
+    const normalizedInput = normalizeSavedPaymentMethod(method);
+    if (!normalizedInput) return null;
+
+    let base: ContactRecord | null = null;
+    if (typeof contactIdOrQuery === 'string') {
+      const key = contactIdOrQuery.trim();
+      base =
+        this.getContactById(key) ||
+        this.getContactByPhone(key) ||
+        this.getContactByEmail(key);
+    } else if (contactIdOrQuery && typeof contactIdOrQuery === 'object') {
+      base =
+        (contactIdOrQuery.contactId
+          ? this.getContactById(contactIdOrQuery.contactId)
+          : null) ||
+        (contactIdOrQuery.phone ? this.getContactByPhone(contactIdOrQuery.phone) : null) ||
+        (contactIdOrQuery.email ? this.getContactByEmail(contactIdOrQuery.email) : null);
+      if (
+        !base &&
+        (contactIdOrQuery.phone?.trim() ||
+          contactIdOrQuery.email?.trim() ||
+          contactIdOrQuery.name?.trim())
+      ) {
+        base = this.saveContact({
+          id: contactIdOrQuery.contactId,
+          name:
+            (contactIdOrQuery.name || '').trim() ||
+            contactIdOrQuery.phone ||
+            contactIdOrQuery.email ||
+            'Customer',
+          phone: contactIdOrQuery.phone || '',
+          email: contactIdOrQuery.email || '',
+        });
+      }
+    }
+    if (!base) return null;
+
+    const current = normalizeSavedPaymentMethods(base.savedPaymentMethods);
+    const makeDefault = Boolean(method.isDefault || current.length === 0);
+    const preparedList = makeDefault
+      ? current.map((m) => ({ ...m, isDefault: false }))
+      : [...current];
+
+    const nextMethods = normalizeSavedPaymentMethods([
+      ...preparedList,
+      { ...normalizedInput, isDefault: makeDefault },
+    ]);
+
+    return this.commitContactRecord({
+      ...base,
+      stripeCustomerId: normalizedInput.stripeCustomerId || base.stripeCustomerId,
+      savedPaymentMethods: nextMethods,
+    });
+  }
+
+  public removeSavedPaymentMethod(contactId: string, methodId: string): ContactRecord | null {
+    const existing =
+      this.getContactById(contactId) ||
+      this.getContactByPhone(contactId) ||
+      this.getContactByEmail(contactId);
+    if (!existing) return null;
+    const filtered = (existing.savedPaymentMethods || []).filter((m) => m.id !== methodId);
+    return this.commitContactRecord({
+      ...existing,
+      savedPaymentMethods: normalizeSavedPaymentMethods(filtered),
+    });
+  }
+
+  public setDefaultSavedPaymentMethod(contactId: string, methodId: string): ContactRecord | null {
+    const existing =
+      this.getContactById(contactId) ||
+      this.getContactByPhone(contactId) ||
+      this.getContactByEmail(contactId);
+    if (!existing || !Array.isArray(existing.savedPaymentMethods)) return null;
+    if (!existing.savedPaymentMethods.some((m) => m.id === methodId)) return existing;
+    const updated = existing.savedPaymentMethods.map((m) => ({
+      ...m,
+      isDefault: m.id === methodId,
+    }));
+    return this.commitContactRecord({
+      ...existing,
+      savedPaymentMethods: normalizeSavedPaymentMethods(updated),
+    });
   }
 
   /**

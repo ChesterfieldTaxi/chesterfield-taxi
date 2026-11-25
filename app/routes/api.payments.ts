@@ -22,15 +22,35 @@ import {
   getRequestClientIp,
   verifyServerRequestAuth,
 } from '../core/services/auth/server-auth.server';
+import {
+  STRIPE_CUS_ID_PATTERN,
+  handleChargeSavedMethodServer,
+  handleCreateSetupIntentServer,
+  handleListSavedMethodsServer,
+} from '../core/services/payments/saved-cards.server';
 
 export interface PaymentApiRequest {
-  action: 'create_intent' | 'verify_processor' | 'capture_intent' | 'cancel_intent';
+  action:
+    | 'create_intent'
+    | 'verify_processor'
+    | 'capture_intent'
+    | 'cancel_intent'
+    | 'create_setup_intent'
+    | 'list_saved_methods'
+    | 'charge_saved_method';
   processor?: 'stripe' | 'square';
   amount?: number; // In dollars (e.g. 45.50)
   currency?: string;
   tripId?: string;
   paymentMethodId?: string;
   paymentIntentId?: string;
+  stripeCustomerId?: string;
+  saveCardForFuture?: boolean;
+  contactId?: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  description?: string;
   credentials?: {
     stripeSecretKey?: string;
     squareAccessToken?: string;
@@ -263,6 +283,12 @@ export async function action({ request }: ActionFunctionArgs) {
       if (data.paymentMethodId && /^pm_[a-zA-Z0-9]+$/.test(data.paymentMethodId)) {
         params.append('payment_method', data.paymentMethodId);
       }
+      if (data.stripeCustomerId && STRIPE_CUS_ID_PATTERN.test(data.stripeCustomerId.trim())) {
+        params.append('customer', data.stripeCustomerId.trim());
+      }
+      if (data.saveCardForFuture) {
+        params.append('setup_future_usage', 'off_session');
+      }
 
       const stripeResp = await fetch('https://api.stripe.com/v1/payment_intents', {
         method: 'POST',
@@ -417,6 +443,53 @@ export async function action({ request }: ActionFunctionArgs) {
           { status: 400 }
         );
       }
+    }
+
+    // ─── 5. Create SetupIntent for PCI-Safe Card Vaulting ───
+    if (data.action === 'create_setup_intent') {
+      const clientIp = getRequestClientIp(request);
+      if (!auth.isDispatcher && !checkRateLimit(`pay_setup:${clientIp}`, 15, 5 * 60_000)) {
+        return Response.json(
+          { success: false, error: 'Too many card setup attempts. Please wait a moment.' },
+          { status: 429 }
+        );
+      }
+      const setupRes = await handleCreateSetupIntentServer({
+        stripeSecretKey,
+        stripeCustomerId: data.stripeCustomerId,
+        contactId: data.contactId,
+        name: data.customerName,
+        email: data.customerEmail,
+        phone: data.customerPhone,
+      });
+      return Response.json(setupRes.body, { status: setupRes.httpStatus });
+    }
+
+    // ─── 6. List Saved PaymentMethods (Staff Only) ───
+    if (data.action === 'list_saved_methods') {
+      const listRes = await handleListSavedMethodsServer({
+        auth,
+        enforceAuth,
+        stripeSecretKey,
+        stripeCustomerId: data.stripeCustomerId,
+      });
+      return Response.json(listRes.body, { status: listRes.httpStatus });
+    }
+
+    // ─── 7. Charge Saved PaymentMethod Off-Session (Staff Only) ───
+    if (data.action === 'charge_saved_method') {
+      const chargeRes = await handleChargeSavedMethodServer({
+        auth,
+        enforceAuth,
+        stripeSecretKey,
+        stripeCustomerId: data.stripeCustomerId,
+        paymentMethodId: data.paymentMethodId,
+        amount: data.amount,
+        currency: data.currency,
+        tripId: data.tripId,
+        description: data.description,
+      });
+      return Response.json(chargeRes.body, { status: chargeRes.httpStatus });
     }
 
     return Response.json(

@@ -10,6 +10,7 @@ import type { AppSettings } from '../core/types/config';
 import type { Trip } from '../core/types/trip';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import type { DispatchFormValues } from '../components/domain/dispatch/DispatchBookingEngine';
+import type { DispatchBookingFeedback } from '../components/domain/dispatch/booking/useDispatchBookingSubmission';
 import type { DateTimeRange } from '../components/domain/dispatch/CustomDateTimePicker';
 import { SpinnerIcon, MapIcon, AlertTriangleIcon, CheckIcon, InfoIcon, XIcon } from '../components/ui/Icons';
 import { useDisplayLayout } from '../core/hooks/useDisplayLayout';
@@ -217,6 +218,14 @@ export default function DispatchRoute() {
     },
     []
   );
+
+  useEffect(() => {
+    return getWorkspaceBus().subscribe((msg) => {
+      if (msg.type === 'DISPATCH_TOAST' && msg.payload?.text) {
+        setDispatchToast({ type: msg.payload.type || 'info', text: msg.payload.text });
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (!dispatchToast) return;
@@ -690,7 +699,7 @@ export default function DispatchRoute() {
   }, []);
 
   const stableDraftBookingSuccess = useCallback(
-    (draftId: string, savedTrip: Trip, isEdit: boolean) => {
+    (draftId: string, savedTrip: Trip, isEdit: boolean, feedback?: DispatchBookingFeedback) => {
       const shortTripNo = savedTrip.id.slice(-6).toUpperCase();
       const paxName =
         `${savedTrip.passenger?.firstName || ''} ${savedTrip.passenger?.lastName || ''}`.trim() ||
@@ -698,7 +707,14 @@ export default function DispatchRoute() {
       const autoClear = normalizeDispatchConsoleConfig(
         getAdminConfigService().getCachedSettings().dispatchConsoleConfig
       ).autoClearFormAfterCreate;
-      if (savedTrip.multiCarGroupId && (savedTrip.multiCarTotal || 1) > 1) {
+      if (feedback?.emailToastText && !isEdit) {
+        panelCallbacksRef.current.showDispatchToast(
+          feedback.emailToastType === 'success'
+            ? `Booked Trip #${shortTripNo} (${paxName}) · ${feedback.emailToastText}`
+            : feedback.emailToastText,
+          feedback.emailToastType || 'info'
+        );
+      } else if (savedTrip.multiCarGroupId && (savedTrip.multiCarTotal || 1) > 1) {
         panelCallbacksRef.current.showDispatchToast(
           `${isEdit ? 'Split into' : 'Created'} ${savedTrip.multiCarTotal} linked trips (${savedTrip.multiCarGroupId}) — assign each car individually.`,
           'success'

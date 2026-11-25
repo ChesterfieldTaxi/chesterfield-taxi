@@ -20,7 +20,9 @@ import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import type { BillingSettingsConfig, InvoiceRecord } from '../../types/config';
 import type { Trip } from '../../types/trip';
 import {
+  buildCardSetupPayLinkProjection,
   buildInvoicePayLinkProjection,
+  buildPayReceiptNumber,
   buildTripPayLinkProjection,
   computeAuthoritativePayLinkCharge,
   evaluatePayLinkExpiry,
@@ -39,16 +41,32 @@ import {
 } from '../auth/server-auth.server';
 import { getBookingService } from '../booking';
 import type { IBookingService } from '../booking-service';
+import { getContactService } from '../customer/contact.service';
 import { ResendEmailService } from '../email/resend-email.service';
 import { isFirebaseConfigured } from '../firebase';
 import { getInvoicingService } from '../invoicing.service';
 import type { IInvoicingService } from '../../types/invoicing';
+import {
+  handleCreateSetupIntentServer,
+  verifySetupIntentAndExtractMethodServer,
+} from './saved-cards.server';
 import {
   getServerPaymentLoopStore,
   getServiceAccountDatastoreToken,
   patchFirestoreDocumentRest,
   settleVerifiedPaymentIntent,
 } from './stripe-webhook.server';
+
+const cardSetupMetaStore = new Map<
+  string,
+  {
+    contactId: string;
+    contactName?: string;
+    contactPhone?: string;
+    contactEmail?: string;
+    stripeCustomerId?: string;
+  }
+>();
 
 const STRIPE_PI_PATTERN = /^pi_[a-zA-Z0-9]{8,64}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -165,7 +183,10 @@ async function sendPayLinkEmailServer(params: {
   const companyName = COMPANY_CONFIG.name;
   const companyPhone = COMPANY_CONFIG.phone.dispatch;
   const isInvoice = payLink.targetType === 'invoice';
-  const subject = isInvoice
+  const isCardSetup = payLink.targetType === 'card_setup';
+  const subject = isCardSetup
+    ? `Secure Card on File Setup ($0.00 Today) | ${companyName}`
+    : isInvoice
     ? `Payment Link: Invoice ${payLink.referenceNumber} ($${payLink.baseAmount.toFixed(2)}) | ${companyName}`
     : `1-Tap Pay Link: Ride ${payLink.referenceNumber} ($${payLink.baseAmount.toFixed(2)}) | ${companyName}`;
 
@@ -230,7 +251,7 @@ async function sendPayLinkEmailServer(params: {
 
           <div style="text-align: center; margin: 22px 0;">
             <a href="${escapeHtml(payUrl)}" style="display: inline-block; background-color: #2563eb; color: #ffffff; font-size: 15px; font-weight: 800; text-decoration: none; padding: 13px 28px; border-radius: 12px;">
-              Pay $${payLink.baseAmount.toFixed(2)} Securely &rarr;
+              ${isCardSetup ? 'Save Card Securely ($0.00 Today)' : `Pay $${payLink.baseAmount.toFixed(2)} Securely`} &rarr;
             </a>
             <div style="font-size: 11px; color: #64748b; margin-top: 10px; word-break: break-all;">
               ${escapeHtml(payUrl)}
@@ -354,6 +375,10 @@ export async function lookupPublicPayLinkServer(
 export interface CreatePayLinkServerInput {
   targetType: PayLinkTargetType;
   targetId: string;
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  stripeCustomerId?: string;
   expiresInHours?: number;
   allowTip?: boolean;
   billingSettings?: Partial<BillingSettingsConfig> | null;
@@ -390,11 +415,28 @@ export async function createOrReusePayLinkServer(input: CreatePayLinkServerInput
 }> {
   const nowMs = input.nowMs ?? Date.now();
   const nowIso = new Date(nowMs).toISOString();
-  const targetType: PayLinkTargetType = input.targetType === 'invoice' ? 'invoice' : 'trip';
+  const targetType: PayLinkTargetType =
+    input.targetType === 'invoice'
+      ? 'invoice'
+      : input.targetType === 'card_setup'
+      ? 'card_setup'
+      : 'trip';
   const targetId = String(input.targetId || '').trim();
 
   if (!targetId) {
     return { success: false, status: 400, error: 'Valid targetId is required to create a pay link.' };
+  }
+
+  if (
+    targetType === 'card_setup' &&
+    (input.isDriver || input.isCorporateManager) &&
+    !input.isDispatcher
+  ) {
+    return {
+      success: false,
+      status: 403,
+      error: 'Forbidden: Only Dispatchers or Administrators may generate client card setup links.',
+    };
   }
 
   if (
@@ -495,6 +537,27 @@ export async function createOrReusePayLinkServer(input: CreatePayLinkServerInput
       billingSettings: input.billingSettings,
       nowMs,
     });
+  } else if (targetType === 'card_setup') {
+    const existingContact = getContactService().getContactById(targetId);
+    if (!resolvedPhone) {
+      resolvedPhone = input.contactPhone?.trim() || existingContact?.phone || '';
+    }
+    if (!resolvedEmail) {
+      resolvedEmail = input.contactEmail?.trim() || existingContact?.email || '';
+    }
+    freshProjection = buildCardSetupPayLinkProjection(
+      {
+        contactId: targetId,
+        contactName: input.contactName || existingContact?.name,
+        contactPhone: resolvedPhone,
+        contactEmail: resolvedEmail,
+      },
+      {
+        expiresInHours: input.expiresInHours,
+        billingSettings: input.billingSettings,
+        nowMs,
+      }
+    );
   } else {
     if (restToken && isFirebaseConfigured()) {
       const doc = await fetchFirestoreDocumentRest('invoices', targetId, restToken);
@@ -540,7 +603,7 @@ export async function createOrReusePayLinkServer(input: CreatePayLinkServerInput
     });
   }
 
-  if (freshProjection.baseAmount <= 0) {
+  if (targetType !== 'card_setup' && freshProjection.baseAmount <= 0) {
     return {
       success: false,
       status: 400,
@@ -558,10 +621,11 @@ export async function createOrReusePayLinkServer(input: CreatePayLinkServerInput
       existingLookup.found &&
       existingLookup.payLink &&
       existingLookup.payLink.targetType === targetType &&
-      existingLookup.payLink.targetId === targetId &&
+      (existingLookup.payLink.targetId === targetId ||
+        existingLookup.payLink.targetId === freshProjection.targetId) &&
       ((existingLookup.payLink.status === 'open' &&
         Math.abs(existingLookup.payLink.baseAmount - freshProjection.baseAmount) < 0.01) ||
-        existingLookup.payLink.status === 'paid')
+        (targetType !== 'card_setup' && existingLookup.payLink.status === 'paid'))
     ) {
       activePayLink = existingLookup.payLink;
       reused = true;
@@ -634,6 +698,16 @@ export async function createOrReusePayLinkServer(input: CreatePayLinkServerInput
     }
   }
 
+  if (targetType === 'card_setup') {
+    cardSetupMetaStore.set(activePayLink.payToken, {
+      contactId: targetId,
+      contactName: input.contactName,
+      contactPhone: resolvedPhone,
+      contactEmail: resolvedEmail,
+      stripeCustomerId: input.stripeCustomerId,
+    });
+  }
+
   const payUrl = `${origin}/pay/${activePayLink.payToken}`;
 
   let smsResult:
@@ -645,7 +719,9 @@ export async function createOrReusePayLinkServer(input: CreatePayLinkServerInput
 
   if (input.sendSms && activePayLink.status === 'open') {
     const smsBody =
-      targetType === 'invoice'
+      targetType === 'card_setup'
+        ? `Chesterfield Taxi: Securely save a card on file ($0.00 charge today): ${payUrl}`
+        : targetType === 'invoice'
         ? `Chesterfield Taxi: Pay Invoice ${activePayLink.referenceNumber} ($${activePayLink.baseAmount.toFixed(2)}) securely online: ${payUrl}`
         : `Chesterfield Taxi: Pay securely for Ride ${activePayLink.referenceNumber} ($${activePayLink.baseAmount.toFixed(2)}) with Apple Pay, Google Pay, or Card: ${payUrl}`;
     smsResult = await sendPayLinkSmsServer(resolvedPhone, smsBody);
@@ -723,6 +799,54 @@ export async function createPayLinkCheckoutIntentServer(params: {
         error: `This payment link is ${payLink.status} and can no longer accept payment. Please call Chesterfield Taxi Dispatch at (314) 738-0100.`,
         payLink,
       },
+    };
+  }
+
+  // Zero-charge Card Setup Vaulting flow (`targetType === 'card_setup'`)
+  if (payLink.targetType === 'card_setup') {
+    const gateway = getStripeGatewayServerStatus(params.stripeSecretKeyOverride);
+    if (!gateway.stripeConfigured) {
+      return {
+        httpStatus: 200,
+        body: {
+          success: false,
+          stripeConfigured: false,
+          mode: 'setup',
+          baseAmount: 0,
+          tipAmount: 0,
+          amount: 0,
+          message:
+            'Online card vaulting is not currently active on this server. Please call Chesterfield Taxi Dispatch at (314) 738-0100.',
+        },
+      };
+    }
+    const meta = cardSetupMetaStore.get(payLink.payToken);
+    const setupRes = await handleCreateSetupIntentServer({
+      stripeSecretKey: gateway.stripeSecretKey,
+      stripeCustomerId: meta?.stripeCustomerId,
+      contactId: meta?.contactId || payLink.targetId,
+      name: meta?.contactName,
+      email: meta?.contactEmail,
+      phone: meta?.contactPhone,
+      payToken: payLink.payToken,
+      fetchImpl: params.fetchImpl,
+    });
+    return {
+      httpStatus: setupRes.httpStatus,
+      body: setupRes.body.success
+        ? {
+            ...setupRes.body,
+            stripeConfigured: true,
+            mode: 'setup',
+            amount: 0,
+            baseAmount: 0,
+            tipAmount: 0,
+            currency: 'USD',
+          }
+        : {
+            ...setupRes.body,
+            stripeConfigured: true,
+          },
     };
   }
 
@@ -977,7 +1101,7 @@ export async function confirmPayLinkPaymentServer(params: {
       amountDollars: verifiedDollars,
       currency: String(piJson.currency || 'usd'),
       payToken: cleanToken,
-      targetType: payLink.targetType,
+      targetType: payLink.targetType === 'card_setup' ? undefined : payLink.targetType,
       targetId: payLink.targetId,
       baseAmount: payLink.baseAmount,
       tipAmount: payLink.allowTip ? verifiedTip : 0,
@@ -999,6 +1123,112 @@ export async function confirmPayLinkPaymentServer(params: {
       alreadySettled: settled.alreadySettled,
       receiptNumber: settled.receiptNumber,
       payLink: settled.payLink || payLink,
+    },
+  };
+}
+
+export async function confirmCardSetupPayLinkServer(params: {
+  payToken: string;
+  setupIntentId: string;
+  stripeSecretKeyOverride?: string;
+  fetchImpl?: typeof fetch;
+  nowMs?: number;
+}): Promise<{
+  httpStatus: number;
+  body: Record<string, any>;
+}> {
+  const cleanToken = String(params.payToken || '').trim();
+  if (!isValidPayToken(cleanToken)) {
+    return {
+      httpStatus: 400,
+      body: { success: false, error: 'Invalid card setup link token.' },
+    };
+  }
+
+  const lookup = await lookupPublicPayLinkServer(cleanToken, { nowMs: params.nowMs });
+  if (!lookup.found || !lookup.payLink || lookup.payLink.targetType !== 'card_setup') {
+    return {
+      httpStatus: 404,
+      body: { success: false, error: 'Card setup link not found.' },
+    };
+  }
+
+  const payLink = lookup.payLink;
+  if (payLink.status === 'paid') {
+    return {
+      httpStatus: 200,
+      body: {
+        success: true,
+        alreadySettled: true,
+        payLink,
+        receiptNumber: payLink.receiptNumber,
+      },
+    };
+  }
+
+  const meta = cardSetupMetaStore.get(cleanToken);
+  const resolvedContactId = meta?.contactId || payLink.targetId;
+  const gateway = getStripeGatewayServerStatus(params.stripeSecretKeyOverride);
+  const verified = await verifySetupIntentAndExtractMethodServer({
+    setupIntentId: params.setupIntentId,
+    expectedPayToken: cleanToken,
+    contactId: resolvedContactId,
+    stripeSecretKey: gateway.stripeSecretKey,
+    fetchImpl: params.fetchImpl,
+  });
+
+  if (!verified.body.success || !verified.savedMethod) {
+    return {
+      httpStatus: verified.httpStatus,
+      body: verified.body,
+    };
+  }
+
+  const nowIso = new Date(params.nowMs ?? Date.now()).toISOString();
+  const updatedLink = sanitizePayLinkProjection({
+    ...payLink,
+    status: 'paid',
+    paidAt: nowIso,
+    totalPaidAmount: 0,
+    receiptNumber: buildPayReceiptNumber(params.setupIntentId),
+    cardBrand: verified.savedMethod.brand,
+    cardLast4: verified.savedMethod.last4,
+    updatedAt: nowIso,
+  });
+
+  const store = getServerPaymentLoopStore();
+  store.payLinks.set(cleanToken, updatedLink);
+
+  if (isFirebaseConfigured()) {
+    const saToken = await getServiceAccountDatastoreToken();
+    if (saToken) {
+      await patchFirestoreDocumentRest(
+        'payLinks',
+        cleanToken,
+        updatedLink as unknown as Record<string, unknown>,
+        saToken,
+        true
+      ).catch(() => null);
+    }
+  }
+
+  getContactService().upsertSavedPaymentMethod(
+    {
+      contactId: resolvedContactId,
+      name: meta?.contactName,
+      phone: meta?.contactPhone,
+      email: meta?.contactEmail,
+    },
+    verified.savedMethod
+  );
+
+  return {
+    httpStatus: 200,
+    body: {
+      success: true,
+      receiptNumber: updatedLink.receiptNumber,
+      payLink: updatedLink,
+      savedMethod: verified.savedMethod,
     },
   };
 }
@@ -1105,8 +1335,18 @@ export async function handlePayApiPost(
     }
 
     const createRes = await createOrReusePayLinkServer({
-      targetType: body.targetType === 'invoice' ? 'invoice' : 'trip',
-      targetId: String(body.targetId || ''),
+      targetType:
+        body.targetType === 'invoice'
+          ? 'invoice'
+          : body.targetType === 'card_setup'
+          ? 'card_setup'
+          : 'trip',
+      targetId: String(body.targetId || body.contactId || ''),
+      contactName: typeof body.contactName === 'string' ? body.contactName : undefined,
+      contactPhone: typeof body.contactPhone === 'string' ? body.contactPhone : undefined,
+      contactEmail: typeof body.contactEmail === 'string' ? body.contactEmail : undefined,
+      stripeCustomerId:
+        typeof body.stripeCustomerId === 'string' ? body.stripeCustomerId : undefined,
       expiresInHours: body.expiresInHours !== undefined ? Number(body.expiresInHours) : undefined,
       allowTip:
         typeof body.allowTip === 'boolean' && (auth.isDispatcher || !enforceAuth)
@@ -1185,6 +1425,27 @@ export async function handlePayApiPost(
     });
 
     return Response.json(confirmRes.body, { status: confirmRes.httpStatus });
+  }
+
+  // ─── Action 4: `confirm_card_setup` (Rate-Limited Public Action for `card_setup`) ───
+  if (action === 'confirm_card_setup') {
+    const payToken = String(body.payToken || '').trim();
+    if (!checkRateLimit(`pay_setup_confirm:${clientIp}:${payToken.slice(0, 24)}`, 20, 5 * 60_000)) {
+      return Response.json(
+        {
+          success: false,
+          error: 'Too many confirmation attempts. Please wait a moment and try again.',
+        },
+        { status: 429 }
+      );
+    }
+
+    const setupConfirmRes = await confirmCardSetupPayLinkServer({
+      payToken,
+      setupIntentId: String(body.setupIntentId || ''),
+    });
+
+    return Response.json(setupConfirmRes.body, { status: setupConfirmRes.httpStatus });
   }
 
   return Response.json(

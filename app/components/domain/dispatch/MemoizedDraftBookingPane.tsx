@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import type { Trip } from '../../../core/types/trip';
 import type { DriverRosterItem } from '../../../core/services/operator.service';
 import { DispatchBookingEngine, type DispatchFormValues } from './DispatchBookingEngine';
+import type { DispatchBookingFeedback } from './booking/useDispatchBookingSubmission';
 import { SpinnerIcon } from '../../ui/Icons';
 
 export interface MemoizedDraftBookingPaneProps {
@@ -13,7 +14,12 @@ export interface MemoizedDraftBookingPaneProps {
   allTrips: Trip[];
   drivers: DriverRosterItem[];
   onValuesChangeByDraft: (draftId: string, vals: DispatchFormValues) => void;
-  onBookingSuccessByDraft: (draftId: string, savedTrip: Trip, isEdit: boolean) => void;
+  onBookingSuccessByDraft: (
+    draftId: string,
+    savedTrip: Trip,
+    isEdit: boolean,
+    feedback?: DispatchBookingFeedback
+  ) => void;
   onClearDraftById: (draftId: string) => void;
   onCloneBooking: (values: DispatchFormValues) => void;
   onOpenLinkedTrip: (linkedTripId: string) => Promise<void>;
@@ -38,7 +44,8 @@ export const MemoizedDraftBookingPane = React.memo(function MemoizedDraftBooking
     [draftId, onValuesChangeByDraft]
   );
   const handleBookingSuccess = useCallback(
-    (savedTrip: Trip, isEdit?: boolean) => onBookingSuccessByDraft(draftId, savedTrip, Boolean(isEdit)),
+    (savedTrip: Trip, isEdit?: boolean, feedback?: DispatchBookingFeedback) =>
+      onBookingSuccessByDraft(draftId, savedTrip, Boolean(isEdit), feedback),
     [draftId, onBookingSuccessByDraft]
   );
   const handleClearDraft = useCallback(

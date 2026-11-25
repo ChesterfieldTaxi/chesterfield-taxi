@@ -406,7 +406,10 @@ export class MockBookingService implements IBookingService {
       payload.passenger?.email,
       payload.passenger?.firstName
     );
-    let initialStatus: TripStatus = payload.status || 'UNCONFIRMED';
+    const meta = (payload.metadata || {}) as Record<string, any>;
+    const isStaffCreated = meta.createdByRole === 'dispatcher' || meta.createdByRole === 'admin';
+    const isDirectStaffConfirmed = isStaffCreated || payload.status === 'CONFIRMED';
+    let initialStatus: TripStatus = isDirectStaffConfirmed ? 'CONFIRMED' : (payload.status || 'UNCONFIRMED');
     let blockReason = '';
 
     try {
@@ -460,6 +463,8 @@ export class MockBookingService implements IBookingService {
           metadata: { tripId: id, pickup: payload.pickupLocation?.address, dropoff: payload.dropoffLocation?.address }
         });
         throw new Error(`Booking Blocked: ${evaluation.reason || 'This account or location has been restricted by dispatch policy.'}`);
+      } else if (isDirectStaffConfirmed) {
+        initialStatus = 'CONFIRMED';
       } else if (evaluation.mode === 'AUTO_CONFIRM') {
         initialStatus = 'CONFIRMED';
       } else if (evaluation.mode === 'REQUIRE_REVIEW') {
@@ -473,17 +478,38 @@ export class MockBookingService implements IBookingService {
       console.warn('[MockBookingService] Booking rules evaluation failed', e);
     }
 
+    const channel = (meta.channel || (isStaffCreated ? 'dispatch' : 'web')) as 'web' | 'app' | 'dispatch' | 'email' | 'phone';
+    const bookedByName = meta.bookedByName || (isStaffCreated ? 'Dispatcher Console' : payload.passenger?.firstName ? `${payload.passenger.firstName} ${payload.passenger.lastName || ''}`.trim() : 'Online Passenger');
+    const bookedByRole = (meta.createdByRole || 'passenger') as 'passenger' | 'dispatcher' | 'admin' | 'system';
+    const bkgRef = (meta.referenceNumber as string) || `BKG-${Math.floor(1000 + Math.random() * 9000)}`;
+
     const initialHistoryEntry: TripStatusHistoryEntry = {
       from: null,
       to: initialStatus,
       timestamp: now,
-      actorRole: 'passenger',
-      reason: initialStatus === 'UNCONFIRMED'
+      actorRole: isDirectStaffConfirmed ? bookedByRole : 'passenger',
+      reason: isDirectStaffConfirmed
+        ? 'Booked & confirmed directly via Dispatch Console'
+        : initialStatus === 'UNCONFIRMED'
         ? (blockReason || 'Web booking submitted by customer (pending dispatcher review)')
         : 'Booking submitted via system (Auto-confirmed)',
     };
 
-    const meta = (payload.metadata || {}) as Record<string, any>;
+    const auditEvent = {
+      action: (initialStatus === 'CONFIRMED' ? 'AUTO_CONFIRMED' : 'TRIP_REQUESTED') as 'AUTO_CONFIRMED' | 'TRIP_REQUESTED',
+      timestamp: now,
+      actorRole: bookedByRole,
+      referenceNumber: bkgRef,
+      referenceType: 'booking' as const,
+      bookingChannel: channel,
+      bookedBy: {
+        name: bookedByName,
+        role: bookedByRole,
+        email: payload.passenger?.email,
+      },
+      context: `Initial reservation received via ${channel.toUpperCase()} intake by ${bookedByName} (${payload.passenger?.email || 'no email'}). ${initialHistoryEntry.reason}`,
+    };
+
     const resolvedCorporateAccountId =
       payload.corporateAccountId ||
       payload.payment?.corporateAccountId ||
@@ -501,6 +527,7 @@ export class MockBookingService implements IBookingService {
       rejectedByIds: [],
       assignedDriverId: null,
       statusHistory: [initialHistoryEntry],
+      auditLog: [auditEvent],
       createdAt: now,
       updatedAt: now,
     };

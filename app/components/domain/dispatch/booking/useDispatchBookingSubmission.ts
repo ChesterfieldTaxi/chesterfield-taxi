@@ -30,7 +30,10 @@ import { formatInheritedCorporateBillingTerms } from '../../../../core/services/
 import {
   getContactService,
   normalizeClientDriverPreferences,
+  normalizePhone,
+  parseCardExpiryInput,
 } from '../../../../core/services/customer/contact.service';
+import { getWorkspaceBus } from '../../../../core/services/workspace-bus.service';
 import {
   generateMultiCarGroupId,
   distributeAcrossCars,
@@ -92,6 +95,72 @@ export function resolveTripClientDriverPreferencesMetadata(
   };
 }
 
+export interface DispatchBookingFeedback {
+  emailToastText?: string;
+  emailToastType?: 'success' | 'error' | 'info';
+}
+
+/**
+ * Resolves the authoritative confirmation email recipient & passenger email fallback for Dispatch bookings:
+ * 1. Form `email.trim()` (`'passenger'`)
+ * 2. Booker `contactEmail.trim()` when `isBookerDifferent` (`'booker'`)
+ * 3. CRM `getContactService().getContactByPhone(phone)?.email?.trim()` (`'crm_contact'`)
+ * 4. Latest non-empty `t.passenger?.email` from `lookupTrips` matching normalized phone (`'trip_history'`)
+ * 5. `''` (`'none'`)
+ */
+export function resolveDispatchConfirmationRecipient(params: {
+  email: string;
+  isBookerDifferent?: boolean;
+  contactEmail?: string;
+  phone?: string;
+  lookupTrips?: ReadonlyArray<Trip>;
+}): {
+  recipientEmail: string;
+  passengerEmail: string;
+  source: 'passenger' | 'booker' | 'crm_contact' | 'trip_history' | 'none';
+} {
+  const formEmail = String(params.email || '').trim();
+  const cleanPhone = String(params.phone || '').trim();
+  const normPhone = normalizePhone(cleanPhone);
+  const crmEmail = cleanPhone
+    ? String(getContactService().getContactByPhone(cleanPhone)?.email || '').trim()
+    : '';
+
+  let historyEmail = '';
+  if (normPhone && Array.isArray(params.lookupTrips) && params.lookupTrips.length > 0) {
+    let latestTs = -1;
+    for (const t of params.lookupTrips) {
+      const candEmail = String(t?.passenger?.email || '').trim();
+      if (!candEmail) continue;
+      if (normalizePhone(t?.passenger?.phone || '') !== normPhone) continue;
+      const ts = Date.parse(t.updatedAt || t.createdAt || '') || 0;
+      if (ts >= latestTs) {
+        latestTs = ts;
+        historyEmail = candEmail;
+      }
+    }
+  }
+
+  if (formEmail) {
+    return { recipientEmail: formEmail, passengerEmail: formEmail, source: 'passenger' };
+  }
+  const bookerEmail = params.isBookerDifferent ? String(params.contactEmail || '').trim() : '';
+  if (bookerEmail) {
+    return {
+      recipientEmail: bookerEmail,
+      passengerEmail: crmEmail || historyEmail || '',
+      source: 'booker',
+    };
+  }
+  if (crmEmail) {
+    return { recipientEmail: crmEmail, passengerEmail: crmEmail, source: 'crm_contact' };
+  }
+  if (historyEmail) {
+    return { recipientEmail: historyEmail, passengerEmail: historyEmail, source: 'trip_history' };
+  }
+  return { recipientEmail: '', passengerEmail: '', source: 'none' };
+}
+
 export interface ContactPersonDetails {
   isBookerDifferent: boolean;
   contactName: string;
@@ -102,10 +171,12 @@ export interface ContactPersonDetails {
 
 export interface CardDetails {
   cardPaymentType: 'terminal' | 'payment_link' | 'card_on_file' | 'manual';
+  cardBrand?: string;
   cardholderName: string;
   cardNumber: string; // Last-4 reference only (PCI-safe — never stores full PAN)
   cardExp: string;
   cardCvc: string; // Deprecated — always blank for PCI compliance
+  savedPaymentMethodId?: string;
   saveCardOnFile: boolean;
 }
 
@@ -221,7 +292,7 @@ export interface DispatchBookingEngineProps {
   allTrips?: Trip[];
   trips?: Trip[];
   drivers?: DriverRosterItem[];
-  onBookingSuccess?: (trip: Trip, isEdit: boolean) => void;
+  onBookingSuccess?: (trip: Trip, isEdit: boolean, feedback?: DispatchBookingFeedback) => void;
   onValuesChange?: (values: DispatchFormValues) => void;
   onClearDraft?: () => void;
   onCloneBooking?: (values: DispatchFormValues) => void;
@@ -278,6 +349,8 @@ export interface DispatchHydrationSetters {
   setCardholderName: (v: string) => void;
   setCardNumber: (v: string) => void;
   setCardExp: (v: string) => void;
+  setCardBrand?: (v: string) => void;
+  setSavedPaymentMethodId?: (v: string) => void;
   setCorporateAccount: (v: string) => void;
   setBillingPo: (v: string) => void;
   setAuthorizedBy: (v: string) => void;
@@ -459,6 +532,12 @@ export function applySavedDraftOverlayToDispatchState(
   }
   if (parsed.cardholderName || card?.cardholderName) {
     s.setCardholderName(parsed.cardholderName || card?.cardholderName);
+  }
+  if (parsed.cardBrand || card?.cardBrand) {
+    s.setCardBrand?.(parsed.cardBrand || card?.cardBrand);
+  }
+  if (parsed.savedPaymentMethodId || card?.savedPaymentMethodId) {
+    s.setSavedPaymentMethodId?.(parsed.savedPaymentMethodId || card?.savedPaymentMethodId);
   }
 
   const corp = parsed.corporateDetails;
@@ -840,6 +919,10 @@ export function hydrateInitialTripIntoDispatchState(
     s.setCardholderName(meta.cardDetails.cardholderName || '');
     if (meta.cardDetails.cardLast4) s.setCardNumber(String(meta.cardDetails.cardLast4).slice(-4));
     if (meta.cardDetails.cardExp) s.setCardExp(meta.cardDetails.cardExp);
+    if (meta.cardDetails.cardBrand) s.setCardBrand?.(meta.cardDetails.cardBrand);
+    if (meta.cardDetails.savedPaymentMethodId) {
+      s.setSavedPaymentMethodId?.(meta.cardDetails.savedPaymentMethodId);
+    }
   }
 
   if (meta.corporateDetails) {
@@ -1025,6 +1108,8 @@ export interface UseDispatchBookingSubmissionParams {
   cardholderName: string;
   cardNumber: string;
   cardExp: string;
+  cardBrand?: string;
+  savedPaymentMethodId?: string;
   saveCardOnFile: boolean;
   corporateAccount: string;
   corporateAccountList: CorporateAccountConfig[];
@@ -1114,7 +1199,7 @@ export interface UseDispatchBookingSubmissionParams {
   validateDispatchAccount: typeof validateDispatchCorporateSubmission;
   allTrips?: ReadonlyArray<Trip>;
   onResetAfterCreate?: () => void;
-  onBookingSuccess?: (trip: Trip, isEdit: boolean) => void;
+  onBookingSuccess?: (trip: Trip, isEdit: boolean, feedback?: DispatchBookingFeedback) => void;
 }
 
 export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissionParams) {
@@ -1165,6 +1250,8 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     cardholderName,
     cardNumber,
     cardExp,
+    cardBrand = 'visa',
+    savedPaymentMethodId = '',
     saveCardOnFile,
     corporateAccount,
     corporateAccountList,
@@ -1847,7 +1934,67 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
       hasCheckedLuggage: returnHasCheckedLuggage,
     });
 
-    const clientDriverPrefsMeta = resolveTripClientDriverPreferencesMetadata(phone, email);
+    const emailResolution = resolveDispatchConfirmationRecipient({
+      email,
+      isBookerDifferent,
+      contactEmail,
+      phone,
+      lookupTrips: allTrips,
+    });
+    const effectivePassengerEmail = email.trim() || emailResolution.passengerEmail;
+
+    const cleanCardLast4 = cardNumber ? cardNumber.replace(/\D/g, '').slice(-4) : '';
+    if (
+      paymentMethod === 'card' &&
+      (cardPaymentType === 'card_on_file' || cardPaymentType === 'manual') &&
+      saveCardOnFile &&
+      cleanCardLast4.length === 4
+    ) {
+      const parsedExp = parseCardExpiryInput(cardExp) || {
+        expMonth: 12,
+        expYear: new Date().getFullYear() + 3,
+      };
+      getContactService().upsertSavedPaymentMethod(
+        {
+          phone: phone || (isBookerDifferent ? contactPhone : ''),
+          email: effectivePassengerEmail || (isBookerDifferent ? contactEmail : ''),
+          name: passengerName.trim() || contactName.trim(),
+        },
+        {
+          brand: cardBrand || 'visa',
+          last4: cleanCardLast4,
+          expMonth: parsedExp.expMonth,
+          expYear: parsedExp.expYear,
+          cardholderName: cardholderName.trim() || passengerName.trim() || undefined,
+          mode: 'reference_only',
+        }
+      );
+    }
+
+    const callerContactForVault =
+      (phone.trim() ? getContactService().getContactByPhone(phone) : null) ||
+      (effectivePassengerEmail
+        ? getContactService().getContactByEmail(effectivePassengerEmail)
+        : null) ||
+      (isBookerDifferent && contactPhone.trim()
+        ? getContactService().getContactByPhone(contactPhone)
+        : null);
+    const selectedVaultMethod =
+      paymentMethod === 'card' &&
+      (cardPaymentType === 'card_on_file' || cardPaymentType === 'manual') &&
+      savedPaymentMethodId &&
+      savedPaymentMethodId !== '__new_reference__'
+        ? callerContactForVault?.savedPaymentMethods?.find((m) => m.id === savedPaymentMethodId)
+        : undefined;
+    const effectiveCardBrand = selectedVaultMethod?.brand || cardBrand || undefined;
+    const effectiveCardLast4 = selectedVaultMethod?.last4 || cleanCardLast4 || undefined;
+    const effectiveVaultedPmId =
+      selectedVaultMethod?.mode === 'stripe_pm' ? selectedVaultMethod.id : undefined;
+
+    const clientDriverPrefsMeta = resolveTripClientDriverPreferencesMetadata(
+      phone,
+      effectivePassengerEmail
+    );
 
     const metadataPayload = {
       ...clientDriverPrefsMeta,
@@ -1909,9 +2056,20 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
         paymentMethod === 'card'
           ? {
               cardPaymentType,
+              cardBrand: effectiveCardBrand,
               cardholderName,
-              cardLast4: cardNumber ? cardNumber.slice(-4) : undefined,
+              cardLast4: effectiveCardLast4,
               cardExp,
+              savedPaymentMethodId:
+                selectedVaultMethod?.id ||
+                (savedPaymentMethodId && savedPaymentMethodId !== '__new_reference__'
+                  ? savedPaymentMethodId
+                  : undefined),
+              stripeCustomerId:
+                selectedVaultMethod?.stripeCustomerId ||
+                callerContactForVault?.stripeCustomerId ||
+                undefined,
+              mode: selectedVaultMethod?.mode || 'reference_only',
               saveCardOnFile,
             }
           : undefined,
@@ -2216,6 +2374,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           for (let i = 1; i < carCount; i++) {
             const spec = carSpecs[i];
             const sibPayload: CreateTripInput = {
+              status: 'CONFIRMED',
               bookingType: timingType === 'later' ? 'scheduled' : 'asap',
               scheduledPickupTime,
               pickupLocation: {
@@ -2241,7 +2400,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                 firstName,
                 lastName,
                 phone,
-                email,
+                email: effectivePassengerEmail,
                 passengerCount: paxAlloc[i],
                 luggageCount: bagAlloc[i],
               },
@@ -2257,6 +2416,13 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                 status: 'pending',
                 amount: spec.fare,
                 corporateAccountId: matchedCorporateAccount?.id,
+                ...(paymentMethod === 'card'
+                  ? {
+                      vaultedCardId: effectiveVaultedPmId,
+                      cardBrand: effectiveCardBrand,
+                      cardLast4: effectiveCardLast4,
+                    }
+                  : {}),
               },
               multipleVehiclesRequested: true,
               vehicleCount: carCount,
@@ -2538,6 +2704,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           const spec = outboundCarSpecs[i];
           const isCar1 = i === 0;
           const carPayload: CreateTripInput = {
+            status: 'CONFIRMED',
             bookingType: timingType === 'later' ? 'scheduled' : 'asap',
             scheduledPickupTime,
             pickupLocation: {
@@ -2563,7 +2730,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
               firstName,
               lastName,
               phone,
-              email,
+              email: effectivePassengerEmail,
               passengerCount: paxAlloc[i],
               luggageCount: bagAlloc[i],
               specialRequests: isCar1 ? specialRequests : undefined,
@@ -2578,6 +2745,13 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
               status: 'pending',
               amount: spec.fare,
               corporateAccountId: matchedCorporateAccount?.id,
+              ...(paymentMethod === 'card'
+                ? {
+                    vaultedCardId: effectiveVaultedPmId,
+                    cardBrand: effectiveCardBrand,
+                    cardLast4: effectiveCardLast4,
+                  }
+                : {}),
             },
             ...(isMultiVehicle
               ? {
@@ -2789,6 +2963,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
               const rSpec = returnCarSpecs[rIdx];
               const pairedOutbound = createdOutboundTrips[rIdx] || createdTrip;
               const returnPayload: CreateTripInput = {
+                status: 'CONFIRMED',
                 bookingType: 'scheduled',
                 scheduledPickupTime: returnScheduledTimeIso,
                 pickupLocation: {
@@ -2813,7 +2988,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                   firstName,
                   lastName,
                   phone,
-                  email,
+                  email: effectivePassengerEmail,
                   passengerCount: retPaxAlloc[rIdx],
                   luggageCount: retBagAlloc[rIdx],
                   specialRequests: rIdx === 0 ? returnSpecialRequests : undefined,
@@ -2828,6 +3003,13 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                   status: 'pending',
                   amount: rSpec.fare,
                   corporateAccountId: matchedCorporateAccount?.id,
+                  ...(paymentMethod === 'card'
+                    ? {
+                        vaultedCardId: effectiveVaultedPmId,
+                        cardBrand: effectiveCardBrand,
+                        cardLast4: effectiveCardLast4,
+                      }
+                    : {}),
                 },
                 ...(isReturnMultiCar
                   ? {
@@ -2968,6 +3150,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
               for (let cIdx = 0; cIdx < outboundCarSpecs.length; cIdx++) {
                 const spec = outboundCarSpecs[cIdx];
                 const occCreated = await service.createBooking({
+                  status: 'CONFIRMED',
                   bookingType: 'scheduled',
                   scheduledPickupTime: occIso,
                   pickupLocation: {
@@ -2993,7 +3176,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                     firstName,
                     lastName,
                     phone,
-                    email,
+                    email: effectivePassengerEmail,
                     passengerCount: paxAlloc[cIdx],
                     luggageCount: bagAlloc[cIdx],
                     specialRequests: cIdx === 0 ? specialRequests : undefined,
@@ -3007,6 +3190,13 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                     status: 'pending',
                     amount: spec.fare,
                     corporateAccountId: matchedCorporateAccount?.id,
+                    ...(paymentMethod === 'card'
+                      ? {
+                          vaultedCardId: effectiveVaultedPmId,
+                          cardBrand: effectiveCardBrand,
+                          cardLast4: effectiveCardLast4,
+                        }
+                      : {}),
                   },
                   ...(isMultiVehicle
                     ? {
@@ -3059,7 +3249,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                 firstName,
                 lastName,
                 phone,
-                email: email || undefined,
+                email: effectivePassengerEmail || undefined,
                 passengerCount: passengers,
                 luggageCount: bags,
                 specialRequests: specialRequests || undefined,
@@ -3123,33 +3313,50 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           }
         }
 
-        if (sendEmailConfirmation && email.trim()) {
-          try {
-            const cachedAppSettings = getAdminConfigService().getCachedSettings();
-            const multiCarEmailLabel = isMultiVehicle
-              ? `${carCount} Vehicles (${outboundCarSpecs
-                  .map((s) => `${s.vehicleDisplayName} $${s.fare.toFixed(0)}`)
-                  .join(', ')})`
-              : primaryVehicleDisplayName;
-            const multiCarEmailNote = isMultiVehicle
-              ? `Multi-Car Convoy (${multiCarGroupId}): ${createdOutboundTrips
-                  .map((t, idx) => `Car ${idx + 1} #${t.id.slice(-6).toUpperCase()}`)
-                  .join(', ')}.`
-              : '';
-            const combinedEmailPickupNotes =
-              [multiCarEmailNote, notesForAll].filter(Boolean).join(' ') || undefined;
+        let bookingFeedback: DispatchBookingFeedback | undefined;
+        if (sendEmailConfirmation) {
+          if (emailResolution.recipientEmail) {
+            try {
+              const cachedAppSettings = getAdminConfigService().getCachedSettings();
+              const multiCarEmailLabel = isMultiVehicle
+                ? `${carCount} Vehicles (${outboundCarSpecs
+                    .map((s) => `${s.vehicleDisplayName} $${s.fare.toFixed(0)}`)
+                    .join(', ')})`
+                : primaryVehicleDisplayName;
+              const multiCarEmailNote = isMultiVehicle
+                ? `Multi-Car Convoy (${multiCarGroupId}): ${createdOutboundTrips
+                    .map((t, idx) => `Car ${idx + 1} #${t.id.slice(-6).toUpperCase()}`)
+                    .join(', ')}.`
+                : '';
+              const combinedEmailPickupNotes =
+                [multiCarEmailNote, notesForAll].filter(Boolean).join(' ') || undefined;
 
-            getEmailDispatchService()
-              .sendBookingConfirmation({
+              const emailResult = await getEmailDispatchService().sendBookingConfirmation({
                 tripId: createdTrip.id,
+                customerId: createdTrip.customerId ?? null,
                 trackingToken: createdTrip.trackingToken,
                 status: 'CONFIRMED',
                 passenger: {
                   firstName,
                   lastName,
-                  email: email.trim(),
+                  email: effectivePassengerEmail || emailResolution.recipientEmail,
                   phone,
                 },
+                recipientEmailOverride:
+                  emailResolution.source === 'booker'
+                    ? emailResolution.recipientEmail
+                    : undefined,
+                contactPerson: isBookerDifferent
+                  ? {
+                      isBookerDifferent: true,
+                      contactName,
+                      contactPhone,
+                      contactEmail,
+                      contactRole,
+                    }
+                  : undefined,
+                oversizedItemsSummary,
+                customExtrasSummary,
                 pickupAddress,
                 pickupNotes: combinedEmailPickupNotes,
                 intermediateStops:
@@ -3229,14 +3436,48 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                   address: cachedAppSettings.company?.address,
                   email: cachedAppSettings.company?.email,
                 },
-              })
-              .catch((mailErr) => {
-                console.warn(
-                  '[DispatchBookingEngine] Non-blocking confirmation email warning:',
-                  mailErr
-                );
               });
-          } catch {}
+
+              if (emailResult.success) {
+                bookingFeedback = {
+                  emailToastType: 'success',
+                  emailToastText: `Confirmation emailed to ${emailResolution.recipientEmail}`,
+                };
+              } else {
+                bookingFeedback = {
+                  emailToastType: 'error',
+                  emailToastText: `Trip confirmed — confirmation email failed: ${
+                    emailResult.error || 'Email delivery error'
+                  }`,
+                };
+              }
+            } catch (mailErr: any) {
+              console.warn(
+                '[DispatchBookingEngine] Confirmation email delivery error:',
+                mailErr
+              );
+              bookingFeedback = {
+                emailToastType: 'error',
+                emailToastText: `Trip confirmed — confirmation email failed: ${
+                  mailErr?.message || 'Email delivery error'
+                }`,
+              };
+            }
+          } else {
+            bookingFeedback = {
+              emailToastType: 'info',
+              emailToastText: 'Trip confirmed — no email on file to send confirmation',
+            };
+          }
+
+          if (bookingFeedback?.emailToastText) {
+            try {
+              getWorkspaceBus().publish('DISPATCH_TOAST', {
+                text: bookingFeedback.emailToastText,
+                type: bookingFeedback.emailToastType || 'info',
+              });
+            } catch {}
+          }
         }
 
         if (dispatchConsoleConfig.autoClearFormAfterCreate) {
@@ -3245,7 +3486,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           } catch {}
           onResetAfterCreate?.();
         }
-        onBookingSuccess?.(createdTrip, false);
+        onBookingSuccess?.(createdTrip, false, bookingFeedback);
       }
     } catch (err: any) {
       setSubmitError(err?.message || 'Failed to save booking. Please try again.');

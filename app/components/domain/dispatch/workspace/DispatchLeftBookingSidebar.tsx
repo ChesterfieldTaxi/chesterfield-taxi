@@ -2,6 +2,7 @@ import React from 'react';
 import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import type { DispatchFormValues } from '../DispatchBookingEngine';
+import type { DispatchBookingFeedback } from '../booking/useDispatchBookingSubmission';
 import { MemoizedDraftBookingPane } from '../MemoizedDraftBookingPane';
 import { getTripCascadeExhaustedTooltip } from '../DispatchCascadeSlaBadges';
 import {
@@ -54,7 +55,12 @@ export interface DispatchLeftBookingSidebarProps {
   trips: Trip[];
   drivers: LiveFleetDriver[];
   onValuesChangeByDraft: (draftId: string, vals: DispatchFormValues) => void;
-  onBookingSuccessByDraft: (draftId: string, savedTrip: Trip, isEdit: boolean) => void;
+  onBookingSuccessByDraft: (
+    draftId: string,
+    savedTrip: Trip,
+    isEdit: boolean,
+    feedback?: DispatchBookingFeedback
+  ) => void;
   onClearDraftById: (draftId: string) => void;
   onCloneBooking: (values: DispatchFormValues) => void;
   onOpenLinkedTrip: (linkedTripId: string) => Promise<void>;

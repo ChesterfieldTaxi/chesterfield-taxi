@@ -726,7 +726,10 @@ export async function settleVerifiedPaymentIntent(
   }
 
   const resolvedTargetType: 'trip' | 'invoice' | undefined =
-    params.targetType || payLink?.targetType;
+    params.targetType ||
+    (payLink?.targetType === 'trip' || payLink?.targetType === 'invoice'
+      ? payLink.targetType
+      : undefined);
   const resolvedTargetId: string | undefined =
     params.targetId || payLink?.targetId;
 

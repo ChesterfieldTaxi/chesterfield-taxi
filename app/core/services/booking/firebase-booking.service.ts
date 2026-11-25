@@ -80,6 +80,8 @@ export interface FirebaseClientConfig {
   storageBucket?: string;
   messagingSenderId?: string;
   appId?: string;
+  /** Skips remote Firestore setDoc/projection writes in offline Node unit tests while executing full createBooking rules/audit logic. */
+  skipNetworkPersistence?: boolean;
 }
 
 import {
@@ -99,8 +101,10 @@ import { getFirestoreDb, getFirebaseApp } from '../firebase';
 export class FirebaseBookingService implements IBookingService {
   private db: Firestore;
   private collectionName = 'trips';
+  private skipNetworkPersistence = false;
 
   constructor(customConfig?: FirebaseClientConfig) {
+    this.skipNetworkPersistence = Boolean(customConfig?.skipNetworkPersistence);
     if (customConfig && customConfig.apiKey) {
       const app = getFirebaseApp(customConfig);
       this.db = getFirestore(app);
@@ -401,8 +405,13 @@ export class FirebaseBookingService implements IBookingService {
     );
     const tripDocRef = doc(this.db, this.collectionName, id);
 
-    // Phase 29: Evaluate booking request against Rules Engine & Universal Blacklist
-    let initialStatus: TripStatus = payload.status || 'UNCONFIRMED';
+    const meta = (payload.metadata || {}) as Record<string, any>;
+    const isStaffCreated = meta.createdByRole === 'dispatcher' || meta.createdByRole === 'admin';
+    const isDirectStaffConfirmed = isStaffCreated || payload.status === 'CONFIRMED';
+
+    // Phase 29 & Phase 76: Evaluate booking request against Rules Engine & Universal Blacklist
+    // Dispatcher/Admin bookings still enforce BLACKLIST_BLOCK, but NEVER downgrade to UNCONFIRMED on REQUIRE_REVIEW.
+    let initialStatus: TripStatus = isDirectStaffConfirmed ? 'CONFIRMED' : (payload.status || 'UNCONFIRMED');
     let blockReason = '';
     
     try {
@@ -445,6 +454,8 @@ export class FirebaseBookingService implements IBookingService {
           metadata: { tripId: id, pickup: payload.pickupLocation?.address, dropoff: payload.dropoffLocation?.address }
         });
         throw new Error(`Booking Blocked: ${evaluation.reason || 'This account or location has been restricted by dispatch policy.'}`);
+      } else if (isDirectStaffConfirmed) {
+        initialStatus = 'CONFIRMED';
       } else if (evaluation.mode === 'AUTO_CONFIRM') {
         initialStatus = 'CONFIRMED';
       } else if (evaluation.mode === 'REQUIRE_REVIEW') {
@@ -458,21 +469,22 @@ export class FirebaseBookingService implements IBookingService {
       console.warn('Booking rules evaluation failed', e);
     }
 
+    const channel = (meta.channel || (isStaffCreated ? 'dispatch' : 'web')) as 'web' | 'app' | 'dispatch' | 'email' | 'phone';
+    const bookedByName = meta.bookedByName || (isStaffCreated ? 'Dispatcher Console' : payload.passenger?.firstName ? `${payload.passenger.firstName} ${payload.passenger.lastName || ''}`.trim() : 'Online Passenger');
+    const bookedByRole = (meta.createdByRole || 'passenger') as 'passenger' | 'dispatcher' | 'admin' | 'system';
+    const bkgRef = (meta.referenceNumber as string) || `BKG-${Math.floor(1000 + Math.random() * 9000)}`;
+
     const initialHistoryEntry: TripStatusHistoryEntry = {
       from: null,
       to: initialStatus,
       timestamp: now,
-      actorRole: 'passenger',
-      reason: initialStatus === 'UNCONFIRMED'
+      actorRole: isDirectStaffConfirmed ? bookedByRole : 'passenger',
+      reason: isDirectStaffConfirmed
+        ? 'Booked & confirmed directly via Dispatch Console'
+        : initialStatus === 'UNCONFIRMED'
         ? blockReason || 'Web booking submitted by customer (pending dispatcher review)'
         : 'Booking auto-confirmed by rules engine',
     };
-
-    const meta = (payload.metadata || {}) as Record<string, any>;
-    const channel = (meta.channel || (meta.createdByRole === 'dispatcher' ? 'dispatch' : 'web')) as 'web' | 'app' | 'dispatch' | 'email' | 'phone';
-    const bookedByName = meta.bookedByName || (meta.createdByRole === 'dispatcher' ? 'Dispatcher Console' : payload.passenger?.firstName ? `${payload.passenger.firstName} ${payload.passenger.lastName || ''}`.trim() : 'Online Passenger');
-    const bookedByRole = (meta.createdByRole || 'passenger') as 'passenger' | 'dispatcher' | 'admin' | 'system';
-    const bkgRef = (meta.referenceNumber as string) || `BKG-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const auditEvent: TripAuditEvent = {
       action: initialStatus === 'CONFIRMED' ? 'AUTO_CONFIRMED' : 'TRIP_REQUESTED',
@@ -534,14 +546,16 @@ export class FirebaseBookingService implements IBookingService {
       }
     }
 
-    try {
-      await setDoc(tripDocRef, sanitizedTrip);
-    } catch (err: unknown) {
-      console.warn('[FirebaseBookingService] Firestore setDoc failed (e.g. cloud security rules pending deploy), trip preserved in local storage:', err);
-    }
+    if (!this.skipNetworkPersistence) {
+      try {
+        await setDoc(tripDocRef, sanitizedTrip);
+      } catch (err: unknown) {
+        console.warn('[FirebaseBookingService] Firestore setDoc failed (e.g. cloud security rules pending deploy), trip preserved in local storage:', err);
+      }
 
-    // Mirror strictly zero-PII public tracking projection & last-4 phone lookup index
-    this.syncPublicTrackingProjection(sanitizedTrip, true).catch(() => {});
+      // Mirror strictly zero-PII public tracking projection & last-4 phone lookup index
+      this.syncPublicTrackingProjection(sanitizedTrip, true).catch(() => {});
+    }
 
     getCommsThreadService()
       .linkTripToThread({

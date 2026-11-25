@@ -229,7 +229,7 @@ export interface TripStatusHistoryEntry {
   to: TripStatus;
   timestamp: string; // ISO 8601 string
   actorId?: string;
-  actorRole?: 'passenger' | 'driver' | 'admin' | 'system';
+  actorRole?: 'passenger' | 'driver' | 'admin' | 'dispatcher' | 'system';
   reason?: string;
 }
 

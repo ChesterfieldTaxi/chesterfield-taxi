@@ -36,6 +36,9 @@ export interface DispatchBookingFooterBarProps {
   manualFare: string;
   setManualFare: (val: string) => void;
   email: string;
+  contactEmail?: string;
+  hasResolvedRecipientEmail?: boolean;
+  resolvedRecipientEmail?: string;
   sendEmailConfirmation: boolean;
   setSendEmailConfirmation: React.Dispatch<React.SetStateAction<boolean>>;
   isClearModalOpen: boolean;
@@ -66,6 +69,9 @@ export function DispatchBookingFooterBar({
   manualFare,
   setManualFare,
   email,
+  contactEmail,
+  hasResolvedRecipientEmail,
+  resolvedRecipientEmail,
   sendEmailConfirmation,
   setSendEmailConfirmation,
   isClearModalOpen,
@@ -78,6 +84,9 @@ export function DispatchBookingFooterBar({
   const displayLeg2 = displayRoundTripFares.returnLegFare;
   const displayTotal = displayRoundTripFares.totalFare;
   const primaryOpt = dispatchVehicleOptions.find((o) => o.key === selectedVehicles[0]);
+  const effectiveTargetEmail =
+    resolvedRecipientEmail?.trim() || email.trim() || contactEmail?.trim() || '';
+  const hasRecipientEmail = hasResolvedRecipientEmail ?? Boolean(effectiveTargetEmail);
 
   return (
     <>
@@ -269,9 +278,9 @@ export function DispatchBookingFooterBar({
               <label
                 className="hidden sm:flex items-center gap-1 text-[10.5px] font-semibold text-slate-600 cursor-pointer select-none px-1.5 py-1 rounded-lg hover:bg-slate-100"
                 title={
-                  email.trim()
-                    ? `Send confirmation email to ${email.trim()}`
-                    : 'Enter passenger email above to send confirmation'
+                  effectiveTargetEmail
+                    ? `Send confirmation email to ${effectiveTargetEmail}`
+                    : 'No email on file — enter passenger email above to send confirmation'
                 }
               >
                 <input
@@ -281,6 +290,14 @@ export function DispatchBookingFooterBar({
                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
                 />
                 <span>Email Confirm</span>
+                {sendEmailConfirmation && !hasRecipientEmail && (
+                  <span
+                    data-email-confirm-no-email="true"
+                    className="text-[9.5px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1 rounded"
+                  >
+                    (no email)
+                  </span>
+                )}
               </label>
             </>
           )}

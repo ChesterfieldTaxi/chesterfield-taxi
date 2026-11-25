@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type {
   CorporateAccountConfig,
   CorporateAuthorizedRider,
@@ -8,6 +8,11 @@ import type {
 } from '../../../../core/types/config';
 import type { TripPricing } from '../../../../core/types/trip';
 import type { PoValidationResult } from '../../../../core/services/corporate-account.service';
+import {
+  formatCardBrandLabel,
+  formatCardExpiryDisplay,
+  getContactService,
+} from '../../../../core/services/customer/contact.service';
 import type { DriverRosterItem } from '../../../../core/services/operator.service';
 import {
   DEFAULT_DISPATCH_COMPANIES as DEFAULT_COMPANIES,
@@ -20,7 +25,15 @@ import {
   LockIcon,
   ShieldCheckIcon,
 } from '../../../ui/Icons';
-import { Select } from '../../../ui/Select';
+import { Select, type SelectOption } from '../../../ui/Select';
+
+const DISPATCH_CARD_BRAND_OPTIONS: ReadonlyArray<SelectOption> = [
+  { value: 'visa', label: 'Visa' },
+  { value: 'mastercard', label: 'Mastercard' },
+  { value: 'amex', label: 'Amex' },
+  { value: 'discover', label: 'Discover' },
+  { value: 'card', label: 'Card' },
+];
 
 export interface DispatchPaymentAssignmentSectionProps {
   paymentMethod: 'cash' | 'card' | 'account';
@@ -33,6 +46,12 @@ export interface DispatchPaymentAssignmentSectionProps {
   setCardNumber: (val: string) => void;
   cardExp: string;
   setCardExp: (val: string) => void;
+  cardBrand?: string;
+  setCardBrand?: (val: string) => void;
+  savedPaymentMethodId?: string;
+  setSavedPaymentMethodId?: (val: string) => void;
+  saveCardOnFile?: boolean;
+  setSaveCardOnFile?: (val: boolean) => void;
   corporateAccount: string;
   setCorporateAccount: (val: string) => void;
   corporateAccountList: CorporateAccountConfig[];
@@ -102,6 +121,12 @@ export function DispatchPaymentAssignmentSection({
   setCardNumber,
   cardExp,
   setCardExp,
+  cardBrand = 'visa',
+  setCardBrand,
+  savedPaymentMethodId = '',
+  setSavedPaymentMethodId,
+  saveCardOnFile = false,
+  setSaveCardOnFile,
   corporateAccount,
   setCorporateAccount,
   corporateAccountList,
@@ -157,6 +182,100 @@ export function DispatchPaymentAssignmentSection({
   internalNotes,
   setInternalNotes,
 }: DispatchPaymentAssignmentSectionProps) {
+  const [contactsRev, setContactsRev] = useState(0);
+  useEffect(() => {
+    return getContactService().subscribe(() => setContactsRev((r) => r + 1));
+  }, []);
+
+  const activeCallerContact = useMemo(() => {
+    const svc = getContactService();
+    const phones = [passengerPhone, bookerPhone, callerPhone].filter(Boolean) as string[];
+    for (const ph of phones) {
+      const found = svc.getContactByPhone(ph);
+      if (found) return found;
+    }
+    const emails = [passengerEmail, bookerEmail].filter(Boolean) as string[];
+    for (const em of emails) {
+      const found = svc.getContactByEmail(em);
+      if (found) return found;
+    }
+    return null;
+  }, [passengerPhone, bookerPhone, callerPhone, passengerEmail, bookerEmail, contactsRev]);
+
+  const savedCardMethods = activeCallerContact?.savedPaymentMethods || [];
+  const defaultSavedMethod = useMemo(
+    () => savedCardMethods.find((m) => m.isDefault) || savedCardMethods[0] || null,
+    [savedCardMethods]
+  );
+
+  const savedCardSelectOptions = useMemo<SelectOption[]>(() => {
+    const opts: SelectOption[] = savedCardMethods.map((m) => ({
+      value: m.id,
+      label: `${formatCardBrandLabel(m.brand)} •••• ${m.last4} · ${formatCardExpiryDisplay(
+        m.expMonth,
+        m.expYear
+      )}${m.isDefault ? ' (Default)' : ''}`,
+      badge: m.mode === 'stripe_pm' ? 'Stripe Vault' : 'Ref Only',
+      subtitle: m.cardholderName || undefined,
+    }));
+    opts.push({ value: '__new_reference__', label: '+ New Card Reference' });
+    return opts;
+  }, [savedCardMethods]);
+
+  const effectiveSavedCardValue = useMemo(() => {
+    if (savedPaymentMethodId === '__new_reference__') return '__new_reference__';
+    if (savedPaymentMethodId && savedCardMethods.some((m) => m.id === savedPaymentMethodId)) {
+      return savedPaymentMethodId;
+    }
+    return defaultSavedMethod ? defaultSavedMethod.id : '__new_reference__';
+  }, [savedPaymentMethodId, savedCardMethods, defaultSavedMethod]);
+
+  useEffect(() => {
+    if (
+      paymentMethod !== 'card' ||
+      (cardPaymentType !== 'card_on_file' && cardPaymentType !== 'manual') ||
+      !defaultSavedMethod
+    ) {
+      return;
+    }
+    if (
+      !savedPaymentMethodId ||
+      (savedPaymentMethodId !== '__new_reference__' &&
+        !savedCardMethods.some((m) => m.id === savedPaymentMethodId))
+    ) {
+      setSavedPaymentMethodId?.(defaultSavedMethod.id);
+      setCardholderName(defaultSavedMethod.cardholderName || activeCallerContact?.name || '');
+      setCardNumber(defaultSavedMethod.last4);
+      setCardExp(
+        formatCardExpiryDisplay(defaultSavedMethod.expMonth, defaultSavedMethod.expYear)
+      );
+      setCardBrand?.(defaultSavedMethod.brand);
+    }
+  }, [
+    paymentMethod,
+    cardPaymentType,
+    defaultSavedMethod?.id,
+    activeCallerContact?.id,
+    savedPaymentMethodId,
+  ]);
+
+  const handleSelectSavedCard = (nextId: string) => {
+    setSavedPaymentMethodId?.(nextId);
+    if (nextId === '__new_reference__') {
+      setCardNumber('');
+      setCardExp('');
+      return;
+    }
+    const chosen = savedCardMethods.find((m) => m.id === nextId);
+    if (chosen) {
+      setCardholderName(chosen.cardholderName || activeCallerContact?.name || '');
+      setCardNumber(chosen.last4);
+      setCardExp(formatCardExpiryDisplay(chosen.expMonth, chosen.expYear));
+      setCardBrand?.(chosen.brand);
+      setSaveCardOnFile?.(false);
+    }
+  };
+
   return (
     <>
       {/* Payment (Segmented) & Detailed Sub-Panels */}
@@ -219,24 +338,34 @@ export function DispatchPaymentAssignmentSection({
 
             {(cardPaymentType === 'card_on_file' || cardPaymentType === 'manual') && (
               <div className="space-y-1.5 pt-1">
+                <div data-dispatch-saved-card-select="true">
+                  <Select
+                    size="sm"
+                    searchable
+                    searchPlaceholder="Search saved client cards..."
+                    options={savedCardSelectOptions}
+                    value={effectiveSavedCardValue}
+                    onValueChange={handleSelectSavedCard}
+                    aria-label="Client saved payment method"
+                  />
+                </div>
                 <div className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 flex items-center gap-1">
                   <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   <span>
-                    PCI-Safe Reference Only — enter cardholder name &amp; last 4 digits (never full
-                    PAN/CVC).
+                    PCI-Safe Vault — tokenized card or last 4 digits only (never full PAN/CVC).
                   </span>
                 </div>
-                <input
-                  type="text"
-                  placeholder="Cardholder Name"
-                  value={cardholderName}
-                  onChange={(e) => setCardholderName(e.target.value)}
-                  className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs"
-                />
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-3 gap-1.5">
+                  <Select
+                    size="xs"
+                    options={DISPATCH_CARD_BRAND_OPTIONS}
+                    value={cardBrand || 'visa'}
+                    onValueChange={(v) => setCardBrand?.(v)}
+                    aria-label="Card brand"
+                  />
                   <input
                     type="text"
-                    placeholder="Last 4 Digits (e.g. 4242)"
+                    placeholder="Last 4 (4242)"
                     maxLength={4}
                     value={cardNumber.replace(/\D/g, '').slice(-4)}
                     onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 4))}
@@ -251,6 +380,25 @@ export function DispatchPaymentAssignmentSection({
                     className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs text-center font-mono"
                   />
                 </div>
+                <input
+                  type="text"
+                  placeholder="Cardholder Name"
+                  value={cardholderName}
+                  onChange={(e) => setCardholderName(e.target.value)}
+                  className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs"
+                />
+                {effectiveSavedCardValue === '__new_reference__' && (
+                  <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer pt-0.5">
+                    <input
+                      type="checkbox"
+                      data-save-card-reference-checkbox="true"
+                      checked={Boolean(saveCardOnFile)}
+                      onChange={(e) => setSaveCardOnFile?.(e.target.checked)}
+                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
+                    />
+                    <span>Save reference to client profile</span>
+                  </label>
+                )}
               </div>
             )}
           </div>
