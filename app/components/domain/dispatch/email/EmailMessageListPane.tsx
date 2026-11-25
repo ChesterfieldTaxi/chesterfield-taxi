@@ -1,5 +1,4 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { useBottomSheetDragToClose } from '../../../../core/hooks/useBottomSheetDragToClose';
 import { getContactService, normalizeEmail } from '../../../../core/services/customer/contact.service';
 import {
   DISPATCH_EMAIL_CATEGORY_BADGE_CONFIG,
@@ -13,6 +12,7 @@ import {
   DISPATCH_MAILBOX_ADDRESS,
   type DispatchEmailRecord,
 } from '../../../../core/types/dispatch-email';
+import { FloatingWindow } from '../../../ui/FloatingWindow';
 import {
   BuildingIcon,
   CarIcon,
@@ -21,7 +21,6 @@ import {
   MailIcon,
   StarIcon,
   TrashIcon,
-  XIcon,
 } from '../../../ui/Icons';
 
 export interface EmailMessageListPaneProps {
@@ -97,7 +96,6 @@ export function EmailMessageListPane({
   const suppressNextClickRef = useRef<boolean>(false);
 
   const dismissActionSheet = useCallback(() => setActionSheetEmail(null), []);
-  const actionSheetDrag = useBottomSheetDragToClose({ onClose: dismissActionSheet });
 
   const cancelLongPress = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -482,158 +480,134 @@ export function EmailMessageListPane({
         )}
       </div>
 
-      {/* ─── SCROLL-SAFE MOBILE TOUCH-AND-HOLD ACTION SHEET ─── */}
+      {/* ─── EMAIL QUICK ACTION FLOATING WINDOW ─── */}
       {actionSheetEmail && (
-        <div
-          className="fixed inset-0 z-[130] bg-slate-900/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4"
-          onClick={dismissActionSheet}
+        <FloatingWindow
+          id="dispatch_email_actions"
+          isOpen={Boolean(actionSheetEmail)}
+          onClose={dismissActionSheet}
+          hasBackdrop={false}
+          title={actionSheetEmail.fromName || actionSheetEmail.fromEmail}
+          subtitle={actionSheetEmail.subject}
+          icon={<MailIcon className="w-4 h-4 text-blue-400" />}
+          initialSize={{ width: 420, height: 360 }}
+          autoHeight
+          minWidth={340}
+          minHeight={240}
+          zIndex={225}
         >
-          <div
-            style={actionSheetDrag.sheetStyle}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0"
-          >
-            <div
-              {...actionSheetDrag.dragHandlers}
-              className="bg-slate-900 text-white px-4 pt-2 pb-3.5 touch-none"
-            >
-              <div
-                className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden"
-                aria-hidden="true"
-              />
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-extrabold text-white truncate">
-                    {actionSheetEmail.fromName || actionSheetEmail.fromEmail}
-                  </p>
-                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                    {actionSheetEmail.subject}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={dismissActionSheet}
-                  className="p-1.5 rounded-full bg-slate-800 text-slate-300 hover:text-white cursor-pointer shrink-0"
-                  aria-label="Close email actions"
-                >
-                  <XIcon className="w-4 h-4" />
-                </button>
-              </div>
+          <div className="p-3 space-y-2">
+            {actionSheetEmail.suggestedBooking && (
+              <button
+                type="button"
+                onClick={() => {
+                  const target = actionSheetEmail;
+                  setActionSheetEmail(null);
+                  onPopulateBooking(target);
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+              >
+                <CarIcon className="w-4 h-4" />
+                <span>Populate Dispatch Booking</span>
+              </button>
+            )}
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = actionSheetEmail;
+                  setActionSheetEmail(null);
+                  onSelectEmail(target);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <MailIcon className="w-4 h-4" />
+                <span>Open Thread</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = actionSheetEmail;
+                  setActionSheetEmail(null);
+                  onQuickReply(target);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <EditIcon className="w-4 h-4" />
+                <span>Reply</span>
+              </button>
             </div>
 
-            <div className="p-3 space-y-2">
-              {actionSheetEmail.suggestedBooking && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const target = actionSheetEmail;
-                    setActionSheetEmail(null);
-                    onPopulateBooking(target);
-                  }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                >
-                  <CarIcon className="w-4 h-4" />
-                  <span>Populate Dispatch Booking</span>
-                </button>
-              )}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const id = actionSheetEmail.id;
+                  setActionSheetEmail(null);
+                  onToggleRead(id);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <CheckIcon className="w-4 h-4" />
+                <span>{actionSheetEmail.isUnread ? 'Mark Read' : 'Mark Unread'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = actionSheetEmail.id;
+                  setActionSheetEmail(null);
+                  onToggleStar(id);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <StarIcon className="w-4 h-4" />
+                <span>{actionSheetEmail.isStarred ? 'Unstar' : 'Star'}</span>
+              </button>
+            </div>
 
-              <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              {actionSheetEmail.folder === 'archive' || actionSheetEmail.folder === 'trash' ? (
                 <button
                   type="button"
                   onClick={() => {
-                    const target = actionSheetEmail;
+                    const id = actionSheetEmail.id;
                     setActionSheetEmail(null);
-                    onSelectEmail(target);
+                    onMoveToFolder(id, 'inbox');
                   }}
                   className="py-2.5 px-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <MailIcon className="w-4 h-4" />
-                  <span>Open Thread</span>
+                  <span>Move to Inbox</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const target = actionSheetEmail;
-                    setActionSheetEmail(null);
-                    onQuickReply(target);
-                  }}
-                  className="py-2.5 px-3 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <EditIcon className="w-4 h-4" />
-                  <span>Reply</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
+              ) : (
                 <button
                   type="button"
                   onClick={() => {
                     const id = actionSheetEmail.id;
                     setActionSheetEmail(null);
-                    onToggleRead(id);
+                    onMoveToFolder(id, 'archive');
                   }}
-                  className="py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="py-2.5 px-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <CheckIcon className="w-4 h-4" />
-                  <span>{actionSheetEmail.isUnread ? 'Mark Read' : 'Mark Unread'}</span>
+                  <span>Archive</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const id = actionSheetEmail.id;
-                    setActionSheetEmail(null);
-                    onToggleStar(id);
-                  }}
-                  className="py-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <StarIcon className="w-4 h-4" />
-                  <span>{actionSheetEmail.isStarred ? 'Unstar' : 'Star'}</span>
-                </button>
-              </div>
+              )}
 
-              <div className="grid grid-cols-2 gap-2">
-                {actionSheetEmail.folder === 'archive' || actionSheetEmail.folder === 'trash' ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const id = actionSheetEmail.id;
-                      setActionSheetEmail(null);
-                      onMoveToFolder(id, 'inbox');
-                    }}
-                    className="py-2.5 px-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <span>Move to Inbox</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const id = actionSheetEmail.id;
-                      setActionSheetEmail(null);
-                      onMoveToFolder(id, 'archive');
-                    }}
-                    className="py-2.5 px-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <span>Archive</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const id = actionSheetEmail.id;
-                    setActionSheetEmail(null);
-                    onMoveToFolder(id, 'trash');
-                  }}
-                  className="py-2.5 px-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                  <span>Trash</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = actionSheetEmail.id;
+                  setActionSheetEmail(null);
+                  onMoveToFolder(id, 'trash');
+                }}
+                className="py-2.5 px-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <TrashIcon className="w-4 h-4" />
+                <span>Trash</span>
+              </button>
             </div>
           </div>
-        </div>
+        </FloatingWindow>
       )}
     </>
   );

@@ -824,18 +824,35 @@ class ContactService {
         secondaryEmailCandidate && secondaryEmailCandidate !== primaryEmailValue
           ? secondaryEmailCandidate
           : '',
-      corporateAccountId: profile.corporateAccountId || mergedExisting.corporateAccountId,
+      corporateAccountId:
+        profile.corporateAccountId !== undefined
+          ? profile.corporateAccountId
+          : mergedExisting.corporateAccountId,
       corporateAccountNumber:
-        profile.corporateAccountNumber || mergedExisting.corporateAccountNumber,
-      corporateAccountName: profile.corporateAccountName || mergedExisting.corporateAccountName,
-      billingDepartment: profile.billingDepartment || mergedExisting.billingDepartment,
-      defaultPoNumber: profile.defaultPoNumber || mergedExisting.defaultPoNumber,
+        profile.corporateAccountNumber !== undefined
+          ? profile.corporateAccountNumber
+          : mergedExisting.corporateAccountNumber,
+      corporateAccountName:
+        profile.corporateAccountName !== undefined
+          ? profile.corporateAccountName
+          : mergedExisting.corporateAccountName,
+      billingDepartment:
+        profile.billingDepartment !== undefined
+          ? profile.billingDepartment
+          : mergedExisting.billingDepartment,
+      defaultPoNumber:
+        profile.defaultPoNumber !== undefined
+          ? profile.defaultPoNumber
+          : mergedExisting.defaultPoNumber,
       isVip: profile.isVip ?? mergedExisting.isVip ?? false,
-      vipReason: profile.vipReason || mergedExisting.vipReason || '',
+      vipReason:
+        profile.vipReason !== undefined ? profile.vipReason : mergedExisting.vipReason || '',
       preferredVehicleTier:
         profile.preferredVehicleTier || mergedExisting.preferredVehicleTier || 'standard',
-      homeAddress: profile.homeAddress || mergedExisting.homeAddress || '',
-      workAddress: profile.workAddress || mergedExisting.workAddress || '',
+      homeAddress:
+        profile.homeAddress !== undefined ? profile.homeAddress : mergedExisting.homeAddress || '',
+      workAddress:
+        profile.workAddress !== undefined ? profile.workAddress : mergedExisting.workAddress || '',
       accessibilityNeeds: profile.accessibilityNeeds || mergedExisting.accessibilityNeeds || {},
       smsNotifications: profile.smsNotifications ?? mergedExisting.smsNotifications ?? true,
       notes: profile.notes !== undefined ? profile.notes : mergedExisting.notes || '',
@@ -857,6 +874,12 @@ class ContactService {
 
     this.notifyListeners({ action: 'saved', contact: record });
     return record;
+  }
+
+  public upsertContact(
+    profile: Partial<ContactRecord> & { phone?: string; email?: string; name: string }
+  ): ContactRecord {
+    return this.saveContact(profile);
   }
 
   /**

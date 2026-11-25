@@ -8,8 +8,6 @@ import {
 import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
-import { formatDisplayPhone } from '../../../../core/services/telephony.service';
-import { getWorkspaceBus } from '../../../../core/services/workspace-bus.service';
 import { DispatchHeaderCallHud } from '../DispatchHeaderCallHud';
 import { FleetAlertCard, type DispatchMessageItem } from '../FleetAlertCard';
 import {
@@ -231,56 +229,6 @@ export function DispatchDesktopTopHeader({
 
   return (
     <>
-      {/* ─── INCOMING WEBRTC SOFTPHONE CALL ALERT BANNER ─── */}
-      {incomingCallAlert && (
-        <div className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white px-4 py-2.5 flex items-center justify-between shadow-xl z-50 shrink-0 border-b-2 border-emerald-400 animate-in slide-in-from-top duration-300">
-          <div className="flex items-center gap-3">
-            <div className="relative flex items-center justify-center">
-              <span className="w-5 h-5 rounded-full bg-white animate-ping absolute opacity-75" />
-              <PhoneIcon className="w-5 h-5 text-white relative animate-pulse" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">
-                  Incoming Softphone Call
-                </span>
-                <span className="text-sm font-extrabold tracking-wide">
-                  {formatDisplayPhone(incomingCallAlert.from)}
-                </span>
-              </div>
-              <p className="text-[11px] text-emerald-100 font-medium">
-                Customer is calling the dispatch desk. Click Answer to connect headset audio.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                getWorkspaceBus().publish('ANSWER_INCOMING_CALL', {});
-                onDismissIncomingCallAlert();
-                onActiveDockTabChange('phone');
-                onCommsActiveTabChange('phone');
-              }}
-              className="px-4 py-1.5 bg-white text-emerald-800 hover:bg-emerald-50 rounded-xl text-xs font-black shadow-lg transition-transform active:scale-95 cursor-pointer flex items-center gap-1.5"
-            >
-              <PhoneIcon className="w-4 h-4 text-emerald-600" />
-              <span>Answer Call</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                getWorkspaceBus().publish('REJECT_INCOMING_CALL', {});
-                onDismissIncomingCallAlert();
-              }}
-              className="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
-            >
-              <span>Decline</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ─── TOP NAVIGATION BAR ─── */}
       <header className="h-12 bg-white border-b border-slate-200 px-3 sm:px-4 flex items-center justify-between shrink-0 z-30 shadow-xs">
         {/* Left: Mobile Drawer Trigger + Desktop Workspace Switcher */}

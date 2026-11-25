@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { getCommsThreadService } from '../../../../core/services/comms/comms-thread.service';
+import { FloatingWindow } from '../../../ui/FloatingWindow';
 import {
   CarIcon,
   ChatBubbleLeftRightIcon,
@@ -8,7 +9,6 @@ import {
   MailIcon,
   PhoneIcon,
   TrashIcon,
-  XIcon,
 } from '../../../ui/Icons';
 import type { CommsSheetDragProps, InteractionEvent } from './comms-types';
 
@@ -221,7 +221,7 @@ export interface CommsRowActionSheetProps {
   onSelectMultiple: (target: InteractionEvent) => void;
   onArchive: (target: InteractionEvent) => void;
   onOpenEmailInDock?: (target: InteractionEvent) => void;
-  sheetDrag: CommsSheetDragProps;
+  sheetDrag?: CommsSheetDragProps;
 }
 
 export function CommsRowActionSheet({
@@ -242,49 +242,27 @@ export function CommsRowActionSheet({
   const isEmailEvent = event.type.startsWith('email_');
 
   return (
-    <div
-      className="fixed inset-0 z-[122] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
-      onClick={onClose}
+    <FloatingWindow
+      id="comms_row_actions"
+      isOpen={Boolean(event)}
+      onClose={onClose}
+      hasBackdrop={false}
+      title={event.contactName || 'Communication Actions'}
+      subtitle={`${contactHandle} · ${event.timestamp}`}
+      icon={<ChatBubbleLeftRightIcon className="w-4 h-4 text-blue-400" />}
+      initialSize={{ width: 420, height: 420 }}
+      autoHeight
+      minWidth={340}
+      minHeight={260}
+      zIndex={225}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={sheetDrag.sheetStyle}
-        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 w-full max-w-md max-h-[85dvh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
-      >
-        {/* Header with drag-down-to-close */}
-        <div
-          {...sheetDrag.dragHandlers}
-          className="bg-slate-900 text-white px-4 pt-2 pb-3.5 shrink-0 touch-none"
-        >
-          <div
-            className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden"
-            aria-hidden="true"
-          />
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-extrabold text-white truncate">
-                {event.contactName}
-              </div>
-              <div className="text-[11px] font-mono text-slate-400 truncate mt-0.5">
-                {contactHandle} · {event.timestamp}
-              </div>
-              {event.snippet && (
-                <p className="text-[11px] text-slate-300 line-clamp-1 mt-1">{event.snippet}</p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-9 h-9 rounded-full bg-slate-800/90 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer shrink-0"
-              aria-label="Close communication actions"
-            >
-              <XIcon className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-4 space-y-3 overflow-y-auto overscroll-contain pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-          <div className="grid grid-cols-2 gap-2">
+      <div className="p-4 space-y-3">
+        {event.snippet && (
+          <p className="text-[11px] text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2 line-clamp-2">
+            {event.snippet}
+          </p>
+        )}
+        <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               disabled={!event.contactPhone}
@@ -355,8 +333,7 @@ export function CommsRowActionSheet({
               <span>Archive Communication</span>
             </button>
           </div>
-        </div>
       </div>
-    </div>
+    </FloatingWindow>
   );
 }

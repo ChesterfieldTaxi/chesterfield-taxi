@@ -471,9 +471,6 @@ export function useDispatchWorkspaceSync({
       } else if (msg.type === 'INCOMING_CALL') {
         const payload = msg.payload;
         setIncomingCallAlert({ from: payload.from, callSid: payload.callSid });
-        setActiveDockTab('phone');
-        setCommsInitialTab('phone');
-        setCommsActiveTab('phone');
       } else if (msg.type === 'INCOMING_CALL_DISMISSED') {
         setIncomingCallAlert(null);
       } else if (msg.type === 'FOCUS_TRIP_ON_MAP') {

@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useBottomSheetDragToClose } from '../../../core/hooks/useBottomSheetDragToClose';
 import { resolveInteractionSelectorTarget } from '../../../core/services/comms/comms-templates.service';
 import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
-import { formatDisplayPhone } from '../../../core/utils/phone';
 import {
   ChatBubbleLeftRightIcon,
   ClockIcon,
@@ -11,7 +10,6 @@ import {
   UserIcon,
   XIcon,
 } from '../../ui/Icons';
-import { CommsContactModal } from './comms/comms-ContactModal';
 import { CommsRowActionSheet, useCommsRowTriage } from './comms/CommsRowActionSheet';
 import {
   MobileComposeSmsFab,
@@ -132,8 +130,6 @@ function CommsHubComponent({
         triage.setCommsActionSheetEvent(null);
       } else if (messaging.isNewMessageModalOpen) {
         messaging.setIsNewMessageModalOpen(false);
-      } else if (messaging.isContactEditOpen) {
-        messaging.handleCloseContactEdit();
       } else if (softphone.showAgentSetupModal) {
         softphone.handleCloseAgentSetupModal();
       }
@@ -203,12 +199,6 @@ function CommsHubComponent({
           messaging.setIsNewMessageModalOpen(false);
           return;
         }
-        if (messaging.isContactEditOpen) {
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          messaging.handleCloseContactEdit();
-          return;
-        }
         if (softphone.showAgentSetupModal) {
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -248,7 +238,7 @@ function CommsHubComponent({
     window.addEventListener('keydown', handleCommsHotkeys, true);
     return () => window.removeEventListener('keydown', handleCommsHotkeys, true);
   }, [
-    isVisible, triage.commsActionSheetEvent, messaging.isNewMessageModalOpen, messaging.isContactEditOpen,
+    isVisible, triage.commsActionSheetEvent, messaging.isNewMessageModalOpen,
     softphone.showAgentSetupModal, softphone.isEditingOperatorPhone, messaging.selectedContactPhone,
     triage.selectedItemIds.size, messaging.newMsgBody, messaging.noteDraftText, messaging.smsReplyText,
   ]);
@@ -372,61 +362,6 @@ function CommsHubComponent({
     >
       {/* Hidden audio element for Twilio recordings & voicemail playback */}
       <audio ref={sync.audioPlayerRef} onEnded={sync.handleAudioEnded} className="hidden" />
-
-      {/* ─── Incoming Softphone Call Banner ─── */}
-      {softphone.incomingCallInfo && (
-        <div className="bg-emerald-600 text-white px-4 py-3 shrink-0 shadow-lg flex items-center justify-between border-b border-emerald-700 animate-pulse">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-              <PhoneIcon className="w-5 h-5 text-white animate-bounce" />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-wider text-emerald-200">
-                Incoming Softphone Call
-                {softphone.callerCrmContext?.isVip ? ' · VIP' : ''}
-                {softphone.callerCrmContext?.isBlacklisted ? ' · DO NOT DISPATCH' : ''}
-              </p>
-              <p className="text-sm font-bold font-mono">
-                {softphone.callerCrmContext?.hasKnownContext &&
-                softphone.callerCrmContext.contactName !== 'Unknown Caller'
-                  ? `${softphone.callerCrmContext.contactName} (${formatDisplayPhone(
-                      softphone.incomingCallInfo.from
-                    )})`
-                  : formatDisplayPhone(softphone.incomingCallInfo.from)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() =>
-                getWorkspaceBus().publish('OPEN_CLIENT_PROFILE', {
-                  phone: softphone.incomingCallInfo?.from,
-                  name: softphone.callerCrmContext?.contactName,
-                  source: 'comms_hub',
-                })
-              }
-              className="px-2.5 py-1.5 rounded-xl bg-emerald-800/70 hover:bg-emerald-800 text-white text-xs font-bold cursor-pointer transition-colors"
-            >
-              Client Profile
-            </button>
-            <button
-              type="button"
-              onClick={softphone.handleRejectIncomingCall}
-              className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold cursor-pointer transition-colors shadow-xs"
-            >
-              Decline
-            </button>
-            <button
-              type="button"
-              onClick={softphone.handleAcceptIncomingCall}
-              className="px-4 py-1.5 rounded-xl bg-white text-emerald-800 hover:bg-emerald-50 text-xs font-black cursor-pointer shadow-md transition-all active:scale-95"
-            >
-              Answer
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ─── Clean Sub-Navigation Bar (All | Calls | SMS | VM) ─── */}
       <div className="bg-white border-b border-slate-200/80 px-2.5 py-2 shrink-0">
@@ -766,27 +701,7 @@ function CommsHubComponent({
         sheetDrag={commsSheetDrag}
       />
 
-      {/* Contact Profile & Edit Modal */}
-      <CommsContactModal
-        isOpen={messaging.isContactEditOpen}
-        contactEditForm={messaging.contactEditForm}
-        setContactEditForm={messaging.setContactEditForm}
-        contactSaveFeedback={messaging.contactSaveFeedback}
-        activeContactPhoneFallback={messaging.activeContactSummary?.contactPhone || ''}
-        corpSearchQuery={messaging.corpSearchQuery}
-        onChangeCorpSearchQuery={messaging.setCorpSearchQuery}
-        isCorpDropdownOpen={messaging.isCorpDropdownOpen}
-        setIsCorpDropdownOpen={messaging.setIsCorpDropdownOpen}
-        filteredCorpAccounts={messaging.filteredCorpAccounts}
-        onAddPhone={messaging.handleAddPhone}
-        onUpdatePhone={messaging.handleUpdatePhone}
-        onRemovePhone={messaging.handleRemovePhone}
-        onSaveContact={messaging.handleSaveContactFromHub}
-        onClose={messaging.handleCloseContactEdit}
-        sheetDrag={commsSheetDrag}
-      />
-
-      {/* ─── NEW SMS MESSAGE MODAL (Bottom-Docked Composer) ─── */}
+      {/* ─── NEW SMS MESSAGE FLOATING COMPOSER ─── */}
       <NewSmsMessageModal
         isOpen={messaging.isNewMessageModalOpen}
         newMsgError={messaging.newMsgError}

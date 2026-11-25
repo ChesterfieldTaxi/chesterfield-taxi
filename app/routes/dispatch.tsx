@@ -20,6 +20,7 @@ import { soundNotificationService } from '../core/services/sound-notification.se
 import type { DriverRosterItem } from '../core/services/operator.service';
 import { DriverQueueWindow } from '../components/domain/dispatch/DriverQueueWindow';
 import { ClientProfileWindow } from '../components/domain/dispatch/ClientProfileWindow';
+import { FloatingCallPill } from '../components/domain/dispatch/FloatingCallPill';
 import type { DispatchUniversalTripActions } from '../components/domain/dispatch/TripActionDropdown';
 import { DispatchStagedPlannerModals } from '../components/domain/dispatch/StagedDriverConflictModal';
 import { useDispatchFleet, type LiveFleetDriver } from '../core/hooks/useDispatchFleet';
@@ -898,7 +899,19 @@ export default function DispatchRoute() {
         />
       )}
 
-      {/* 1. Top Header, Incoming Call Banner & Mobile Sticky Call Banner */}
+      {/* Compact Draggable FaceTime / Dynamic-Island Softphone Pill */}
+      <FloatingCallPill
+        incomingCallAlert={incomingCallAlert}
+        activeCallStatus={activeCallStatus}
+        activeCallMeta={activeCallMeta}
+        callDuration={callDuration}
+        dialedNumber={dialedNumber}
+        trips={trips}
+        drivers={drivers}
+        onDismissIncomingCallAlert={() => setIncomingCallAlert(null)}
+      />
+
+      {/* 1. Top Header */}
       <DispatchDesktopTopHeader
         isDesktop={isDesktop}
         settings={settings}
@@ -1350,7 +1363,7 @@ export default function DispatchRoute() {
       {Boolean(reviewTrip || auditTrailTrip || driverModalTrip || completeTripTarget) && (
         <Suspense
           fallback={
-            <div className="fixed inset-0 z-[120] bg-slate-950/35 backdrop-blur-xs flex items-center justify-center">
+            <div className="fixed bottom-4 right-4 z-[210] pointer-events-none">
               <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-4 py-3 flex items-center gap-2.5 text-xs font-bold text-slate-700">
                 <SpinnerIcon className="w-4 h-4 animate-spin text-blue-600" />
                 <span>Loading trip details...</span>

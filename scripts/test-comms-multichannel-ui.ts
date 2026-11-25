@@ -751,7 +751,7 @@ async function runVerification() {
     'app/components/domain/dispatch/comms/SmsThreadPane.tsx',
     'app/components/domain/dispatch/comms/SoftphoneDialerPane.tsx',
     'app/components/domain/dispatch/comms/VoicemailCallLogPane.tsx',
-    'app/components/domain/dispatch/comms/comms-ContactModal.tsx',
+    'app/components/domain/dispatch/ClientProfileEditTab.tsx',
     'app/components/domain/dispatch/comms/comms-types.ts',
   ];
 

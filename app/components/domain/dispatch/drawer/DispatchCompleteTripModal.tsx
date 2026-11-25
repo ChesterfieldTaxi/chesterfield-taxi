@@ -7,7 +7,7 @@ import { getBookingService } from '../../../../core/services/booking';
 import { getEmailDispatchService } from '../../../../core/services/email/resend-email.service';
 import { getTelephonyService } from '../../../../core/services/telephony.service';
 import { formatVehicleTierDisplay } from '../../../../core/utils/vehicle-tier-format.util';
-import { useBottomSheetDragToClose } from '../../../../core/hooks/useBottomSheetDragToClose';
+import { FloatingWindow } from '../../../ui/FloatingWindow';
 import {
   BuildingIcon,
   CashIcon,
@@ -15,7 +15,6 @@ import {
   CreditCardIcon,
   DollarSignIcon,
   SpinnerIcon,
-  XIcon,
 } from '../../../ui/Icons';
 
 export interface DispatchCompleteTripModalProps {
@@ -69,13 +68,6 @@ export function DispatchCompleteTripModal({
     setCompleteSendReceipt(Boolean(completeTripTarget.passenger?.email) && autoReceipts);
     setCompleteNotes('');
   }, [completeTripTarget?.id, completeModalOpenSeq]);
-
-  const completeSheetDrag = useBottomSheetDragToClose({
-    onClose: () => {
-      if (!isCompletingTrip) onCloseCompleteTripModal();
-    },
-    disabled: isDesktop || isCompletingTrip,
-  });
 
   const handleDispatchCompleteTrip = async () => {
     if (!completeTripTarget) return;
@@ -247,179 +239,26 @@ export function DispatchCompleteTripModal({
   const computedGrandTotal = Number((parsedSubtotal + parsedTip).toFixed(2));
 
   return (
-    <div
-      className="fixed inset-0 z-[135] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
-      onClick={() => {
+    <FloatingWindow
+      id="dispatch_complete_trip"
+      isOpen={Boolean(completeTripTarget)}
+      onClose={() => {
         if (!isCompletingTrip) onCloseCompleteTripModal();
       }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={completeSheetDrag.sheetStyle}
-        className="bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
-      >
-        <div
-          {...completeSheetDrag.dragHandlers}
-          className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 sm:pb-4 shrink-0 touch-none"
-        >
-          <div
-            className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden"
-            aria-hidden="true"
-          />
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <CheckIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-                <h3 className="text-sm font-black tracking-tight">Complete Trip</h3>
-                <span className="text-[11px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
-                  #{completeTripTarget.id.slice(-6).toUpperCase()}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-0.5 truncate">
-                {completeTripTarget.passenger?.firstName} {completeTripTarget.passenger?.lastName}
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={isCompletingTrip}
-              onClick={onCloseCompleteTripModal}
-              className="w-9 h-9 sm:w-8 sm:h-8 rounded-full sm:rounded-lg bg-slate-800/80 sm:bg-transparent text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer shrink-0"
-              aria-label="Close complete trip modal"
-            >
-              <XIcon className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain text-xs">
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-            <div className="flex items-start gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
-              <span className="text-slate-700 font-medium truncate">
-                {completeTripTarget.pickupLocation?.address || 'Pickup'}
-              </span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="w-2 h-2 rounded-full bg-rose-500 mt-1 shrink-0" />
-              <span className="text-slate-700 font-medium truncate">
-                {completeTripTarget.dropoffLocation?.address || 'Dropoff'}
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                Final Fare (USD)
-              </label>
-              <div className="relative">
-                <DollarSignIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={completeFareInput}
-                  onChange={(e) => setCompleteFareInput(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                Tip / Gratuity (USD)
-              </label>
-              <div className="relative">
-                <DollarSignIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={completeTipInput}
-                  onChange={(e) => setCompleteTipInput(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-              Payment Settlement Method
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  { id: 'cash', label: 'Cash (In Car)', icon: CashIcon },
-                  { id: 'card_terminal', label: 'Card (In Car)', icon: CreditCardIcon },
-                  { id: 'card_on_file', label: 'Card on File', icon: CreditCardIcon },
-                  { id: 'corporate_account', label: 'Corporate Account', icon: BuildingIcon },
-                ] as const
-              ).map((opt) => {
-                const IconComp = opt.icon;
-                const active = completePaymentMethod === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setCompletePaymentMethod(opt.id)}
-                    className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
-                      active
-                        ? 'bg-emerald-50 border-emerald-500 text-emerald-900 ring-1 ring-emerald-500'
-                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <IconComp
-                      className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-emerald-600' : 'text-slate-400'}`}
-                    />
-                    <span className="truncate">{opt.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-              Completion Note (Audit Log — Optional)
-            </label>
-            <input
-              type="text"
-              value={completeNotes}
-              onChange={(e) => setCompleteNotes(e.target.value)}
-              placeholder="e.g. Driver lost cellular signal at airport dropoff"
-              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-            />
-          </div>
-
-          <label className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={completeSendReceipt}
-              disabled={!completeTripTarget.passenger?.email}
-              onChange={(e) => setCompleteSendReceipt(e.target.checked)}
-              className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
-            />
-            <div className="min-w-0">
-              <div className="font-bold text-slate-800">
-                Send Official Receipt Email to Passenger
-              </div>
-              <div className="text-[11px] text-slate-600 truncate">
-                {completeTripTarget.passenger?.email
-                  ? completeTripTarget.passenger.email
-                  : 'No email address on file for this passenger'}
-              </div>
-            </div>
-          </label>
-
-          <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-900 text-white">
-            <span className="text-xs font-semibold text-slate-300">Total Settled</span>
-            <span className="text-base font-mono font-black text-emerald-400 tabular-nums">
-              ${computedGrandTotal.toFixed(2)}
-            </span>
-          </div>
-        </div>
-
-        <div className="px-4 sm:px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
+      hasBackdrop={false}
+      title={`Complete Trip · #${completeTripTarget.id.slice(-6).toUpperCase()}`}
+      subtitle={
+        `${completeTripTarget.passenger?.firstName || ''} ${completeTripTarget.passenger?.lastName || ''}`.trim() ||
+        'Passenger Settlement'
+      }
+      icon={<CheckIcon className="w-4 h-4 text-emerald-400" />}
+      initialSize={{ width: 460, height: 560 }}
+      autoHeight
+      minWidth={380}
+      minHeight={360}
+      zIndex={225}
+      footer={
+        <div className="px-4 sm:px-5 py-3 bg-slate-50 flex items-center justify-end gap-2">
           <button
             type="button"
             disabled={isCompletingTrip}
@@ -447,7 +286,133 @@ export function DispatchCompleteTripModal({
             )}
           </button>
         </div>
+      }
+    >
+      <div className="p-4 sm:p-5 space-y-4 text-xs">
+        <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+          <div className="flex items-start gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
+            <span className="text-slate-700 font-medium truncate">
+              {completeTripTarget.pickupLocation?.address || 'Pickup'}
+            </span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="w-2 h-2 rounded-full bg-rose-500 mt-1 shrink-0" />
+            <span className="text-slate-700 font-medium truncate">
+              {completeTripTarget.dropoffLocation?.address || 'Dropoff'}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+              Final Fare (USD)
+            </label>
+            <div className="relative">
+              <DollarSignIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={completeFareInput}
+                onChange={(e) => setCompleteFareInput(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+              Tip / Gratuity (USD)
+            </label>
+            <div className="relative">
+              <DollarSignIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={completeTipInput}
+                onChange={(e) => setCompleteTipInput(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+            Payment Settlement Method
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                { id: 'cash', label: 'Cash (In Car)', icon: CashIcon },
+                { id: 'card_terminal', label: 'Card (In Car)', icon: CreditCardIcon },
+                { id: 'card_on_file', label: 'Card on File', icon: CreditCardIcon },
+                { id: 'corporate_account', label: 'Corporate Account', icon: BuildingIcon },
+              ] as const
+            ).map((opt) => {
+              const IconComp = opt.icon;
+              const active = completePaymentMethod === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setCompletePaymentMethod(opt.id)}
+                  className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                    active
+                      ? 'bg-emerald-50 border-emerald-500 text-emerald-900 ring-1 ring-emerald-500'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <IconComp
+                    className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-emerald-600' : 'text-slate-400'}`}
+                  />
+                  <span className="truncate">{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+            Completion Note (Audit Log — Optional)
+          </label>
+          <input
+            type="text"
+            value={completeNotes}
+            onChange={(e) => setCompleteNotes(e.target.value)}
+            placeholder="e.g. Driver lost cellular signal at airport dropoff"
+            className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+          />
+        </div>
+
+        <label className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={completeSendReceipt}
+            disabled={!completeTripTarget.passenger?.email}
+            onChange={(e) => setCompleteSendReceipt(e.target.checked)}
+            className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50"
+          />
+          <div className="min-w-0">
+            <div className="font-bold text-slate-800">Send Official Receipt Email to Passenger</div>
+            <div className="text-[11px] text-slate-600 truncate">
+              {completeTripTarget.passenger?.email
+                ? completeTripTarget.passenger.email
+                : 'No email address on file for this passenger'}
+            </div>
+          </div>
+        </label>
+
+        <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-900 text-white">
+          <span className="text-xs font-semibold text-slate-300">Total Settled</span>
+          <span className="text-base font-mono font-black text-emerald-400 tabular-nums">
+            ${computedGrandTotal.toFixed(2)}
+          </span>
+        </div>
       </div>
-    </div>
+    </FloatingWindow>
   );
 }

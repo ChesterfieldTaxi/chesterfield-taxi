@@ -1185,3 +1185,18 @@
   - [x] 71.B.3 Auto-route `From=client:*` form POSTs to `voice_client_twiml`, return `text/xml` TwiML on voice webhook signature/exception errors in `telephony-gateway.server.ts`, and add `www.` <-> apex host candidate URLs in `telephony-credentials.server.ts`.
   - [x] 71.B.4 Purge unattached recording generator & cached `rec_*` / `'Recorded Call'` phantom items, enforce deterministic `timestampMs` descending sort, and remove 12s `setInterval` polling in `useCommsInteractionSync.ts`.
   - [x] 71.B.5 Add `min-h-0` flex scroll fixes in `CommsHub.tsx` (`< 900`L) and `SmsThreadPane.tsx`, expand `scripts/test-nextiva-hybrid-softphone-phase71.ts` (`< 400`L), and pass `npm run typecheck`, Phases 69–71 suites, and `npm run build`.
+
+## Phase 72 (Wave 6 Phase 7): Compact Draggable `FloatingCallPill` (FaceTime / Dynamic Island Style + End-Call Deduplication), Unified `ClientProfileWindow` (`Overview & Trips` | `Edit Profile`) & Console-Wide Non-Blocking `FloatingWindow` Multi-Tasking Sweep
+- [x] 72.1 Spec-Driven Documentation:
+  - [x] 72.1.1 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 72 scope, architecture, and checklist.
+- [x] 72.2 Compact Draggable `FloatingCallPill` & End-Call Loop Deduplication:
+  - [x] 72.2.1 Create `app/components/domain/dispatch/FloatingCallPill.tsx` (`< 300`L) with Ringing & Live Call Dynamic-Island modes, 12-key DTMF popover, `z-[260]` portal + SSR fallback, and `ct_floating_call_pill_pos_v1` position persistence.
+  - [x] 72.2.2 Remove duplicate incoming call banners from `DispatchDesktopTopHeader.tsx` and `CommsHub.tsx`, mount `<FloatingCallPill />` in `dispatch.tsx` (`< 1,600`L), and stop forcing `setActiveDockTab('phone')` on `INCOMING_CALL` in `useDispatchWorkspaceSync.ts`.
+  - [x] 72.2.3 Add `'TOGGLE_CALL_MUTE'`, `'SEND_CALL_DTMF'`, and `'CALL_MUTE_CHANGED'` to `WorkspaceBus` and guard `handleEndCall` in `useTwilioSoftphoneDevice.ts` (`isEndingCallRef` + `endedCallSidsRef` + idle early return + single `postCallFetchTimerRef`).
+- [x] 72.3 Unified `ClientProfileWindow` (`Overview & Trips` | `Edit Profile`) & Retire `comms-ContactModal.tsx`:
+  - [x] 72.3.1 Create `app/components/domain/dispatch/ClientProfileEditTab.tsx` (`< 340`L) with full CRM fields (`<Switch />`, `<Select searchable>`, `<LocationAutocomplete />`, `<Checkbox />`) saving via `ContactService`.
+  - [x] 72.3.2 Add 2-tab segmented toggle (`Overview & Trips` | `Edit Profile`) + `initialTab` bus handling in `ClientProfileWindow.tsx` (`< 360`L), delete `comms-ContactModal.tsx`, and route Comms contact edit triggers to `OPEN_CLIENT_PROFILE` (`initialTab: 'edit'`).
+- [x] 72.4 Console-Wide Non-Blocking `FloatingWindow` (`hasBackdrop={false}`) Sweep:
+  - [x] 72.4.1 Convert `DispatchBookingConflictGuard`, `DispatchCompleteTripModal`, `DispatchDriverFareModal`, `DispatchTripQueueSheets`, `DispatchDriverSheets`, `StagedDriverConflictModal`, `NewSmsMessageModal`, `CommsRowActionSheet` / `VoicemailCallLogPane`, `AgentPhoneSetupModal`, `EmailMessageListPane`, and `dispatch.tsx` lazy fallback to non-blocking `FloatingWindow` / non-blocking UI.
+- [x] 72.5 Verification & Build Gate (`scripts/test-floating-call-pill-and-nonblocking-windows-phase72.ts < 360`L):
+  - [x] 72.5.1 Create `scripts/test-floating-call-pill-and-nonblocking-windows-phase72.ts` (`< 360`L) and pass `npm run typecheck`, Phases 69–72 suites, and `npm run build` with exit code `0`, leaving Phase 72 uncommitted in the working tree for review.

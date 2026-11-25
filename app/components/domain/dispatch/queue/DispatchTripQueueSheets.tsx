@@ -31,6 +31,7 @@ import {
   CopyIcon,
   ShieldCheckIcon,
 } from '../../../ui/Icons';
+import { FloatingWindow } from '../../../ui/FloatingWindow';
 import { Select } from '../../../ui/Select';
 
 export interface DispatchTripQueueSheetsProps {
@@ -96,121 +97,35 @@ export function DispatchTripQueueSheets({
 
   return (
     <>
-      {/* ─── Batch Assign / Stage Driver Modal ─── */}
+      {/* ─── Batch Assign / Stage Driver Floating Window ─── */}
       {isBatchAssignOpen && (
-        <div
-          className="fixed inset-0 z-[125] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
-          onClick={onCloseBatchAssign}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={sheetStyle}
-            className="bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90dvh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
-          >
-            <div
-              {...dragHandlers}
-              className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 shrink-0 touch-none"
-            >
-              <div
-                className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden"
-                aria-hidden="true"
-              />
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="text-sm font-black tracking-tight flex items-center gap-2">
-                    <UsersIcon className="w-4 h-4 text-blue-400 shrink-0" />
-                    <span>
-                      {isStageBatchMode
-                        ? `Batch Stage Driver (${selectedTripIdsCount} Trips)`
-                        : `Batch Assign Driver (${selectedTripIdsCount} Trips)`}
-                    </span>
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {isStageBatchMode
-                      ? 'Stage a shift placeholder held in Dispatch (zero driver alerts until sent).'
-                      : `Send immediately to driver across ${selectedTripIdsCount} selected trip(s).`}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={onCloseBatchAssign}
-                  className="w-9 h-9 sm:w-8 sm:h-8 rounded-full sm:rounded-lg bg-slate-800/80 sm:bg-transparent text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                  aria-label="Close batch assign modal"
-                >
-                  <XIcon className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-4 sm:p-5 space-y-3">
-              {stagedPlanner && (
-                <div>
-                  <span className="block text-[10.5px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                    Placement Mode
-                  </span>
-                  <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => stagedPlanner.setBatchAssignMode('send_to_driver')}
-                      className={`py-1.5 px-2.5 rounded-lg text-xs font-extrabold transition-colors cursor-pointer ${
-                        !isStageBatchMode
-                          ? 'bg-blue-600 text-white shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Send to Driver
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => stagedPlanner.setBatchAssignMode('stage_hold')}
-                      className={`py-1.5 px-2.5 rounded-lg text-xs font-extrabold transition-colors cursor-pointer ${
-                        isStageBatchMode
-                          ? 'bg-indigo-600 text-white shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      📌 Stage (Hold)
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                  Driver Operator
-                </label>
-                <Select
-                  size="md"
-                  searchable
-                  searchPlaceholder="Search driver, cab #, status..."
-                  value={batchAssignDriverId}
-                  onChange={(e) => onBatchAssignDriverIdChange(e.target.value)}
-                >
-                  <option value="">Select a driver...</option>
-                  <option value="unassigned">
-                    {isStageBatchMode
-                      ? 'Clear Staged Driver on Selected Trips'
-                      : 'Unassign Selected Trips'}
-                  </option>
-                  {drivers.map((drv) => (
-                    <option
-                      key={drv.id}
-                      value={drv.id}
-                      disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
-                    >
-                      {drv.formattedLabel || formatDriverAssignmentLabel(drv)} —{' '}
-                      {getMapStatusLabel(drv.mapStatus, drv.activeTripStatus)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-
-            <div className="px-4 sm:px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+        <FloatingWindow
+          id="dispatch_batch_assign"
+          isOpen={isBatchAssignOpen}
+          onClose={onCloseBatchAssign}
+          hasBackdrop={false}
+          title={
+            isStageBatchMode
+              ? `Batch Stage Driver (${selectedTripIdsCount} Trips)`
+              : `Batch Assign Driver (${selectedTripIdsCount} Trips)`
+          }
+          subtitle={
+            isStageBatchMode
+              ? 'Stage a shift placeholder held in Dispatch (zero driver alerts until sent).'
+              : `Send immediately to driver across ${selectedTripIdsCount} selected trip(s).`
+          }
+          icon={<UsersIcon className="w-4 h-4 text-blue-400" />}
+          initialSize={{ width: 440, height: 340 }}
+          autoHeight
+          minWidth={360}
+          minHeight={240}
+          zIndex={225}
+          footer={
+            <div className="px-4 sm:px-5 py-3 bg-slate-50 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={onCloseBatchAssign}
-                className="px-4 py-2 sm:py-1.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
+                className="px-4 py-1.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
               >
                 Cancel
               </button>
@@ -224,10 +139,8 @@ export function DispatchTripQueueSheets({
                     onConfirmBatchAssign();
                   }
                 }}
-                className={`px-4 py-2 sm:py-1.5 rounded-xl disabled:opacity-40 text-white text-xs font-bold shadow-xs cursor-pointer ${
-                  isStageBatchMode
-                    ? 'bg-indigo-600 hover:bg-indigo-700'
-                    : 'bg-blue-600 hover:bg-blue-700'
+                className={`px-4 py-1.5 rounded-xl disabled:opacity-40 text-white text-xs font-bold shadow-xs cursor-pointer ${
+                  isStageBatchMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-blue-600 hover:bg-blue-700'
                 }`}
               >
                 {isStageBatchMode
@@ -235,11 +148,75 @@ export function DispatchTripQueueSheets({
                   : `Send to Driver (${selectedTripIdsCount})`}
               </button>
             </div>
+          }
+        >
+          <div className="p-4 sm:p-5 space-y-3">
+            {stagedPlanner && (
+              <div>
+                <span className="block text-[10.5px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  Placement Mode
+                </span>
+                <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => stagedPlanner.setBatchAssignMode('send_to_driver')}
+                    className={`py-1.5 px-2.5 rounded-lg text-xs font-extrabold transition-colors cursor-pointer ${
+                      !isStageBatchMode
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Send to Driver
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => stagedPlanner.setBatchAssignMode('stage_hold')}
+                    className={`py-1.5 px-2.5 rounded-lg text-xs font-extrabold transition-colors cursor-pointer ${
+                      isStageBatchMode
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    📌 Stage (Hold)
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                Driver Operator
+              </label>
+              <Select
+                size="md"
+                searchable
+                searchPlaceholder="Search driver, cab #, status..."
+                value={batchAssignDriverId}
+                onChange={(e) => onBatchAssignDriverIdChange(e.target.value)}
+              >
+                <option value="">Select a driver...</option>
+                <option value="unassigned">
+                  {isStageBatchMode
+                    ? 'Clear Staged Driver on Selected Trips'
+                    : 'Unassign Selected Trips'}
+                </option>
+                {drivers.map((drv) => (
+                  <option
+                    key={drv.id}
+                    value={drv.id}
+                    disabled={drv.isBlacklisted || drv.zone === 'Suspended'}
+                  >
+                    {drv.formattedLabel || formatDriverAssignmentLabel(drv)} —{' '}
+                    {getMapStatusLabel(drv.mapStatus, drv.activeTripStatus)}
+                  </option>
+                ))}
+              </Select>
+            </div>
           </div>
-        </div>
+        </FloatingWindow>
       )}
 
-      {/* ─── Mobile-Native Trip Quick Action Bottom Sheet ─── */}
+      {/* ─── Trip Quick Action Floating Window ─── */}
       {mobileActionSheetTrip &&
         (() => {
           const sheetTrip =
@@ -254,76 +231,31 @@ export function DispatchTripQueueSheets({
           const tripHasStaged = hasStagedDriver(sheetTrip);
 
           return (
-            <div
-              className="fixed inset-0 z-[122] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
-              onClick={onCloseMobileActionSheetTrip}
+            <FloatingWindow
+              id="dispatch_trip_actions"
+              isOpen={Boolean(mobileActionSheetTrip)}
+              onClose={onCloseMobileActionSheetTrip}
+              hasBackdrop={false}
+              title={`#${sheetTrip.id.slice(-6).toUpperCase()} · ${sheetTrip.passenger?.firstName || ''} ${sheetTrip.passenger?.lastName || ''}`.trim()}
+              subtitle={`${sheetTrip.pickupLocation?.address || 'Pickup'} → ${sheetTrip.dropoffLocation?.address || 'Dropoff'}`}
+              icon={<CarIcon className="w-4 h-4 text-blue-400" />}
+              headerExtra={
+                <span className="font-mono font-black text-[11px] text-emerald-400 mr-1">
+                  ${sheetTrip.pricing?.totalFare?.toFixed(2) || '0.00'}
+                </span>
+              }
+              initialSize={{ width: 440, height: 560 }}
+              autoHeight
+              minWidth={360}
+              minHeight={320}
+              zIndex={222}
             >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                style={sheetStyle}
-                className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 w-full max-w-md max-h-[90dvh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
-              >
-                {/* Sheet Header */}
-                <div
-                  {...dragHandlers}
-                  className="bg-slate-900 text-white px-4 pt-2 pb-3.5 shrink-0 touch-none"
-                >
-                  <div
-                    className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden"
-                    aria-hidden="true"
-                  />
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono font-black text-xs text-blue-400">
-                          #{sheetTrip.id.slice(-6).toUpperCase()}
-                        </span>
-                        <span className="text-sm font-extrabold text-white truncate">
-                          {sheetTrip.passenger?.firstName} {sheetTrip.passenger?.lastName}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                        {sheetTrip.pickupLocation?.address} → {sheetTrip.dropoffLocation?.address}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1.5 text-[11px] flex-wrap">
-                        <span className="font-mono font-black text-emerald-400">
-                          ${sheetTrip.pricing?.totalFare?.toFixed(2) || '0.00'}
-                        </span>
-                        <span className="text-slate-600">•</span>
-                        <span className="capitalize text-slate-300 font-semibold">
-                          {sheetTrip.status.replace(/_/g, ' ')}
-                        </span>
-                        {assignedDrv ? (
-                          <>
-                            <span className="text-slate-600">•</span>
-                            <span className="text-blue-300 font-semibold truncate">
-                              {assignedDrv.formattedLabel ||
-                                formatDriverAssignmentLabel(assignedDrv)}
-                            </span>
-                          </>
-                        ) : tripHasStaged ? (
-                          <>
-                            <span className="text-slate-600">•</span>
-                            <span className="text-indigo-300 font-bold truncate">
-                              📌 Staged: {sheetTrip.plannedDriverLabel || sheetTrip.plannedDriverId}
-                            </span>
-                          </>
-                        ) : null}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={onCloseMobileActionSheetTrip}
-                      className="w-9 h-9 rounded-full bg-slate-800/90 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer shrink-0"
-                      aria-label="Close trip actions"
-                    >
-                      <XIcon className="w-4 h-4" />
-                    </button>
+              <div className="p-4 space-y-3">
+                {assignedDrv && (
+                  <div className="text-[11px] font-bold text-blue-800 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl truncate">
+                    Assigned: {assignedDrv.formattedLabel || formatDriverAssignmentLabel(assignedDrv)}
                   </div>
-                </div>
-
-                {/* Scrollable Sheet Actions */}
-                <div className="p-4 space-y-3 overflow-y-auto overscroll-contain pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+                )}
                   {/* Staged Driver Banner + 1-Tap Send to Driver */}
                   {tripHasStaged && stagedPlanner && (
                     <div className="p-3 rounded-2xl border-2 border-dashed border-indigo-400 bg-indigo-50/80 flex items-center justify-between gap-2">
@@ -634,8 +566,7 @@ export function DispatchTripQueueSheets({
                     </button>
                   )}
                 </div>
-              </div>
-            </div>
+            </FloatingWindow>
           );
         })()}
     </>

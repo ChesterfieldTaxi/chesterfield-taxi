@@ -199,6 +199,15 @@ export function useTwilioSoftphoneDevice({
   const deviceRef = useRef<any>(null);
   const activeCallRef = useRef<any>(null);
   const incomingCallRef = useRef<any>(null);
+  const callStatusRef = useRef<CallStatus>(callStatus);
+  callStatusRef.current = callStatus;
+  const activeCallSidRef = useRef<string | null>(activeCallSid);
+  activeCallSidRef.current = activeCallSid;
+  const isMutedRef = useRef<boolean>(isMuted);
+  isMutedRef.current = isMuted;
+  const isEndingCallRef = useRef<boolean>(false);
+  const endedCallSidsRef = useRef<Set<string>>(new Set());
+  const postCallFetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleEndCallRef = useRef<(broadcast?: boolean) => void>(() => {});
   const isMountedRef = useRef(true);
   const initWebRtcPromiseRef = useRef<Promise<any> | null>(null);
@@ -362,6 +371,10 @@ export function useTwilioSoftphoneDevice({
     return () => {
       isMountedRef.current = false;
       stopInboundRingtone();
+      if (postCallFetchTimerRef.current) {
+        clearTimeout(postCallFetchTimerRef.current);
+        postCallFetchTimerRef.current = null;
+      }
       if (deviceRef.current) {
         try {
           deviceRef.current.destroy();
@@ -385,10 +398,13 @@ export function useTwilioSoftphoneDevice({
     activeCallRef.current = call;
 
     call.accept();
+    callStatusRef.current = 'connected';
+    incomingCallRef.current = null;
     setIncomingCallInfo(null);
     setCallStatus('connected');
     setActiveCallContact(displayNum);
     setActiveCallPhone(callerFrom);
+    activeCallSidRef.current = call.parameters?.CallSid || null;
     setActiveCallSid(call.parameters?.CallSid || null);
     setActiveTab('phone');
     setCallsSubTab('keypad');
@@ -413,10 +429,6 @@ export function useTwilioSoftphoneDevice({
       },
       ...prev,
     ]);
-
-    call.on('disconnect', () => {
-      handleEndCallRef.current?.(true);
-    });
   };
 
   const handleRejectIncomingCall = () => {
@@ -482,7 +494,9 @@ export function useTwilioSoftphoneDevice({
       const callId = `call_${Date.now()}`;
       activeCallInteractionIdRef.current = callId;
 
-      setCallStatus('calling');
+      callStatusRef.current = 'calling';
+      callStatusRef.current = 'calling';
+    setCallStatus('calling');
       setActiveCallContact(callerDisplayName);
       setActiveCallPhone(targetE164);
       setCallNotice({
@@ -590,6 +604,7 @@ export function useTwilioSoftphoneDevice({
     const callId = `call_${Date.now()}`;
     activeCallInteractionIdRef.current = callId;
 
+    callStatusRef.current = 'calling';
     setCallStatus('calling');
     setActiveCallContact(callerDisplayName);
     setActiveCallPhone(targetE164);
@@ -696,77 +711,110 @@ export function useTwilioSoftphoneDevice({
   };
 
   const handleEndCall = (broadcast: boolean | React.MouseEvent | unknown = true) => {
-    if (activeCallRef.current) {
-      try {
-        activeCallRef.current.disconnect();
-      } catch {
-        // Ignore disconnect errors
-      }
+    const currentSid =
+      activeCallSidRef.current ||
+      activeCallRef.current?.parameters?.CallSid ||
+      incomingCallRef.current?.parameters?.CallSid ||
+      null;
+
+    if (isEndingCallRef.current) return;
+    if (callStatus === 'idle' && !activeCallRef.current && !incomingCallRef.current) return;
+    if (callStatusRef.current === 'idle' && !activeCallRef.current && !incomingCallRef.current) return;
+    if (currentSid && endedCallSidsRef.current.has(currentSid)) return;
+
+    isEndingCallRef.current = true;
+    if (currentSid) {
+      endedCallSidsRef.current.add(currentSid);
+    }
+
+    try {
+      stopInboundRingtone();
+      const activeCall = activeCallRef.current;
       activeCallRef.current = null;
-    }
+      incomingCallRef.current = null;
+      callStatusRef.current = 'idle';
+      activeCallSidRef.current = null;
+      isMutedRef.current = false;
 
-    const finalSecs = callTimer > 0 ? callTimer : 1;
-    const m = Math.floor(finalSecs / 60);
-    const s = (finalSecs % 60).toString().padStart(2, '0');
-    const durationLabel = `${m}:${s}`;
-
-    if (activeCallSid) {
-      try {
-        const creds = getClientTelephonyCredentials();
-        authorizedFetch('/api/telephony', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'end_call',
-            callSid: activeCallSid,
-            credentials: creds.accountSid ? creds : undefined,
-          }),
-        }).catch(() => {});
-      } catch {
-        // Ignore hangup network errors
+      if (activeCall) {
+        try {
+          activeCall.disconnect();
+        } catch {
+          // Ignore disconnect errors
+        }
       }
+
+      const finalSecs = callTimer > 0 ? callTimer : 1;
+      const m = Math.floor(finalSecs / 60);
+      const s = (finalSecs % 60).toString().padStart(2, '0');
+      const durationLabel = `${m}:${s}`;
+
+      if (currentSid) {
+        try {
+          const creds = getClientTelephonyCredentials();
+          authorizedFetch('/api/telephony', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'end_call',
+              callSid: currentSid,
+              credentials: creds.accountSid ? creds : undefined,
+            }),
+          }).catch(() => {});
+        } catch {
+          // Ignore hangup network errors
+        }
+      }
+
+      if (activeCallInteractionIdRef.current) {
+        const activeId = activeCallInteractionIdRef.current;
+        setInteractions((prev) =>
+          prev.map((i) =>
+            i.id === activeId
+              ? {
+                  ...i,
+                  durationSeconds: finalSecs,
+                  audioDuration: durationLabel,
+                  snippet: `Outbound Call (${durationLabel})`,
+                }
+              : i
+          )
+        );
+      }
+
+      setIncomingCallInfo(null);
+      setCallStatus('idle');
+      setCallsSubTab('history');
+      setActiveCallContact(null);
+      setActiveCallPhone(null);
+      setActiveCallSid(null);
+      setCallTimer(0);
+      setIsMuted(false);
+      setCallNotice(null);
+      setShowInCallKeypad(false);
+      setShowInCallTrips(false);
+      setShowInCallNotes(false);
+      activeCallInteractionIdRef.current = null;
+
+      workspaceBus.publish('CALL_MUTE_CHANGED', { isMuted: false });
+      const shouldBroadcast = typeof broadcast === 'boolean' ? broadcast : true;
+      if (shouldBroadcast) {
+        workspaceBus.publish('CALL_ENDED', {
+          callSid: currentSid || undefined,
+          durationSeconds: finalSecs,
+        });
+      }
+
+      if (postCallFetchTimerRef.current) {
+        clearTimeout(postCallFetchTimerRef.current);
+      }
+      postCallFetchTimerRef.current = setTimeout(() => {
+        postCallFetchTimerRef.current = null;
+        void fetchTelephonyData();
+      }, 4000);
+    } finally {
+      isEndingCallRef.current = false;
     }
-
-    const shouldBroadcast = typeof broadcast === 'boolean' ? broadcast : true;
-    if (shouldBroadcast) {
-      workspaceBus.publish('CALL_ENDED', {
-        callSid: activeCallSid || undefined,
-        durationSeconds: finalSecs,
-      });
-    }
-
-    if (activeCallInteractionIdRef.current) {
-      const activeId = activeCallInteractionIdRef.current;
-      setInteractions((prev) =>
-        prev.map((i) =>
-          i.id === activeId
-            ? {
-                ...i,
-                durationSeconds: finalSecs,
-                audioDuration: durationLabel,
-                snippet: `Outbound Call (${durationLabel})`,
-              }
-            : i
-        )
-      );
-    }
-
-    setCallStatus('idle');
-    setCallsSubTab('history');
-    setActiveCallContact(null);
-    setActiveCallPhone(null);
-    setActiveCallSid(null);
-    setCallTimer(0);
-    setIsMuted(false);
-    setCallNotice(null);
-    setShowInCallKeypad(false);
-    setShowInCallTrips(false);
-    setShowInCallNotes(false);
-    activeCallInteractionIdRef.current = null;
-
-    setTimeout(() => {
-      void fetchTelephonyData();
-    }, 4000);
   };
   handleEndCallRef.current = handleEndCall;
 
@@ -813,17 +861,39 @@ export function useTwilioSoftphoneDevice({
     };
   }, [activeCallSid, callStatus]);
 
-  // Sync call ending from external triggers (header flydown or top banner)
+  // Sync call ending, mute toggle & DTMF keypad digits from FloatingCallPill / external triggers
   useEffect(() => {
     const unsub = workspaceBus.subscribe((msg) => {
       if (msg.type === 'CALL_ENDED') {
-        if (callStatus !== 'idle') {
+        if (callStatusRef.current !== 'idle' || activeCallRef.current || incomingCallRef.current) {
           handleEndCallRef.current(false);
+        }
+      } else if (msg.type === 'TOGGLE_CALL_MUTE') {
+        const nextMute =
+          typeof msg.payload?.muted === 'boolean' ? msg.payload.muted : !isMutedRef.current;
+        isMutedRef.current = nextMute;
+        setIsMuted(nextMute);
+        if (activeCallRef.current) {
+          try {
+            activeCallRef.current.mute(nextMute);
+          } catch {}
+        }
+        workspaceBus.publish('CALL_MUTE_CHANGED', { isMuted: nextMute });
+      } else if (msg.type === 'SEND_CALL_DTMF') {
+        const digit = msg.payload?.digit;
+        if (digit) {
+          setActiveKeypadFeedback(digit);
+          if (activeCallRef.current) {
+            try {
+              activeCallRef.current.sendDigits(digit);
+            } catch {}
+          }
+          setTimeout(() => setActiveKeypadFeedback(null), 150);
         }
       }
     });
     return unsub;
-  }, [workspaceBus, callStatus]);
+  }, [workspaceBus]);
 
   // Focus dialpad input when Phone drawer is visible and on keypad sub-tab
   useEffect(() => {
@@ -957,7 +1027,8 @@ export function useTwilioSoftphoneDevice({
   };
 
   const handleToggleMute = () => {
-    const nextMute = !isMuted;
+    const nextMute = !isMutedRef.current;
+    isMutedRef.current = nextMute;
     setIsMuted(nextMute);
     if (activeCallRef.current) {
       try {
@@ -966,6 +1037,7 @@ export function useTwilioSoftphoneDevice({
         // Ignore mute errors
       }
     }
+    workspaceBus.publish('CALL_MUTE_CHANGED', { isMuted: nextMute });
   };
 
   const handleToggleHold = () => {

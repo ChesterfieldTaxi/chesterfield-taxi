@@ -13,8 +13,8 @@ import {
   CheckIcon,
   ClockIcon,
   SparklesIcon,
-  XIcon,
 } from '../../ui/Icons';
+import { FloatingWindow } from '../../ui/FloatingWindow';
 
 export interface StagedDriverConflictModalProps {
   isOpen: boolean;
@@ -40,50 +40,37 @@ export function StagedDriverConflictModal({
   const totalCount = stagedTrips.length + unstagedTrips.length;
 
   return (
-    <div
-      className="fixed inset-0 z-[135] bg-slate-950/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
-      onClick={() => {
+    <FloatingWindow
+      id="dispatch_staged_conflict"
+      isOpen={isOpen && stagedTrips.length > 0}
+      onClose={() => {
         if (!isResolving) onClose();
       }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90dvh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="staged-conflict-modal-title"
-      >
-        {/* Header */}
-        <div className="bg-slate-900 text-white px-5 py-4 flex items-start justify-between gap-3 shrink-0">
-          <div className="space-y-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-lg bg-indigo-500/25 border border-indigo-400/40 flex items-center justify-center shrink-0">
-                <AlertTriangleIcon className="w-3.5 h-3.5 text-amber-300" />
-              </span>
-              <h3 id="staged-conflict-modal-title" className="text-sm font-black tracking-tight">
-                Staged Driver Placeholder{stagedTrips.length === 1 ? '' : 's'} Detected
-              </h3>
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              <strong>{stagedTrips.length}</strong> of <strong>{totalCount}</strong> target trip
-              {totalCount === 1 ? '' : 's'} in <strong>{sourceLabel}</strong> already{' '}
-              {stagedTrips.length === 1 ? 'has a' : 'have'} pre-planned staged driver
-              {stagedTrips.length === 1 ? '' : 's'}. How should Dispatch handle staged assignments?
-            </p>
-          </div>
+      hasBackdrop={false}
+      title={`Staged Driver Placeholder${stagedTrips.length === 1 ? '' : 's'} Detected`}
+      subtitle={`${stagedTrips.length} of ${totalCount} target trip${
+        totalCount === 1 ? '' : 's'
+      } in ${sourceLabel} already staged`}
+      icon={<AlertTriangleIcon className="w-4 h-4 text-amber-300" />}
+      initialSize={{ width: 520, height: 540 }}
+      autoHeight
+      minWidth={380}
+      minHeight={320}
+      zIndex={230}
+      footer={
+        <div className="px-4 sm:px-5 py-3 bg-slate-50 flex items-center justify-end">
           <button
             type="button"
             disabled={isResolving}
             onClick={onClose}
-            className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer shrink-0 disabled:opacity-40"
-            aria-label="Close staged conflict prompt"
+            className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer disabled:opacity-50"
           >
-            <XIcon className="w-4 h-4" />
+            Cancel
           </button>
         </div>
-
-        {/* Staged Trips Preview List */}
-        <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto flex-1">
+      }
+    >
+      <div className="p-4 sm:p-5 space-y-3.5">
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
               <span>Trips with Staged Drivers ({stagedTrips.length})</span>
@@ -195,21 +182,8 @@ export function StagedDriverConflictModal({
               </p>
             </button>
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 sm:px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end shrink-0">
-          <button
-            type="button"
-            disabled={isResolving}
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer disabled:opacity-50"
-          >
-            Cancel
-          </button>
-        </div>
       </div>
-    </div>
+    </FloatingWindow>
   );
 }
 
@@ -235,43 +209,50 @@ export function AutoStageSuggestionsModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[135] bg-slate-950/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
-      onClick={() => {
+    <FloatingWindow
+      id="dispatch_auto_stage_suggestions"
+      isOpen={isOpen}
+      onClose={() => {
         if (!isApplying) onClose();
       }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[88dvh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="auto-stage-modal-title"
-      >
-        <div className="bg-slate-900 text-white px-5 py-4 flex items-start justify-between gap-3 shrink-0">
-          <div className="space-y-1">
-            <h3 id="auto-stage-modal-title" className="text-sm font-black flex items-center gap-2">
-              <SparklesIcon className="w-4 h-4 text-indigo-400 shrink-0" />
-              <span>Auto-Stage Shift Suggestions ({suggestions.length})</span>
-            </h3>
-            <p className="text-xs text-slate-300">
-              Non-conflicting driver shift placeholders (&ge;15m turnaround buffer). Held in Dispatch
-              with zero driver alerts until you click <strong>Send to Driver</strong> or enter the
-              Auto-Release window.
-            </p>
-          </div>
+      hasBackdrop={false}
+      title={`Auto-Stage Shift Suggestions (${suggestions.length})`}
+      subtitle="Non-conflicting driver shift placeholders (≥15m turnaround buffer)"
+      icon={<SparklesIcon className="w-4 h-4 text-indigo-400" />}
+      initialSize={{ width: 520, height: 500 }}
+      autoHeight
+      minWidth={380}
+      minHeight={300}
+      zIndex={230}
+      footer={
+        <div className="px-4 sm:px-5 py-3 bg-slate-50 flex items-center justify-end gap-2">
           <button
             type="button"
             disabled={isApplying}
             onClick={onClose}
-            className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center cursor-pointer shrink-0"
-            aria-label="Close auto-stage preview"
+            className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer"
           >
-            <XIcon className="w-4 h-4" />
+            Cancel
           </button>
+          {suggestions.length > 0 && (
+            <button
+              type="button"
+              disabled={isApplying}
+              onClick={() => void onConfirmApply()}
+              className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-extrabold shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <CheckIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                {isApplying
+                  ? 'Staging...'
+                  : `Stage ${suggestions.length} Trip${suggestions.length === 1 ? '' : 's'} (Hold)`}
+              </span>
+            </button>
+          )}
         </div>
-
-        <div className="p-4 sm:p-5 space-y-3 overflow-y-auto flex-1">
+      }
+    >
+      <div className="p-4 sm:p-5 space-y-3">
           {suggestions.length === 0 ? (
             <div className="p-6 rounded-xl border border-dashed border-slate-300 text-center space-y-1.5">
               <p className="text-xs font-bold text-slate-800">
@@ -343,35 +324,8 @@ export function AutoStageSuggestionsModal({
               overlaps or vehicle capacity mismatches.
             </div>
           )}
-        </div>
-
-        <div className="px-4 sm:px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
-          <button
-            type="button"
-            disabled={isApplying}
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer"
-          >
-            Cancel
-          </button>
-          {suggestions.length > 0 && (
-            <button
-              type="button"
-              disabled={isApplying}
-              onClick={() => void onConfirmApply()}
-              className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-extrabold shadow-xs cursor-pointer inline-flex items-center gap-1.5"
-            >
-              <CheckIcon className="w-3.5 h-3.5 shrink-0" />
-              <span>
-                {isApplying
-                  ? 'Staging...'
-                  : `Stage ${suggestions.length} Trip${suggestions.length === 1 ? '' : 's'} (Hold)`}
-              </span>
-            </button>
-          )}
-        </div>
       </div>
-    </div>
+    </FloatingWindow>
   );
 }
 

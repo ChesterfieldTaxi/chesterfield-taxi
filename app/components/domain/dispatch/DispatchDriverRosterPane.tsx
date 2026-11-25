@@ -22,6 +22,7 @@ import {
   CalendarIcon,
   PlusIcon,
 } from '../../ui/Icons';
+import { FloatingWindow } from '../../ui/FloatingWindow';
 import { Select } from '../../ui/Select';
 
 export type DriverStatusFilter = 'all' | 'available' | 'en_route' | 'busy' | 'break' | 'offline';
@@ -638,47 +639,75 @@ export function DispatchDriverSheets({
           .sort((a, b) => (statusRank[a.mapStatus] ?? 9) - (statusRank[b.mapStatus] ?? 9));
 
         return (
-          <div
-            className="fixed inset-0 z-[124] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
-            onClick={onCloseDriverPicker}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={sheetStyle}
-              className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 w-full max-w-md max-h-[88dvh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
-            >
-              {/* Header */}
-              <div
-                {...dragHandlers}
-                className="bg-slate-900 text-white px-4 pt-2 pb-3.5 shrink-0 touch-none"
-              >
-                <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-black tracking-tight flex items-center gap-2">
-                      <CarIcon className="w-4 h-4 text-blue-400 shrink-0" />
-                      <span>Assign Driver</span>
-                      <span className="text-[11px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
-                        #{targetTrip.id.slice(-6).toUpperCase()}
-                      </span>
-                    </h3>
-                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                      {targetTrip.passenger?.firstName} {targetTrip.passenger?.lastName} · ${targetTrip.pricing?.totalFare?.toFixed(2) || '0.00'}
-                    </p>
-                  </div>
+          <FloatingWindow
+            id="dispatch_driver_picker"
+            isOpen={Boolean(driverPickerTrip)}
+            onClose={onCloseDriverPicker}
+            hasBackdrop={false}
+            title={`Assign Driver · #${targetTrip.id.slice(-6).toUpperCase()}`}
+            subtitle={`${targetTrip.passenger?.firstName || ''} ${targetTrip.passenger?.lastName || ''} · $${
+              targetTrip.pricing?.totalFare?.toFixed(2) || '0.00'
+            }`.trim()}
+            icon={<CarIcon className="w-4 h-4 text-blue-400" />}
+            initialSize={{ width: 460, height: 560 }}
+            minWidth={360}
+            minHeight={360}
+            zIndex={224}
+            footer={
+              <div className="px-4 py-3 bg-slate-50 flex items-center justify-between gap-2 flex-wrap">
+                {targetTrip.assignedDriverId ? (
                   <button
                     type="button"
-                    onClick={onCloseDriverPicker}
-                    className="w-9 h-9 rounded-full bg-slate-800/90 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer shrink-0"
-                    aria-label="Close driver picker"
+                    onClick={() => {
+                      onQuickAssignDriver(targetTrip.id, 'unassigned');
+                      onCloseDriverPicker();
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold text-xs cursor-pointer"
                   >
-                    <XIcon className="w-4 h-4" />
+                    Unassign Driver
                   </button>
-                </div>
+                ) : hasStagedDriver(targetTrip) && stagedPlanner ? (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void stagedPlanner.sendStagedTrip(targetTrip);
+                        onCloseDriverPicker();
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs cursor-pointer"
+                    >
+                      Send to Driver
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void stagedPlanner.clearTripStage(targetTrip);
+                        onCloseDriverPicker();
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-rose-50 border border-slate-300 text-rose-600 font-bold text-xs cursor-pointer"
+                    >
+                      Clear Stage
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    {stagedPlanner?.driverPickerMode === 'stage_hold'
+                      ? 'Click any driver to stage (held in Dispatch)'
+                      : 'Click any driver to send immediately'}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={onCloseDriverPicker}
+                  className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 font-bold text-xs cursor-pointer ml-auto"
+                >
+                  Cancel
+                </button>
               </div>
-
-              {/* Search, Placement Mode & Filter */}
-              <div className="p-3 bg-slate-50 border-b border-slate-200 space-y-2 shrink-0">
+            }
+          >
+            {/* Search, Placement Mode & Filter */}
+            <div className="p-3 bg-slate-50 border-b border-slate-200 space-y-2 shrink-0">
                 {stagedPlanner && isTripEligibleForStaging(targetTrip) && (
                   <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-200/70 border border-slate-300/70">
                     <button
@@ -829,111 +858,40 @@ export function DispatchDriverSheets({
                   })
                 )}
               </div>
-
-              {/* Sticky Footer: Unassign or Send/Clear Staged */}
-              <div className="px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0 flex-wrap">
-                {targetTrip.assignedDriverId ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onQuickAssignDriver(targetTrip.id, 'unassigned');
-                      onCloseDriverPicker();
-                    }}
-                    className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold text-xs cursor-pointer"
-                  >
-                    Unassign Driver
-                  </button>
-                ) : hasStagedDriver(targetTrip) && stagedPlanner ? (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void stagedPlanner.sendStagedTrip(targetTrip);
-                        onCloseDriverPicker();
-                      }}
-                      className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs cursor-pointer"
-                    >
-                      Send to Driver
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void stagedPlanner.clearTripStage(targetTrip);
-                        onCloseDriverPicker();
-                      }}
-                      className="px-3 py-2 rounded-xl bg-white hover:bg-rose-50 border border-slate-300 text-rose-600 font-bold text-xs cursor-pointer"
-                    >
-                      Clear Stage
-                    </button>
-                  </div>
-                ) : (
-                  <span className="text-[11px] text-slate-500 font-medium">
-                    {stagedPlanner?.driverPickerMode === 'stage_hold'
-                      ? 'Tap any driver to stage (held in Dispatch)'
-                      : 'Tap any driver to send immediately'}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={onCloseDriverPicker}
-                  className="px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 font-bold text-xs cursor-pointer ml-auto"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
+          </FloatingWindow>
         );
       })()}
 
-      {/* ─── Mobile-Native Driver Quick Action Bottom Sheet (Touch & Hold / Status Pill) ─── */}
+      {/* ─── Driver Quick Action Floating Window ─── */}
       {mobileActionSheetDriver && (() => {
         const liveDriver = drivers.find((d) => d.id === mobileActionSheetDriver.id) || mobileActionSheetDriver;
         const statusPalette = FLEET_STATUS_COLORS[liveDriver.mapStatus] || FLEET_STATUS_COLORS.offline;
         const statusLabel = getMapStatusLabel(liveDriver.mapStatus, liveDriver.activeTripStatus);
         const totalAssignedCount = liveDriver.queuedTripsCount + (liveDriver.activeTrip ? 1 : 0);
         return (
-          <div
-            className="fixed inset-0 z-[122] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
-            onClick={onCloseMobileActionSheetDriver}
+          <FloatingWindow
+            id="dispatch_driver_actions"
+            isOpen={Boolean(mobileActionSheetDriver)}
+            onClose={onCloseMobileActionSheetDriver}
+            hasBackdrop={false}
+            title={liveDriver.name}
+            subtitle={`${
+              liveDriver.vehicle && liveDriver.vehicle !== 'Unassigned' ? `${liveDriver.vehicle} · ` : ''
+            }${liveDriver.tier} · ${liveDriver.zone}`}
+            icon={<CarIcon className="w-4 h-4 text-emerald-400" />}
+            headerExtra={
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border mr-1 ${statusPalette.badgeClass}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${statusPalette.dotClass}`} />
+                <span>{statusLabel}</span>
+              </span>
+            }
+            initialSize={{ width: 440, height: 420 }}
+            autoHeight
+            minWidth={360}
+            minHeight={280}
+            zIndex={222}
           >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={sheetStyle}
-              className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 w-full max-w-md max-h-[88dvh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
-            >
-              {/* Drag-down Header */}
-              <div
-                {...dragHandlers}
-                className="bg-slate-900 text-white px-4 pt-2 pb-3.5 shrink-0 touch-none"
-              >
-                <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-extrabold text-white truncate">{liveDriver.name}</span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusPalette.badgeClass}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${statusPalette.dotClass}`} />
-                        <span>{statusLabel}</span>
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                      {liveDriver.vehicle && liveDriver.vehicle !== 'Unassigned' ? `${liveDriver.vehicle} · ` : ''}
-                      {liveDriver.tier} · {liveDriver.zone}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onCloseMobileActionSheetDriver}
-                    className="w-9 h-9 rounded-full bg-slate-800/90 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer shrink-0"
-                    aria-label="Close driver actions"
-                  >
-                    <XIcon className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-4 space-y-3.5 overflow-y-auto overscroll-contain pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <div className="p-4 space-y-3.5">
                 {/* Direct Duty Status Switcher */}
                 <div className="space-y-1.5">
                   <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
@@ -1029,9 +987,8 @@ export function DispatchDriverSheets({
                     <span className="text-xs font-extrabold">Assign Active Draft</span>
                   </button>
                 </div>
-              </div>
             </div>
-          </div>
+          </FloatingWindow>
         );
       })()}
     </>

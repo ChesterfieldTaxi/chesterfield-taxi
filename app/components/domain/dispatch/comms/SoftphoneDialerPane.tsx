@@ -6,6 +6,7 @@ import type {
   WorkspaceEventMap,
 } from '../../../../core/services/workspace-bus.service';
 import { CommsCrmContextBanner } from './CommsCrmContextBanner';
+import { FloatingWindow } from '../../../ui/FloatingWindow';
 import {
   PhoneIcon,
   PauseIcon,
@@ -20,7 +21,6 @@ import {
   PhoneOffIcon,
   SpinnerIcon,
   AlertTriangleIcon,
-  XIcon,
 } from '../../../ui/Icons';
 import {
   formatCallTimer,
@@ -680,7 +680,7 @@ export interface AgentPhoneSetupModalProps {
   onChangeSetupAgentPhoneInput: (val: string) => void;
   onSaveAndCall: () => void;
   onClose: () => void;
-  sheetDrag: CommsSheetDragProps;
+  sheetDrag?: CommsSheetDragProps;
 }
 
 export function AgentPhoneSetupModal({
@@ -691,98 +691,84 @@ export function AgentPhoneSetupModal({
   onChangeSetupAgentPhoneInput,
   onSaveAndCall,
   onClose,
-  sheetDrag,
 }: AgentPhoneSetupModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={sheetDrag.sheetStyle}
-        className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-sm w-full border-t sm:border border-slate-200 overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200"
-      >
-        <div
-          {...sheetDrag.dragHandlers}
-          className="bg-slate-900 text-white px-4 sm:px-5 pt-2 sm:pt-4 pb-3.5 touch-none"
-        >
-          <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
-                <PhoneIcon className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-sm font-bold text-white truncate">Set Dispatcher Line</h3>
-                <p className="text-[11px] text-slate-400 truncate">Connect your phone to speak live</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-8 h-8 rounded-full sm:rounded-lg bg-slate-800/80 sm:bg-transparent text-slate-300 hover:text-white hover:bg-slate-800 flex items-center justify-center cursor-pointer shrink-0"
-              aria-label="Close modal"
-            >
-              <XIcon className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-4 sm:p-5">
-          <p className="text-xs text-slate-600 mb-3 leading-relaxed">
-            To connect you with <strong className="text-slate-900">{pendingCallTarget?.name || pendingCallTarget?.phone}</strong>, enter your mobile or desk phone number. Twilio dials the recipient and simultaneously rings your phone so you speak together live.
-          </p>
-
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold text-slate-700 block">
-              Your Phone Number (Mobile or Desk):
-            </label>
-            <input
-              type="tel"
-              autoFocus
-              placeholder="(314) 555-0100"
-              value={setupAgentPhoneInput}
-              onChange={(e) => onChangeSetupAgentPhoneInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  onSaveAndCall();
-                }
-              }}
-              className={`w-full px-3 py-2 text-sm rounded-xl border font-mono bg-slate-50 focus:bg-white focus:outline-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
-                setupAgentPhoneError ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'
-              }`}
-            />
-            {setupAgentPhoneError ? (
-              <p className="text-[10px] text-rose-600 font-semibold">{setupAgentPhoneError}</p>
-            ) : (
-              <p className="text-[10px] text-slate-400">
-                Tip: Want to speak through your computer microphone &amp; headset without ringing your cell phone? Configure Twilio WebRTC keys in Admin &gt; Integrations.
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="px-4 sm:px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+    <FloatingWindow
+      id="comms_agent_phone_setup"
+      isOpen={isOpen}
+      onClose={onClose}
+      hasBackdrop={false}
+      title="Set Dispatcher Line"
+      subtitle="Connect your phone to speak live"
+      icon={<PhoneIcon className="w-4 h-4 text-blue-400" />}
+      initialSize={{ width: 410, height: 320 }}
+      autoHeight
+      minWidth={340}
+      minHeight={240}
+      isResizable={false}
+      isMaximizable={false}
+      zIndex={225}
+      footer={
+        <div className="px-4 sm:px-5 py-3 bg-slate-50 flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="px-3.5 py-2 sm:py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-xl sm:rounded-lg hover:bg-slate-200/70 cursor-pointer"
+            className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 rounded-lg hover:bg-slate-200/70 cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={onSaveAndCall}
-            className="px-4 py-2 sm:py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl sm:rounded-lg shadow-xs cursor-pointer flex items-center gap-1.5"
+            className="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs cursor-pointer flex items-center gap-1.5"
           >
             <PhoneIcon className="w-3.5 h-3.5" />
             <span>Save &amp; Call Now</span>
           </button>
         </div>
+      }
+    >
+      <div className="p-4 sm:p-5">
+        <p className="text-xs text-slate-600 mb-3 leading-relaxed">
+          To connect you with{' '}
+          <strong className="text-slate-900">
+            {pendingCallTarget?.name || pendingCallTarget?.phone}
+          </strong>
+          , enter your mobile or desk phone number. Twilio dials the recipient and simultaneously
+          rings your phone so you speak together live.
+        </p>
+
+        <div className="space-y-1">
+          <label className="text-[11px] font-bold text-slate-700 block">
+            Your Phone Number (Mobile or Desk):
+          </label>
+          <input
+            type="tel"
+            autoFocus
+            placeholder="(314) 555-0100"
+            value={setupAgentPhoneInput}
+            onChange={(e) => onChangeSetupAgentPhoneInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                onSaveAndCall();
+              }
+            }}
+            className={`w-full px-3 py-2 text-sm rounded-xl border font-mono bg-white focus:outline-blue-500 focus:ring-2 focus:ring-blue-500/20 ${
+              setupAgentPhoneError ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'
+            }`}
+          />
+          {setupAgentPhoneError ? (
+            <p className="text-[10px] text-rose-600 font-semibold">{setupAgentPhoneError}</p>
+          ) : (
+            <p className="text-[10px] text-slate-400">
+              Tip: Want to speak through your computer microphone &amp; headset without ringing your
+              cell phone? Configure Twilio WebRTC keys in Admin &gt; Integrations.
+            </p>
+          )}
+        </div>
       </div>
-    </div>
+    </FloatingWindow>
   );
 }

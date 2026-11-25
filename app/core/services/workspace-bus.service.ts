@@ -50,6 +50,15 @@ export interface WorkspaceEventMap {
     callSid?: string;
     durationSeconds?: number;
   };
+  TOGGLE_CALL_MUTE: {
+    muted?: boolean;
+  };
+  CALL_MUTE_CHANGED: {
+    isMuted: boolean;
+  };
+  SEND_CALL_DTMF: {
+    digit: string;
+  };
   VOICEMAIL_RECEIVED: {
     id: string;
     contactPhone: string;
@@ -178,7 +187,8 @@ export interface WorkspaceEventMap {
     email?: string;
     name?: string;
     callSid?: string;
-    source?: 'incoming_call' | 'answered_call' | 'outbound_call' | 'passenger_crm' | 'comms_hub';
+    initialTab?: 'overview' | 'edit';
+    source?: 'incoming_call' | 'answered_call' | 'outbound_call' | 'passenger_crm' | 'comms_hub' | 'floating_call_pill';
   };
 }
 

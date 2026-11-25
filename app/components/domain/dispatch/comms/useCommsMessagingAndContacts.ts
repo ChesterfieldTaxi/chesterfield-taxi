@@ -4,13 +4,8 @@ import { authorizedFetch } from '../../../../core/services/auth/auth-headers';
 import { resolveCommsCrmContext } from '../../../../core/services/comms/comms-templates.service';
 import { getCommsThreadService } from '../../../../core/services/comms/comms-thread.service';
 import {
-  DEFAULT_CORPORATE_ACCOUNTS,
-  getAdminConfigService,
-} from '../../../../core/services/config/admin-config.service';
-import {
   getContactService,
   normalizeEmail,
-  type AdditionalPhone,
   type ContactRecord,
 } from '../../../../core/services/customer/contact.service';
 import { buildTripTrackingUrl } from '../../../../core/services/email/dispatch-email.service';
@@ -21,7 +16,6 @@ import {
   type UpcomingBookingPreview,
   type WorkspaceEventMap,
 } from '../../../../core/services/workspace-bus.service';
-import type { CorporateAccountConfig } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
 import {
   formatDisplayPhone,
@@ -79,16 +73,8 @@ export function useCommsMessagingAndContacts({
   const [isGeneratingPayLink, setIsGeneratingPayLink] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Contact Profile & Edit modal state
-  const [isContactEditOpen, setIsContactEditOpen] = useState(false);
-  const [contactEditForm, setContactEditForm] = useState<Partial<ContactRecord>>({});
-  const [contactSaveFeedback, setContactSaveFeedback] = useState<string | null>(null);
+  // Contact Profile record synced from ContactService / WorkspaceBus
   const [activeContactRecord, setActiveContactRecord] = useState<ContactRecord | null>(null);
-  const [corporateAccountsList, setCorporateAccountsList] = useState<CorporateAccountConfig[]>(
-    DEFAULT_CORPORATE_ACCOUNTS
-  );
-  const [corpSearchQuery, setCorpSearchQuery] = useState('');
-  const [isCorpDropdownOpen, setIsCorpDropdownOpen] = useState(false);
 
   // Bottom-docked New SMS composition modal state
   const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
@@ -100,31 +86,6 @@ export function useCommsMessagingAndContacts({
   const [allContactsForMsg, setAllContactsForMsg] = useState<ContactRecord[]>([]);
   const [msgContactSearch, setMsgContactSearch] = useState('');
   const [isMsgContactDropdownOpen, setIsMsgContactDropdownOpen] = useState(false);
-
-  // Load corporate accounts from AdminConfigService
-  useEffect(() => {
-    getAdminConfigService()
-      .getSettings()
-      .then((settings) => {
-        if (settings?.corporateAccounts && settings.corporateAccounts.length > 0) {
-          setCorporateAccountsList(settings.corporateAccounts);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const filteredCorpAccounts = useMemo(() => {
-    const q = corpSearchQuery.toLowerCase().trim();
-    if (!q) return corporateAccountsList.slice(0, 8);
-    return corporateAccountsList
-      .filter(
-        (a) =>
-          (a.accountNumber && a.accountNumber.toLowerCase().includes(q)) ||
-          (a.companyName && a.companyName.toLowerCase().includes(q)) ||
-          (a.billingContactName && a.billingContactName.toLowerCase().includes(q))
-      )
-      .slice(0, 10);
-  }, [corporateAccountsList, corpSearchQuery]);
 
   // Refresh contact directory when New SMS composer opens
   useEffect(() => {
@@ -520,113 +481,32 @@ export function useCommsMessagingAndContacts({
     return list;
   }, [activeContactSummary, trips]);
 
-  // Contact Profile Edit handlers
+  // Route contact profile edit triggers to unified ClientProfileWindow (`initialTab: 'edit'`)
   const handleOpenContactEdit = () => {
-    const phone = activeContactSummary?.contactPhone || selectedContactPhone || '';
-    const contactService = getContactService();
-    const existing = (phone ? contactService.getContactByPhone(phone) : null) || activeContactRecord;
-    setContactEditForm({
-      id: existing?.id,
-      name: existing?.name || activeContactSummary?.contactName || formatDisplayPhone(phone),
-      firstName: existing?.firstName || '',
-      lastName: existing?.lastName || '',
-      phone: existing?.phone || phone,
-      primaryPhoneType: existing?.primaryPhoneType || 'mobile',
-      additionalPhones: existing?.additionalPhones
-        ? JSON.parse(JSON.stringify(existing.additionalPhones))
-        : [],
-      mobilePhone: existing?.mobilePhone || existing?.phone || phone,
-      homePhone: existing?.homePhone || '',
-      workPhone: existing?.workPhone || '',
-      workExtension: existing?.workExtension || '',
-      email: existing?.email || '',
-      secondaryEmail: existing?.secondaryEmail || '',
-      corporateAccountId: existing?.corporateAccountId || '',
-      corporateAccountNumber: existing?.corporateAccountNumber || '',
-      corporateAccountName: existing?.corporateAccountName || '',
-      billingDepartment: existing?.billingDepartment || '',
-      defaultPoNumber: existing?.defaultPoNumber || '',
-      homeAddress: existing?.homeAddress || '',
-      workAddress: existing?.workAddress || '',
-      isVip: existing?.isVip || false,
-      vipReason: existing?.vipReason || '',
-      preferredVehicleTier: existing?.preferredVehicleTier || 'standard',
-      accessibilityNeeds: existing?.accessibilityNeeds ? { ...existing.accessibilityNeeds } : {},
-      smsNotifications: existing?.smsNotifications ?? true,
-      notes: existing?.notes || '',
-      internalDispatcherNotes: existing?.internalDispatcherNotes || '',
-    });
-    setCorpSearchQuery(existing?.corporateAccountNumber || existing?.corporateAccountName || '');
-    setIsCorpDropdownOpen(false);
-    setContactSaveFeedback(null);
-    setIsContactEditOpen(true);
-  };
-
-  const handleCloseContactEdit = () => {
-    setIsCorpDropdownOpen(false);
-    setIsContactEditOpen(false);
-  };
-
-  const handleAddPhone = () => {
-    const newPhone: AdditionalPhone = {
-      id: `phone_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      type: 'mobile',
-      number: '',
-    };
-    setContactEditForm((prev) => ({
-      ...prev,
-      additionalPhones: [...(prev.additionalPhones || []), newPhone],
-    }));
-  };
-
-  const handleUpdatePhone = (index: number, patch: Partial<AdditionalPhone>) => {
-    setContactEditForm((prev) => {
-      const list = [...(prev.additionalPhones || [])];
-      if (list[index]) {
-        list[index] = { ...list[index], ...patch };
-      }
-      return { ...prev, additionalPhones: list };
-    });
-  };
-
-  const handleRemovePhone = (index: number) => {
-    setContactEditForm((prev) => {
-      const list = [...(prev.additionalPhones || [])];
-      list.splice(index, 1);
-      return { ...prev, additionalPhones: list };
-    });
-  };
-
-  const handleSaveContactFromHub = () => {
-    const contactService = getContactService();
     const phone =
-      contactEditForm.phone || activeContactSummary?.contactPhone || selectedContactPhone || '';
-    if (!phone) return;
+      activeContactRecord?.phone ||
+      activeContactSummary?.mobilePhone ||
+      activeContactSummary?.contactPhone ||
+      (selectedContactPhone &&
+      !selectedContactPhone.includes('@') &&
+      !selectedContactPhone.startsWith('thr_')
+        ? selectedContactPhone
+        : '') ||
+      '';
+    const email =
+      activeContactRecord?.email ||
+      activeContactSummary?.contactEmail ||
+      (selectedContactPhone?.includes('@') ? selectedContactPhone : '') ||
+      '';
+    const name = activeContactRecord?.name || activeContactSummary?.contactName || '';
 
-    const cleanAdditional = (contactEditForm.additionalPhones || []).filter(
-      (ap) => ap.number && ap.number.trim()
-    );
-
-    const updated = contactService.saveContact({
-      ...contactEditForm,
-      id: contactEditForm.id || activeContactRecord?.id || `cust_${Date.now()}`,
-      name:
-        contactEditForm.name || activeContactSummary?.contactName || formatDisplayPhone(phone),
-      phone: phone.trim(),
-      additionalPhones: cleanAdditional,
-      customerScore: activeContactRecord?.customerScore ?? 90,
-      tripCount: activeContactRecord?.tripCount ?? 1,
-      totalSpend: activeContactRecord?.totalSpend ?? 0,
-      isBlacklisted: activeContactRecord?.isBlacklisted ?? false,
+    workspaceBus.publish('OPEN_CLIENT_PROFILE', {
+      phone: phone || undefined,
+      email: email || undefined,
+      name: name || undefined,
+      initialTab: 'edit',
+      source: 'comms_hub',
     });
-
-    setActiveContactRecord(updated);
-    void getCommsThreadService().mergeThreadsForContact(updated);
-    setContactSaveFeedback('Contact profile updated successfully');
-    setTimeout(() => {
-      setContactSaveFeedback(null);
-      setIsContactEditOpen(false);
-    }, 1200);
   };
 
   // Bottom-Docked New SMS Composition handlers
@@ -1187,22 +1067,7 @@ export function useCommsMessagingAndContacts({
     smsStatusMessage,
     retryingSmsId,
     isGeneratingPayLink,
-    isContactEditOpen,
-    setIsContactEditOpen,
-    contactEditForm,
-    setContactEditForm,
-    contactSaveFeedback,
-    corpSearchQuery,
-    setCorpSearchQuery,
-    isCorpDropdownOpen,
-    setIsCorpDropdownOpen,
-    filteredCorpAccounts,
     handleOpenContactEdit,
-    handleCloseContactEdit,
-    handleAddPhone,
-    handleUpdatePhone,
-    handleRemovePhone,
-    handleSaveContactFromHub,
     isNewMessageModalOpen,
     setIsNewMessageModalOpen,
     newMsgRecipientPhone,
