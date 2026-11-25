@@ -11,6 +11,7 @@ import {
 } from '../../../../core/services/corporate-account.service';
 import { getContactService } from '../../../../core/services/customer/contact.service';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
+import { getOperatorService, type DriverRosterItem } from '../../../../core/services/operator.service';
 import {
   buildCustomerProfilesList,
   PassengerDirectoryPanel,
@@ -35,6 +36,7 @@ export function AdminCustomersSubpage({
   const [searchTerm, setSearchTerm] = useState('');
   const [archiveFilter, setArchiveFilter] = useState<CustomerArchiveFilter>('active');
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [drivers, setDrivers] = useState<DriverRosterItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerProfile | null>(null);
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
@@ -124,10 +126,14 @@ export function AdminCustomersSubpage({
     const unsubContacts = contactService.subscribe(() => {
       setGovernanceRefreshKey((k) => k + 1);
     });
+    const opSvc = getOperatorService();
+    setDrivers(opSvc.getDriverRoster());
+    const unsubDrivers = opSvc.subscribeToDrivers((roster) => setDrivers(roster));
 
     return () => {
       unsubGov();
       unsubContacts();
+      unsubDrivers();
     };
   }, []);
 
@@ -346,6 +352,10 @@ export function AdminCustomersSubpage({
         selectedCustomer={selectedCustomer}
         isEditingCustomer={isEditingCustomer}
         setIsEditingCustomer={setIsEditingCustomer}
+        trips={trips}
+        corporateAccounts={corporateClients}
+        vehicles={settings.vehicles}
+        drivers={drivers}
         onClose={() => {
           setSelectedCustomer(null);
           setIsEditingCustomer(false);

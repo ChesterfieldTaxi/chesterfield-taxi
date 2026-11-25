@@ -266,7 +266,7 @@ export function ClientProfileEditTab({
         <textarea rows={2} value={form.notes || ''} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Dispatcher & driver notes (gate code, pickup instructions)..." className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-blue-500" />
       </div>
 
-      <div className="flex items-center justify-end gap-2 pt-1">
+      <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 py-2.5 px-1 -mx-1 bg-slate-50/95 backdrop-blur-xs border-t border-slate-200">
         {onCancel && <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold cursor-pointer">Cancel</button>}
         <button type="submit" disabled={!canSave} className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-45 text-white font-extrabold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
           <CheckIcon className="w-3.5 h-3.5" /><span>Save Profile</span>

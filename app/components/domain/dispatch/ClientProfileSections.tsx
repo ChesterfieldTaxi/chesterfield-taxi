@@ -131,7 +131,7 @@ export interface ClientSavedPlacesSectionProps {
   places: ReadonlyArray<ClientQuickPlaceItem>;
   contactId?: string;
   identity: { phone?: string; email?: string; name?: string };
-  onSetEndpoint: (place: ClientQuickPlaceItem, endpoint: 'pickup' | 'dropoff') => void;
+  onSetEndpoint?: (place: ClientQuickPlaceItem, endpoint: 'pickup' | 'dropoff') => void;
 }
 
 export function ClientSavedPlacesSection({ places, contactId, identity, onSetEndpoint }: ClientSavedPlacesSectionProps) {
@@ -145,6 +145,7 @@ export function ClientSavedPlacesSection({ places, contactId, identity, onSetEnd
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
 
   const apply = (place: ClientQuickPlaceItem, endpoint: 'pickup' | 'dropoff') => {
+    if (!onSetEndpoint) return;
     onSetEndpoint(place, endpoint);
     setApplied({ id: place.id, endpoint });
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -251,8 +252,8 @@ export function ClientSavedPlacesSection({ places, contactId, identity, onSetEnd
                   {place.notes && <div className="text-[10.5px] text-amber-800 truncate">{place.notes}</div>}
                 </div>
                 <div className="shrink-0 flex items-center gap-1">
-                  {actionBtn(place, 'pickup')}
-                  {actionBtn(place, 'dropoff')}
+                  {onSetEndpoint && actionBtn(place, 'pickup')}
+                  {onSetEndpoint && actionBtn(place, 'dropoff')}
                   {place.removable && contactId && (
                     <button
                       type="button"
