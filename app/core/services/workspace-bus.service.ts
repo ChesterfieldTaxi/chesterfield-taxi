@@ -59,6 +59,15 @@ export interface WorkspaceEventMap {
   SEND_CALL_DTMF: {
     digit: string;
   };
+  START_SOFTPHONE_CALL: {
+    to: string;
+    contactName?: string;
+  };
+  OPEN_SOFTPHONE_KEYPAD: Record<string, never>;
+  SOFTPHONE_VIEW_STATE_CHANGED: {
+    activeTab: string;
+    callsSubTab: string;
+  };
   VOICEMAIL_RECEIVED: {
     id: string;
     contactPhone: string;
@@ -191,8 +200,8 @@ export interface WorkspaceEventMap {
     email?: string;
     name?: string;
     callSid?: string;
-    initialTab?: 'overview' | 'edit' | 'trips' | 'places' | 'contact';
-    source?: 'incoming_call' | 'answered_call' | 'outbound_call' | 'passenger_crm' | 'comms_hub' | 'floating_call_pill';
+    initialTab?: 'overview' | 'edit' | 'trips' | 'places' | 'contact' | 'profile';
+    source?: 'incoming_call' | 'answered_call' | 'outbound_call' | 'passenger_crm' | 'comms_hub' | 'floating_call_pill' | 'header_call_hud';
   };
 }
 

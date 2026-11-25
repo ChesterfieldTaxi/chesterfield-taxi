@@ -6,7 +6,8 @@ import { isTripEligibleForAutoPilot } from '../../services/dispatch/auto-dispatc
 import { getEmailDispatchService } from '../../services/email/resend-email.service';
 import type { DriverRosterItem } from '../../services/operator.service';
 import { formatLocalDateStr } from '../../services/pricing/vehicle-matching';
-import { getTelephonyService, sanitizePhoneNumber } from '../../services/telephony.service';
+import { getTelephonyService } from '../../services/telephony.service';
+import { getWorkspaceBus } from '../../services/workspace-bus.service';
 import type { AppSettings } from '../../types/config';
 import type { Trip, TripStatus } from '../../types/trip';
 import { formatVehicleTier, formatVehicleTierDisplay } from '../../utils/vehicle-tier-format.util';
@@ -840,31 +841,14 @@ export function useDispatchTripTriageActions({
 
   const handleStartCall = useCallback(
     async (targetNum?: string, peerName?: string) => {
-      const numToCall = targetNum || dialedNumber;
+      const numToCall = (targetNum || dialedNumber || '').trim();
       if (!numToCall) return;
       setDialedNumber(numToCall);
       setActiveCallStatus('calling');
-
-      try {
-        getTelephonyService().startSoftphoneCall(numToCall, peerName);
-      } catch (e) {
-        console.warn('Softphone call initiation warning:', e);
-      }
-
-      try {
-        await authorizedFetch('/api/telephony', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'make_call',
-            to: sanitizePhoneNumber(numToCall),
-          }),
-        });
-      } catch (err) {
-        console.warn('Telephony endpoint error:', err);
-      }
-
-      setActiveCallStatus('connected');
+      getWorkspaceBus().publish('START_SOFTPHONE_CALL', {
+        to: numToCall,
+        ...(peerName ? { contactName: peerName } : {}),
+      });
     },
     [dialedNumber, setDialedNumber, setActiveCallStatus]
   );

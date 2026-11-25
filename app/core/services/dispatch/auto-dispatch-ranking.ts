@@ -89,10 +89,12 @@ export interface RankedDispatchCandidate {
   strategy: DispatchRankingStrategy;
   rankReason: string;
   isPlannedDriver?: boolean;
+  preferredDriverRank?: number;
 }
 
 export type CandidateExclusionCode =
   | 'BLACKLISTED_OR_SUSPENDED'
+  | 'EXCLUDED_BY_CLIENT'
   | 'OFF_DUTY_OR_BREAK'
   | 'BUSY_OR_CONFLICT'
   | 'ALREADY_REJECTED_OR_ATTEMPTED'
@@ -455,6 +457,31 @@ export function evaluateAutoDispatchCandidates(
     ? new Set<string>()
     : new Set<string>(trip.offerCascade?.attemptedDriverIds || []);
 
+  const tripMeta = (trip.metadata || {}) as Record<string, unknown>;
+  const rawClientExcluded = Array.isArray(tripMeta.clientExcludedDriverIds)
+    ? tripMeta.clientExcludedDriverIds
+    : Array.isArray(tripMeta.excludedDriverIds)
+    ? tripMeta.excludedDriverIds
+    : [];
+  const clientExcludedSet = new Set<string>();
+  for (const rawId of rawClientExcluded) {
+    const cleanId = String(rawId || '').trim();
+    if (cleanId) clientExcludedSet.add(cleanId);
+  }
+
+  const rawClientPreferred = Array.isArray(tripMeta.clientPreferredDriverIds)
+    ? tripMeta.clientPreferredDriverIds
+    : Array.isArray(tripMeta.preferredDriverIds)
+    ? tripMeta.preferredDriverIds
+    : [];
+  const clientPreferredRankMap = new Map<string, number>();
+  for (const rawId of rawClientPreferred) {
+    const cleanId = String(rawId || '').trim();
+    if (cleanId && !clientExcludedSet.has(cleanId) && !clientPreferredRankMap.has(cleanId)) {
+      clientPreferredRankMap.set(cleanId, clientPreferredRankMap.size + 1);
+    }
+  }
+
   const pickupCoord = isValidGeoPoint(trip.pickupLocation?.coordinates)
     ? trip.pickupLocation!.coordinates!
     : null;
@@ -526,6 +553,16 @@ export function evaluateAutoDispatchCandidates(
           : drv.isArchived
           ? 'Driver profile is archived'
           : 'Driver operator status is suspended'
+      );
+      continue;
+    }
+
+    // 1b. Client-excluded drivers (unless dispatcher explicitly staged trip.plannedDriverId === drv.id)
+    const isPlannedDriver = Boolean(trip.plannedDriverId && trip.plannedDriverId === drv.id);
+    if (!isPlannedDriver && clientExcludedSet.has(drv.id)) {
+      recordExclusion(
+        'EXCLUDED_BY_CLIENT',
+        'Driver is excluded by client profile preference (Do Not Send)'
       );
       continue;
     }
@@ -740,7 +777,7 @@ export function evaluateAutoDispatchCandidates(
       }
     }
 
-    const isPlannedDriver = Boolean(trip.plannedDriverId && trip.plannedDriverId === drv.id);
+    const preferredDriverRank = clientPreferredRankMap.get(drv.id);
     const distStr = distanceMiles !== null ? `${distanceMiles.toFixed(1)} mi` : 'no GPS';
     const idleMins = Math.round(idleDurationMs / 60_000);
     const baseReason =
@@ -763,8 +800,13 @@ export function evaluateAutoDispatchCandidates(
       idleDurationMs,
       driverScore,
       strategy: cfg.rankingStrategy,
-      rankReason: isPlannedDriver ? `Planned Driver · ${baseReason}` : baseReason,
+      rankReason: isPlannedDriver
+        ? `Planned Driver · ${baseReason}`
+        : preferredDriverRank !== undefined
+        ? `Client Preferred #${preferredDriverRank} · ${baseReason}`
+        : baseReason,
       ...(isPlannedDriver ? { isPlannedDriver: true } : {}),
+      ...(preferredDriverRank !== undefined ? { preferredDriverRank } : {}),
     });
   }
 
@@ -779,6 +821,13 @@ export function evaluateAutoDispatchCandidates(
     // Pre-staged / planned driver always receives #1 priority when eligible
     if (Boolean(a.isPlannedDriver) !== Boolean(b.isPlannedDriver)) {
       return a.isPlannedDriver ? -1 : 1;
+    }
+
+    // Client preferred drivers (#1..#N) sort right after isPlannedDriver
+    const prefA = a.preferredDriverRank ?? Number.POSITIVE_INFINITY;
+    const prefB = b.preferredDriverRank ?? Number.POSITIVE_INFINITY;
+    if (prefA !== prefB) {
+      return prefA - prefB;
     }
 
     // Enforce strictZoneFirst across all strategies when enabled

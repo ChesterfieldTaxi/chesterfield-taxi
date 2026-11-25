@@ -209,6 +209,8 @@ export function useTwilioSoftphoneDevice({
   const endedCallSidsRef = useRef<Set<string>>(new Set());
   const postCallFetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleEndCallRef = useRef<(broadcast?: boolean) => void>(() => {});
+  const isVisibleRef = useRef<boolean>(isVisible);
+  isVisibleRef.current = isVisible;
   const isMountedRef = useRef(true);
   const initWebRtcPromiseRef = useRef<Promise<any> | null>(null);
 
@@ -406,8 +408,10 @@ export function useTwilioSoftphoneDevice({
     setActiveCallPhone(callerFrom);
     activeCallSidRef.current = call.parameters?.CallSid || null;
     setActiveCallSid(call.parameters?.CallSid || null);
-    setActiveTab('phone');
-    setCallsSubTab('keypad');
+    if (isVisibleRef.current) {
+      setActiveTab('phone');
+      setCallsSubTab('keypad');
+    }
     workspaceBus.publish('CALL_ANSWERED', {
       callerNumber: callerFrom,
       callSid: call.parameters?.CallSid,
@@ -503,8 +507,10 @@ export function useTwilioSoftphoneDevice({
       setShowInCallTrips(false);
       setShowInCallNotes(false);
 
-      setActiveTab('phone');
-      setCallsSubTab('keypad');
+      if (isVisibleRef.current) {
+        setActiveTab('phone');
+        setCallsSubTab('keypad');
+      }
 
       const newCallRecord: InteractionEvent = {
         id: callId,
@@ -857,10 +863,18 @@ export function useTwilioSoftphoneDevice({
     };
   }, [activeCallSid, callStatus]);
 
-  // Sync call ending, mute toggle & DTMF keypad digits from FloatingCallPill / external triggers
-  useEffect(() => {
-    const unsub = workspaceBus.subscribe((msg) => {
-      if (msg.type === 'CALL_ENDED') {
+    // Sync call start, keypad maximize, call ending, mute toggle & DTMF keypad digits across WorkspaceBus
+    useEffect(() => {
+      const unsub = workspaceBus.subscribe((msg) => {
+        if (msg.type === 'START_SOFTPHONE_CALL') {
+          const to = msg.payload?.to?.trim();
+          if (to) {
+            void startCallLatestRef.current(to, msg.payload?.contactName);
+          }
+        } else if (msg.type === 'OPEN_SOFTPHONE_KEYPAD') {
+          setActiveTab('phone');
+          setCallsSubTab('keypad');
+        } else if (msg.type === 'CALL_ENDED') {
         if (callStatusRef.current !== 'idle' || activeCallRef.current || incomingCallRef.current) {
           handleEndCallRef.current(false);
         }

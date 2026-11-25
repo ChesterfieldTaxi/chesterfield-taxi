@@ -8,7 +8,7 @@ import type { ChannelFilter, CommsAllViewMode, ContactFilter, MultiChannelKey, M
 
 export const MULTI_CHANNEL_FILTER_OPTS: ReadonlyArray<{ value: MultiChannelKey; label: string }> = [
   { value: 'calls', label: 'Calls' }, { value: 'voicemail', label: 'Voicemail' },
-  { value: 'messages', label: 'SMS' }, { value: 'emails', label: 'Email' }, { value: 'notes', label: 'Notes' },
+  { value: 'messages', label: 'Messages' }, { value: 'emails', label: 'Email' }, { value: 'notes', label: 'Notes' },
 ];
 
 export const MULTI_CONTACT_FILTER_OPTS: ReadonlyArray<{ value: MultiContactKey; label: string }> = [

@@ -20,7 +20,6 @@ import { soundNotificationService } from '../core/services/sound-notification.se
 import type { DriverRosterItem } from '../core/services/operator.service';
 import { DriverQueueWindow } from '../components/domain/dispatch/DriverQueueWindow';
 import { ClientProfileWindow } from '../components/domain/dispatch/ClientProfileWindow';
-import { FloatingCallPill } from '../components/domain/dispatch/FloatingCallPill';
 import type { DispatchUniversalTripActions } from '../components/domain/dispatch/TripActionDropdown';
 import { DispatchStagedPlannerModals } from '../components/domain/dispatch/StagedDriverConflictModal';
 import { useDispatchFleet, type LiveFleetDriver } from '../core/hooks/useDispatchFleet';
@@ -770,8 +769,6 @@ export default function DispatchRoute() {
   }, []);
   const stableOpenDriverQueue = useCallback((drv: DriverRosterItem) => setQueueDriver(drv), []);
   const stableCallDriverFromMap = useCallback((phone: string, name?: string) => {
-    setCommsInitialTab('phone');
-    setActiveDockTab('phone');
     void panelCallbacksRef.current.handleStartCall(phone, name);
   }, []);
   const stableChangeDriverDutyStatus = useCallback(
@@ -899,18 +896,6 @@ export default function DispatchRoute() {
           }`}
         />
       )}
-
-      {/* Compact Draggable FaceTime / Dynamic-Island Softphone Pill */}
-      <FloatingCallPill
-        incomingCallAlert={incomingCallAlert}
-        activeCallStatus={activeCallStatus}
-        activeCallMeta={activeCallMeta}
-        callDuration={callDuration}
-        dialedNumber={dialedNumber}
-        trips={trips}
-        drivers={drivers}
-        onDismissIncomingCallAlert={() => setIncomingCallAlert(null)}
-      />
 
       {/* 1. Top Header */}
       <DispatchDesktopTopHeader
@@ -1170,9 +1155,6 @@ export default function DispatchRoute() {
             onQuickAssignDriver={handleQuickAssignDriver}
             onCallPassengerFromQueue={(phone, passengerFullName) => {
               void handleStartCall(phone, passengerFullName);
-              setCommsInitialTab('phone');
-              setActiveDockTab('phone');
-              setActiveMobileTab('phone');
             }}
             slaSummary={slaSummary}
             slaUrgentOnlyFilter={slaUrgentOnlyFilter}
@@ -1326,8 +1308,6 @@ export default function DispatchRoute() {
           onOpenMobileActionSheetDriver={setMobileActionSheetDriver}
           onFocusMapDriver={setFocusedMapDriverId}
           onCallDriverFromDock={(phone, name) => {
-            setCommsInitialTab('phone');
-            setActiveDockTab('phone');
             void handleStartCall(phone, name);
           }}
           onChangeDriverDutyStatus={setDriverDutyStatus}
@@ -1437,7 +1417,6 @@ export default function DispatchRoute() {
         onPopulateBookingDraft={stableCommsPopulateBooking}
         onCallClient={(ph, nm) => {
           void handleStartCall(ph, nm);
-          setActiveDockTab('phone');
         }}
       />
 
@@ -1461,7 +1440,6 @@ export default function DispatchRoute() {
           }}
           onCallPassenger={(phone, name) => {
             void handleStartCall(phone, name);
-            setActiveDockTab('phone');
           }}
           onAssignActiveDraft={handleAssignDriverToDraft}
           tripActions={universalTripActions}

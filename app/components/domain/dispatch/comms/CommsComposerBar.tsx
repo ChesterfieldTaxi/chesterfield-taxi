@@ -96,7 +96,7 @@ export function CommsComposerBar({
       <div className="flex items-center gap-1.5">
         <div className="inline-flex items-center bg-slate-100 border border-slate-200 p-0.5 rounded-lg text-[10.5px] font-bold shrink-0">
           <button type="button" disabled={!effectivePhone} aria-pressed={!isNote} onClick={() => setComposerMode('sms')} className={`px-2 py-1 rounded-md transition-colors cursor-pointer disabled:opacity-40 ${!isNote ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}>
-            SMS
+            Message
           </button>
           <button type="button" aria-pressed={isNote} onClick={() => setComposerMode('note')} className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${isNote ? 'bg-amber-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}>
             Note
@@ -115,7 +115,7 @@ export function CommsComposerBar({
           onChange={(e) => onChangeDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (canSend) onSubmit(); } }}
           disabled={!isNote && !effectivePhone}
-          placeholder={isNote ? 'Add internal note...' : effectivePhone ? `SMS ${formatDisplayPhone(effectivePhone)}...` : 'Link phone to send SMS...'}
+          placeholder={isNote ? 'Add internal note...' : effectivePhone ? `Message ${formatDisplayPhone(effectivePhone)}...` : 'Link phone to send message...'}
           className={`h-8 flex-1 min-w-0 px-2.5 text-xs rounded-lg border focus:outline-none ${
             isNote ? 'border-amber-300 bg-amber-50/40 focus:border-amber-500 focus:bg-white' : 'border-slate-200 bg-slate-50 focus:border-blue-500 focus:bg-white'
           }`}

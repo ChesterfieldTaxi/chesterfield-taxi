@@ -56,10 +56,11 @@ function makeTrip(id: string, overrides: Partial<Trip> = {}): Trip {
 function testProfileRenameAndThreeTabClientProfileWindow(): void {
   console.log('1️⃣  Testing `Profile` Button Rename + 3-Tab ClientProfileWindow (Trips | Places | Contact) + [Thread] Jump...');
   assert.equal(normalizeClientProfileTab('overview'), 'trips');
-  assert.equal(normalizeClientProfileTab('edit'), 'contact');
+  assert.equal(normalizeClientProfileTab('edit'), 'profile');
   assert.equal(normalizeClientProfileTab('trips'), 'trips');
   assert.equal(normalizeClientProfileTab('places'), 'places');
-  assert.equal(normalizeClientProfileTab('contact'), 'contact');
+  assert.equal(normalizeClientProfileTab('contact'), 'profile');
+  assert.equal(normalizeClientProfileTab('profile'), 'profile');
   assert.equal(normalizeClientProfileTab(undefined), 'trips');
 
   const crmHtml = renderToStaticMarkup(
@@ -91,7 +92,7 @@ function testProfileRenameAndThreeTabClientProfileWindow(): void {
       initialTab: 'trips', onLoadTripIntoNewTab: noop, onCallClient: noop,
     })
   );
-  for (const needle of ['>Trips<', '>Places<', '>Contact<', 'data-client-profile-thread-btn="true"', '>Thread<', '>Call<', 'Active &amp; Upcoming Rides (1)', 'Recent Trips (1 of 1)', 'Load into New Tab', '⇄ Book Return']) {
+  for (const needle of ['>Trips<', '>Places<', '>Profile<', 'data-client-profile-thread-btn="true"', '>Thread<', '>Call<', 'Active &amp; Upcoming Rides (1)', 'Recent Trips (1 of 1)', 'Load into New Tab', '⇄ Book Return']) {
     assert.equal(tripsTabHtml.includes(needle), true, `Trips tab markup must include ${needle}`);
   }
 
@@ -270,7 +271,7 @@ function testBottomNewSmsFabAndSheetWithActiveRideChips(): void {
   assert.equal(chips.length === 1 && chips[0].tripId === 'TRP-7302' && chips[0].passengerName === 'Elena Vance', true);
 
   const hubClosedHtml = renderToStaticMarkup(React.createElement(CommsHub, { initialTab: 'all', trips: [activeTrip] }));
-  assert.equal(hubClosedHtml.includes('data-comms-new-sms-fab="true"') && hubClosedHtml.includes('absolute bottom-3.5 right-3.5 z-30') && hubClosedHtml.includes('<span>New SMS</span>'), true);
+  assert.equal(hubClosedHtml.includes('data-comms-new-sms-fab="true"') && hubClosedHtml.includes('absolute bottom-3.5 right-3.5 z-30') && hubClosedHtml.includes('<span>New Message</span>'), true);
   assert.equal(hubClosedHtml.includes('<span>New</span>'), false, 'Top-row + New button must be removed');
   assert.equal(hubClosedHtml.includes('data-comms-bottom-sms-sheet="true"'), false);
 

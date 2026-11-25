@@ -536,6 +536,11 @@ export function useDispatchWorkspaceSync({
         setActiveCallStatus('idle');
         setActiveCallMeta(null);
         setCallDuration(0);
+      } else if (msg.type === 'OPEN_SOFTPHONE_KEYPAD') {
+        setActiveDockTab('phone');
+        setCommsInitialTab('phone');
+        setCommsActiveTab('phone');
+        setActiveMobileTab('phone');
       } else if (msg.type === 'OPEN_COMMS_THREAD') {
         setActiveDockTab('comms');
         setCommsInitialTab('messages');

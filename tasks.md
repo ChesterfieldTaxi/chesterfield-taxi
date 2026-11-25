@@ -1225,3 +1225,19 @@
   - [x] 73.B.3 Add universal `OPEN_TRIP_DETAILS` bus event, clickable `#TRIP_ID` (`data-open-trip-details`), `#Cab` + flight delay badges (`resolveTripFlightBadge`), and 1-input inline caller quick-name save in `SmsThreadPane.tsx` (`< 380`L).
   - [x] 73.B.4 Add `All` tab `Grouped | Stream` toggle (`ct_comms_all_view_mode`), `MapLayersAndVehiclesToolbar`-parity multi-select `Filter ▾` menus (list & thread), and bottom-right `New SMS` FAB + dock-bottom `CommsBottomNewSmsSheet` w/ active-ride passenger chips (`CommsHub < 360`L, `CommsFilterToolbar < 250`L, `CommsModals < 250`L).
   - [x] 73.B.5 Create `scripts/test-comms-profile-polish-phase73b.ts` (`< 360`L) and pass `npm run typecheck`, `test-comms-multichannel-ui.ts`, Phases 69–73B suites, and `npm run build`.
+
+## Phase 74 (Wave 6 Phase 9): Call HUD Simplification, `Messages` Rename, Bottom `Keypad` FAB, Explicit `Trips | Places | Profile` Window & Client Preferred/Excluded Drivers Engine
+- [x] 74.0 Baseline Commit & Spec-Driven Documentation:
+  - [x] 74.0.1 Stage and commit verified Phase 73.B baseline on `main` (`feat(phase-73b): polish Profile 3-tab window, clickable thread Trip IDs, multi-select Comms filters, Grouped/Stream toggle, and bottom New SMS sheet`).
+  - [x] 74.0.2 Document Platform Phase 74 deliverables and verification gates in `spec.md`, `plan.md`, and `tasks.md`.
+- [x] 74.1 `Messages` Rename, `FloatingCallPill` Retirement, Bottom `Keypad` FAB & Context-Aware `DispatchHeaderCallHud`:
+  - [x] 74.1.1 Rename user-facing `SMS` labels to `Messages` / `Message` across `DispatchRightOperationsDock.tsx`, `CommsHub.tsx`, `CommsModals.tsx`, `SmsThreadPane.tsx`, `CommsFilterToolbar.tsx`, `CommsComposerBar.tsx`, and `scripts/test-comms-profile-polish-phase73b.ts`.
+  - [x] 74.1.2 Delete `FloatingCallPill.tsx`, remove `<FloatingCallPill />` from `dispatch.tsx`, and update `scripts/test-floating-call-pill-and-nonblocking-windows-phase72.ts`.
+  - [x] 74.1.3 Simplify `CommsHub.tsx` (`< 360`L) & `SoftphoneDialerPane.tsx` (`< 260`L) with passive WebRTC dot, `All | Missed` `leadingSlot`, `← Calls` idle back button, and bottom-right `Keypad` (`data-comms-keypad-fab="true"`) + `New Message` FABs.
+  - [x] 74.1.4 Add `START_SOFTPHONE_CALL`, `OPEN_SOFTPHONE_KEYPAD`, and `SOFTPHONE_VIEW_STATE_CHANGED` to `WorkspaceEventMap`, stop forced dock switching on call initiation, and rebuild 4-state `DispatchHeaderCallHud.tsx` (`< 360`L) with `data-maximize-keypad-btn="true"`.
+- [x] 74.2 Explicit `Trips | Places | Profile` Window, Booking Autocomplete -> `Trips` & Client Preferred/Excluded Drivers Engine:
+  - [x] 74.2.1 Make `ClientProfileWindow.tsx` (`< 340`L) explicit-only (zero call auto-pop), publish `OPEN_CLIENT_PROFILE` (`initialTab: 'trips'`) on `DispatchPassengerCrmSection.handleApplyCallerCandidate`, and rename the 3rd tab to `Profile`.
+  - [x] 74.2.2 Extend `ContactRecord` with `preferredDriverIds` & `excludedDriverIds`, create `ClientDriverPreferencesCard.tsx` (`< 160`L), and wire `Contact Info` + `<ClientDriverPreferencesCard />` into `ClientProfileEditTab.tsx` (`< 285`L).
+  - [x] 74.2.3 Propagate `clientPreferredDriverIds` & `clientExcludedDriverIds` onto `Trip.metadata` in `useDispatchBookingSubmission.ts` and enforce `'EXCLUDED_BY_CLIENT'` + `preferredDriverRank` in `evaluateAutoDispatchCandidates` (`auto-dispatch-ranking.ts`).
+- [x] 74.3 Verification Suite (`scripts/test-call-hud-and-driver-prefs-phase74.ts < 360`L) & Build Gate:
+  - [x] 74.3.1 Create `scripts/test-call-hud-and-driver-prefs-phase74.ts` (`< 360`L), mark all Phase 74 tasks `[x]`, and pass `npm run typecheck`, Phases 69–74 suites, and `npm run build`.

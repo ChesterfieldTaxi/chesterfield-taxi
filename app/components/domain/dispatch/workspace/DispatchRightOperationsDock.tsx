@@ -202,7 +202,7 @@ export function DispatchRightOperationsDock({
                 <PhoneIcon className="w-3.5 h-3.5" />
               </div>
               <span className="font-extrabold text-slate-900 tracking-tight truncate">
-                Phone &amp; SMS
+                Phone &amp; Messages
               </span>
               {activeCallStatus !== 'idle' && (
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1">

@@ -13,6 +13,20 @@ import {
 import { MailIcon, MapPinIcon, PhoneIcon, PlusIcon, UserIcon } from '../../../ui/Icons';
 import { Select } from '../../../ui/Select';
 
+export function publishPassengerCandidateTripsProfile(cand: {
+  phone?: string;
+  email?: string;
+  name?: string;
+}): void {
+  getWorkspaceBus().publish('OPEN_CLIENT_PROFILE', {
+    phone: cand.phone || undefined,
+    email: cand.email || undefined,
+    name: cand.name || undefined,
+    initialTab: 'trips',
+    source: 'passenger_crm',
+  });
+}
+
 export interface DispatchPassengerCrmSectionProps {
   passengerName: string;
   setPassengerName: (val: string) => void;
@@ -180,22 +194,23 @@ export function DispatchPassengerCrmSection({
       .slice(0, 6);
   }, [showCallerSuggestions, passengerName, phone, lookupTrips]);
 
-  const handleApplyCallerCandidate = (candidate: (typeof callerSuggestions)[number]) => {
-    if (candidate.name) setPassengerName(candidate.name);
-    if (candidate.phone) setPhone(candidate.phone);
-    if (candidate.email) setEmail(candidate.email);
-    if (candidate.corporateAccount) {
+  const handleApplyCallerCandidate = (cand: (typeof callerSuggestions)[number]) => {
+    if (cand.name) setPassengerName(cand.name);
+    if (cand.phone) setPhone(cand.phone);
+    if (cand.email) setEmail(cand.email);
+    if (cand.corporateAccount) {
       const matched = findMatchingCorporateAccount(
         corporateAccountList,
-        candidate.corporateAccount,
+        cand.corporateAccount,
         { caseInsensitiveName: true }
       );
-      setCorporateAccount(matched ? matched.companyName : candidate.corporateAccount);
+      setCorporateAccount(matched ? matched.companyName : cand.corporateAccount);
       setPaymentMethod('account');
     }
-    if (candidate.defaultPo) setBillingPo(candidate.defaultPo);
-    setCallerQuickAddresses(candidate.addresses);
+    if (cand.defaultPo) setBillingPo(cand.defaultPo);
+    setCallerQuickAddresses(cand.addresses);
     setShowCallerSuggestions(false);
+    publishPassengerCandidateTripsProfile(cand);
   };
 
   return (

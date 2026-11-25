@@ -274,7 +274,7 @@ export function DispatchDesktopTopHeader({
                   ? 'bg-white text-blue-700 shadow-2xs ring-1 ring-slate-200/80'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
-              title="Phone & SMS Hub (Alt+P)"
+              title="Phone & Messages Hub (Alt+P)"
             >
               <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
               <span>Phone</span>
@@ -394,8 +394,16 @@ export function DispatchDesktopTopHeader({
 
           <DispatchHeaderCallHud
             trips={trips}
+            drivers={drivers}
             missedCallsCount={missedCallsCount}
             hideIdleButtonOnDesktop={true}
+            activeDockTab={activeDockTab}
+            commsActiveTab={commsActiveTab}
+            incomingCallAlert={incomingCallAlert}
+            onDismissIncomingCallAlert={onDismissIncomingCallAlert}
+            activeCallStatus={activeCallStatus}
+            activeCallMeta={activeCallMeta}
+            callDuration={callDuration}
             isPhoneDockActive={
               isDesktop
                 ? activeDockTab === 'phone' || activeDockTab === 'comms'

@@ -61,6 +61,8 @@ export interface ContactRecord {
   isVip?: boolean;
   vipReason?: string;
   preferredVehicleTier?: 'standard' | 'premium' | 'xl' | 'wheelchair' | 'executive' | 'suv' | 'van';
+  preferredDriverIds?: string[];
+  excludedDriverIds?: string[];
   homeAddress?: string;
   workAddress?: string;
   savedPlaces?: ContactSavedPlace[];
@@ -158,6 +160,40 @@ export function normalizePlaceAddressKey(address: string | null | undefined): st
     .replace(/[.,#]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Normalizes client driver priority & exclusion lists: trims IDs, preserves `#1..#N` order
+ * in `preferredDriverIds`, deduplicates both lists, and enforces strict mutual exclusivity
+ * (any ID in `excludedDriverIds` is stripped from `preferredDriverIds`).
+ */
+export function normalizeClientDriverPreferences(
+  preferredIds?: ReadonlyArray<string> | null,
+  excludedIds?: ReadonlyArray<string> | null
+): { preferredDriverIds: string[]; excludedDriverIds: string[] } {
+  const excludedSet = new Set<string>();
+  const excludedDriverIds: string[] = [];
+  if (Array.isArray(excludedIds)) {
+    for (const raw of excludedIds) {
+      const id = String(raw || '').trim();
+      if (id && !excludedSet.has(id)) {
+        excludedSet.add(id);
+        excludedDriverIds.push(id);
+      }
+    }
+  }
+  const preferredSet = new Set<string>();
+  const preferredDriverIds: string[] = [];
+  if (Array.isArray(preferredIds)) {
+    for (const raw of preferredIds) {
+      const id = String(raw || '').trim();
+      if (id && !excludedSet.has(id) && !preferredSet.has(id)) {
+        preferredSet.add(id);
+        preferredDriverIds.push(id);
+      }
+    }
+  }
+  return { preferredDriverIds, excludedDriverIds };
 }
 
 /**
@@ -804,6 +840,11 @@ class ContactService {
         ? normalizeEmail(secondaryExisting.email)
         : '');
 
+    const normalizedDriverPrefs = normalizeClientDriverPreferences(
+      profile.preferredDriverIds !== undefined ? profile.preferredDriverIds : mergedExisting.preferredDriverIds,
+      profile.excludedDriverIds !== undefined ? profile.excludedDriverIds : mergedExisting.excludedDriverIds
+    );
+
     const record: ContactRecord = {
       ...(mergedExisting as ContactRecord),
       ...profile,
@@ -849,6 +890,8 @@ class ContactService {
         profile.vipReason !== undefined ? profile.vipReason : mergedExisting.vipReason || '',
       preferredVehicleTier:
         profile.preferredVehicleTier || mergedExisting.preferredVehicleTier || 'standard',
+      preferredDriverIds: normalizedDriverPrefs.preferredDriverIds,
+      excludedDriverIds: normalizedDriverPrefs.excludedDriverIds,
       homeAddress:
         profile.homeAddress !== undefined ? profile.homeAddress : mergedExisting.homeAddress || '',
       workAddress:

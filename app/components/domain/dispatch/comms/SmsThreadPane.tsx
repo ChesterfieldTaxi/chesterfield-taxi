@@ -16,7 +16,7 @@ import { formatMessageTimestamp, type InteractionEvent, type PlaybackSpeed, type
 export { NewSmsMessageModal, type NewSmsMessageModalProps } from './CommsModals';
 
 export const THREAD_TIMELINE_FILTER_OPTS: ReadonlyArray<{ value: ThreadTimelineType; label: string }> = [
-  { value: 'sms', label: 'SMS' }, { value: 'calls', label: 'Calls' }, { value: 'emails', label: 'Email' }, { value: 'trips', label: 'Trips' }, { value: 'notes', label: 'Notes' },
+  { value: 'sms', label: 'Messages' }, { value: 'calls', label: 'Calls' }, { value: 'emails', label: 'Email' }, { value: 'trips', label: 'Trips' }, { value: 'notes', label: 'Notes' },
 ];
 
 export interface SmsThreadPaneProps {
@@ -319,7 +319,7 @@ export function SmsThreadPane({
       {rows.length === 0 ? (
         <div className="py-12 px-4 text-center space-y-2">
           <p className="text-xs font-bold text-slate-600">No Conversations Found</p>
-          <button type="button" onClick={onOpenFreshNewMessageModal} className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold cursor-pointer">+ New SMS</button>
+          <button type="button" onClick={onOpenFreshNewMessageModal} className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold cursor-pointer">+ New Message</button>
         </div>
       ) : rows.map((row) => {
         const isUnread = row.unreadCountTotal > 0 || Boolean(row.latestEvent.isUnread);

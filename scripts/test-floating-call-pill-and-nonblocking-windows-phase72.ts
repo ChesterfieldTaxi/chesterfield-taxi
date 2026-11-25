@@ -1,5 +1,5 @@
 /**
- * Platform Phase 72 Automated Verification Suite
+ * Platform Phase 72 Automated Verification Suite (Updated in Phase 74 for FloatingCallPill retirement)
  * (`scripts/test-floating-call-pill-and-nonblocking-windows-phase72.ts`)
  */
 
@@ -9,15 +9,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import {
-  DEFAULT_FLOATING_CALL_PILL_POSITION,
-  FLOATING_CALL_PILL_STORAGE_KEY,
-  FloatingCallPill,
-  clampFloatingCallPillPosition,
-  formatFloatingCallTimer,
-  parseStoredFloatingCallPillPosition,
-  serializeFloatingCallPillPosition,
-} from '../app/components/domain/dispatch/FloatingCallPill';
 import { ClientProfileEditTab } from '../app/components/domain/dispatch/ClientProfileEditTab';
 import { ClientProfileWindow, resolveClientProfileData } from '../app/components/domain/dispatch/ClientProfileWindow';
 import { DispatchBookingConflictModal } from '../app/components/domain/dispatch/booking/DispatchBookingConflictGuard';
@@ -63,69 +54,15 @@ function makeSampleTrip(id: string): Trip {
   };
 }
 
-function testFloatingCallPillModesPositionAndBannerRemoval(): void {
-  console.log('1️⃣  Testing FloatingCallPill SSR Modes, Position Clamping & Banner/Dock Removal...');
-  assert.equal(FLOATING_CALL_PILL_STORAGE_KEY, 'ct_floating_call_pill_pos_v1');
-  assert.deepEqual(DEFAULT_FLOATING_CALL_PILL_POSITION, { top: 58, right: 16 });
-  assert.equal(formatFloatingCallTimer(0), '00:00');
-  assert.equal(formatFloatingCallTimer(125), '02:05');
-
-  const vp = { width: 1280, height: 800 };
-  assert.deepEqual(clampFloatingCallPillPosition({ top: -50, right: -20 }, vp), { top: 8, right: 8 });
-  assert.deepEqual(clampFloatingCallPillPosition({ top: 9999, right: 9999 }, vp), { top: 716, right: 940 });
-  assert.deepEqual(parseStoredFloatingCallPillPosition(serializeFloatingCallPillPosition({ top: 72.4, right: 24.6 }), vp), { top: 72, right: 25 });
-  assert.equal(parseStoredFloatingCallPillPosition('invalid-json', vp), null);
-
-  const contactSvc = getContactService();
-  contactSvc.resetForTests();
-  contactSvc.saveContact({ name: 'Elena Vance', phone: '+13145550144', email: 'elena@bayer.example', isVip: true });
-  contactSvc.saveContact({ name: 'Blocked Caller', phone: '+13145550198', isBlacklisted: true });
-
-  assert.equal(renderToStaticMarkup(React.createElement(FloatingCallPill, { incomingCallAlert: null, activeCallStatus: 'idle', activeCallMeta: null, callDuration: 0 })), '');
-
-  const ringVipHtml = renderToStaticMarkup(
-    React.createElement(FloatingCallPill, { incomingCallAlert: { from: '+13145550144', callSid: 'CA_RING_VIP' }, activeCallStatus: 'idle', activeCallMeta: null, callDuration: 0 })
-  );
-  for (const needle of ['data-floating-call-pill="ringing"', 'z-[260]', 'Elena Vance', '(314) 555-0144', '>VIP<', '>Profile<', '>Decline<', '>Answer<']) {
-    assert.equal(ringVipHtml.includes(needle), true, `Ringing pill markup must include ${needle}`);
-  }
-
-  const ringDriverHtml = renderToStaticMarkup(
-    React.createElement(FloatingCallPill, {
-      incomingCallAlert: { from: '+13149151800' },
-      activeCallStatus: 'idle',
-      activeCallMeta: null,
-      callDuration: 0,
-      drivers: [{ id: 'drv-947', name: 'Zak R', cabNumber: '947', status: 'available', vehicle: 'Car', tier: 'standard', phone: '314-915-1800', zone: 'West' }],
-    })
-  );
-  assert.equal(ringDriverHtml.includes('>Driver<') && ringDriverHtml.includes('Zak R (#947)'), true);
-
-  const ringBlockedHtml = renderToStaticMarkup(
-    React.createElement(FloatingCallPill, { incomingCallAlert: { from: '+13145550198' }, activeCallStatus: 'idle', activeCallMeta: null, callDuration: 0 })
-  );
-  assert.equal(ringBlockedHtml.includes('>Blacklist<'), true);
-
-  const liveHtml = renderToStaticMarkup(
-    React.createElement(FloatingCallPill, {
-      incomingCallAlert: null,
-      activeCallStatus: 'connected',
-      activeCallMeta: { contactName: 'Elena Vance', phoneNumber: '+13145550144', duration: 125 },
-      callDuration: 125,
-      initialMuted: true,
-      initialKeypadOpen: true,
-    })
-  );
-  for (const needle of ['data-floating-call-pill="live"', '● 02:05', 'Elena Vance', '>Mute<', '>Keypad<', '>Profile<', '>Thread<', '>End<', '>*<', '>#<']) {
-    assert.equal(liveHtml.includes(needle), true, `Live call pill markup must include ${needle}`);
-  }
-  contactSvc.resetForTests();
+function testFloatingCallPillRetirementAndBannerRemoval(): void {
+  console.log('1️⃣  Testing FloatingCallPill Retirement & Banner/Dock Non-Disruption...');
+  assert.equal(fs.existsSync(path.join(ROOT_DIR, 'app/components/domain/dispatch/FloatingCallPill.tsx')), false, 'FloatingCallPill.tsx must be deleted');
+  assert.equal(readRel('app/routes/dispatch.tsx').includes('FloatingCallPill'), false, 'dispatch.tsx must not mount FloatingCallPill');
 
   assert.equal(readRel('app/components/domain/dispatch/workspace/DispatchDesktopTopHeader.tsx').includes('Incoming Softphone Call'), false);
   const commsSrc = readRel('app/components/domain/dispatch/CommsHub.tsx');
   assert.equal(commsSrc.includes('Incoming Softphone Call'), false);
   assert.equal(commsSrc.includes('Client Profile') && commsSrc.includes('flex-1 min-h-0 flex flex-col min-w-0 overflow-hidden'), true);
-  assert.equal(readRel('app/routes/dispatch.tsx').includes('<FloatingCallPill'), true);
 
   const syncSrc = readRel('app/core/hooks/dispatch/useDispatchWorkspaceSync.ts');
   const incomingBlock = syncSrc.split("msg.type === 'INCOMING_CALL'")[1]?.split("msg.type === 'INCOMING_CALL_DISMISSED'")[0] || '';
@@ -163,7 +100,7 @@ function testEndCallIdempotencyAndSoftphoneBusEvents(): void {
 }
 
 function testUnifiedClientProfileEditTabAndRetiredContactModal(): void {
-  console.log('3️⃣  Testing Unified ClientProfileWindow (Overview & Trips | Edit Profile) & Retired comms-ContactModal...');
+  console.log('3️⃣  Testing Unified ClientProfileWindow (Trips | Places | Profile) & Retired comms-ContactModal...');
   assert.equal(fs.existsSync(path.join(ROOT_DIR, 'app/components/domain/dispatch/comms/comms-ContactModal.tsx')), false);
   for (const filePath of collectFiles(path.join(ROOT_DIR, 'app'), /\.(ts|tsx)$/)) {
     assert.equal(/comms-ContactModal|CommsContactModal/.test(fs.readFileSync(filePath, 'utf8')), false);
@@ -194,7 +131,7 @@ function testUnifiedClientProfileEditTabAndRetiredContactModal(): void {
   const winOverviewHtml = renderToStaticMarkup(
     React.createElement(ClientProfileWindow, { trips: [makeSampleTrip('trip-7201')], corporateAccounts: corpAccounts, initialOpen: true, initialTarget: { phone: '+13145550144' }, initialTab: 'overview', onLoadTripIntoNewTab: () => {} })
   );
-  assert.equal(winOverviewHtml.includes('>Trips<') && winOverviewHtml.includes('>Places<') && winOverviewHtml.includes('>Contact<') && winOverviewHtml.includes('Recent Trips (1 of 1)'), true);
+  assert.equal(winOverviewHtml.includes('>Trips<') && winOverviewHtml.includes('>Places<') && winOverviewHtml.includes('>Profile<') && winOverviewHtml.includes('Recent Trips (1 of 1)'), true);
 
   const winEditHtml = renderToStaticMarkup(
     React.createElement(ClientProfileWindow, { trips: [makeSampleTrip('trip-7201')], corporateAccounts: corpAccounts, initialOpen: true, initialTarget: { phone: '+13145550144' }, initialTab: 'edit', onLoadTripIntoNewTab: () => {} })
@@ -264,7 +201,7 @@ function testGuardrailsCeilingsAndImmutableFiles(): void {
 
   const secretShapes = [/\bAC[0-9a-f]{32}\b/i, /\bSK[0-9a-f]{32}\b/i, /\bAP[0-9a-f]{32}\b/i, /AKIA[0-9A-Z]{16}/, /sk_(live|test)_[0-9A-Za-z]{16,}/, /-----BEGIN [A-Z ]*PRIVATE KEY-----/];
   for (const rel of [
-    'app/components/domain/dispatch/FloatingCallPill.tsx',
+    'app/components/domain/dispatch/DispatchHeaderCallHud.tsx',
     'app/components/domain/dispatch/ClientProfileEditTab.tsx',
     'app/components/domain/dispatch/ClientProfileWindow.tsx',
     'app/components/domain/dispatch/CommsHub.tsx',
@@ -279,7 +216,7 @@ function testGuardrailsCeilingsAndImmutableFiles(): void {
     ['app/routes/dispatch.tsx', 1600],
     ['app/components/domain/dispatch/ClientProfileWindow.tsx', 360],
     ['app/components/domain/dispatch/CommsHub.tsx', 900],
-    ['app/components/domain/dispatch/FloatingCallPill.tsx', 300],
+    ['app/components/domain/dispatch/DispatchHeaderCallHud.tsx', 360],
     ['app/components/domain/dispatch/ClientProfileEditTab.tsx', 340],
     ['scripts/test-floating-call-pill-and-nonblocking-windows-phase72.ts', 360],
   ];
@@ -296,7 +233,7 @@ function testGuardrailsCeilingsAndImmutableFiles(): void {
 
 function main(): void {
   console.log('🚀 Running Platform Phase 72 Verification Suite...\n');
-  testFloatingCallPillModesPositionAndBannerRemoval();
+  testFloatingCallPillRetirementAndBannerRemoval();
   testEndCallIdempotencyAndSoftphoneBusEvents();
   testUnifiedClientProfileEditTabAndRetiredContactModal();
   testNonBlockingFloatingWindowsSweep();

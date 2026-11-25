@@ -28,6 +28,10 @@ import { parseFlightIdent, type AirportDetectionResult } from '../../../../core/
 import { getBookingService } from '../../../../core/services/booking';
 import { formatInheritedCorporateBillingTerms } from '../../../../core/services/corporate-caller-auth.util';
 import {
+  getContactService,
+  normalizeClientDriverPreferences,
+} from '../../../../core/services/customer/contact.service';
+import {
   generateMultiCarGroupId,
   distributeAcrossCars,
   buildPerVehiclePricingSpecs,
@@ -62,6 +66,31 @@ import {
   type VehicleCapacityInfo,
   type validateDispatchCorporateSubmission,
 } from '../../../../core/hooks/booking';
+
+export function resolveTripClientDriverPreferencesMetadata(
+  phone?: string,
+  email?: string
+): {
+  clientPreferredDriverIds?: string[];
+  clientExcludedDriverIds?: string[];
+} {
+  const cleanPhone = String(phone || '').trim();
+  const cleanEmail = String(email || '').trim();
+  const contact =
+    (cleanPhone ? getContactService().getContactByPhone(cleanPhone) : null) ||
+    (cleanEmail ? getContactService().getContactByEmail(cleanEmail) : null);
+  if (!contact) return {};
+  const prefs = normalizeClientDriverPreferences(
+    contact.preferredDriverIds,
+    contact.excludedDriverIds
+  );
+  return {
+    clientPreferredDriverIds:
+      prefs.preferredDriverIds.length > 0 ? prefs.preferredDriverIds : undefined,
+    clientExcludedDriverIds:
+      prefs.excludedDriverIds.length > 0 ? prefs.excludedDriverIds : undefined,
+  };
+}
 
 export interface ContactPersonDetails {
   isBookerDifferent: boolean;
@@ -1818,7 +1847,10 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
       hasCheckedLuggage: returnHasCheckedLuggage,
     });
 
+    const clientDriverPrefsMeta = resolveTripClientDriverPreferencesMetadata(phone, email);
+
     const metadataPayload = {
+      ...clientDriverPrefsMeta,
       company,
       internalNotes,
       tariff,

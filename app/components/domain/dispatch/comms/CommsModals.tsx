@@ -217,7 +217,7 @@ export function CommsBottomNewSmsSheet(props: CommsBottomNewSmsSheetProps) {
     <div data-comms-bottom-sms-sheet="true" className="absolute inset-x-0 bottom-0 z-40 rounded-t-2xl border-t border-slate-200 bg-white shadow-2xl p-3 space-y-2 text-xs">
       <div className="flex items-center justify-between gap-2">
         <span className="font-extrabold text-slate-900 inline-flex items-center gap-1.5">
-          <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-blue-600" /><span>New SMS</span>
+          <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-blue-600" /><span>New Message</span>
         </span>
         <button type="button" onClick={props.onClose} title="Close" className="p-1 rounded-md hover:bg-slate-100 text-slate-500 cursor-pointer"><XIcon className="w-3.5 h-3.5" /></button>
       </div>

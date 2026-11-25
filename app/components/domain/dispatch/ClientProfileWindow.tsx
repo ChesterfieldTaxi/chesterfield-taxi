@@ -36,11 +36,11 @@ export {
   shouldAutoOpenClientProfileOnCall,
 };
 
-export type ClientProfileTab = 'trips' | 'places' | 'contact';
-export type LegacyClientProfileTab = ClientProfileTab | 'overview' | 'edit';
+export type ClientProfileTab = 'trips' | 'places' | 'profile';
+export type LegacyClientProfileTab = ClientProfileTab | 'overview' | 'edit' | 'contact';
 
 export function normalizeClientProfileTab(tab?: LegacyClientProfileTab | null): ClientProfileTab {
-  if (tab === 'edit' || tab === 'contact') return 'contact';
+  if (tab === 'edit' || tab === 'contact' || tab === 'profile') return 'profile';
   if (tab === 'places') return 'places';
   return 'trips';
 }
@@ -99,32 +99,11 @@ export function ClientProfileWindow({
     return bus.subscribe((msg) => {
       if (msg.type === 'OPEN_CLIENT_PROFILE') {
         const p = msg.payload;
-        if (p.source === 'incoming_call' || p.source === 'answered_call' || p.source === 'outbound_call') {
-          const check = shouldAutoOpenClientProfileOnCall({
-            phone: p.phone, callSid: p.callSid, seenCallKeys: seenCallKeysRef.current,
-            contacts: getContactService().getAllContacts(), trips: tripsRef.current,
-          });
-          if (!check.shouldOpen) return;
-        }
+        if (p.source === 'incoming_call' || p.source === 'answered_call' || p.source === 'outbound_call') return;
         setTarget({ phone: p.phone, email: p.email, name: p.name });
         setActiveTab(normalizeClientProfileTab(p.initialTab));
         setVisibleCount(CLIENT_TRIPS_PAGE_SIZE);
         setIsOpen(true);
-      } else if (msg.type === 'INCOMING_CALL' || msg.type === 'CALL_INCOMING' || msg.type === 'CALL_ANSWERED') {
-        const callerPhone = msg.type === 'INCOMING_CALL' ? msg.payload?.from : msg.payload?.callerNumber;
-        const callSid = msg.payload?.callSid;
-        const check = shouldAutoOpenClientProfileOnCall({
-          phone: callerPhone, callSid, seenCallKeys: seenCallKeysRef.current,
-          contacts: getContactService().getAllContacts(), trips: tripsRef.current,
-        });
-        if (check.shouldOpen) {
-          setTarget({ phone: callerPhone, name: check.profile?.displayName, email: check.profile?.displayEmail });
-          setActiveTab('trips');
-          setVisibleCount(CLIENT_TRIPS_PAGE_SIZE);
-          setIsOpen(true);
-        }
-      } else if (msg.type === 'CALL_ENDED') {
-        seenCallKeysRef.current.clear();
       }
     });
   }, []);
@@ -175,7 +154,7 @@ export function ClientProfileWindow({
           {([
             { id: 'trips' as const, label: 'Trips', count: profile.sortedTrips.length, icon: <CarIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" /> },
             { id: 'places' as const, label: 'Places', count: places.length, icon: <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> },
-            { id: 'contact' as const, label: 'Contact', count: null, icon: <PencilIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> },
+            { id: 'profile' as const, label: 'Profile', count: null, icon: <PencilIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> },
           ] as const).map((tab) => (
             <button
               key={tab.id}
@@ -194,9 +173,10 @@ export function ClientProfileWindow({
           ))}
         </div>
 
-        {activeTab === 'contact' ? (
+        {activeTab === 'profile' ? (
           <ClientProfileEditTab
             profile={profile}
+            drivers={drivers}
             vehicles={vehicles}
             corporateAccounts={corporateAccounts}
             onSaved={(saved) => setTarget({ phone: saved.phone, email: saved.email, name: saved.name })}

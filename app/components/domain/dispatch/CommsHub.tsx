@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getCommsThreadService } from '../../../core/services/comms/comms-thread.service';
-import { ExternalLinkIcon, PhoneIcon, PlusIcon, SpinnerIcon, XIcon } from '../../ui/Icons';
+import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
+import { ExternalLinkIcon, KeypadGridIcon, PlusIcon, SpinnerIcon, XIcon } from '../../ui/Icons';
 import { CommsFilterToolbar } from './comms/CommsFilterToolbar';
 import { AgentPhoneSetupModal, CommsBottomNewSmsSheet } from './comms/CommsModals';
 import { SmsThreadPane } from './comms/SmsThreadPane';
@@ -69,6 +70,27 @@ function CommsHubComponent({
     onPopulateBooking, onOpenEditTrip, initialNewSmsSheetOpen,
   });
 
+  const openKeypadView = () => {
+    messaging.setSelectedContactPhone(null);
+    setActiveTab('phone');
+    softphone.setCallsSubTab('keypad');
+    onTabChange?.('phone');
+  };
+  const openKeypadRef = useRef(openKeypadView);
+  openKeypadRef.current = openKeypadView;
+
+  useEffect(() => getWorkspaceBus().subscribe((msg) => {
+    if (msg.type === 'OPEN_SOFTPHONE_KEYPAD') openKeypadRef.current();
+  }), []);
+
+  const isThreadOpen = Boolean(messaging.selectedContactPhone && messaging.activeContactSummary);
+  useEffect(() => {
+    getWorkspaceBus().publish('SOFTPHONE_VIEW_STATE_CHANGED', {
+      activeTab,
+      callsSubTab: isThreadOpen ? 'thread' : softphone.callsSubTab,
+    });
+  }, [activeTab, softphone.callsSubTab, isThreadOpen]);
+
   const handleMarkAllRead = () => {
     const unreadIds = sync.interactions.filter((i) => i.isUnread).map((i) => i.id);
     if (unreadIds.length === 0) return;
@@ -110,9 +132,10 @@ function CommsHubComponent({
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [isVisible, messaging.isNewMessageModalOpen, softphone.showAgentSetupModal, messaging.selectedContactPhone, messaging.newMsgBody, messaging.noteDraftText, messaging.smsReplyText]);
 
-  const isThreadOpen = Boolean(messaging.selectedContactPhone && messaging.activeContactSummary);
   const showListToolbar = !isThreadOpen && !(activeTab === 'phone' && softphone.callsSubTab === 'keypad');
   const activeUnreadCount = activeTab === 'messages' ? sync.unreadCountMessages : activeTab === 'voicemail' ? sync.unreadCountVoicemail : activeTab === 'phone' ? sync.unreadCountMissed : sync.unreadCountAll;
+  const showKeypadFab = activeTab === 'all' || activeTab === 'phone' || activeTab === 'voicemail';
+  const showNewMsgFab = activeTab === 'all' || activeTab === 'messages';
 
   const sharedSmsProps = {
     threadTab: messaging.threadTab, onChangeThreadTab: messaging.setThreadTab,
@@ -137,30 +160,28 @@ function CommsHubComponent({
     >
       <audio ref={sync.audioPlayerRef} onEnded={sync.handleAudioEnded} className="hidden" />
 
-      {/* Row 1 (h-10): Dock Header + 4-Segment Switch (0 top-row + New button) */}
+      {/* Row 1 (h-10): Passive WebRTC Dot + 4-Segment Switch (Window Title/Controls only in popout/window mode) */}
       <div data-comms-row="header" className="h-10 px-2.5 border-b border-slate-200 bg-white flex items-center justify-between gap-1.5 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0 shrink-0">
-          <span className="text-[11px] font-extrabold text-slate-900 truncate hidden @[390px]/commshub:inline">Phone &amp; SMS</span>
-          <button
-            type="button"
-            onClick={() => { handleSelectTab('phone'); messaging.setSelectedContactPhone(null); softphone.setCallsSubTab('keypad'); }}
-            title="Open Softphone Keypad"
-            className={`h-6 px-1.5 rounded-full border text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer ${
-              softphone.softphoneStatus === 'ready' ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                : softphone.softphoneStatus === 'initializing' ? 'bg-blue-50 border-blue-200 text-blue-700'
-                : 'bg-slate-100 border-slate-200 text-slate-600'
-            }`}
-          >
-            {softphone.softphoneStatus === 'initializing' ? <SpinnerIcon className="w-2.5 h-2.5 animate-spin" /> : <span className={`w-1.5 h-1.5 rounded-full ${softphone.softphoneStatus === 'ready' ? 'bg-emerald-500' : 'bg-amber-500'}`} />}
-            <PhoneIcon className="w-2.5 h-2.5" />
-          </button>
+          {softphone.softphoneStatus === 'initializing' ? (
+            <SpinnerIcon className="w-2.5 h-2.5 animate-spin text-blue-600 shrink-0" />
+          ) : (
+            <span
+              data-webrtc-status-dot={softphone.softphoneStatus}
+              title={softphone.softphoneStatus === 'ready' ? 'WebRTC Softphone Ready' : 'Softphone Bridge Mode'}
+              className={`w-2 h-2 rounded-full shrink-0 ${softphone.softphoneStatus === 'ready' ? 'bg-emerald-500' : 'bg-amber-500'}`}
+            />
+          )}
+          {(isPopout || showWindowControls) && (
+            <span className="text-[11px] font-extrabold text-slate-900 truncate">Phone &amp; Messages</span>
+          )}
         </div>
 
         <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg text-[11px] font-bold min-w-0">
           {([
             { id: 'all' as const, label: 'All', badge: sync.unreadCountAll, cls: 'bg-slate-700' },
             { id: 'phone' as const, label: 'Calls', badge: sync.unreadCountMissed, cls: 'bg-rose-500' },
-            { id: 'messages' as const, label: 'SMS', badge: sync.unreadCountMessages, cls: 'bg-blue-600' },
+            { id: 'messages' as const, label: 'Messages', badge: sync.unreadCountMessages, cls: 'bg-blue-600' },
             { id: 'voicemail' as const, label: 'VM', badge: sync.unreadCountVoicemail, cls: 'bg-amber-500' },
           ] as const).map((t) => (
             <button
@@ -175,31 +196,21 @@ function CommsHubComponent({
           ))}
         </div>
 
-        <div className="flex items-center gap-1 shrink-0 min-w-[4px]">
-          {showWindowControls && !isPopout && onPopOut && (
-            <button type="button" onClick={onPopOut} title="Pop out window" className="p-1 rounded-md hover:bg-slate-100 text-slate-500 cursor-pointer"><ExternalLinkIcon className="w-3.5 h-3.5" /></button>
-          )}
-          {showWindowControls && !isPopout && onClose && (
-            <button type="button" onClick={onClose} title="Close" className="p-1 rounded-md hover:bg-slate-100 text-slate-500 hover:text-rose-600 cursor-pointer"><XIcon className="w-3.5 h-3.5" /></button>
-          )}
-        </div>
+        {isPopout || showWindowControls ? (
+          <div className="flex items-center gap-1 shrink-0 min-w-[4px]">
+            {showWindowControls && !isPopout && onPopOut && (
+              <button type="button" onClick={onPopOut} title="Pop out window" className="p-1 rounded-md hover:bg-slate-100 text-slate-500 cursor-pointer"><ExternalLinkIcon className="w-3.5 h-3.5" /></button>
+            )}
+            {showWindowControls && !isPopout && onClose && (
+              <button type="button" onClick={onClose} title="Close" className="p-1 rounded-md hover:bg-slate-100 text-slate-500 hover:text-rose-600 cursor-pointer"><XIcon className="w-3.5 h-3.5" /></button>
+            )}
+          </div>
+        ) : (
+          <span className="w-2 shrink-0" />
+        )}
       </div>
 
-      {activeTab === 'phone' && !isThreadOpen && (
-        <div className="h-8 px-2.5 border-b border-slate-200/80 bg-slate-50 flex items-center gap-1 text-[11px] font-bold shrink-0">
-          {([
-            { id: 'history' as const, label: `History (${sync.allHistoryCalls.length})` },
-            { id: 'missed' as const, label: `Missed (${sync.allMissedCalls.length})` },
-            { id: 'keypad' as const, label: 'Keypad' },
-          ] as const).map((sub) => (
-            <button key={sub.id} type="button" onClick={() => softphone.setCallsSubTab(sub.id)} className={`px-2 py-0.5 rounded-md cursor-pointer ${softphone.callsSubTab === sub.id ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'}`}>
-              {sub.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Row 2 (h-9): List-Only Grouped|Stream Toggle + Search + Multi-Select Filter ▾ */}
+      {/* Row 2 (h-9): List-Only Leading Toggle (Grouped|Stream or All|Missed) + Search + Multi-Select Filter ▾ */}
       {showListToolbar && (
         <CommsFilterToolbar
           searchQuery={sync.searchQuery} onChangeSearchQuery={sync.setSearchQuery} searchInputRef={searchInputRef}
@@ -210,6 +221,18 @@ function CommsHubComponent({
           filterUnreadOnly={sync.filterUnreadOnly} onToggleUnreadOnly={() => sync.setFilterUnreadOnly((v) => !v)}
           unreadCount={activeUnreadCount} onMarkAllRead={handleMarkAllRead} onRefresh={() => void sync.fetchTelephonyData()}
           allViewMode={allViewMode} onChangeAllViewMode={handleChangeAllViewMode} showAllViewModeToggle={activeTab === 'all'}
+          leadingSlot={activeTab === 'phone' ? (
+            <div data-comms-calls-subtoggle="true" className="flex items-center bg-slate-200/80 p-0.5 rounded-lg text-[10.5px] font-bold shrink-0">
+              {([
+                { id: 'history' as const, label: 'All' },
+                { id: 'missed' as const, label: 'Missed' },
+              ] as const).map((sub) => (
+                <button key={sub.id} type="button" onClick={() => softphone.setCallsSubTab(sub.id)} className={`h-6 px-2 rounded-md transition-colors cursor-pointer ${softphone.callsSubTab === sub.id ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}>
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+          ) : undefined}
         />
       )}
 
@@ -251,6 +274,7 @@ function CommsHubComponent({
             onDeleteDialDigit={softphone.handleDeleteDialDigit} onClearDialpad={softphone.handleClearDialpad}
             onStartCall={softphone.handleStartCall} drivers={drivers} callerCrmContext={softphone.callerCrmContext}
             onRebookCallerRide={messaging.handleRebookFromCrm} onSelectThread={messaging.setSelectedContactPhone}
+            onBackToHistory={() => softphone.setCallsSubTab('history')}
           />
         ) : (
           <VoicemailCallLogPane
@@ -266,15 +290,30 @@ function CommsHubComponent({
       </div>
 
       {showListToolbar && !messaging.isNewMessageModalOpen && (
-        <button
-          type="button"
-          data-comms-new-sms-fab="true"
-          onClick={messaging.handleOpenFreshNewMessageModal}
-          title="Compose New SMS"
-          className="absolute bottom-3.5 right-3.5 z-30 h-9 px-3.5 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-extrabold shadow-lg ring-1 ring-blue-700/20 inline-flex items-center gap-1.5 cursor-pointer"
-        >
-          <PlusIcon className="w-3.5 h-3.5" /><span>New SMS</span>
-        </button>
+        <div className="absolute bottom-3.5 right-3.5 z-30 flex items-center gap-2">
+          {showKeypadFab && (
+            <button
+              type="button"
+              data-comms-keypad-fab="true"
+              onClick={openKeypadView}
+              title="Open Softphone Keypad"
+              className="h-9 px-3.5 rounded-full bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-extrabold shadow-lg ring-1 ring-emerald-700/20 inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <KeypadGridIcon className="w-3.5 h-3.5" /><span>Keypad</span>
+            </button>
+          )}
+          {showNewMsgFab && (
+            <button
+              type="button"
+              data-comms-new-sms-fab="true"
+              onClick={messaging.handleOpenFreshNewMessageModal}
+              title="Compose New Message"
+              className="h-9 px-3.5 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-extrabold shadow-lg ring-1 ring-blue-700/20 inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <PlusIcon className="w-3.5 h-3.5" /><span>New Message</span>
+            </button>
+          )}
+        </div>
       )}
 
       <AgentPhoneSetupModal

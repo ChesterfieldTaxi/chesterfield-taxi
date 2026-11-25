@@ -51,6 +51,7 @@ export interface SoftphoneDialerPaneProps {
   callerCrmContext?: CommsCrmContextSummary | null;
   onRebookCallerRide?: (payload: WorkspaceEventMap['POPULATE_BOOKING']) => void;
   onSelectThread?: (selectorTarget: string) => void;
+  onBackToHistory?: () => void;
 }
 
 function CallerQuickChip({
@@ -105,7 +106,7 @@ export function SoftphoneDialerPane({
   softphoneStatus, operatorPhoneInput, onChangeOperatorPhoneInput, isEditingOperatorPhone,
   onToggleEditingOperatorPhone, onSaveOperatorPhone, onCancelEditingOperatorPhone,
   activeKeypadFeedback, onDialDigit, onDeleteDialDigit, onClearDialpad, onStartCall,
-  drivers, callerCrmContext, onSelectThread,
+  drivers, callerCrmContext, onSelectThread, onBackToHistory,
 }: SoftphoneDialerPaneProps) {
   if (callStatus !== 'idle') {
     return (
@@ -159,6 +160,17 @@ export function SoftphoneDialerPane({
   return (
     <div className="flex-1 min-h-0 flex flex-col items-center p-3.5 bg-white overflow-y-auto">
       <div className="w-full max-w-xs space-y-2.5">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            data-dialer-back-to-calls="true"
+            onClick={() => onBackToHistory?.()}
+            className="px-2 py-1 rounded-lg hover:bg-slate-100 text-xs font-extrabold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 cursor-pointer"
+          >
+            ← Calls
+          </button>
+          <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">Softphone Keypad</span>
+        </div>
         <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 relative">
           <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold mb-1">
             <span>ID: {formatDisplayPhone(getClientTelephonyCredentials().phoneNumber)}</span>

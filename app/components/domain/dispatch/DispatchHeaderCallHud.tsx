@@ -1,498 +1,351 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  getWorkspaceBus,
-  type WorkspaceMessage,
-  type UpcomingBookingPreview,
-} from '../../../core/services/workspace-bus.service';
-import {
-  matchPassengerByPhone,
-  resolvePrimarySmsPhone,
-  DEFAULT_PASSENGER_ACCOUNT,
-} from '../../../core/services/passenger.service';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { getContactService, normalizePhone } from '../../../core/services/customer/contact.service';
+import { getWorkspaceBus, type UpcomingBookingPreview, type WorkspaceMessage } from '../../../core/services/workspace-bus.service';
 import type { Trip } from '../../../core/types/trip';
-import {
-  PhoneIcon,
-  CheckIcon,
-  XIcon,
-  CalendarIcon,
-  PlusIcon,
-  HomeModernIcon,
-  DevicePhoneMobileIcon,
-} from '../../ui/Icons';
-import { soundNotificationService } from '../../../core/services/sound-notification.service';
+import { formatDisplayPhone } from '../../../core/utils/phone';
+import { CalendarIcon, CarIcon, ExternalLinkIcon, KeypadGridIcon, MicIcon, MicOffIcon, PauseIcon, PhoneIcon, PhoneOffIcon, PlayIcon, PlusIcon, XIcon } from '../../ui/Icons';
 
-interface DispatchHeaderCallHudProps {
+const DTMF_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'] as const;
+
+export interface DispatchHeaderCallHudProps {
   trips?: Trip[];
+  drivers?: ReadonlyArray<{ id: string; name: string; cabNumber?: string; phone?: string }>;
   onOpenBooking?: () => void;
   onOpenEditTrip?: (tripId: string) => void;
   onOpenComms?: (tab?: 'all' | 'phone' | 'messages' | 'voicemail', phone?: string) => void;
   onPopulateBooking?: (data: any) => void;
   missedCallsCount?: number;
   isPhoneDockActive?: boolean;
+  activeDockTab?: string;
+  commsActiveTab?: string;
+  commsCallsSubTab?: string;
+  incomingCallAlert?: { from: string; callSid?: string; callerName?: string } | null;
+  onDismissIncomingCallAlert?: () => void;
+  activeCallStatus?: 'idle' | 'calling' | 'connected' | 'on_hold';
+  activeCallMeta?: { contactName: string; phoneNumber: string; duration?: number; callSid?: string } | null;
+  callDuration?: number;
+  initialMuted?: boolean;
+  initialKeypadOpen?: boolean;
+  initialFlydownOpen?: boolean;
   onTogglePhoneDock?: () => void;
-  /** When true, hides the idle Phone icon button on desktop (lg+) so the left workspace bar stays the single nav surface */
   hideIdleButtonOnDesktop?: boolean;
 }
 
+interface InternalCallState {
+  callSid?: string;
+  callerNumber: string;
+  callerName?: string;
+  upcomingBookings: UpcomingBookingPreview[];
+  vipTag?: string;
+  mode: 'incoming' | 'calling' | 'connected' | 'on_hold';
+}
+
+export function formatHudCallTimer(seconds: number): string {
+  const safe = Math.max(0, Math.floor(seconds || 0));
+  return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`;
+}
+
 export function DispatchHeaderCallHud({
-  trips = [],
-  onOpenBooking,
-  onOpenEditTrip,
-  onOpenComms,
-  onPopulateBooking,
-  missedCallsCount = 0,
-  isPhoneDockActive = false,
-  onTogglePhoneDock,
-  hideIdleButtonOnDesktop = false,
+  trips = [], drivers = [], onOpenBooking, onOpenEditTrip, onOpenComms, onPopulateBooking,
+  missedCallsCount = 0, isPhoneDockActive = false, activeDockTab,
+  commsActiveTab: propCommsActiveTab, commsCallsSubTab: propCommsCallsSubTab,
+  incomingCallAlert, onDismissIncomingCallAlert, activeCallStatus = 'idle', activeCallMeta,
+  callDuration: propCallDuration = 0, initialMuted = false, initialKeypadOpen = false,
+  initialFlydownOpen, onTogglePhoneDock, hideIdleButtonOnDesktop = false,
 }: DispatchHeaderCallHudProps) {
-  const [activeCall, setActiveCall] = useState<{
-    callSid?: string;
-    callerNumber: string;
-    callerName: string;
-    numberType: 'home' | 'mobile' | 'work' | 'other';
-    mobileForSms: string;
-    upcomingBookings: UpcomingBookingPreview[];
-    vipTag?: string;
-  } | null>(null);
-
-  const [callState, setCallState] = useState<'incoming' | 'connected' | 'on_hold'>('incoming');
-  const [callDuration, setCallDuration] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
-
-  // Dropdown visibility states
-  const [showInboundFlydown, setShowInboundFlydown] = useState(false);
-
-  const containerRef = useRef<HTMLDivElement>(null);
   const workspaceBus = getWorkspaceBus();
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Listen for incoming and outbound calls across windows via WorkspaceBus
-  useEffect(() => {
-    const unsub = workspaceBus.subscribe((msg: WorkspaceMessage) => {
-      if (msg.type === 'CALL_INCOMING') {
-        const payload = msg.payload;
-        setActiveCall({
-          callSid: payload.callSid,
-          callerNumber: payload.callerNumber,
-          callerName: payload.callerName || 'Unregistered Caller',
-          numberType: payload.numberType || 'mobile',
-          mobileForSms: payload.mobileForSms || payload.callerNumber,
-          upcomingBookings: payload.upcomingBookings || [],
-          vipTag: payload.vipTag,
-        });
-        setCallState('incoming');
-        setCallDuration(0);
-        setShowInboundFlydown(true);
-      } else if (msg.type === 'CALL_OUTBOUND_STARTED') {
-        const payload = msg.payload;
-        setActiveCall({
-          callSid: payload.callSid,
-          callerNumber: payload.targetNumber,
-          callerName: payload.contactName || payload.targetNumber,
-          numberType: 'mobile',
-          mobileForSms: payload.targetNumber,
-          upcomingBookings: [],
-        });
-        setCallState('connected');
-        setCallDuration(0);
-      } else if (msg.type === 'CALL_ANSWERED') {
-        setCallState('connected');
-      } else if (msg.type === 'CALL_ENDED') {
-        setActiveCall(null);
-        setShowInboundFlydown(false);
-        setCallState('incoming');
-        setCallDuration(0);
-      }
-    });
+  const [busCall, setBusCall] = useState<InternalCallState | null>(null);
+  const [localDuration, setLocalDuration] = useState(0);
+  const [isMuted, setIsMuted] = useState(initialMuted);
+  const [isOnHold, setIsOnHold] = useState(activeCallStatus === 'on_hold');
+  const [showDtmfKeypad, setShowDtmfKeypad] = useState(initialKeypadOpen);
+  const [flydownOverride, setFlydownOverride] = useState<boolean | null>(
+    typeof initialFlydownOpen === 'boolean' ? initialFlydownOpen : null
+  );
+  const [liveCommsTab, setLiveCommsTab] = useState<string>(propCommsActiveTab || 'all');
+  const [liveCallsSubTab, setLiveCallsSubTab] = useState<string>(propCommsCallsSubTab || 'history');
 
-    return unsub;
-  }, [workspaceBus]);
+  useEffect(() => { if (propCommsActiveTab) setLiveCommsTab(propCommsActiveTab); }, [propCommsActiveTab]);
+  useEffect(() => { if (propCommsCallsSubTab) setLiveCallsSubTab(propCommsCallsSubTab); }, [propCommsCallsSubTab]);
 
-  // Audio ring cadence for incoming calls
-  useEffect(() => {
-    let ringInterval: NodeJS.Timeout | null = null;
-    if (activeCall && callState === 'incoming') {
-      soundNotificationService.playInboundCallRing();
-      ringInterval = setInterval(() => {
-        soundNotificationService.playInboundCallRing();
-      }, 4000);
+  const commsActiveTab = propCommsActiveTab || liveCommsTab;
+  const commsCallsSubTab = propCommsCallsSubTab || liveCallsSubTab;
+  const isKeypadTabVisible = Boolean(isPhoneDockActive && commsActiveTab === 'phone' && commsCallsSubTab === 'keypad');
+
+  const prevContextKeyRef = useRef('');
+  const contextKey = `${Boolean(incomingCallAlert)}_${activeCallStatus}_${Boolean(busCall)}_${isPhoneDockActive}_${isKeypadTabVisible}_${activeDockTab || ''}`;
+  if (prevContextKeyRef.current && prevContextKeyRef.current !== contextKey && initialFlydownOpen === undefined) {
+    prevContextKeyRef.current = contextKey;
+    if (flydownOverride !== null) setFlydownOverride(null);
+  } else {
+    prevContextKeyRef.current = contextKey;
+  }
+
+  useEffect(() => workspaceBus.subscribe((msg: WorkspaceMessage) => {
+    if (msg.type === 'SOFTPHONE_VIEW_STATE_CHANGED') {
+      setLiveCommsTab(msg.payload.activeTab);
+      setLiveCallsSubTab(msg.payload.callsSubTab);
+      setFlydownOverride(null);
+    } else if (msg.type === 'INCOMING_CALL') {
+      setBusCall({ callSid: msg.payload.callSid, callerNumber: msg.payload.from, upcomingBookings: [], mode: 'incoming' });
+      setLocalDuration(0);
+      setFlydownOverride(true);
+    } else if (msg.type === 'CALL_INCOMING') {
+      setBusCall({
+        callSid: msg.payload.callSid, callerNumber: msg.payload.callerNumber, callerName: msg.payload.callerName,
+        upcomingBookings: msg.payload.upcomingBookings || [], vipTag: msg.payload.vipTag, mode: 'incoming',
+      });
+      setLocalDuration(0);
+      setFlydownOverride(true);
+    } else if (msg.type === 'INCOMING_CALL_DISMISSED') {
+      setBusCall((prev) => (prev?.mode === 'incoming' ? null : prev));
+    } else if (msg.type === 'CALL_OUTBOUND_STARTED') {
+      setBusCall({ callSid: msg.payload.callSid, callerNumber: msg.payload.targetNumber, callerName: msg.payload.contactName, upcomingBookings: [], mode: 'calling' });
+      setLocalDuration(0);
+      setIsOnHold(false);
+      setFlydownOverride(null);
+    } else if (msg.type === 'CALL_ANSWERED') {
+      setBusCall((prev) => ({
+        callSid: msg.payload.callSid || prev?.callSid, callerNumber: msg.payload.callerNumber || prev?.callerNumber || '',
+        callerName: prev?.callerName, upcomingBookings: prev?.upcomingBookings || [], vipTag: prev?.vipTag, mode: 'connected',
+      }));
+      setIsOnHold(false);
+      setFlydownOverride(null);
+    } else if (msg.type === 'CALL_MUTE_CHANGED') {
+      setIsMuted(Boolean(msg.payload?.isMuted));
+    } else if (msg.type === 'CALL_ENDED') {
+      setBusCall(null); setLocalDuration(0); setIsMuted(false); setIsOnHold(false); setShowDtmfKeypad(false); setFlydownOverride(null);
     }
-    return () => {
-      if (ringInterval) clearInterval(ringInterval);
+  }), [workspaceBus]);
+
+  const effectiveCall = useMemo<InternalCallState | null>(() => {
+    if (incomingCallAlert?.from) {
+      return {
+        callSid: incomingCallAlert.callSid, callerNumber: incomingCallAlert.from, callerName: incomingCallAlert.callerName,
+        upcomingBookings: busCall?.upcomingBookings || [], vipTag: busCall?.vipTag, mode: 'incoming',
+      };
+    }
+    if (busCall) return isOnHold && busCall.mode !== 'incoming' ? { ...busCall, mode: 'on_hold' } : busCall;
+    if (activeCallStatus !== 'idle' && activeCallMeta) {
+      return {
+        callSid: activeCallMeta.callSid, callerNumber: activeCallMeta.phoneNumber, callerName: activeCallMeta.contactName,
+        upcomingBookings: [], mode: isOnHold ? 'on_hold' : activeCallStatus,
+      };
+    }
+    return null;
+  }, [incomingCallAlert, busCall, activeCallStatus, activeCallMeta, isOnHold]);
+
+  useEffect(() => {
+    if (!effectiveCall || effectiveCall.mode === 'incoming') return;
+    const t = setInterval(() => setLocalDuration((d) => d + 1), 1000);
+    return () => clearInterval(t);
+  }, [effectiveCall?.mode, effectiveCall?.callerNumber]);
+
+  const callerMeta = useMemo(() => {
+    if (!effectiveCall) return null;
+    const rawNum = effectiveCall.callerNumber || '';
+    const norm = normalizePhone(rawNum);
+    const contact = rawNum ? getContactService().getContactByPhone(rawNum) : null;
+    const drv = norm ? drivers.find((d) => normalizePhone(d.phone || '') === norm) : undefined;
+    const matchedTrip = norm
+      ? trips.find((t) => normalizePhone(t.passenger?.phone || '') === norm && !['completed', 'cancelled', 'declined'].includes(String(t.status)))
+      : undefined;
+    const displayPhone = rawNum ? formatDisplayPhone(rawNum) : '';
+    const resolvedName =
+      contact?.name ||
+      (drv ? `${drv.name}${drv.cabNumber ? ` (#${drv.cabNumber})` : ''}` : '') ||
+      (effectiveCall.callerName && effectiveCall.callerName !== rawNum ? effectiveCall.callerName : '') ||
+      (matchedTrip ? `${matchedTrip.passenger?.firstName || ''} ${matchedTrip.passenger?.lastName || ''}`.trim() : '') ||
+      displayPhone || 'Caller';
+    return {
+      callerNumber: rawNum, displayPhone, callerName: resolvedName,
+      isVip: Boolean(contact?.isVip || effectiveCall.vipTag),
+      isBlacklisted: Boolean(contact?.isBlacklisted),
+      isDriver: Boolean(drv), contact, upcomingTrip: matchedTrip,
     };
-  }, [activeCall, callState]);
+  }, [effectiveCall, drivers, trips]);
 
-  // Connected call duration timer
+  const isIncoming = effectiveCall?.mode === 'incoming';
+  const isSwitchedToOtherDock = activeDockTab === 'email' || activeDockTab === 'drivers' || activeDockTab === 'alerts';
+  const defaultFlydownOpen = isIncoming ? true : !isPhoneDockActive && !isSwitchedToOtherDock;
+  const showFlydown = Boolean(effectiveCall && (flydownOverride !== null ? flydownOverride : defaultFlydownOpen));
+
   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-    if (activeCall && callState === 'connected') {
-      timer = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-      }, 1000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
+    if (!showFlydown) return;
+    const onOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setFlydownOverride(false);
     };
-  }, [activeCall, callState]);
+    document.addEventListener('mousedown', onOutside);
+    return () => document.removeEventListener('mousedown', onOutside);
+  }, [showFlydown]);
 
-  // Dismiss HUD when clicking outside
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setShowInboundFlydown(false);
-      }
-    }
-    if (showInboundFlydown) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showInboundFlydown]);
+  if (effectiveCall && !isIncoming && isKeypadTabVisible) return null;
 
-  // Handle answering call: sets connected, publishes to bus, and opens phone dock
-  const handleAnswer = () => {
-    if (!activeCall) return;
-    setCallState('connected');
-    workspaceBus.publish('CALL_ANSWERED', {
-      callSid: activeCall.callSid,
-      callerNumber: activeCall.callerNumber,
-    });
-    if (onOpenComms) {
-      onOpenComms('phone', activeCall.callerNumber);
-    }
+  if (!effectiveCall || !callerMeta) {
+    return (
+      <div className={`relative inline-flex items-center ${hideIdleButtonOnDesktop ? 'lg:hidden' : ''}`} ref={containerRef}>
+        <button
+          type="button" onClick={onTogglePhoneDock} title="Phone & Messages Hub (Alt+P)" aria-label="Phone"
+          className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
+            isPhoneDockActive ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
+          }`}
+        >
+          <PhoneIcon className="w-4 h-4" />
+          {missedCallsCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs">{missedCallsCount}</span>
+          )}
+        </button>
+      </div>
+    );
+  }
+
+  const effectiveSecs = propCallDuration > 0 ? propCallDuration : activeCallMeta?.duration ?? localDuration;
+  const timerLabel = formatHudCallTimer(effectiveSecs);
+
+  const openKeypadInDock = () => {
+    onOpenComms?.('phone', callerMeta.callerNumber);
+    workspaceBus.publish('OPEN_SOFTPHONE_KEYPAD', {});
+    setFlydownOverride(false);
   };
 
-  // Handle ending call
-  const handleEndCall = () => {
-    if (!activeCall) return;
-    workspaceBus.publish('CALL_ENDED', {
-      durationSeconds: callDuration,
-      callSid: activeCall.callSid,
-    });
-    setActiveCall(null);
-    setShowInboundFlydown(false);
-  };
-
-  // Handle pre-populating booking form from caller CRM
-  const handleNewBooking = () => {
-    if (!activeCall) return;
+  const handleBook = () => {
+    const c = callerMeta.contact;
     const payload = {
-      passengerName: activeCall.callerName === 'Unregistered Caller' ? '' : activeCall.callerName,
-      passengerPhone: activeCall.mobileForSms,
-      phone: activeCall.mobileForSms,
-      callingFromPhone: activeCall.callerNumber,
-      pickupAddress:
-        activeCall.upcomingBookings.length > 0
-          ? activeCall.upcomingBookings[0].pickupAddress
-          : '',
-      notes: `Inbound Call via ${activeCall.numberType.toUpperCase()} line (${activeCall.callerNumber}). SMS updates routed to ${activeCall.mobileForSms}.`,
+      passengerName: c?.name || (callerMeta.callerName !== callerMeta.displayPhone ? callerMeta.callerName : ''),
+      passengerPhone: c?.phone || callerMeta.callerNumber, phone: c?.phone || callerMeta.callerNumber,
+      passengerEmail: c?.email || '', pickupAddress: c?.homeAddress || effectiveCall.upcomingBookings[0]?.pickupAddress || '',
+      dropoffAddress: c?.workAddress && c?.homeAddress ? c.workAddress : '',
+      corporateAccount: c?.corporateAccountName || '', billingPo: c?.defaultPoNumber || '',
     };
-
-    // Publish once on WorkspaceBus (avoid double-firing with onPopulateBooking which duplicated notes)
     workspaceBus.publish('POPULATE_BOOKING', payload);
-    if (onOpenBooking) onOpenBooking();
-    setShowInboundFlydown(false);
+    onPopulateBooking?.(payload);
+    onOpenBooking?.();
+    setFlydownOverride(false);
   };
 
-  // Handle Quick Text to caller's mobile
-  const handleQuickText = () => {
-    if (!activeCall) return;
-    if (onOpenComms) {
-      onOpenComms('messages', activeCall.mobileForSms);
-    }
-    setShowInboundFlydown(false);
-  };
-
-  // Handle routing caller to voicemail
-  const handleSendVoicemail = () => {
-    if (!activeCall) return;
-    workspaceBus.publish('CALL_ENDED', {
-      callSid: activeCall.callSid,
+  const handleOpenTrips = () => {
+    workspaceBus.publish('OPEN_CLIENT_PROFILE', {
+      phone: callerMeta.callerNumber || undefined, email: callerMeta.contact?.email || undefined,
+      name: callerMeta.callerName || undefined, initialTab: 'trips', source: 'header_call_hud',
     });
-    setActiveCall(null);
-    setShowInboundFlydown(false);
+    setFlydownOverride(false);
   };
 
-  // Diagnostic simulator for dispatcher testing
-  const handleSimulateInboundCall = () => {
-    const matched = matchPassengerByPhone('(314) 532-1200');
-    const passenger = matched ? matched.passenger : DEFAULT_PASSENGER_ACCOUNT;
-    const smsCell = resolvePrimarySmsPhone(passenger);
-
-    const upcoming: UpcomingBookingPreview[] = [
-      {
-        id: 'bk-994',
-        time: 'Tomorrow 6:00 AM',
-        pickupAddress: '14848 Conway Rd, Chesterfield, MO',
-        dropoffAddress: 'Lambert Airport Terminal 1 (STL)',
-        fare: 68.5,
-      },
-    ];
-
-    workspaceBus.publish('CALL_INCOMING', {
-      callSid: `CA_${Date.now()}`,
-      callerNumber: '(314) 532-1200',
-      callerName: `${passenger.firstName} ${passenger.lastName}`,
-      numberType: 'home',
-      mobileForSms: smsCell,
-      upcomingBookings: upcoming,
-      vipTag: 'VIP Executive',
-    });
+  const handleAnswer = () => {
+    workspaceBus.publish('ANSWER_INCOMING_CALL', {});
+    onDismissIncomingCallAlert?.();
+    setBusCall((prev) => (prev ? { ...prev, mode: 'connected' } : null));
   };
 
-  const formatSecs = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  const handleDecline = () => {
+    workspaceBus.publish('REJECT_INCOMING_CALL', {});
+    onDismissIncomingCallAlert?.();
+    setBusCall(null);
+    setFlydownOverride(null);
   };
+
+  const handleToggleMute = () => {
+    const next = !isMuted;
+    setIsMuted(next);
+    workspaceBus.publish('TOGGLE_CALL_MUTE', { muted: next });
+  };
+
+  const handleEndCall = () => {
+    workspaceBus.publish('CALL_ENDED', { durationSeconds: effectiveSecs, callSid: effectiveCall.callSid });
+    setBusCall(null); setShowDtmfKeypad(false); setFlydownOverride(null);
+  };
+
+  const hudStateAttr = isIncoming ? 'incoming' : !isPhoneDockActive && !isSwitchedToOtherDock ? 'active-dock-closed' : 'active-compact';
 
   return (
-    <div
-      className={`relative inline-flex items-center gap-1.5 ${
-        !activeCall && hideIdleButtonOnDesktop ? 'lg:hidden' : ''
-      }`}
-      ref={containerRef}
-    >
-      {/* RESTING STATE: Phone Icon Button with Missed Counter */}
-      {!activeCall ? (
-        <div className="relative">
-          <button
-            type="button"
-            onClick={onTogglePhoneDock}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
-              isPhoneDockActive
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
-            }`}
-            title="Phone Hub & Dialpad (Alt+P)"
-            aria-label="Phone"
-          >
-            <PhoneIcon className="w-4 h-4" />
-            {missedCallsCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
-                {missedCallsCount}
+    <div className="relative inline-flex items-center gap-1" ref={containerRef} data-call-hud-state={hudStateAttr}>
+      <div className="inline-flex items-center rounded-xl bg-emerald-600 text-white shadow-md border border-emerald-500 overflow-hidden">
+        <button type="button" data-call-hud-pill="true" onClick={() => setFlydownOverride(!showFlydown)} title="Toggle call controls flydown" className="px-2.5 py-1.5 text-xs font-extrabold hover:bg-emerald-500 transition-colors cursor-pointer inline-flex items-center gap-1.5">
+          <PhoneIcon className={`w-3.5 h-3.5 shrink-0 ${isIncoming ? 'animate-bounce' : ''}`} />
+          <span className="truncate max-w-[180px]">{isIncoming ? `Inbound · ${callerMeta.callerName}` : `● ${timerLabel} · ${callerMeta.callerName}`}</span>
+        </button>
+        {!isIncoming && (
+          <button type="button" data-maximize-keypad-btn="true" onClick={(e) => { e.stopPropagation(); openKeypadInDock(); }} title="Maximize to Phone Keypad" aria-label="Maximize to Phone Keypad" className="px-2 py-1.5 border-l border-emerald-500/70 hover:bg-emerald-500 text-emerald-50 cursor-pointer">
+            <ExternalLinkIcon className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {showFlydown && (
+        <div data-call-hud-flydown="true" className="absolute right-0 top-full mt-2 w-80 sm:w-92 bg-slate-950 text-white rounded-2xl shadow-2xl border border-emerald-500/80 z-50 overflow-hidden">
+          <div className="px-3 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-400">{isIncoming ? 'Incoming Call' : 'Call in Progress'}</span>
+            <button type="button" onClick={() => setFlydownOverride(false)} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer" title="Minimize"><XIcon className="w-3.5 h-3.5" /></button>
+          </div>
+
+          <div className="p-3 space-y-2.5 text-xs">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-black text-sm text-white truncate">{callerMeta.callerName}</span>
+                  {callerMeta.isBlacklisted && <span className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9px] font-black uppercase">Blocked</span>}
+                  {callerMeta.isVip && <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 text-[9px] font-black uppercase">VIP</span>}
+                  {callerMeta.isDriver && <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[9px] font-bold">Driver</span>}
+                </div>
+                {callerMeta.displayPhone && <p className="font-mono text-[11px] text-slate-400">{callerMeta.displayPhone}</p>}
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 font-mono font-bold text-[11px] shrink-0">
+                {isIncoming ? 'Ringing...' : effectiveCall.mode === 'calling' ? 'Calling...' : timerLabel}
               </span>
-            )}
-          </button>
-        </div>
-      ) : (
-        /* INCOMING / IN-CALL STATE: Emerald Pulsing Pill */
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setShowInboundFlydown((prev) => !prev)}
-            className="text-xs font-extrabold text-white px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 border border-emerald-400 ring-2 ring-emerald-300 animate-pulse transition-all cursor-pointer flex items-center gap-2 shadow-md"
-            title="Incoming call active - click to open flydown"
-          >
-            <PhoneIcon className="w-3.5 h-3.5 animate-bounce" />
-            <span>
-              {callState === 'connected'
-                ? `Active: ${activeCall.callerName} (${formatSecs(callDuration)})`
-                : `Inbound: ${activeCall.callerName}`}
-            </span>
-          </button>
-
-          {/* INBOUND CALL FLYDOWN (Anchored Directly Below Green Pill) */}
-          {showInboundFlydown && (
-            <div className="absolute right-0 mt-2 w-84 sm:w-96 bg-slate-950 text-white rounded-2xl shadow-2xl border-2 border-emerald-500 ring-4 ring-emerald-500/20 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-              {/* Header */}
-              <div className="p-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                  <span className="font-extrabold text-xs uppercase tracking-wider text-slate-200">
-                    {callState === 'connected' ? 'Call in Progress' : 'Inbound Screen Pop'}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowInboundFlydown(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                  title="Dismiss HUD"
-                >
-                  <XIcon className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="p-4 space-y-3.5">
-                {/* Caller Profile */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-2.5 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                      <PhoneIcon className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-black text-sm text-white truncate">
-                          {activeCall.callerName}
-                        </span>
-                        {activeCall.vipTag && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 font-black shrink-0">
-                            ⭐ {activeCall.vipTag}
-                          </span>
-                        )}
-                      </div>
-                      {/* Compact Phone Icons (Home & Mobile) */}
-                      <div className="flex items-center gap-3 text-xs text-slate-300 font-mono mt-1 flex-wrap">
-                        <div className="flex items-center gap-1" title="Calling line (Landline/Home)">
-                          <HomeModernIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="font-semibold">{activeCall.callerNumber}</span>
-                        </div>
-                        {activeCall.mobileForSms && (
-                          <div className="flex items-center gap-1 text-cyan-300" title="Primary SMS Mobile">
-                            <DevicePhoneMobileIcon className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                            <span className="font-semibold">{activeCall.mobileForSms}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-800/80 px-2 py-0.5 rounded-full shrink-0">
-                    {callState === 'connected' ? formatSecs(callDuration) : 'Ringing...'}
-                  </span>
-                </div>
-
-                {/* Clickable Upcoming Reservation Preview */}
-                {activeCall.upcomingBookings.length > 0 && (
-                  <div
-                    onClick={() => {
-                      if (onOpenEditTrip) {
-                        onOpenEditTrip(activeCall.upcomingBookings[0].id);
-                      }
-                      setShowInboundFlydown(false);
-                    }}
-                    className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800/90 border border-slate-700/80 hover:border-blue-400 transition-all cursor-pointer flex items-center justify-between text-xs group"
-                    title="Click to open trip in edit tab"
-                  >
-                    <div className="flex items-center gap-2 text-slate-300 min-w-0">
-                      <CalendarIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span className="font-bold text-white shrink-0">Upcoming:</span>
-                      <span className="truncate text-slate-300 font-medium">
-                        {activeCall.upcomingBookings[0].time} to{' '}
-                        {activeCall.upcomingBookings[0].dropoffAddress}
-                      </span>
-                    </div>
-                    <span className="font-mono font-bold text-emerald-400 text-[11px] group-hover:underline shrink-0 ml-2">
-                      Open Edit →
-                    </span>
-                  </div>
-                )}
-
-                {/* Active Connected Call In-Flight Controls */}
-                {callState !== 'incoming' ? (
-                  <div className="pt-2 border-t border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsMuted(!isMuted)}
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          isMuted
-                            ? 'bg-amber-600 text-white'
-                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
-                        }`}
-                      >
-                        {isMuted ? '🔇 Muted' : '🎤 Mute'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCallState((prev) => (prev === 'connected' ? 'on_hold' : 'connected'))
-                        }
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          callState === 'on_hold'
-                            ? 'bg-amber-500 text-slate-950 font-black'
-                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
-                        }`}
-                      >
-                        {callState === 'on_hold' ? '⏸ On Hold' : 'Hold'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleEndCall}
-                        className="flex-1 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow-md transition-all cursor-pointer"
-                      >
-                        End Call
-                      </button>
-                    </div>
-
-                    <div className="pt-2 flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (onOpenComms) onOpenComms('phone', activeCall.callerNumber);
-                          setShowInboundFlydown(false);
-                        }}
-                        className="flex-1 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                        title="Expand call to Phone Dock"
-                      >
-                        <PhoneIcon className="w-3.5 h-3.5" />
-                        <span>Open Phone</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleNewBooking}
-                        className="flex-1 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        <PlusIcon className="w-3.5 h-3.5" />
-                        <span>New Booking</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleQuickText}
-                        className="flex-1 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        <DevicePhoneMobileIcon className="w-3.5 h-3.5" />
-                        <span>Text</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* Incoming 4 Action Buttons */
-                  <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-800">
-                    <button
-                      type="button"
-                      onClick={handleAnswer}
-                      className="px-2 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-xs flex flex-col items-center justify-center gap-1 active:scale-95 cursor-pointer"
-                      title="Answer call inline inside HUD"
-                    >
-                      <PhoneIcon className="w-3.5 h-3.5" />
-                      <span>Answer</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleNewBooking}
-                      className="px-2 py-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-xl shadow-xs flex flex-col items-center justify-center gap-1 active:scale-95 cursor-pointer"
-                      title="Create new booking pre-filled with caller CRM data"
-                    >
-                      <PlusIcon className="w-3.5 h-3.5" />
-                      <span>New Booking</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleQuickText}
-                      className="px-2 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-black text-xs rounded-xl shadow-xs flex flex-col items-center justify-center gap-1 active:scale-95 cursor-pointer"
-                      title="Send SMS text to caller's mobile number"
-                    >
-                      <DevicePhoneMobileIcon className="w-3.5 h-3.5" />
-                      <span>Text</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleSendVoicemail}
-                      className="px-2 py-2 bg-rose-950/60 hover:bg-rose-900 border border-rose-800/60 text-rose-300 hover:text-white font-black text-xs rounded-xl shadow-xs flex flex-col items-center justify-center gap-1 active:scale-95 cursor-pointer"
-                      title="Route caller directly to voicemail"
-                    >
-                      <span className="text-xs">🔴</span>
-                      <span>Voicemail</span>
-                    </button>
-                  </div>
-                )}
-              </div>
             </div>
-          )}
+
+            {callerMeta.upcomingTrip && onOpenEditTrip && (
+              <button type="button" onClick={() => { onOpenEditTrip(callerMeta.upcomingTrip!.id); setFlydownOverride(false); }} className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 flex items-center justify-between gap-2 text-[11px] cursor-pointer">
+                <span className="inline-flex items-center gap-1.5 truncate text-slate-200"><CalendarIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" /><span className="truncate">Upcoming #{callerMeta.upcomingTrip.id.slice(-6).toUpperCase()}</span></span>
+                <span className="text-emerald-400 font-bold shrink-0">Edit →</span>
+              </button>
+            )}
+
+            {isIncoming ? (
+              <div className="space-y-2 pt-1 border-t border-slate-800">
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={handleAnswer} className="py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black inline-flex items-center justify-center gap-1.5 cursor-pointer"><PhoneIcon className="w-3.5 h-3.5" /><span>Answer</span></button>
+                  <button type="button" onClick={handleDecline} className="py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black inline-flex items-center justify-center gap-1.5 cursor-pointer"><PhoneOffIcon className="w-3.5 h-3.5" /><span>Decline</span></button>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button type="button" onClick={handleBook} className="py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold inline-flex items-center justify-center gap-1 cursor-pointer"><PlusIcon className="w-3 h-3" /><span>Book</span></button>
+                  <button type="button" onClick={handleOpenTrips} className="py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold inline-flex items-center justify-center gap-1 cursor-pointer"><CarIcon className="w-3 h-3 text-blue-400" /><span>Trips</span></button>
+                  <button type="button" onClick={openKeypadInDock} className="py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold inline-flex items-center justify-center gap-1 cursor-pointer"><PhoneIcon className="w-3 h-3 text-emerald-400" /><span>Phone Dock</span></button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2 pt-1 border-t border-slate-800">
+                {showDtmfKeypad && (
+                  <div className="grid grid-cols-3 gap-1 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
+                    {DTMF_KEYS.map((digit) => (
+                      <button key={digit} type="button" onClick={() => workspaceBus.publish('SEND_CALL_DTMF', { digit })} className="py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-mono font-bold text-xs cursor-pointer">{digit}</button>
+                    ))}
+                  </div>
+                )}
+                <div className="grid grid-cols-4 gap-1.5">
+                  <button type="button" onClick={handleToggleMute} className={`py-1.5 rounded-xl font-bold flex flex-col items-center gap-0.5 text-[11px] cursor-pointer ${isMuted ? 'bg-amber-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'}`}>
+                    {isMuted ? <MicOffIcon className="w-3.5 h-3.5" /> : <MicIcon className="w-3.5 h-3.5" />}<span>{isMuted ? 'Unmute' : 'Mute'}</span>
+                  </button>
+                  <button type="button" onClick={() => setIsOnHold((v) => !v)} className={`py-1.5 rounded-xl font-bold flex flex-col items-center gap-0.5 text-[11px] cursor-pointer ${effectiveCall.mode === 'on_hold' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'}`}>
+                    {effectiveCall.mode === 'on_hold' ? <PlayIcon className="w-3.5 h-3.5" /> : <PauseIcon className="w-3.5 h-3.5" />}<span>Hold</span>
+                  </button>
+                  <button type="button" onClick={() => setShowDtmfKeypad((v) => !v)} className={`py-1.5 rounded-xl font-bold flex flex-col items-center gap-0.5 text-[11px] cursor-pointer ${showDtmfKeypad ? 'bg-blue-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'}`}>
+                    <KeypadGridIcon className="w-3.5 h-3.5" /><span>Keypad</span>
+                  </button>
+                  <button type="button" onClick={handleEndCall} className="py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold flex flex-col items-center gap-0.5 text-[11px] cursor-pointer">
+                    <PhoneOffIcon className="w-3.5 h-3.5" /><span>End Call</span>
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button type="button" onClick={handleBook} className="py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold inline-flex items-center justify-center gap-1 cursor-pointer"><PlusIcon className="w-3 h-3" /><span>Book</span></button>
+                  <button type="button" onClick={handleOpenTrips} className="py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold inline-flex items-center justify-center gap-1 cursor-pointer"><CarIcon className="w-3 h-3 text-blue-400" /><span>Trips</span></button>
+                  <button type="button" onClick={openKeypadInDock} className="py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold inline-flex items-center justify-center gap-1 cursor-pointer"><PhoneIcon className="w-3 h-3" /><span>Open Phone Dock</span></button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
