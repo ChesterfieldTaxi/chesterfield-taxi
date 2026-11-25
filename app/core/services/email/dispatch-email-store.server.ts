@@ -94,10 +94,11 @@ export interface EmailHttpHandlerOptions {
 
 export function makeEnvReader(envOverride?: Record<string, string | undefined>) {
   return (key: string): string => {
-    if (envOverride && key in envOverride) {
-      return String(envOverride[key] ?? '').trim();
-    }
-    return String(process.env[key] ?? '').trim();
+    const raw =
+      envOverride && key in envOverride
+        ? String(envOverride[key] ?? '')
+        : String(process.env[key] ?? '');
+    return raw.trim().replace(/^["']|["']$/g, '').trim();
   };
 }
 

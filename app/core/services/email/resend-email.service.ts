@@ -55,13 +55,21 @@ function getEnv(key: string): string | undefined {
     (typeof process !== 'undefined' && process.env) ||
     (typeof globalThis !== 'undefined' && (globalThis as any).process?.env);
   if (envSource && envSource[key]) {
-    return envSource[key];
+    const cleaned = String(envSource[key]).trim().replace(/^["']|["']$/g, '').trim();
+    return cleaned || undefined;
   }
   return undefined;
 }
 
+function isServerRuntime(): boolean {
+  if (typeof window !== 'undefined') return false;
+  if (typeof process !== 'undefined' && process.env?.VITE_CLIENT_BUILD === '1') return false;
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.SSR === false) return false;
+  return true;
+}
+
 async function loadServerEmailTemplates() {
-  if (typeof window === 'undefined' && process.env.VITE_CLIENT_BUILD !== '1') {
+  if (isServerRuntime()) {
     return import('./email-templates');
   }
   return null;
@@ -112,7 +120,7 @@ export class ResendEmailService implements IEmailDispatchService {
   private async getServerResendClient(): Promise<Resend | null> {
     if (this.resendClient) return this.resendClient;
     if (!this.apiKey || this.fetchImpl) return null;
-    if (typeof window === 'undefined' && process.env.VITE_CLIENT_BUILD !== '1') {
+    if (isServerRuntime()) {
       try {
         const { Resend: ResendCtor } = await import('resend');
         this.resendClient = new ResendCtor(this.apiKey);

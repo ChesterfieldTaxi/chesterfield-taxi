@@ -57,7 +57,10 @@ export async function sendDispatchContextualTripEmail(params: {
         ? new Date(targetTrip.actualPickupTime || targetTrip.scheduledPickupTime!).toLocaleString()
         : 'Immediate Ride (ASAP)';
 
-    let result: { success: boolean; error?: string } = { success: false, error: 'Unsupported email action' };
+    let result: { success: boolean; simulated?: boolean; error?: string } = {
+      success: false,
+      error: 'Unsupported email action',
+    };
 
     if (metaInfo.kind === 'receipt') {
       const subtotalFare = targetTrip.pricing?.totalFare ?? 0;
@@ -195,6 +198,13 @@ export async function sendDispatchContextualTripEmail(params: {
       const errMsg = result.error || `Failed to send ${metaInfo.shortLabel.toLowerCase()}.`;
       onAlert?.({ type: 'error', message: errMsg });
       onToast(errMsg, 'error');
+      return;
+    }
+
+    if (result.simulated) {
+      const simMsg = `Email simulated only (RESEND_API_KEY not configured on server) for ${recipientEmail}.`;
+      onAlert?.({ type: 'error', message: simMsg });
+      onToast(simMsg, 'info');
       return;
     }
 

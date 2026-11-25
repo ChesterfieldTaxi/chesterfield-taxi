@@ -3438,7 +3438,12 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                 },
               });
 
-              if (emailResult.success) {
+              if (emailResult.success && emailResult.simulated) {
+                bookingFeedback = {
+                  emailToastType: 'info',
+                  emailToastText: `Trip confirmed — email simulated only (RESEND_API_KEY not configured on server) for ${emailResolution.recipientEmail}`,
+                };
+              } else if (emailResult.success) {
                 bookingFeedback = {
                   emailToastType: 'success',
                   emailToastText: `Confirmation emailed to ${emailResolution.recipientEmail}`,
