@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { authorizedFetch } from '../../../../core/services/auth/auth-headers';
 import {
   buildUnifiedCommsThreadSummaries,
@@ -28,15 +28,22 @@ import { playInboundSmsChime } from './useTwilioSoftphoneDevice';
 
 const INITIAL_INTERACTIONS: InteractionEvent[] = [];
 
+function sortInteractionsDesc(items: InteractionEvent[]): InteractionEvent[] {
+  return [...items].sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
+}
+
 function filterLegacySeedInteractions(items: unknown[]): InteractionEvent[] {
-  return (items as InteractionEvent[]).filter(
+  const cleaned = (items as InteractionEvent[]).filter(
     (p: any) =>
       p &&
       !p?.snippet?.includes('Thank you for contacting our dispatch desk') &&
       !p?.id?.startsWith('sms_seed_') &&
       !p?.id?.startsWith('int-') &&
+      !p?.id?.startsWith('rec_') &&
+      p?.contactName !== 'Recorded Call' &&
       p?.contactPhone !== '+13145551234'
   );
+  return sortInteractionsDesc(cleaned);
 }
 
 function readStoredInteractionsClientOnly(): InteractionEvent[] {
@@ -47,8 +54,12 @@ function readStoredInteractionsClientOnly(): InteractionEvent[] {
     const stored = localStorage.getItem(STORAGE_KEY_INTERACTIONS);
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return filterLegacySeedInteractions(parsed);
+      if (Array.isArray(parsed)) {
+        const cleaned = filterLegacySeedInteractions(parsed);
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem(STORAGE_KEY_INTERACTIONS, JSON.stringify(cleaned.slice(0, 100)));
+        }
+        return cleaned;
       }
     }
   } catch {
@@ -102,7 +113,13 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
   const workspaceBus = getWorkspaceBus();
 
   // SSR-deterministic initializers — localStorage & service snapshots hydrate inside useEffect
-  const [interactions, setInteractions] = useState<InteractionEvent[]>(INITIAL_INTERACTIONS);
+  const [interactions, setInteractionsRaw] = useState<InteractionEvent[]>(INITIAL_INTERACTIONS);
+  const setInteractions: Dispatch<SetStateAction<InteractionEvent[]>> = useCallback((updater) => {
+    setInteractionsRaw((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return next === prev ? prev : sortInteractionsDesc(next);
+    });
+  }, []);
   const [commsThreads, setCommsThreads] = useState<CommsThread[]>([]);
   const hasHydratedStorageRef = useRef(false);
 
@@ -157,10 +174,10 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
         const base = storedItems.length > 0 && prev.length === 0 ? storedItems : prev;
         const combined =
           prev.length > 0 && storedItems.length > 0
-            ? Array.from(
-                new Map([...storedItems, ...prev].map((i) => [i.id, i])).values()
-              ).sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0))
-            : base;
+            ? sortInteractionsDesc(
+                Array.from(new Map([...storedItems, ...prev].map((i) => [i.id, i])).values())
+              )
+            : sortInteractionsDesc(base);
         return mergeAdaptedEventsWithInteractions(combined, initialThreads, initialEvents);
       });
     }
@@ -266,7 +283,7 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
                 isUnread: v.isUnread ?? true,
               }));
             if (newVms.length === 0) return prev;
-            return [...newVms, ...prev];
+            return sortInteractionsDesc([...newVms, ...prev]);
           });
         }
       }
@@ -404,64 +421,19 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
               return item;
             });
 
-            const existingRecSids = new Set(updated.map((u) => u.recordingSid).filter(Boolean));
-            const unattached: InteractionEvent[] = recData.recordings
-              .filter((r: any) => !existingRecSids.has(r.sid))
-              .map((r: any) => ({
-                id: `rec_${r.sid}`,
-                type: 'call_inbound' as const,
-                contactName: 'Recorded Call',
-                contactPhone: '+13147391800',
-                contactType: 'passenger' as const,
-                recordingSid: r.sid,
-                audioDuration: r.duration,
-                durationSeconds: r.durationSeconds,
-                audioUrl: r.audioUrl,
-                timestamp: r.dateCreated
-                  ? new Date(r.dateCreated).toLocaleTimeString([], {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })
-                  : 'Recent',
-                timestampMs: r.dateCreated ? new Date(r.dateCreated).getTime() : Date.now(),
-                snippet: `Call Recording (${r.duration})`,
-                isUnread: false,
-              }));
-
-            if (!anyRecAttached && unattached.length === 0) return prev;
-            return [...unattached, ...updated];
+            if (!anyRecAttached) return prev;
+            return sortInteractionsDesc(updated);
           });
         }
       }
     } catch {
-      // Tolerated offline/background polling error
+      // Tolerated offline/background fetch error
     }
   };
 
-  // Poll every 12s when visible, 40s when hidden, and pause when document is backgrounded
-  const isVisibleRef = useRef(isVisible);
-  isVisibleRef.current = isVisible;
+  // Hydrate telephony once on initial open + on CommsHub visibility transition (live Firestore handles realtime updates)
   const lastTelephonyFetchRef = useRef<number>(0);
 
-  useEffect(() => {
-    const runFetchIfEligible = (force = false) => {
-      if (typeof document !== 'undefined' && document.hidden) return;
-      const now = Date.now();
-      const minGap = isVisibleRef.current ? 10_000 : 40_000;
-      if (!force && now - lastTelephonyFetchRef.current < minGap) return;
-      lastTelephonyFetchRef.current = now;
-      void fetchTelephonyData();
-    };
-
-    runFetchIfEligible(true);
-    const interval = setInterval(() => {
-      runFetchIfEligible(false);
-    }, 12_000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Immediately refresh once when dispatcher opens CommsHub
   useEffect(() => {
     if (isVisible) {
       const now = Date.now();

@@ -21,6 +21,10 @@ import {
 } from '../auth/server-auth.server';
 import { isFirebaseConfigured } from '../firebase';
 import { flushAndSyncCommsServer } from './comms-thread.server';
+import {
+  resolveTelephonyInboundMode,
+  type TelephonyInboundMode,
+} from './telephony-twiml.util';
 
 export type TelephonyActionName =
   | 'make_call'
@@ -29,6 +33,7 @@ export type TelephonyActionName =
   | 'call_status_callback'
   | 'get_voice_token'
   | 'voice_client_twiml'
+  | 'voice_dial_status'
   | 'send_sms'
   | 'verify_credentials'
   | 'save_credentials'
@@ -54,6 +59,7 @@ export interface TelephonyApiRequest {
   identity?: string;
   operatorPhone?: string;
   forwardingPhone?: string;
+  isTestCall?: boolean;
   customTwiml?: string;
   recordingSid?: string;
   tripId?: string;
@@ -63,6 +69,8 @@ export interface TelephonyApiRequest {
     accountSid?: string;
     authToken?: string;
     phoneNumber?: string;
+    bridgePhoneNumber?: string;
+    inboundMode?: TelephonyInboundMode;
     apiKeySid?: string;
     apiKeySecret?: string;
     twimlAppSid?: string;
@@ -141,6 +149,7 @@ export const TWILIO_WEBHOOK_ACTIONS = new Set<string>([
   'call_status_callback',
   'call_recording_status',
   'voice_client_twiml',
+  'voice_dial_status',
 ]);
 
 export const DISPATCHER_ONLY_TELEPHONY_ACTIONS = new Set<string>([
@@ -174,6 +183,8 @@ export interface ResolvedTelephonyCredentials {
   accountSid: string;
   authToken: string;
   phoneNumber: string;
+  bridgePhoneNumber?: string;
+  inboundMode?: TelephonyInboundMode;
   forwardingPhone: string;
   apiKeySid: string;
   apiKeySecret: string;
@@ -251,9 +262,33 @@ function resolveCandidateWebhookUrls(request?: Request, explicitUrl?: string): s
   const pushUnique = (u?: string) => {
     if (u && !candidates.includes(u)) candidates.push(u);
   };
+  const pushWithApexWwwVariant = (rawUrl?: string) => {
+    if (!rawUrl) return;
+    pushUnique(rawUrl);
+    try {
+      const parsedUrl = new URL(rawUrl);
+      const hostname = parsedUrl.hostname.toLowerCase();
+      if (
+        hostname &&
+        hostname.includes('.') &&
+        !/^\d+\.\d+\.\d+\.\d+$/.test(hostname) &&
+        !hostname.startsWith('[')
+      ) {
+        const altHostname = hostname.startsWith('www.') ? hostname.slice(4) : `www.${hostname}`;
+        if (altHostname.includes('.')) {
+          const portSuffix = parsedUrl.port ? `:${parsedUrl.port}` : '';
+          pushUnique(
+            `${parsedUrl.protocol}//${altHostname}${portSuffix}${parsedUrl.pathname}${parsedUrl.search}`
+          );
+        }
+      }
+    } catch {
+      // Ignore malformed candidate URLs
+    }
+  };
 
   if (explicitUrl) {
-    pushUnique(explicitUrl);
+    pushWithApexWwwVariant(explicitUrl);
   }
 
   if (request) {
@@ -277,10 +312,10 @@ function resolveCandidateWebhookUrls(request?: Request, explicitUrl?: string): s
           host = host.slice(0, -3);
         }
 
-        pushUnique(`${proto}://${host}${parsed.pathname}${parsed.search}`);
+        pushWithApexWwwVariant(`${proto}://${host}${parsed.pathname}${parsed.search}`);
       }
 
-      pushUnique(request.url);
+      pushWithApexWwwVariant(request.url);
     } catch {
       pushUnique(request.url);
     }
@@ -593,6 +628,16 @@ export async function resolveCredentials(
     data?.credentials?.phoneNumber ||
     ''
   ).trim();
+  let bridgePhoneNumber = (
+    readEnv('TWILIO_BRIDGE_PHONE_NUMBER') ||
+    data?.credentials?.bridgePhoneNumber ||
+    ''
+  ).trim();
+  let rawInboundMode = (
+    readEnv('TWILIO_INBOUND_MODE') ||
+    data?.credentials?.inboundMode ||
+    ''
+  ).trim();
   let apiKeySid = (
     readEnv('TWILIO_API_KEY_SID') ||
     readEnv('TWILIO_API_KEY') ||
@@ -625,6 +670,8 @@ export async function resolveCredentials(
     (!accountSid ||
       !authToken ||
       !phoneNumber ||
+      !bridgePhoneNumber ||
+      !rawInboundMode ||
       !forwardingPhone ||
       !apiKeySid ||
       !apiKeySecret ||
@@ -640,6 +687,12 @@ export async function resolveCredentials(
           const sidMatch = content.match(/^TWILIO_ACCOUNT_SID\s*=\s*["']?([^"'\r\n]+)["']?/m);
           const tokenMatch = content.match(/^TWILIO_AUTH_TOKEN\s*=\s*["']?([^"'\r\n]+)["']?/m);
           const phoneMatch = content.match(/^TWILIO_PHONE_NUMBER\s*=\s*["']?([^"'\r\n]+)["']?/m);
+          const bridgePhoneMatch = content.match(
+            /^TWILIO_BRIDGE_PHONE_NUMBER\s*=\s*["']?([^"'\r\n]+)["']?/m
+          );
+          const inboundModeMatch = content.match(
+            /^TWILIO_INBOUND_MODE\s*=\s*["']?([^"'\r\n]+)["']?/m
+          );
           const apiKeyMatch = content.match(
             /^TWILIO_API_KEY(?:_SID)?\s*=\s*["']?([^"'\r\n]+)["']?/m
           );
@@ -657,6 +710,8 @@ export async function resolveCredentials(
           if (!accountSid && sidMatch) accountSid = sidMatch[1].trim();
           if (!authToken && tokenMatch) authToken = tokenMatch[1].trim();
           if (!phoneNumber && phoneMatch) phoneNumber = phoneMatch[1].trim();
+          if (!bridgePhoneNumber && bridgePhoneMatch) bridgePhoneNumber = bridgePhoneMatch[1].trim();
+          if (!rawInboundMode && inboundModeMatch) rawInboundMode = inboundModeMatch[1].trim();
           if (!apiKeySid && apiKeyMatch) apiKeySid = apiKeyMatch[1].trim();
           if (!apiKeySecret && apiSecretMatch) apiKeySecret = apiSecretMatch[1].trim();
           if (!twimlAppSid && twimlAppMatch) twimlAppSid = twimlAppMatch[1].trim();
@@ -668,7 +723,7 @@ export async function resolveCredentials(
     }
   }
 
-  if (!phoneNumber) {
+  if (!phoneNumber && !bridgePhoneNumber) {
     phoneNumber = '+13142281454';
   }
 
@@ -676,6 +731,10 @@ export async function resolveCredentials(
     accountSid,
     authToken,
     phoneNumber,
+    ...(bridgePhoneNumber ? { bridgePhoneNumber } : {}),
+    ...(rawInboundMode
+      ? { inboundMode: resolveTelephonyInboundMode(undefined, rawInboundMode, undefined) }
+      : {}),
     forwardingPhone,
     apiKeySid,
     apiKeySecret,

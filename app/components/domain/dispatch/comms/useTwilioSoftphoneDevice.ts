@@ -231,7 +231,9 @@ export function useTwilioSoftphoneDevice({
     };
   }, [callStatus]);
 
-  const requestVoiceToken = async (creds: ReturnType<typeof getClientTelephonyCredentials>) => {
+  const requestVoiceToken = async (
+    creds: ReturnType<typeof getClientTelephonyCredentials>
+  ): Promise<{ token: string | null; unconfigured?: boolean }> => {
     const tokenResp = await authorizedFetch('/api/telephony', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -241,10 +243,15 @@ export function useTwilioSoftphoneDevice({
         identity: 'dispatch_agent',
       }),
     });
-    if (!tokenResp.ok) return null;
-    const tokenData = (await tokenResp.json()) as { success?: boolean; token?: string };
-    if (!tokenData.success || !tokenData.token) return null;
-    return tokenData.token;
+    const tokenData = (await tokenResp.json().catch(() => ({}))) as {
+      success?: boolean;
+      configured?: boolean;
+      token?: string;
+    };
+    if (!tokenResp.ok || !tokenData.success || !tokenData.token) {
+      return { token: null, unconfigured: tokenData.configured === false };
+    }
+    return { token: tokenData.token };
   };
 
   // Lazy Twilio WebRTC Softphone Initializer + Automatic Token Refresh
@@ -254,17 +261,15 @@ export function useTwilioSoftphoneDevice({
     if (initWebRtcPromiseRef.current) return initWebRtcPromiseRef.current;
 
     const creds = getClientTelephonyCredentials();
-    if (!creds.accountSid || !creds.apiKeySid || !creds.apiKeySecret || !creds.twimlAppSid) {
-      if (isMountedRef.current) setSoftphoneStatus('unconfigured');
-      return null;
-    }
 
     const initPromise = (async () => {
       try {
         if (isMountedRef.current) setSoftphoneStatus('initializing');
-        const token = await requestVoiceToken(creds);
+        const { token, unconfigured } = await requestVoiceToken(creds);
         if (!token) {
-          if (isMountedRef.current) setSoftphoneStatus('error');
+          if (isMountedRef.current) {
+            setSoftphoneStatus(unconfigured ? 'unconfigured' : 'error');
+          }
           return null;
         }
 
@@ -284,9 +289,9 @@ export function useTwilioSoftphoneDevice({
         device.on('tokenWillExpire', async () => {
           try {
             const latestCreds = getClientTelephonyCredentials();
-            const refreshedToken = await requestVoiceToken(latestCreds);
-            if (refreshedToken && deviceRef.current === device) {
-              device.updateToken(refreshedToken);
+            const refreshed = await requestVoiceToken(latestCreds);
+            if (refreshed.token && deviceRef.current === device) {
+              device.updateToken(refreshed.token);
             }
           } catch (refreshErr) {
             console.warn('Twilio Voice token refresh failed:', refreshErr);
@@ -342,7 +347,14 @@ export function useTwilioSoftphoneDevice({
     return initPromise;
   };
 
-  // Twilio WebRTC Device lifecycle
+  // Twilio WebRTC Device lifecycle (also retries once Firebase staff user hydrates)
+  useEffect(() => {
+    isMountedRef.current = true;
+    if (user?.uid && !deviceRef.current) {
+      void ensureWebRtcDevice();
+    }
+  }, [user?.uid]);
+
   useEffect(() => {
     isMountedRef.current = true;
     void ensureWebRtcDevice();

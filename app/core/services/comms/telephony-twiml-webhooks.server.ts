@@ -9,7 +9,6 @@
  * `voicemail_transcription`) across both `GET` and `POST` webhook deliveries.
  */
 
-import twilio from 'twilio';
 import { formatDisplayPhone, sanitizeToE164 } from '../../utils/phone';
 import { getContactService } from '../customer/contact.service';
 import {
@@ -27,6 +26,16 @@ import {
   type TelephonyApiRequest,
   type TelephonyHttpHandlerOptions,
 } from './telephony-credentials.server';
+import {
+  TWIML_VOICE_WEBHOOK_ACTIONS,
+  buildIncomingCallTwiml,
+  buildOutboundClientCallTwiml,
+  buildVoiceDialStatusTwiml,
+  buildVoiceWebhookErrorTwiml,
+  resolveOutboundCallerId,
+  resolveTelephonyInboundMode,
+  type TelephonyInboundMode,
+} from './telephony-twiml.util';
 
 export async function handleTelephonyWebhookGet(params: {
   request: Request;
@@ -51,6 +60,18 @@ export async function handleTelephonyWebhookGet(params: {
       authToken: resolved.authToken,
     });
     if (!sigResult.valid) {
+      if (TWIML_VOICE_WEBHOOK_ACTIONS.has(action)) {
+        console.warn('[TelephonyWebhook] GET signature check failed:', {
+          action,
+          url: request.url,
+          code: sigResult.code,
+          error: sigResult.error,
+        });
+        return new Response(buildVoiceWebhookErrorTwiml(), {
+          status: 403,
+          headers: { 'Content-Type': 'text/xml' },
+        });
+      }
       return Response.json(
         { success: false, code: sigResult.code, error: sigResult.error },
         { status: sigResult.status }
@@ -102,30 +123,41 @@ export async function handleTelephonyWebhookGet(params: {
   }
 
   if (action === 'voice_client_twiml') {
-    const to = url.searchParams.get('To') || url.searchParams.get('to');
-    const callerId =
-      url.searchParams.get('FromNumber') ||
-      url.searchParams.get('CallerId') ||
-      url.searchParams.get('fromNumber') ||
-      url.searchParams.get('callerId') ||
-      resolved.phoneNumber;
-    const VoiceResponse = twilio.twiml.VoiceResponse;
-    const response = new VoiceResponse();
+    const rawTo = url.searchParams.get('To') || url.searchParams.get('to') || '';
+    const callerId = resolveOutboundCallerId({
+      fromNumber: url.searchParams.get('FromNumber') || url.searchParams.get('fromNumber'),
+      callerId: url.searchParams.get('CallerId') || url.searchParams.get('callerId'),
+      phoneNumber: resolved.phoneNumber,
+      bridgePhoneNumber: resolved.bridgePhoneNumber,
+    });
+    const formattedTo = rawTo.trim() ? sanitizeToE164(rawTo) : '';
+    const formattedCallerId = callerId ? sanitizeToE164(callerId) : '';
+    const twiml = buildOutboundClientCallTwiml({
+      to: formattedTo,
+      callerId: formattedCallerId || undefined,
+    });
 
-    if (to) {
-      const dial = response.dial({
-        callerId: callerId ? sanitizeToE164(callerId) : undefined,
-        record: 'record-from-answer',
-        recordingStatusCallback: '/api/telephony?action=call_recording_status',
-        recordingStatusCallbackEvent: ['completed'],
-        timeout: 30,
+    return new Response(twiml, {
+      headers: { 'Content-Type': 'text/xml' },
+    });
+  }
+
+  if (action === 'voice_dial_status') {
+    const dialCallStatus =
+      url.searchParams.get('DialCallStatus') ||
+      url.searchParams.get('dialCallStatus') ||
+      url.searchParams.get('CallStatus');
+    const errorCode =
+      url.searchParams.get('ErrorCode') ||
+      url.searchParams.get('DialSipResponseCode') ||
+      url.searchParams.get('errorCode');
+    if (String(dialCallStatus || '').toLowerCase() === 'failed' || errorCode) {
+      console.warn('[TelephonyWebhook] GET voice_dial_status failure:', {
+        dialCallStatus,
+        errorCode,
       });
-      dial.number(sanitizeToE164(to));
-    } else {
-      response.say({ voice: 'alice' }, 'No destination number provided.');
     }
-
-    return new Response(response.toString(), {
+    return new Response(buildVoiceDialStatusTwiml({ dialCallStatus, errorCode }), {
       headers: { 'Content-Type': 'text/xml' },
     });
   }
@@ -134,27 +166,18 @@ export async function handleTelephonyWebhookGet(params: {
     const formattedForwarding = resolved.forwardingPhone
       ? sanitizeToE164(resolved.forwardingPhone)
       : '';
-
-    const VoiceResponse = twilio.twiml.VoiceResponse;
-    const response = new VoiceResponse();
-    response.say(
-      { voice: 'alice' },
-      'Thank you for calling Chesterfield Taxi. Connecting your call to dispatch.'
+    const inboundMode = resolveTelephonyInboundMode(
+      url.searchParams.get('mode'),
+      readEnv('TWILIO_INBOUND_MODE'),
+      resolved.inboundMode
     );
-
-    const dial = response.dial({
-      timeout: 30,
-      record: 'record-from-answer',
-      recordingStatusCallback: '/api/telephony?action=call_recording_status',
-      recordingStatusCallbackEvent: ['completed'],
-      action: '/api/telephony?action=handle_unanswered',
+    const twiml = buildIncomingCallTwiml({
+      mode: inboundMode,
+      clientIdentity: 'dispatch_agent',
+      forwardingPhone: formattedForwarding || undefined,
     });
-    dial.client('dispatch_agent');
-    if (formattedForwarding) {
-      dial.number(formattedForwarding);
-    }
 
-    return new Response(response.toString(), { headers: { 'Content-Type': 'text/xml' } });
+    return new Response(twiml, { headers: { 'Content-Type': 'text/xml' } });
   }
 
   if (action === 'handle_unanswered') {
@@ -190,6 +213,8 @@ export async function handleTelephonyWebhookPostAction(params: {
   data: TelephonyApiRequest;
   url: URL;
   twilioFromNumber: string;
+  bridgePhoneNumber?: string;
+  inboundMode?: TelephonyInboundMode;
   forwardingPhone: string;
   options?: TelephonyHttpHandlerOptions;
 }): Promise<Response | null> {
@@ -199,40 +224,66 @@ export async function handleTelephonyWebhookPostAction(params: {
     data,
     url,
     twilioFromNumber,
+    bridgePhoneNumber,
+    inboundMode,
     forwardingPhone,
     options,
   } = params;
+  const readEnv = makeEnvReader(options?.env);
   const signOpts = { nowMs: options?.nowMs, env: options?.env };
+  const fallbackNumber = twilioFromNumber || bridgePhoneNumber || '';
 
   // ─── TWIML APP OUTBOUND VOICE ROUTE (POST / Webhook) ───
   if (effectiveAction === 'voice_client_twiml' || queryAction === 'voice_client_twiml') {
-    const to =
-      data.to || (data as any).To || url.searchParams.get('To') || url.searchParams.get('to');
-    const callerId =
-      (data as any).FromNumber ||
-      (data as any).fromNumber ||
-      (data as any).CallerId ||
-      (data as any).callerId ||
-      url.searchParams.get('FromNumber') ||
-      url.searchParams.get('CallerId') ||
-      twilioFromNumber;
-    const VoiceResponse = twilio.twiml.VoiceResponse;
-    const response = new VoiceResponse();
+    const rawTo =
+      data.to || (data as any).To || url.searchParams.get('To') || url.searchParams.get('to') || '';
+    const callerId = resolveOutboundCallerId({
+      fromNumber:
+        (data as any).FromNumber ||
+        (data as any).fromNumber ||
+        url.searchParams.get('FromNumber') ||
+        url.searchParams.get('fromNumber'),
+      callerId:
+        (data as any).CallerId ||
+        (data as any).callerId ||
+        url.searchParams.get('CallerId') ||
+        url.searchParams.get('callerId'),
+      phoneNumber: twilioFromNumber,
+      bridgePhoneNumber,
+    });
+    const formattedTo = String(rawTo).trim() ? sanitizeToE164(String(rawTo)) : '';
+    const formattedCallerId = callerId ? sanitizeToE164(callerId) : '';
+    const twiml = buildOutboundClientCallTwiml({
+      to: formattedTo,
+      callerId: formattedCallerId || undefined,
+    });
 
-    if (to) {
-      const dial = response.dial({
-        callerId: callerId ? sanitizeToE164(callerId) : undefined,
-        record: 'record-from-answer',
-        recordingStatusCallback: '/api/telephony?action=call_recording_status',
-        recordingStatusCallbackEvent: ['completed'],
-        timeout: 30,
+    return new Response(twiml, {
+      headers: { 'Content-Type': 'text/xml' },
+    });
+  }
+
+  // ─── OUTBOUND CLIENT DIAL COMPLETION / DIAGNOSTICS (POST / Webhook) ───
+  if (effectiveAction === 'voice_dial_status' || queryAction === 'voice_dial_status') {
+    const dialCallStatus =
+      (data as any).DialCallStatus ||
+      (data as any).dialCallStatus ||
+      data.status ||
+      (data as any).CallStatus ||
+      url.searchParams.get('DialCallStatus');
+    const errorCode =
+      (data as any).ErrorCode ||
+      (data as any).errorCode ||
+      (data as any).DialSipResponseCode ||
+      url.searchParams.get('ErrorCode');
+    if (String(dialCallStatus || '').toLowerCase() === 'failed' || errorCode) {
+      console.warn('[TelephonyWebhook] POST voice_dial_status failure:', {
+        callSid: (data as any).CallSid || data.callSid,
+        dialCallStatus,
+        errorCode,
       });
-      dial.number(sanitizeToE164(to));
-    } else {
-      response.say({ voice: 'alice' }, 'No destination number provided.');
     }
-
-    return new Response(response.toString(), {
+    return new Response(buildVoiceDialStatusTwiml({ dialCallStatus, errorCode }), {
       headers: { 'Content-Type': 'text/xml' },
     });
   }
@@ -354,7 +405,7 @@ export async function handleTelephonyWebhookPostAction(params: {
   if (effectiveAction === 'incoming_call') {
     const inboundCallSid = (data as any).CallSid || data.callSid || '';
     const inboundFrom = data.from || (data as any).From || '';
-    const inboundTo = data.to || (data as any).To || twilioFromNumber;
+    const inboundTo = data.to || (data as any).To || fallbackNumber;
 
     if (inboundCallSid && inboundFrom) {
       await ingestCommsEventServer(
@@ -380,26 +431,18 @@ export async function handleTelephonyWebhookPostAction(params: {
     }
 
     const formattedForwarding = forwardingPhone ? sanitizeToE164(forwardingPhone) : '';
-    const VoiceResponse = twilio.twiml.VoiceResponse;
-    const response = new VoiceResponse();
-    response.say(
-      { voice: 'alice' },
-      'Thank you for calling Chesterfield Taxi. Connecting your call to dispatch.'
+    const resolvedMode = resolveTelephonyInboundMode(
+      url.searchParams.get('mode') || (data as any).mode,
+      readEnv('TWILIO_INBOUND_MODE'),
+      inboundMode
     );
-
-    const dial = response.dial({
-      timeout: 30,
-      record: 'record-from-answer',
-      recordingStatusCallback: '/api/telephony?action=call_recording_status',
-      recordingStatusCallbackEvent: ['completed'],
-      action: '/api/telephony?action=handle_unanswered',
+    const twiml = buildIncomingCallTwiml({
+      mode: resolvedMode,
+      clientIdentity: 'dispatch_agent',
+      forwardingPhone: formattedForwarding || undefined,
     });
-    dial.client('dispatch_agent');
-    if (formattedForwarding) {
-      dial.number(formattedForwarding);
-    }
 
-    return new Response(response.toString(), { headers: { 'Content-Type': 'text/xml' } });
+    return new Response(twiml, { headers: { 'Content-Type': 'text/xml' } });
   }
 
   // ─── UNANSWERED INBOUND CALL ROLLOVER TO VOICEMAIL ───

@@ -1771,6 +1771,9 @@ export interface TelephonyIntegrationConfig {
   accountSid: string;
   authToken?: string;
   phoneNumber: string;
+  bridgePhoneNumber?: string;
+  inboundMode?: 'simultaneous_ring' | 'standalone_ivr';
+  voiceOnlyMode?: boolean;
   apiKeySid?: string;
   apiKeySecret?: string;
   twimlAppSid?: string;

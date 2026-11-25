@@ -64,6 +64,10 @@ import {
   handleTelephonyWebhookGet,
   handleTelephonyWebhookPostAction,
 } from './telephony-twiml-webhooks.server';
+import {
+  TWIML_VOICE_WEBHOOK_ACTIONS,
+  buildVoiceWebhookErrorTwiml,
+} from './telephony-twiml.util';
 
 export {
   DISPATCHER_ONLY_TELEPHONY_ACTIONS,
@@ -113,15 +117,31 @@ export async function handleTelephonyGet(
 
   // ─── B. TWILIO WEBHOOK CALLBACKS (GET) — Enforce `X-Twilio-Signature` When Configured ───
   if (TWILIO_WEBHOOK_ACTIONS.has(action)) {
-    const webhookResp = await handleTelephonyWebhookGet({
-      request,
-      url,
-      action,
-      resolved,
-      options,
-    });
-    if (webhookResp) {
-      return webhookResp;
+    try {
+      const webhookResp = await handleTelephonyWebhookGet({
+        request,
+        url,
+        action,
+        resolved,
+        options,
+      });
+      if (webhookResp) {
+        return webhookResp;
+      }
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (TWIML_VOICE_WEBHOOK_ACTIONS.has(action)) {
+        console.warn('[TelephonyWebhook] GET voice webhook exception:', {
+          action,
+          url: request.url,
+          error: errMsg,
+        });
+        return new Response(buildVoiceWebhookErrorTwiml(), {
+          status: 200,
+          headers: { 'Content-Type': 'text/xml' },
+        });
+      }
+      throw err;
     }
   }
 
@@ -271,7 +291,7 @@ export async function handleTelephonyGet(
       activeApiSecret,
       activeTwimlAppSid,
       identity,
-      phoneNumber: resolved.phoneNumber,
+      phoneNumber: resolved.phoneNumber || resolved.bridgePhoneNumber || '',
     });
   }
 
@@ -461,6 +481,20 @@ export async function handleTelephonyGet(
 // 2. `POST /api/telephony` Handler
 // ─────────────────────────────────────────────────────────────────────────────
 
+function inferFallbackFormWebhookAction(formObj: Record<string, any>): TelephonyActionName {
+  const rawFrom = String(formObj.From || formObj.from || '').trim().toLowerCase();
+  if (rawFrom.startsWith('client:')) {
+    return 'voice_client_twiml';
+  }
+  if (formObj.CallSid) {
+    return 'incoming_call';
+  }
+  if (formObj.MessageSid) {
+    return 'incoming_sms';
+  }
+  return 'verify_credentials';
+}
+
 export async function handleTelephonyPost(
   request: Request,
   options?: TelephonyHttpHandlerOptions
@@ -472,9 +506,13 @@ export async function handleTelephonyPost(
     );
   }
 
+  let detectedVoiceWebhookAction: string | null = null;
   try {
     const url = new URL(request.url);
     const queryAction = url.searchParams.get('action');
+    if (queryAction && TWIML_VOICE_WEBHOOK_ACTIONS.has(queryAction)) {
+      detectedVoiceWebhookAction = queryAction;
+    }
     const readEnv = makeEnvReader(options?.env);
     const fetchFn = options?.fetchImpl ?? fetch;
     const resolveAuth = options?.authResolver ?? verifyServerRequestAuth;
@@ -511,11 +549,7 @@ export async function handleTelephonyPost(
             ...formObj,
             action: (formObj.action ||
               queryAction ||
-              (formObj.CallSid
-                ? 'incoming_call'
-                : formObj.MessageSid
-                ? 'incoming_sms'
-                : 'verify_credentials')) as TelephonyActionName,
+              inferFallbackFormWebhookAction(formObj)) as TelephonyActionName,
             to: formObj.To || formObj.to,
             from: formObj.From || formObj.from,
             body: formObj.Body || formObj.body,
@@ -536,11 +570,7 @@ export async function handleTelephonyPost(
             ...formObj,
             action: (formObj.action ||
               queryAction ||
-              (formObj.CallSid
-                ? 'incoming_call'
-                : formObj.MessageSid
-                ? 'incoming_sms'
-                : 'verify_credentials')) as TelephonyActionName,
+              inferFallbackFormWebhookAction(formObj)) as TelephonyActionName,
             to: formObj.To || formObj.to,
             from: formObj.From || formObj.from,
             body: formObj.Body || formObj.body,
@@ -560,6 +590,12 @@ export async function handleTelephonyPost(
     }
 
     const effectiveAction = data.action;
+    const isVoiceWebhook =
+      TWIML_VOICE_WEBHOOK_ACTIONS.has(effectiveAction) ||
+      (queryAction ? TWIML_VOICE_WEBHOOK_ACTIONS.has(queryAction) : false);
+    if (isVoiceWebhook) {
+      detectedVoiceWebhookAction = effectiveAction;
+    }
     const isWebhookAction =
       TWILIO_WEBHOOK_ACTIONS.has(effectiveAction) ||
       (queryAction ? TWILIO_WEBHOOK_ACTIONS.has(queryAction) : false);
@@ -585,6 +621,18 @@ export async function handleTelephonyPost(
           authToken: baseResolved.authToken,
         });
         if (!sigResult.valid) {
+          if (isVoiceWebhook) {
+            console.warn('[TelephonyWebhook] POST signature check failed:', {
+              action: effectiveAction,
+              url: request.url,
+              code: sigResult.code,
+              error: sigResult.error,
+            });
+            return new Response(buildVoiceWebhookErrorTwiml(), {
+              status: 403,
+              headers: { 'Content-Type': 'text/xml' },
+            });
+          }
           return Response.json(
             { success: false, code: sigResult.code, error: sigResult.error },
             { status: sigResult.status }
@@ -651,6 +699,8 @@ export async function handleTelephonyPost(
       accountSid,
       authToken,
       phoneNumber: twilioFromNumber,
+      bridgePhoneNumber,
+      inboundMode,
       forwardingPhone,
       apiKeySid,
       apiKeySecret,
@@ -658,6 +708,7 @@ export async function handleTelephonyPost(
     } = await resolveCredentials(data, options?.env);
 
     const signOpts = { nowMs: options?.nowMs, env: options?.env };
+    const effectiveFromNumber = twilioFromNumber || bridgePhoneNumber || '';
 
     // ─── C. TWIML & WEBHOOK POST ACTIONS ───
     const webhookPostResponse = await handleTelephonyWebhookPostAction({
@@ -666,6 +717,8 @@ export async function handleTelephonyPost(
       data,
       url,
       twilioFromNumber,
+      bridgePhoneNumber,
+      inboundMode,
       forwardingPhone,
       options,
     });
@@ -709,7 +762,7 @@ export async function handleTelephonyPost(
         activeApiSecret,
         activeTwimlAppSid,
         identity,
-        phoneNumber: twilioFromNumber,
+        phoneNumber: effectiveFromNumber,
       });
     }
 
@@ -827,7 +880,7 @@ export async function handleTelephonyPost(
       data,
       accountSid,
       authToken,
-      twilioFromNumber,
+      twilioFromNumber: effectiveFromNumber,
       isConfigured,
       fetchFn,
     });
@@ -885,7 +938,7 @@ export async function handleTelephonyPost(
         data,
         accountSid,
         authHeader,
-        twilioFromNumber,
+        twilioFromNumber: effectiveFromNumber,
         forwardingPhone,
         auth,
         fetchFn,
@@ -900,7 +953,7 @@ export async function handleTelephonyPost(
         accountSid,
         authToken,
         authHeader,
-        twilioFromNumber,
+        twilioFromNumber: effectiveFromNumber,
         isConfigured,
         auth,
         fetchFn,
@@ -1000,6 +1053,17 @@ export async function handleTelephonyPost(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err);
+    if (detectedVoiceWebhookAction) {
+      console.warn('[TelephonyWebhook] Unhandled POST voice webhook error:', {
+        action: detectedVoiceWebhookAction,
+        url: request.url,
+        error: errorMessage,
+      });
+      return new Response(buildVoiceWebhookErrorTwiml(), {
+        status: 200,
+        headers: { 'Content-Type': 'text/xml' },
+      });
+    }
     console.error('[api.telephony] Server error:', errorMessage);
     return Response.json({ success: false, error: errorMessage }, { status: 500 });
   }

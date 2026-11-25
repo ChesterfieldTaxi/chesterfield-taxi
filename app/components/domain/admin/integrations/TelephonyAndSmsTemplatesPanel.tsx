@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import type { AppSettings } from '../../../../core/types/config';
+import type { TelephonyInboundMode } from '../../../../core/services/comms/telephony-twiml.util';
 import { sanitizePhoneNumber, validatePhoneNumber } from '../../../../core/services/telephony.service';
 import { authorizedFetch } from '../../../../core/services/auth/auth-headers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../ui/Card';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
+import { Select } from '../../../ui/Select';
+import { Switch } from '../../../ui/Switch';
 import { CheckIcon, LockIcon, PhoneIcon, SpinnerIcon } from '../../../ui/Icons';
 import { CannedSmsTemplatesEditorCard } from './CannedSmsTemplatesEditorCard';
+import { TelephonyWebhookGuideCard } from './TelephonyWebhookGuideCard';
 
 export interface TelephonyAndSmsTemplatesPanelProps {
   settings: AppSettings;
@@ -15,46 +19,38 @@ export interface TelephonyAndSmsTemplatesPanelProps {
   isLoading?: boolean;
 }
 
+const INBOUND_MODE_OPTIONS = [
+  { value: 'simultaneous_ring', label: 'Nextiva Simultaneous Ring (answerOnBridge, no Twilio voicemail)' },
+  { value: 'standalone_ivr', label: 'Standalone Twilio IVR & Voicemail' },
+] as const;
+
+const readStored = (key: string): string =>
+  (typeof window !== 'undefined' && localStorage.getItem(key)) || '';
+
 export function TelephonyAndSmsTemplatesPanel({
   settings,
   onSave,
   onNotifySuccess,
   isLoading = false,
 }: TelephonyAndSmsTemplatesPanelProps) {
+  const tel = settings.integrations?.telephony;
   const [isSavingTel, setIsSavingTel] = useState(false);
 
-  const [twilioSid, setTwilioSid] = useState(
-    () =>
-      settings.integrations?.telephony?.accountSid ||
-      (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_sid')) ||
-      ''
-  );
+  const [twilioSid, setTwilioSid] = useState(() => tel?.accountSid || readStored('ct_twilio_sid'));
   const [twilioToken, setTwilioToken] = useState('');
-  const [twilioPhone, setTwilioPhone] = useState(
-    () =>
-      settings.integrations?.telephony?.phoneNumber ||
-      (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_phone')) ||
-      '+13147380100'
+  const [twilioPhone, setTwilioPhone] = useState(() => tel?.phoneNumber || readStored('ct_twilio_phone') || '+13147380100');
+  const [bridgePhone, setBridgePhone] = useState(() => tel?.bridgePhoneNumber || readStored('ct_twilio_bridge_phone'));
+  const [inboundMode, setInboundMode] = useState<TelephonyInboundMode>(
+    () => tel?.inboundMode || (readStored('ct_twilio_inbound_mode') as TelephonyInboundMode) || 'simultaneous_ring'
   );
-  const [twilioApiKey, setTwilioApiKey] = useState(
-    () =>
-      settings.integrations?.telephony?.apiKeySid ||
-      (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_api_key')) ||
-      ''
-  );
+  const [voiceOnlyMode, setVoiceOnlyMode] = useState<boolean>(() => Boolean(tel?.voiceOnlyMode));
+  const [twilioApiKey, setTwilioApiKey] = useState(() => tel?.apiKeySid || readStored('ct_twilio_api_key'));
   const [twilioApiSecret, setTwilioApiSecret] = useState('');
-  const [twilioTwimlAppSid, setTwilioTwimlAppSid] = useState(
-    () =>
-      settings.integrations?.telephony?.twimlAppSid ||
-      (typeof window !== 'undefined' && localStorage.getItem('ct_twilio_twiml_app_sid')) ||
-      ''
-  );
+  const [twilioTwimlAppSid, setTwilioTwimlAppSid] = useState(() => tel?.twimlAppSid || readStored('ct_twilio_twiml_app_sid'));
   const [twilioStatus, setTwilioStatus] = useState<'idle' | 'checking' | 'connected' | 'error'>(
-    settings.integrations?.telephony?.status === 'connected' ? 'connected' : 'idle'
+    tel?.status === 'connected' ? 'connected' : 'idle'
   );
-  const [twilioStatusMsg, setTwilioStatusMsg] = useState<string | null>(
-    settings.integrations?.telephony?.statusMessage || null
-  );
+  const [twilioStatusMsg, setTwilioStatusMsg] = useState<string | null>(tel?.statusMessage || null);
 
   const [testCallPhone, setTestCallPhone] = useState('');
   const [testCallStatus, setTestCallStatus] = useState<'idle' | 'calling' | 'success' | 'error'>('idle');
@@ -68,19 +64,11 @@ export function TelephonyAndSmsTemplatesPanel({
     setTwilioStatus('checking');
     setTwilioStatusMsg('Connecting to Twilio Accounts API...');
     try {
+      const creds = { accountSid: twilioSid.trim(), authToken: twilioToken.trim() || undefined, phoneNumber: twilioPhone.trim() };
       const resp = await authorizedFetch('/api/telephony/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountSid: twilioSid.trim(),
-          authToken: twilioToken.trim() || undefined,
-          phoneNumber: twilioPhone.trim(),
-          credentials: {
-            accountSid: twilioSid.trim(),
-            authToken: twilioToken.trim() || undefined,
-            phoneNumber: twilioPhone.trim(),
-          },
-        }),
+        body: JSON.stringify({ ...creds, credentials: creds }),
       });
       const data = (await resp.json().catch(() => ({}))) as any;
       if (resp.ok && data.success) {
@@ -106,9 +94,21 @@ export function TelephonyAndSmsTemplatesPanel({
     const phoneValidation = validatePhoneNumber(twilioPhone.trim());
     if (!phoneValidation.isValid) {
       setTwilioStatus('error');
-      setTwilioStatusMsg(`Invalid Twilio Phone Number: ${phoneValidation.error}`);
+      setTwilioStatusMsg(`Invalid Verified Outbound Caller ID: ${phoneValidation.error}`);
       return;
     }
+    const trimmedBridge = bridgePhone.trim();
+    let bridgeE164: string | undefined;
+    if (trimmedBridge) {
+      const bridgeValidation = validatePhoneNumber(trimmedBridge);
+      if (!bridgeValidation.isValid) {
+        setTwilioStatus('error');
+        setTwilioStatusMsg(`Invalid Twilio Inbound Bridge Number: ${bridgeValidation.error}`);
+        return;
+      }
+      bridgeE164 = bridgeValidation.e164;
+    }
+
     setIsSavingTel(true);
     setTwilioStatus('checking');
     try {
@@ -121,6 +121,8 @@ export function TelephonyAndSmsTemplatesPanel({
             accountSid: trimmedSid,
             authToken: twilioToken.trim() || undefined,
             phoneNumber: phoneValidation.e164,
+            bridgePhoneNumber: bridgeE164,
+            inboundMode,
           },
         }),
       });
@@ -137,6 +139,9 @@ export function TelephonyAndSmsTemplatesPanel({
             provider: 'twilio',
             accountSid: trimmedSid,
             phoneNumber: phoneValidation.e164,
+            bridgePhoneNumber: bridgeE164,
+            inboundMode,
+            voiceOnlyMode,
             apiKeySid: twilioApiKey.trim() || undefined,
             twimlAppSid: twilioTwimlAppSid.trim() || undefined,
             status: 'connected',
@@ -148,6 +153,8 @@ export function TelephonyAndSmsTemplatesPanel({
       if (typeof window !== 'undefined') {
         localStorage.setItem('ct_twilio_sid', trimmedSid);
         localStorage.setItem('ct_twilio_phone', phoneValidation.e164);
+        localStorage.setItem('ct_twilio_bridge_phone', bridgeE164 || '');
+        localStorage.setItem('ct_twilio_inbound_mode', inboundMode);
         localStorage.setItem('ct_twilio_api_key', twilioApiKey.trim());
         localStorage.setItem('ct_twilio_twiml_app_sid', twilioTwimlAppSid.trim());
         localStorage.setItem('ct_twilio_status', 'connected');
@@ -165,33 +172,25 @@ export function TelephonyAndSmsTemplatesPanel({
   };
 
   const handleTestAction = async (kind: 'call' | 'sms') => {
-    const rawPhone = kind === 'call' ? testCallPhone : testSmsPhone;
-    const validation = validatePhoneNumber(rawPhone);
+    const isCall = kind === 'call';
+    const setStatus = isCall ? setTestCallStatus : setTestSmsStatus;
+    const setMsg = isCall ? setTestCallMsg : setTestSmsMsg;
+    const validation = validatePhoneNumber(isCall ? testCallPhone : testSmsPhone);
     if (!validation.isValid) {
-      if (kind === 'call') {
-        setTestCallStatus('error');
-        setTestCallMsg(validation.error || 'Enter a valid phone number.');
-      } else {
-        setTestSmsStatus('error');
-        setTestSmsMsg(validation.error || 'Enter a valid phone number.');
-      }
+      setStatus('error');
+      setMsg(validation.error || 'Enter a valid phone number.');
       return;
     }
-    if (kind === 'call') {
-      setTestCallStatus('calling');
-      setTestCallMsg(`Initiating call to ${validation.e164}...`);
-    } else {
-      setTestSmsStatus('sending');
-      setTestSmsMsg(`Sending SMS to ${validation.e164}...`);
-    }
+    setStatus(isCall ? ('calling' as any) : ('sending' as any));
+    setMsg(isCall ? `Initiating call to ${validation.e164}...` : `Sending SMS to ${validation.e164}...`);
     try {
       const resp = await authorizedFetch('/api/telephony', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: kind === 'call' ? 'make_call' : 'send_sms',
+          action: isCall ? 'make_call' : 'send_sms',
           to: validation.e164,
-          ...(kind === 'sms' ? { body: testSmsBody.trim() } : {}),
+          ...(isCall ? { isTestCall: true } : { body: testSmsBody.trim() }),
           credentials: {
             accountSid: twilioSid.trim(),
             authToken: twilioToken.trim() || undefined,
@@ -201,31 +200,15 @@ export function TelephonyAndSmsTemplatesPanel({
       });
       const data = (await resp.json().catch(() => ({}))) as any;
       if (resp.ok && data.success) {
-        if (kind === 'call') {
-          setTestCallStatus('success');
-          setTestCallMsg(data.message || `Call dispatched (${data.callSid}).`);
-        } else {
-          setTestSmsStatus('success');
-          setTestSmsMsg(data.message || `SMS sent (${data.messageSid}).`);
-        }
+        setStatus('success');
+        setMsg(data.message || (isCall ? `Call dispatched (${data.callSid}).` : `SMS sent (${data.messageSid}).`));
       } else {
-        const msg = data.error || data.message || `Failed to ${kind === 'call' ? 'place call' : 'send SMS'}.`;
-        if (kind === 'call') {
-          setTestCallStatus('error');
-          setTestCallMsg(msg);
-        } else {
-          setTestSmsStatus('error');
-          setTestSmsMsg(msg);
-        }
+        setStatus('error');
+        setMsg(data.error || data.message || `Failed to ${isCall ? 'place call' : 'send SMS'}.`);
       }
     } catch (err: any) {
-      if (kind === 'call') {
-        setTestCallStatus('error');
-        setTestCallMsg(err.message || 'Network error.');
-      } else {
-        setTestSmsStatus('error');
-        setTestSmsMsg(err.message || 'Network error.');
-      }
+      setStatus('error');
+      setMsg(err.message || 'Network error.');
     }
   };
 
@@ -240,7 +223,7 @@ export function TelephonyAndSmsTemplatesPanel({
                 <span>Twilio Telephony &amp; In-Browser WebRTC Softphone</span>
               </CardTitle>
               <CardDescription className="text-xs text-slate-500">
-                Configure PSTN outbound calling, browser WebRTC softphone SIDs, and two-way SMS relay.
+                Configure Nextiva Simultaneous Ring bridge, Verified Outbound Caller ID, WebRTC SIDs, and SMS relay.
               </CardDescription>
             </div>
             <Badge variant={twilioStatus === 'connected' ? 'success' : twilioStatus === 'error' ? 'danger' : 'neutral'}>
@@ -262,8 +245,24 @@ export function TelephonyAndSmsTemplatesPanel({
               <input type="password" value={twilioToken} onChange={(e) => setTwilioToken(e.target.value)} placeholder="TWILIO_AUTH_TOKEN" className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700">Outbound Caller ID</label>
+              <label className="text-xs font-bold text-slate-700">Verified Outbound Caller ID</label>
               <input type="text" value={twilioPhone} onChange={(e) => setTwilioPhone(e.target.value)} placeholder="+13147380100" className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white" />
+              <p className="text-[10.5px] text-slate-500">Shown to customers on outbound softphone calls — verify in Twilio Verified Caller IDs</p>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">Twilio Inbound Bridge Number</label>
+              <input type="text" value={bridgePhone} onChange={(e) => setBridgePhone(e.target.value)} placeholder="+13142281454" className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white" />
+              <p className="text-[10.5px] text-slate-500">Nextiva Simultaneous Ring target number</p>
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs font-bold text-slate-700 block">Inbound Call Mode</label>
+              <Select
+                size="sm"
+                aria-label="Inbound Call Mode"
+                value={inboundMode}
+                options={INBOUND_MODE_OPTIONS}
+                onValueChange={(val) => setInboundMode(val === 'standalone_ivr' ? 'standalone_ivr' : 'simultaneous_ring')}
+              />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-700">WebRTC API Key SID</label>
@@ -279,6 +278,17 @@ export function TelephonyAndSmsTemplatesPanel({
               <label className="text-xs font-bold text-slate-700">TwiML App SID</label>
               <input type="text" value={twilioTwimlAppSid} onChange={(e) => setTwilioTwimlAppSid(e.target.value)} placeholder="AP..." className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white" />
             </div>
+          </div>
+
+          <div className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/70">
+            <Switch
+              size="sm"
+              tone="blue"
+              label="Voice-Only Mode (A2P SMS Deferred)"
+              helperText="Marks A2P 10DLC SMS as deferred / Nextiva-managed without blocking Browser WebRTC Voice."
+              checked={voiceOnlyMode}
+              onChange={setVoiceOnlyMode}
+            />
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -309,20 +319,35 @@ export function TelephonyAndSmsTemplatesPanel({
               {testCallMsg && <p className={`text-[11px] font-medium ${testCallStatus === 'success' ? 'text-emerald-700' : 'text-rose-600'}`}>{testCallMsg}</p>}
             </div>
 
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2">
-              <span className="text-xs font-extrabold text-slate-900 block">Test Outbound SMS</span>
-              <div className="flex gap-2">
-                <input type="tel" value={testSmsPhone} onChange={(e) => setTestSmsPhone(e.target.value)} placeholder="+1 (314) 555-0123" className="w-36 px-2.5 py-1.5 text-xs font-mono rounded-lg border border-slate-300 bg-white" />
-                <input type="text" value={testSmsBody} onChange={(e) => setTestSmsBody(e.target.value)} className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white" />
-                <Button type="button" onClick={() => handleTestAction('sms')} disabled={testSmsStatus === 'sending'} className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer">
-                  Send
-                </Button>
+            {voiceOnlyMode ? (
+              <div className="p-3.5 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 flex flex-col justify-center gap-1 opacity-75">
+                <span className="text-xs font-extrabold text-slate-600">Test Outbound SMS (Paused — Voice-Only Mode)</span>
+                <p className="text-[11px] text-slate-500">A2P SMS is deferred to Nextiva. Disable Voice-Only Mode above to test Twilio SMS dispatch.</p>
               </div>
-              {testSmsMsg && <p className={`text-[11px] font-medium ${testSmsStatus === 'success' ? 'text-emerald-700' : 'text-rose-600'}`}>{testSmsMsg}</p>}
-            </div>
+            ) : (
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2">
+                <span className="text-xs font-extrabold text-slate-900 block">Test Outbound SMS</span>
+                <div className="flex gap-2">
+                  <input type="tel" value={testSmsPhone} onChange={(e) => setTestSmsPhone(e.target.value)} placeholder="+1 (314) 555-0123" className="w-36 px-2.5 py-1.5 text-xs font-mono rounded-lg border border-slate-300 bg-white" />
+                  <input type="text" value={testSmsBody} onChange={(e) => setTestSmsBody(e.target.value)} className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white" />
+                  <Button type="button" onClick={() => handleTestAction('sms')} disabled={testSmsStatus === 'sending'} className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer">
+                    Send
+                  </Button>
+                </div>
+                {testSmsMsg && <p className={`text-[11px] font-medium ${testSmsStatus === 'success' ? 'text-emerald-700' : 'text-rose-600'}`}>{testSmsMsg}</p>}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
+
+      <TelephonyWebhookGuideCard
+        inboundMode={inboundMode}
+        outboundCallerId={twilioPhone}
+        bridgePhoneNumber={bridgePhone}
+        voiceOnlyMode={voiceOnlyMode}
+        onNotifySuccess={onNotifySuccess}
+      />
 
       <CannedSmsTemplatesEditorCard
         settings={settings}

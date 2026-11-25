@@ -258,7 +258,7 @@ export function SmsThreadPane({
     const hasMatchedTrip = Boolean(threadCrmContext?.primaryMatchedTrip);
 
     return (
-      <div className="flex-1 flex flex-col min-w-0 bg-white">
+      <div className="flex-1 min-h-0 flex flex-col min-w-0 overflow-hidden bg-white">
         {/* Thread Header */}
         <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -486,7 +486,7 @@ export function SmsThreadPane({
         )}
 
         {/* Thread Activity Stream */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-slate-50/30">
           {selectedInteractions.map((evt, idx) => {
             const prevEvt = idx > 0 ? selectedInteractions[idx - 1] : null;
             const curDateStr = evt.timestampMs ? new Date(evt.timestampMs).toDateString() : '';
@@ -1080,7 +1080,7 @@ export function SmsThreadPane({
     });
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-white overflow-y-auto">
+    <div className="flex-1 min-h-0 flex flex-col min-w-0 bg-white overflow-y-auto">
       {/* Conversations Actions Header Bar */}
       <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-2">

@@ -82,6 +82,7 @@ import { DEFAULT_UNIVERSAL_EXTRAS, getUniversalExtrasService } from '../pricing/
 import { DEFAULT_SURCHARGES_CONFIG } from '../pricing/surcharges.service';
 import { DEFAULT_NAMED_PRICING_RULES } from '../pricing/pricing-rules.service';
 import { DEFAULT_BOOKING_RULES_CONFIG } from '../bookingRulesEngine';
+import { resolveTelephonyInboundMode } from '../comms/telephony-twiml.util';
 
 export {
   DEFAULT_OVERSIZED_BAG_CATEGORIES,
@@ -382,11 +383,11 @@ function normalizeCustomerBookingConfig(
   };
 }
 
-function normalizeIntegrationsConfig(
+export function normalizeIntegrationsConfig(
   incoming?: Partial<IntegrationsConfig> | null,
   fallback?: Partial<IntegrationsConfig> | null
 ): IntegrationsConfig {
-  const rawTel = {
+  const rawTel: NonNullable<IntegrationsConfig['telephony']> = {
     provider: 'twilio' as const,
     accountSid: '',
     phoneNumber: COMPANY_CONFIG.phone.primaryRaw || '+13147380100',
@@ -395,8 +396,24 @@ function normalizeIntegrationsConfig(
     ...(incoming?.telephony || {}),
   };
   // Never store plaintext authToken or apiKeySecret in browser memory / Firestore config
-  delete (rawTel as Record<string, unknown>).authToken;
-  delete (rawTel as Record<string, unknown>).apiKeySecret;
+  delete (rawTel as unknown as Record<string, unknown>).authToken;
+  delete (rawTel as unknown as Record<string, unknown>).apiKeySecret;
+
+  const cleanBridge =
+    typeof rawTel.bridgePhoneNumber === 'string' ? rawTel.bridgePhoneNumber.trim() : '';
+  if (cleanBridge) {
+    rawTel.bridgePhoneNumber = cleanBridge;
+  } else {
+    delete rawTel.bridgePhoneNumber;
+  }
+
+  if (rawTel.inboundMode !== undefined && String(rawTel.inboundMode).trim() !== '') {
+    rawTel.inboundMode = resolveTelephonyInboundMode(undefined, undefined, rawTel.inboundMode);
+  } else {
+    delete rawTel.inboundMode;
+  }
+
+  rawTel.voiceOnlyMode = Boolean(rawTel.voiceOnlyMode);
 
   const rawStripe = {
     ...(fallback?.payments?.stripe || {}),

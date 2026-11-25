@@ -102,6 +102,15 @@ export async function handleSaveOrVerifyTelephonyCredentialsPost(params: {
       process.env.TWILIO_ACCOUNT_SID = candidateSid;
       process.env.TWILIO_AUTH_TOKEN = candidateToken;
       process.env.TWILIO_PHONE_NUMBER = phoneValidation.e164;
+      if (data.credentials?.bridgePhoneNumber) {
+        const bridgeCheck = validatePhoneNumber(data.credentials.bridgePhoneNumber);
+        if (bridgeCheck.isValid) {
+          process.env.TWILIO_BRIDGE_PHONE_NUMBER = bridgeCheck.e164;
+        }
+      }
+      if (data.credentials?.inboundMode) {
+        process.env.TWILIO_INBOUND_MODE = data.credentials.inboundMode;
+      }
 
       return Response.json({
         success: true,
@@ -239,7 +248,8 @@ export async function handleOutboundMakeCallPost(params: {
     ''
   ).trim();
 
-  if (!dispatchBridgePhone) {
+  const isOneLegTestCall = Boolean(data.isTestCall) && !dispatchBridgePhone;
+  if (!dispatchBridgePhone && !isOneLegTestCall) {
     return Response.json(
       {
         success: false,
@@ -252,25 +262,36 @@ export async function handleOutboundMakeCallPost(params: {
     );
   }
 
-  const formattedForwarding = sanitizeToE164(dispatchBridgePhone);
-  const twiml = `<Response><Say voice="alice">Connecting you to Chesterfield Taxi dispatch desk.</Say><Dial timeout="25" record="record-from-answer" callerId="${formattedFrom}">${formattedForwarding}</Dial><Say voice="alice">Our dispatch agent was unable to connect. We will call you back shortly. Thank you.</Say><Hangup/></Response>`;
+  const twiml = isOneLegTestCall
+    ? `<Response><Say voice="alice">This is a Chesterfield Taxi outbound caller ID verification call. Your Twilio voice integration is connected and working properly. Goodbye.</Say><Hangup/></Response>`
+    : `<Response><Say voice="alice">Connecting you to Chesterfield Taxi dispatch desk.</Say><Dial timeout="25" record="record-from-answer" callerId="${formattedFrom}">${sanitizeToE164(dispatchBridgePhone)}</Dial><Say voice="alice">Our dispatch agent was unable to connect. We will call you back shortly. Thank you.</Say><Hangup/></Response>`;
 
   const callParams = new URLSearchParams();
   callParams.append('To', formattedTo);
   callParams.append('From', formattedFrom);
   callParams.append('Twiml', twiml);
-  callParams.append('Record', 'true');
+  if (!isOneLegTestCall) {
+    callParams.append('Record', 'true');
+  }
 
   try {
     const reqUrl = new URL(request.url);
-    const callbackUrl = `${reqUrl.protocol}//${reqUrl.host}/api/telephony?action=call_status_callback`;
-    callParams.append('StatusCallback', callbackUrl);
-    callParams.append('StatusCallbackMethod', 'POST');
-    callParams.append('StatusCallbackEvent', 'completed');
-    callParams.append('StatusCallbackEvent', 'busy');
-    callParams.append('StatusCallbackEvent', 'no-answer');
-    callParams.append('StatusCallbackEvent', 'failed');
-    callParams.append('StatusCallbackEvent', 'canceled');
+    const hostLower = reqUrl.hostname.toLowerCase();
+    const isLocalHost =
+      hostLower === 'localhost' ||
+      hostLower === '127.0.0.1' ||
+      hostLower === '::1' ||
+      hostLower === '[::1]';
+    if (!isLocalHost) {
+      const callbackUrl = `${reqUrl.protocol}//${reqUrl.host}/api/telephony?action=call_status_callback`;
+      callParams.append('StatusCallback', callbackUrl);
+      callParams.append('StatusCallbackMethod', 'POST');
+      callParams.append('StatusCallbackEvent', 'completed');
+      callParams.append('StatusCallbackEvent', 'busy');
+      callParams.append('StatusCallbackEvent', 'no-answer');
+      callParams.append('StatusCallbackEvent', 'failed');
+      callParams.append('StatusCallbackEvent', 'canceled');
+    }
   } catch {
     // Fallback gracefully
   }

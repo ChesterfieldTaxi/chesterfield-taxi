@@ -1165,3 +1165,23 @@
 - [x] 70.3 Verification Suite (`scripts/test-client-profile-return-places-and-upcoming-phase70.ts < 400`L) & Build Gate:
   - [x] 70.3.1 Create the Phase 70 suite and pass `npm run typecheck`, Phases 64–70 verification suites, and `npm run build` with exit code `0`.
   - [x] 70.3.2 Leave Phase 70 changes uncommitted on top of the Phase 69 baseline commit for review.
+
+## Phase 71 (Wave 6 Phase 6): Nextiva Hybrid Simultaneous-Ring Softphone (`answerOnBridge="true"` Non-Stealing Inbound TwiML, Separate Bridge vs. Outbound Caller ID, Webhook Setup Card & Local Incoming-Ring Simulator)
+- [x] 71.0 Baseline Commit & Spec-Driven Documentation:
+  - [x] 71.0.1 Stage and commit clean Phase 70 baseline on `main` (`feat(phase-70): upgrade ClientProfileWindow with 1-click Book Return, Active & Upcoming Rides strip, and unified Saved & Frequent Places quick-fill`).
+  - [x] 71.0.2 Update `spec.md`, `plan.md`, and `tasks.md` with Platform Phase 71 scope and checklist.
+- [x] 71.1 Non-Stealing Simultaneous-Ring TwiML (`answerOnBridge="true"`) & Outbound Caller ID Separation:
+  - [x] 71.1.1 Create pure `app/core/services/comms/telephony-twiml.util.ts` (`< 160`L, zero DOM/React) with `TelephonyInboundMode`, `resolveTelephonyInboundMode`, `buildIncomingCallTwiml`, `resolveOutboundCallerId`, and `buildTelephonyWebhookUrls`.
+  - [x] 71.1.2 Wire `TWILIO_BRIDGE_PHONE_NUMBER`, `TWILIO_INBOUND_MODE`, `resolveTelephonyInboundMode`, `buildIncomingCallTwiml`, and Verified Outbound Caller ID precedence across `telephony-credentials.server.ts`, `telephony-twiml-webhooks.server.ts`, `telephony-gateway.server.ts`, and `telephony-outbound-rest.server.ts`.
+- [x] 71.2 Admin Telephony Hybrid Config & Copy-Ready Webhook Setup Card:
+  - [x] 71.2.1 Extend `TelephonyIntegrationConfig` (`config.ts`) and export `normalizeIntegrationsConfig` (`admin-config.service.ts`) preserving `bridgePhoneNumber`, `inboundMode`, and `voiceOnlyMode` while strictly stripping `authToken` & `apiKeySecret`.
+  - [x] 71.2.2 Create `app/components/domain/admin/integrations/TelephonyWebhookGuideCard.tsx` (`< 220`L) with copy-ready production webhook URLs and 1-click `"Simulate Incoming Ring (Local Test)"` (`WorkspaceBus` `INCOMING_CALL`), and wire fields + `<Select size="sm">` + `<Switch />` into `TelephonyAndSmsTemplatesPanel.tsx` (`< 440`L).
+- [x] 71.3 Verification Suite (`scripts/test-nextiva-hybrid-softphone-phase71.ts < 400`L) & Full Build Gate:
+  - [x] 71.3.1 Create `scripts/test-nextiva-hybrid-softphone-phase71.ts` (`< 400`L) and pass `npm run typecheck`, telephony & Phases 69–71 suites, and `npm run build` with `0` errors.
+  - [x] 71.3.2 Leave Phase 71 changes uncommitted on top of the Phase 70 baseline commit for review.
+- [x] 71.B Zero-SDK TwiML Hardening, `From=client:*` Routing, Apex/`www` Signatures, Phantom Purge & Omnichannel Scroll Fix:
+  - [x] 71.B.1 Document Phase 71.B in `spec.md`, `plan.md`, and `tasks.md`.
+  - [x] 71.B.2 Add pure `buildOutboundClientCallTwiml` & `buildVoiceDialStatusTwiml` in `telephony-twiml.util.ts` (`< 200`L), remove `import twilio` completely from `telephony-twiml-webhooks.server.ts`, and wire `voice_dial_status` across `GET` & `POST`.
+  - [x] 71.B.3 Auto-route `From=client:*` form POSTs to `voice_client_twiml`, return `text/xml` TwiML on voice webhook signature/exception errors in `telephony-gateway.server.ts`, and add `www.` <-> apex host candidate URLs in `telephony-credentials.server.ts`.
+  - [x] 71.B.4 Purge unattached recording generator & cached `rec_*` / `'Recorded Call'` phantom items, enforce deterministic `timestampMs` descending sort, and remove 12s `setInterval` polling in `useCommsInteractionSync.ts`.
+  - [x] 71.B.5 Add `min-h-0` flex scroll fixes in `CommsHub.tsx` (`< 900`L) and `SmsThreadPane.tsx`, expand `scripts/test-nextiva-hybrid-softphone-phase71.ts` (`< 400`L), and pass `npm run typecheck`, Phases 69–71 suites, and `npm run build`.

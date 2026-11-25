@@ -555,7 +555,7 @@ function CommsHubComponent({
 
         {/* VIEW 2: UNIFIED CONTACT CONVERSATION THREAD */}
         {messaging.selectedContactPhone && messaging.activeContactSummary && (
-          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col min-w-0 overflow-hidden">
             <div className="px-2.5 py-1 bg-indigo-50/80 border-b border-indigo-100 flex items-center justify-between shrink-0">
               <span className="text-[10.5px] font-bold text-indigo-900 truncate">
                 {messaging.activeContactRecord?.name || messaging.activeContactSummary.contactName}
