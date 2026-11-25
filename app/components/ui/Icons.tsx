@@ -2329,4 +2329,27 @@ export function RadarBroadcastIcon({ className = 'w-5 h-5', size, ...props }: Ic
   );
 }
 
+export function VoicemailIcon({ className = 'w-5 h-5', size, ...props }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      width={size}
+      height={size}
+      className={className}
+      aria-hidden="true"
+      {...props}
+    >
+      <circle cx="6" cy="12" r="4" />
+      <circle cx="18" cy="12" r="4" />
+      <line x1="6" y1="16" x2="18" y2="16" />
+    </svg>
+  );
+}
+
 

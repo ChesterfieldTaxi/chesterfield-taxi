@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getCommsThreadService } from '../../../core/services/comms/comms-thread.service';
 import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
-import { ExternalLinkIcon, KeypadGridIcon, PlusIcon, SpinnerIcon, XIcon } from '../../ui/Icons';
+import { ChatBubbleLeftRightIcon, ExternalLinkIcon, KeypadGridIcon, LayersIcon, PhoneIcon, PlusIcon, SpinnerIcon, VoicemailIcon, XIcon } from '../../ui/Icons';
 import { CommsFilterToolbar } from './comms/CommsFilterToolbar';
 import { AgentPhoneSetupModal, CommsBottomNewSmsSheet } from './comms/CommsModals';
 import { SmsThreadPane } from './comms/SmsThreadPane';
@@ -375,21 +375,27 @@ function CommsHubComponent({
 
         <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg text-[11px] font-bold min-w-0">
           {([
-            { id: 'all' as const, label: 'All', badge: sync.unreadCountAll, cls: 'bg-slate-700' },
-            { id: 'phone' as const, label: 'Calls', badge: sync.unreadCountMissed, cls: 'bg-rose-500' },
-            { id: 'messages' as const, label: 'Messages', badge: sync.unreadCountMessages, cls: 'bg-blue-600' },
-            { id: 'voicemail' as const, label: 'VM', badge: sync.unreadCountVoicemail, cls: 'bg-amber-500' },
-          ] as const).map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => { handleSelectTab(t.id); if (t.id !== 'messages') messaging.setSelectedContactPhone(null); }}
-              className={`h-7 px-2 rounded-md inline-flex items-center gap-1 transition-colors cursor-pointer ${activeTab === t.id ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80' : 'text-slate-500 hover:text-slate-800'}`}
-            >
-              <span>{t.label}</span>
-              {t.badge > 0 && <span className={`px-1 rounded-full text-[9px] font-black text-white ${t.cls}`}>{t.badge}</span>}
-            </button>
-          ))}
+            { id: 'all' as const, label: 'All', icon: LayersIcon, badge: sync.unreadCountAll, cls: 'bg-slate-700' },
+            { id: 'phone' as const, label: 'Calls', icon: PhoneIcon, badge: sync.unreadCountMissed, cls: 'bg-rose-500' },
+            { id: 'messages' as const, label: 'Messages', icon: ChatBubbleLeftRightIcon, badge: sync.unreadCountMessages, cls: 'bg-blue-600' },
+            { id: 'voicemail' as const, label: 'Voicemail', icon: VoicemailIcon, badge: sync.unreadCountVoicemail, cls: 'bg-amber-500' },
+          ] as const).map((t) => {
+            const TabIcon = t.icon;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                title={t.label}
+                aria-label={t.label}
+                onClick={() => { handleSelectTab(t.id); if (t.id !== 'messages') messaging.setSelectedContactPhone(null); }}
+                className={`h-7 px-2 rounded-md inline-flex items-center gap-1 transition-colors cursor-pointer ${activeTab === t.id ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                <TabIcon className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden @[340px]/commshub:inline">{t.label}</span>
+                {t.badge > 0 && <span className={`px-1 rounded-full text-[9px] font-black text-white ${t.cls}`}>{t.badge}</span>}
+              </button>
+            );
+          })}
         </div>
 
         {isPopout || showWindowControls ? (
