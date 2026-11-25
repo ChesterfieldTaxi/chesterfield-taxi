@@ -1218,3 +1218,10 @@
   - [x] 73.3.3 Rebuild `VoicemailCallLogPane.tsx` (`< 320`L) and `SoftphoneDialerPane.tsx` (`< 320`L) with 1-row call history (`hasPlayableCallAudio` gated), voicemail transcript/player cards, and compact dialpad + live caller chip (`[Book]` / `[Client Profile]`).
 - [x] 73.4 Verification Suite (`scripts/test-comms-dock-v2-rebuild-phase73.ts < 360`L) & Build Gate:
   - [x] 73.4.1 Create `scripts/test-comms-dock-v2-rebuild-phase73.ts` (`< 360`L) and pass `npm run typecheck`, `test-comms-multichannel-ui.ts`, Phases 69–73 suites, and `npm run build` with `0` errors.
+- [x] 73.B Comms & `Profile` v2.1 Polish (Wave 6 Phase 8.B):
+  - [x] 73.B.0 Stage and commit verified Phase 73 baseline on `main` (`feat(phase-73): rebuild clean-slate Dispatch Comms Dock v2 with 1-bar thread header, interleaved trip cards, conditional call audio, and slim composer`).
+  - [x] 73.B.1 Document Platform Phase 73.B deliverables and verification gates in `spec.md`, `plan.md`, and `tasks.md`.
+  - [x] 73.B.2 Rename visible `Client Profile` buttons to `Profile`, split `ClientProfileWindow.tsx` (`< 340`L) into 3 tabs (`Trips` | `Places` | `Contact`) with legacy `'overview'`/`'edit'` mapping, and add `[Thread]` jump to persistent `ClientProfileHeaderCard.tsx` (`< 120`L).
+  - [x] 73.B.3 Add universal `OPEN_TRIP_DETAILS` bus event, clickable `#TRIP_ID` (`data-open-trip-details`), `#Cab` + flight delay badges (`resolveTripFlightBadge`), and 1-input inline caller quick-name save in `SmsThreadPane.tsx` (`< 380`L).
+  - [x] 73.B.4 Add `All` tab `Grouped | Stream` toggle (`ct_comms_all_view_mode`), `MapLayersAndVehiclesToolbar`-parity multi-select `Filter ▾` menus (list & thread), and bottom-right `New SMS` FAB + dock-bottom `CommsBottomNewSmsSheet` w/ active-ride passenger chips (`CommsHub < 360`L, `CommsFilterToolbar < 250`L, `CommsModals < 250`L).
+  - [x] 73.B.5 Create `scripts/test-comms-profile-polish-phase73b.ts` (`< 360`L) and pass `npm run typecheck`, `test-comms-multichannel-ui.ts`, Phases 69–73B suites, and `npm run build`.

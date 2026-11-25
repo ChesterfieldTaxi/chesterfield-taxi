@@ -5,7 +5,9 @@ import type { BottomSheetDragHandlers } from '../../../../core/hooks/useBottomSh
 
 export type CommsTab = 'all' | 'phone' | 'messages' | 'voicemail';
 export type ChannelFilter = 'all' | 'calls' | 'voicemail' | 'messages' | 'emails' | 'notes';
-export type ContactFilter = 'all' | 'passengers' | 'drivers';
+export type MultiChannelKey = 'calls' | 'voicemail' | 'messages' | 'emails' | 'notes';
+export type ContactFilter = 'all' | 'passengers' | 'drivers' | 'corporate';
+export type MultiContactKey = 'passengers' | 'drivers' | 'corporate';
 export type CallTypeFilter = 'all' | 'inbound' | 'outbound' | 'missed';
 export type CallsSubTab = 'keypad' | 'history' | 'missed';
 export type CallStatus = 'idle' | 'calling' | 'connected' | 'on_hold';
@@ -17,6 +19,9 @@ export type SoftphoneStatus =
   | 'on_call'
   | 'error';
 export type ThreadTab = 'all' | 'sms' | 'calls' | 'emails' | 'trips' | 'notes';
+export type ThreadTimelineType = 'sms' | 'calls' | 'emails' | 'trips' | 'notes';
+export type CommsAllViewMode = 'grouped' | 'stream';
+export const COMMS_ALL_VIEW_MODE_STORAGE_KEY = 'ct_comms_all_view_mode';
 export type PlaybackSpeed = 1 | 1.5 | 2;
 
 export interface CallNotice {
@@ -76,6 +81,9 @@ export interface CommsHubProps {
   onPopOut?: () => void;
   onPopulateBooking?: (bookingData: any) => void;
   onOpenEditTrip?: (tripId: string) => void;
+  onOpenTripDetails?: (tripId: string) => void;
+  initialAllViewMode?: CommsAllViewMode;
+  initialNewSmsSheetOpen?: boolean;
   drivers?: any[];
   trips?: Trip[];
 }

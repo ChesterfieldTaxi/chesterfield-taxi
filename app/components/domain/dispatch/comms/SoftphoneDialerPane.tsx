@@ -86,7 +86,7 @@ function CallerQuickChip({
           onClick={() => getWorkspaceBus().publish('OPEN_CLIENT_PROFILE', { phone: crm.primaryPhone || undefined, email: crm.primaryEmail || undefined, name: crm.contactName || undefined, source: 'comms_hub' })}
           className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold inline-flex items-center gap-1 cursor-pointer border ${dark ? 'bg-slate-700 border-slate-600 text-slate-100 hover:bg-slate-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
         >
-          <UserIcon className="w-2.5 h-2.5" /><span>Client Profile</span>
+          <UserIcon className="w-2.5 h-2.5" /><span>Profile</span>
         </button>
         {onSelectThread && selector && (
           <button type="button" onClick={() => onSelectThread(selector)} className="px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold cursor-pointer">

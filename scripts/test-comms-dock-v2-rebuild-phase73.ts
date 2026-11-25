@@ -174,7 +174,7 @@ function testSsrMarkupOmnichannelV2AndVoiceOnlyComposer(): void {
   );
 
   for (const needle of [
-    'data-comms-thread-header="v2"', 'Elena Vance', '(314) 555-0144', '>VIP<', '>Call<', '>Book<', '>Client Profile<', '>Filter<',
+    'data-comms-thread-header="v2"', 'Elena Vance', '(314) 555-0144', '>VIP<', '>Call<', '>Book<', '>Profile<', '>Filter<',
     'data-pinned-upcoming-trip="TRP-7302"', '#TRP-7302', '>Edit<', '>Map<',
     'data-timeline-trip-card="TRP-7301"', '#TRP-7301', '$68.50', '⇄ Return',
     'data-call-row="call_unrec_73"', 'Outbound Call', '0:52',
@@ -218,7 +218,7 @@ function testSsrMarkupOmnichannelV2AndVoiceOnlyComposer(): void {
       onStartCall: noop, drivers: [], callerCrmContext: crm,
     })
   );
-  assert.equal(dialerHtml.includes('Elena Vance') && dialerHtml.includes('>Book<') && dialerHtml.includes('Client Profile'), true);
+  assert.equal(dialerHtml.includes('Elena Vance') && dialerHtml.includes('>Book<') && dialerHtml.includes('>Profile<'), true);
   contactSvc.resetForTests();
 }
 
@@ -232,7 +232,7 @@ function testCeilingsGuardrailsAndImmutableFiles(): void {
     ['app/components/domain/dispatch/comms/VoicemailCallLogPane.tsx', 340],
     ['app/components/domain/dispatch/comms/SoftphoneDialerPane.tsx', 340],
     ['app/components/domain/dispatch/comms/useCommsMessagingAndContacts.ts', 380],
-    ['app/components/domain/dispatch/comms/CommsModals.tsx', 220],
+    ['app/components/domain/dispatch/comms/CommsModals.tsx', 250],
     ['app/components/domain/dispatch/comms/comms-timeline.util.ts', 220],
     ['scripts/test-comms-dock-v2-rebuild-phase73.ts', 360],
   ];

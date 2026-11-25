@@ -17,6 +17,8 @@ import type {
   ChannelFilter,
   ContactFilter,
   InteractionEvent,
+  MultiChannelKey,
+  MultiContactKey,
 } from '../../../components/domain/dispatch/comms/comms-types';
 import {
   detectAirportInAddresses,
@@ -57,6 +59,7 @@ import {
   resolveTripFlightBadge,
   type TripFlightBadgeDescriptor,
 } from '../flight/flight-status.service';
+export { resolveTripFlightBadge, type TripFlightBadgeDescriptor };
 import { getPayLinkService } from '../payments/pay-link.service';
 import type { WorkspaceEventMap } from '../workspace-bus.service';
 import { getCommsThreadService } from './comms-thread.service';
@@ -1082,15 +1085,28 @@ export function resolveCommsCrmContext(
 
 export interface FilterCommsInteractionsOptions {
   channelFilter?: ChannelFilter;
+  channelFilters?: ReadonlyArray<MultiChannelKey>;
   contactFilter?: ContactFilter;
+  contactFilters?: ReadonlyArray<MultiContactKey>;
   unreadOnly?: boolean;
   searchQuery?: string;
 }
 
+export function toggleCommsMultiFilter<T extends string>(
+  current: ReadonlyArray<T>,
+  value: T
+): T[] {
+  return current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
+}
+
 export function matchesCommsChannelFilter(
   item: InteractionEvent,
-  channelFilter: ChannelFilter = 'all'
+  channelFilter: ChannelFilter = 'all',
+  channelFilters?: ReadonlyArray<MultiChannelKey>
 ): boolean {
+  if (channelFilters && channelFilters.length > 0) {
+    return channelFilters.some((ch) => matchesCommsChannelFilter(item, ch));
+  }
   if (channelFilter === 'all') return true;
   if (channelFilter === 'calls') return item.type.startsWith('call_');
   if (channelFilter === 'voicemail') return item.type === 'voicemail';
@@ -1100,9 +1116,36 @@ export function matchesCommsChannelFilter(
   return true;
 }
 
+function matchesContactFiltersList(
+  contactType: CommsContactType,
+  isCorporate: boolean,
+  contactFilters?: ReadonlyArray<MultiContactKey>,
+  contactFilter?: ContactFilter
+): boolean {
+  if (contactFilters && contactFilters.length > 0) {
+    return contactFilters.some((cf) => {
+      if (cf === 'drivers') return contactType === 'driver';
+      if (cf === 'corporate') return contactType === 'corporate' || isCorporate;
+      if (cf === 'passengers') return contactType === 'passenger' || contactType === 'unknown';
+      return false;
+    });
+  }
+  if (
+    contactFilter === 'passengers' &&
+    contactType !== 'passenger' &&
+    contactType !== 'corporate' &&
+    contactType !== 'unknown'
+  ) {
+    return false;
+  }
+  if (contactFilter === 'drivers' && contactType !== 'driver') return false;
+  if (contactFilter === 'corporate' && contactType !== 'corporate' && !isCorporate) return false;
+  return true;
+}
+
 export function matchesCommsContactAndSearchFilter(
   item: InteractionEvent,
-  options: Omit<FilterCommsInteractionsOptions, 'channelFilter'> = {}
+  options: Omit<FilterCommsInteractionsOptions, 'channelFilter' | 'channelFilters'> = {}
 ): boolean {
   if (item.snippet?.includes('Thank you for contacting our dispatch desk')) {
     return false;
@@ -1111,14 +1154,13 @@ export function matchesCommsContactAndSearchFilter(
     return false;
   }
   if (
-    options.contactFilter === 'passengers' &&
-    item.contactType !== 'passenger' &&
-    item.contactType !== 'corporate' &&
-    item.contactType !== 'unknown'
+    !matchesContactFiltersList(
+      item.contactType,
+      item.contactType === 'corporate',
+      options.contactFilters,
+      options.contactFilter
+    )
   ) {
-    return false;
-  }
-  if (options.contactFilter === 'drivers' && item.contactType !== 'driver') {
     return false;
   }
 
@@ -1151,7 +1193,7 @@ export function filterCommsInteractionEvents(
   const channelFilter = options.channelFilter || 'all';
   return items.filter(
     (item) =>
-      matchesCommsChannelFilter(item, channelFilter) &&
+      matchesCommsChannelFilter(item, channelFilter, options.channelFilters) &&
       matchesCommsContactAndSearchFilter(item, options)
   );
 }
@@ -1193,9 +1235,22 @@ function inferInteractionChannel(evt: InteractionEvent): CommsChannel {
 export function buildUnifiedCommsThreadSummaries(
   interactions: InteractionEvent[],
   threads: CommsThread[] = [],
-  filterOptions: Omit<FilterCommsInteractionsOptions, 'channelFilter'> = {}
+  filterOptions: FilterCommsInteractionsOptions = {}
 ): CommsConversationRowSummary[] {
   const contactService = getContactService();
+  const hasChannelRestriction = Boolean(
+    (filterOptions.channelFilters && filterOptions.channelFilters.length > 0) ||
+      (filterOptions.channelFilter && filterOptions.channelFilter !== 'all')
+  );
+  const sourceInteractions = hasChannelRestriction
+    ? interactions.filter((evt) =>
+        matchesCommsChannelFilter(
+          evt,
+          filterOptions.channelFilter || 'all',
+          filterOptions.channelFilters
+        )
+      )
+    : interactions;
   const threadById = new Map<string, CommsThread>();
   for (const t of threads) {
     if (t && t.id && !t.mergedIntoThreadId && !t.isArchived) {
@@ -1214,7 +1269,7 @@ export function buildUnifiedCommsThreadSummaries(
 
   const buckets = new Map<string, Bucket>();
 
-  for (const evt of interactions) {
+  for (const evt of sourceInteractions) {
     if (evt.snippet?.includes('Thank you for contacting our dispatch desk')) continue;
 
     const resolution = contactService.resolveUnifiedContact({
@@ -1326,15 +1381,20 @@ export function buildUnifiedCommsThreadSummaries(
       latest.contactType ||
       'passenger';
 
+    const isCorpBucket = Boolean(
+      bucket.contact?.corporateAccountId ||
+        bucket.contact?.corporateAccountName ||
+        bucket.thread?.corporateAccountName ||
+        contactType === 'corporate'
+    );
     if (
-      filterOptions.contactFilter === 'passengers' &&
-      contactType !== 'passenger' &&
-      contactType !== 'corporate' &&
-      contactType !== 'unknown'
+      !matchesContactFiltersList(
+        contactType,
+        isCorpBucket,
+        filterOptions.contactFilters,
+        filterOptions.contactFilter
+      )
     ) {
-      continue;
-    }
-    if (filterOptions.contactFilter === 'drivers' && contactType !== 'driver') {
       continue;
     }
 

@@ -91,6 +91,7 @@ export interface UseDispatchWorkspaceSyncParams {
   >;
   populateActiveDraftFromPayload: (payload: any) => void;
   onOpenEditTrip: (trip: Trip) => void;
+  onOpenReviewModal?: (trip: Trip, initialTab?: 'details' | 'audit') => void;
   autoOfferContextRef: React.MutableRefObject<{
     autoOfferOnConfirm: boolean;
     isEligibleForAutoPilot: (trip: Trip) => boolean;
@@ -157,6 +158,7 @@ export function useDispatchWorkspaceSync({
   setIncomingCallAlert,
   populateActiveDraftFromPayload,
   onOpenEditTrip,
+  onOpenReviewModal,
   autoOfferContextRef,
   autoOfferStartedIdsRef,
 }: UseDispatchWorkspaceSyncParams): void {
@@ -164,6 +166,8 @@ export function useDispatchWorkspaceSync({
   const knownTripIdsRef = useRef<Set<string> | null>(null);
   const onOpenEditTripRef = useRef(onOpenEditTrip);
   onOpenEditTripRef.current = onOpenEditTrip;
+  const onOpenReviewModalRef = useRef(onOpenReviewModal);
+  onOpenReviewModalRef.current = onOpenReviewModal;
 
   // 1. Client mount hydration for open tabs, mobile tab, audio/wake-lock, and unread badges
   useEffect(() => {
@@ -459,6 +463,13 @@ export function useDispatchWorkspaceSync({
           setShouldZoomMap(true);
           onOpenEditTripRef.current(found);
           setActiveMobileTab('booking');
+        }
+      } else if (msg.type === 'OPEN_TRIP_DETAILS') {
+        const found = msg.payload?.tripId ? trips.find((t) => t.id === msg.payload.tripId) : undefined;
+        if (found) {
+          setSelectedQueueTripId(found.id);
+          setSelectedMapTrip(found);
+          onOpenReviewModalRef.current?.(found, msg.payload.initialTab || 'details');
         }
       } else if (msg.type === 'UNREAD_COUNTS_CHANGED') {
         const payload = msg.payload;

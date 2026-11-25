@@ -116,6 +116,10 @@ export interface WorkspaceEventMap {
     tripId?: string;
     phone?: string;
   };
+  OPEN_TRIP_DETAILS: {
+    tripId: string;
+    initialTab?: 'details' | 'audit';
+  };
   UNREAD_COUNTS_CHANGED: {
     unreadMessages: number;
     missedCalls: number;
@@ -187,7 +191,7 @@ export interface WorkspaceEventMap {
     email?: string;
     name?: string;
     callSid?: string;
-    initialTab?: 'overview' | 'edit';
+    initialTab?: 'overview' | 'edit' | 'trips' | 'places' | 'contact';
     source?: 'incoming_call' | 'answered_call' | 'outbound_call' | 'passenger_crm' | 'comms_hub' | 'floating_call_pill';
   };
 }

@@ -10,7 +10,7 @@ import { getPayLinkService } from '../../../../core/services/payments/pay-link.s
 import { getWorkspaceBus, type WorkspaceEventMap } from '../../../../core/services/workspace-bus.service';
 import type { Trip } from '../../../../core/types/trip';
 import { formatDisplayPhone, sanitizeToE164, validatePhoneNumber } from '../../../../core/utils/phone';
-import { getClientTelephonyCredentials, type CommsTab, type InteractionEvent, type ThreadTab } from './comms-types';
+import { getClientTelephonyCredentials, type CommsTab, type InteractionEvent, type ThreadTab, type ThreadTimelineType } from './comms-types';
 
 export interface UseCommsMessagingAndContactsOptions {
   user?: any;
@@ -25,15 +25,18 @@ export interface UseCommsMessagingAndContactsOptions {
   showTimedBookingToast: (message: string, durationMs?: number) => void;
   onPopulateBooking?: (bookingData: any) => void;
   onOpenEditTrip?: (tripId: string) => void;
+  initialNewSmsSheetOpen?: boolean;
 }
 
 export function useCommsMessagingAndContacts({
   user, interactions, setInteractions, fetchTelephonyData, trips, drivers,
   activeCallPhone, dialpadNumber, showTimedBookingToast, onPopulateBooking, onOpenEditTrip,
+  initialNewSmsSheetOpen = false,
 }: UseCommsMessagingAndContactsOptions) {
   const workspaceBus = getWorkspaceBus();
   const [selectedContactPhone, setSelectedContactPhone] = useState<string | null>(null);
   const [threadTab, setThreadTab] = useState<ThreadTab>('all');
+  const [timelineFilters, setTimelineFilters] = useState<ThreadTimelineType[]>([]);
   const pendingBusThreadTabRef = useRef<ThreadTab | null>(null);
   const [noteDraftText, setNoteDraftText] = useState('');
   const [smsReplyText, setSmsReplyText] = useState('');
@@ -43,7 +46,7 @@ export function useCommsMessagingAndContacts({
   const [isGeneratingPayLink, setIsGeneratingPayLink] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [activeContactRecord, setActiveContactRecord] = useState<ContactRecord | null>(null);
-  const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
+  const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(initialNewSmsSheetOpen);
   const [newMsgRecipientPhone, setNewMsgRecipientPhone] = useState('');
   const [newMsgRecipientName, setNewMsgRecipientName] = useState('');
   const [newMsgBody, setNewMsgBody] = useState('');
@@ -72,7 +75,11 @@ export function useCommsMessagingAndContacts({
       const resolved = getCommsThreadService().findThread({ threadId: p.threadId, phone: p.phone, email: p.email });
       const target = resolved?.primaryPhone || p.phone || resolved?.primaryEmail || p.email || resolved?.id || p.threadId || null;
       if (target) {
-        if (p.tab) { pendingBusThreadTabRef.current = p.tab; setThreadTab(p.tab); }
+        if (p.tab) {
+          pendingBusThreadTabRef.current = p.tab;
+          setThreadTab(p.tab);
+          setTimelineFilters(p.tab === 'all' ? [] : [p.tab]);
+        }
         setSelectedContactPhone(target);
       }
     } else if (msg.type === 'CONTACT_UPDATED') {
@@ -82,8 +89,15 @@ export function useCommsMessagingAndContacts({
   }), [workspaceBus, selectedContactPhone]);
 
   useEffect(() => {
-    if (pendingBusThreadTabRef.current) { setThreadTab(pendingBusThreadTabRef.current); pendingBusThreadTabRef.current = null; return; }
+    if (pendingBusThreadTabRef.current) {
+      const next = pendingBusThreadTabRef.current;
+      setThreadTab(next);
+      setTimelineFilters(next === 'all' ? [] : [next]);
+      pendingBusThreadTabRef.current = null;
+      return;
+    }
     setThreadTab('all');
+    setTimelineFilters([]);
   }, [selectedContactPhone]);
 
   const activeUnifiedThread = useMemo(() => {
@@ -335,7 +349,7 @@ export function useCommsMessagingAndContacts({
   };
 
   return {
-    selectedContactPhone, setSelectedContactPhone, threadTab, setThreadTab,
+    selectedContactPhone, setSelectedContactPhone, threadTab, setThreadTab, timelineFilters, setTimelineFilters,
     activeUnifiedThread, allSelectedContactInteractions, activeContactSummary, activeContactRecord, threadCrmContext,
     messagesEndRef, noteDraftText, setNoteDraftText, smsReplyText, setSmsReplyText,
     isSendingSms, smsStatusMessage, retryingSmsId, isGeneratingPayLink,

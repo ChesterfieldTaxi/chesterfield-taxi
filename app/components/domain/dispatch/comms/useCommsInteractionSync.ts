@@ -4,6 +4,7 @@ import {
   buildUnifiedCommsThreadSummaries,
   filterCommsInteractionEvents,
   matchesCommsContactAndSearchFilter,
+  toggleCommsMultiFilter,
 } from '../../../../core/services/comms/comms-templates.service';
 import {
   commsEventToInteractionEvent,
@@ -22,6 +23,8 @@ import {
   type ChannelFilter,
   type ContactFilter,
   type InteractionEvent,
+  type MultiChannelKey,
+  type MultiContactKey,
   type PlaybackSpeed,
 } from './comms-types';
 import { playInboundSmsChime } from './useTwilioSoftphoneDevice';
@@ -126,9 +129,20 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
   // Filter state
   const [filterUnreadOnly, setFilterUnreadOnly] = useState(false);
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
+  const [channelFilters, setChannelFilters] = useState<MultiChannelKey[]>([]);
   const [callTypeFilter, setCallTypeFilter] = useState<CallTypeFilter>('all');
   const [contactFilter, setContactFilter] = useState<ContactFilter>('all');
+  const [contactFilters, setContactFilters] = useState<MultiContactKey[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const toggleChannelFilter = useCallback(
+    (key: MultiChannelKey) => setChannelFilters((prev) => toggleCommsMultiFilter(prev, key)),
+    []
+  );
+  const toggleContactFilter = useCallback(
+    (key: MultiContactKey) => setContactFilters((prev) => toggleCommsMultiFilter(prev, key)),
+    []
+  );
 
   // Audio playback state (voicemails & call recordings)
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
@@ -449,9 +463,10 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
     () => ({
       unreadOnly: filterUnreadOnly,
       contactFilter,
+      contactFilters,
       searchQuery,
     }),
-    [filterUnreadOnly, contactFilter, searchQuery]
+    [filterUnreadOnly, contactFilter, contactFilters, searchQuery]
   );
 
   const allHistoryCalls = useMemo(
@@ -480,9 +495,10 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
     () =>
       filterCommsInteractionEvents(interactions, {
         channelFilter,
+        channelFilters,
         ...filterOptionsBase,
       }),
-    [interactions, channelFilter, filterOptionsBase]
+    [interactions, channelFilter, channelFilters, filterOptionsBase]
   );
 
   const filteredHistoryCalls = useMemo(() => {
@@ -513,6 +529,16 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
   const conversationRows = useMemo(
     () => buildUnifiedCommsThreadSummaries(interactions, commsThreads, filterOptionsBase),
     [interactions, commsThreads, filterOptionsBase]
+  );
+
+  const filteredAllConversationRows = useMemo(
+    () =>
+      buildUnifiedCommsThreadSummaries(interactions, commsThreads, {
+        channelFilter,
+        channelFilters,
+        ...filterOptionsBase,
+      }),
+    [interactions, commsThreads, channelFilter, channelFilters, filterOptionsBase]
   );
 
   const threadUnreadCountMap = useMemo(() => {
@@ -596,10 +622,16 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
     setFilterUnreadOnly,
     channelFilter,
     setChannelFilter,
+    channelFilters,
+    setChannelFilters,
+    toggleChannelFilter,
     callTypeFilter,
     setCallTypeFilter,
     contactFilter,
     setContactFilter,
+    contactFilters,
+    setContactFilters,
+    toggleContactFilter,
     searchQuery,
     setSearchQuery,
     allHistoryCalls,
@@ -609,6 +641,7 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
     filteredMissedCalls,
     filteredVoicemails,
     conversationRows,
+    filteredAllConversationRows,
     threadUnreadCountMap,
     messageConversations,
     unreadCountAll,

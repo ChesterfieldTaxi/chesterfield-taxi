@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getContactService } from '../../../core/services/customer/contact.service';
 import type { DriverRosterItem } from '../../../core/services/operator.service';
+import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
 import type { Trip } from '../../../core/types/trip';
 import { LocationAutocomplete, type PlaceSelectedDetails } from '../LocationAutocomplete';
 import { MapPinIcon, XIcon } from '../../ui/Icons';
@@ -65,18 +66,18 @@ export function ClientUpcomingRidesStrip({
               <div className="min-w-0 flex-1 space-y-0.5">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <DispatchStatusBadge compact status={trip.status} trip={trip} nowMs={nowMs} />
-                  {onOpenTripDetails ? (
-                    <button
-                      type="button"
-                      onClick={() => onOpenTripDetails(trip)}
-                      className="font-mono font-bold text-[10.5px] text-blue-600 hover:underline cursor-pointer"
-                      title="Open Trip Details & Audit"
-                    >
-                      #{shortId}
-                    </button>
-                  ) : (
-                    <span className="font-mono font-bold text-[10.5px] text-slate-500">#{shortId}</span>
-                  )}
+                  <button
+                    type="button"
+                    data-open-trip-details={trip.id}
+                    onClick={() => {
+                      getWorkspaceBus().publish('OPEN_TRIP_DETAILS', { tripId: trip.id, initialTab: 'details' });
+                      onOpenTripDetails?.(trip);
+                    }}
+                    className="font-mono font-bold text-[10.5px] text-blue-700 hover:underline cursor-pointer"
+                    title="Open Trip Details & Audit"
+                  >
+                    #{shortId}
+                  </button>
                   <span className="font-bold text-slate-800 text-[11px]">{formatUpcomingPickupLabel(trip)}</span>
                   {driverLabel && (
                     <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-slate-100 text-slate-700 border border-slate-200">

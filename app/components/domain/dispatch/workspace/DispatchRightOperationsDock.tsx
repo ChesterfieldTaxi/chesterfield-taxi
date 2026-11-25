@@ -55,6 +55,7 @@ export interface DispatchRightOperationsDockProps {
   onCommsPopOut: () => void;
   onCommsClose: () => void;
   onOpenEditTripById: (tripId: string) => void;
+  onOpenTripDetailsById?: (tripId: string) => void;
   onCommsPopulateBooking: (payload: any) => void;
   onEmailPopulateBooking: () => void;
 
@@ -122,6 +123,7 @@ export function DispatchRightOperationsDock({
   onCommsPopOut,
   onCommsClose,
   onOpenEditTripById,
+  onOpenTripDetailsById,
   onCommsPopulateBooking,
   onEmailPopulateBooking,
   driverFilter,
@@ -310,6 +312,7 @@ export function DispatchRightOperationsDock({
               onPopOut={onCommsPopOut}
               onClose={onCommsClose}
               onOpenEditTrip={onOpenEditTripById}
+              onOpenTripDetails={onOpenTripDetailsById}
               onPopulateBooking={onCommsPopulateBooking}
             />
           </Suspense>

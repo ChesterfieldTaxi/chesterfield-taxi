@@ -2,11 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { getCommsThreadService } from '../../../core/services/comms/comms-thread.service';
 import { ExternalLinkIcon, PhoneIcon, PlusIcon, SpinnerIcon, XIcon } from '../../ui/Icons';
 import { CommsFilterToolbar } from './comms/CommsFilterToolbar';
-import { AgentPhoneSetupModal, NewSmsMessageModal } from './comms/CommsModals';
+import { AgentPhoneSetupModal, CommsBottomNewSmsSheet } from './comms/CommsModals';
 import { SmsThreadPane } from './comms/SmsThreadPane';
 import { SoftphoneDialerPane } from './comms/SoftphoneDialerPane';
 import { VoicemailCallLogPane } from './comms/VoicemailCallLogPane';
-import type { CommsHubProps, CommsTab } from './comms/comms-types';
+import { COMMS_ALL_VIEW_MODE_STORAGE_KEY, type CommsAllViewMode, type CommsHubProps, type CommsTab } from './comms/comms-types';
 import { useCommsInteractionSync } from './comms/useCommsInteractionSync';
 import { useCommsMessagingAndContacts } from './comms/useCommsMessagingAndContacts';
 import { useTwilioSoftphoneDevice } from './comms/useTwilioSoftphoneDevice';
@@ -19,10 +19,27 @@ const CLIENT_PROFILE_ACTION_LABEL = 'Client Profile';
 function CommsHubComponent({
   user: _user, initialTab = 'all', onTabChange, isPopout = false, isVisible = true,
   showWindowControls = false, onClose, onPopOut, onPopulateBooking, onOpenEditTrip,
+  onOpenTripDetails, initialAllViewMode = 'grouped', initialNewSmsSheetOpen = false,
   drivers = [], trips = [],
 }: CommsHubProps) {
   const [activeTab, setActiveTab] = useState<CommsTab>(initialTab);
+  const [allViewMode, setAllViewMode] = useState<CommsAllViewMode>(initialAllViewMode);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      const saved = localStorage.getItem(COMMS_ALL_VIEW_MODE_STORAGE_KEY);
+      if (saved === 'grouped' || saved === 'stream') setAllViewMode(saved);
+    } catch {}
+  }, []);
+
+  const handleChangeAllViewMode = (mode: CommsAllViewMode) => {
+    setAllViewMode(mode);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try { localStorage.setItem(COMMS_ALL_VIEW_MODE_STORAGE_KEY, mode); } catch {}
+    }
+  };
 
   const sync = useCommsInteractionSync({ isVisible });
   const softphone = useTwilioSoftphoneDevice({
@@ -49,7 +66,7 @@ function CommsHubComponent({
     user: _user, activeTab, interactions: sync.interactions, setInteractions: sync.setInteractions,
     fetchTelephonyData: sync.fetchTelephonyData, trips, drivers, activeCallPhone: softphone.activeCallPhone,
     dialpadNumber: softphone.dialpadNumber, showTimedBookingToast: softphone.showTimedBookingToast,
-    onPopulateBooking, onOpenEditTrip,
+    onPopulateBooking, onOpenEditTrip, initialNewSmsSheetOpen,
   });
 
   const handleMarkAllRead = () => {
@@ -99,6 +116,7 @@ function CommsHubComponent({
 
   const sharedSmsProps = {
     threadTab: messaging.threadTab, onChangeThreadTab: messaging.setThreadTab,
+    timelineFilters: messaging.timelineFilters, onChangeTimelineFilters: messaging.setTimelineFilters,
     onBackFromThread: () => messaging.setSelectedContactPhone(null),
     onOpenContactEdit: messaging.handleOpenContactEdit, onOpenClientProfile: messaging.handleOpenClientProfile,
     onBookContactRide: messaging.handleBookContactRide, playingCallId: sync.playingCallId,
@@ -119,10 +137,10 @@ function CommsHubComponent({
     >
       <audio ref={sync.audioPlayerRef} onEnded={sync.handleAudioEnded} className="hidden" />
 
-      {/* Row 1 (h-10): Dock Header + 4-Segment Switch */}
+      {/* Row 1 (h-10): Dock Header + 4-Segment Switch (0 top-row + New button) */}
       <div data-comms-row="header" className="h-10 px-2.5 border-b border-slate-200 bg-white flex items-center justify-between gap-1.5 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0 shrink-0">
-          <span className="text-[11px] font-extrabold text-slate-900 truncate hidden @[410px]/commshub:inline">Phone &amp; SMS</span>
+          <span className="text-[11px] font-extrabold text-slate-900 truncate hidden @[390px]/commshub:inline">Phone &amp; SMS</span>
           <button
             type="button"
             onClick={() => { handleSelectTab('phone'); messaging.setSelectedContactPhone(null); softphone.setCallsSubTab('keypad'); }}
@@ -157,10 +175,7 @@ function CommsHubComponent({
           ))}
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
-          <button type="button" onClick={messaging.handleOpenFreshNewMessageModal} title="Compose New SMS" className="h-7 px-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold inline-flex items-center gap-0.5 cursor-pointer">
-            <PlusIcon className="w-3 h-3" /><span>New</span>
-          </button>
+        <div className="flex items-center gap-1 shrink-0 min-w-[4px]">
           {showWindowControls && !isPopout && onPopOut && (
             <button type="button" onClick={onPopOut} title="Pop out window" className="p-1 rounded-md hover:bg-slate-100 text-slate-500 cursor-pointer"><ExternalLinkIcon className="w-3.5 h-3.5" /></button>
           )}
@@ -184,14 +199,17 @@ function CommsHubComponent({
         </div>
       )}
 
-      {/* Row 2 (h-9): List-Only Search + Filter ▾ */}
+      {/* Row 2 (h-9): List-Only Grouped|Stream Toggle + Search + Multi-Select Filter ▾ */}
       {showListToolbar && (
         <CommsFilterToolbar
           searchQuery={sync.searchQuery} onChangeSearchQuery={sync.setSearchQuery} searchInputRef={searchInputRef}
-          channelFilter={sync.channelFilter} onChangeChannelFilter={sync.setChannelFilter} showChannelFilter={activeTab === 'all'}
+          channelFilter={sync.channelFilter} onChangeChannelFilter={sync.setChannelFilter}
+          channelFilters={sync.channelFilters} onChangeChannelFilters={sync.setChannelFilters} showChannelFilter={activeTab === 'all'}
           contactFilter={sync.contactFilter} onChangeContactFilter={sync.setContactFilter}
+          contactFilters={sync.contactFilters} onChangeContactFilters={sync.setContactFilters}
           filterUnreadOnly={sync.filterUnreadOnly} onToggleUnreadOnly={() => sync.setFilterUnreadOnly((v) => !v)}
           unreadCount={activeUnreadCount} onMarkAllRead={handleMarkAllRead} onRefresh={() => void sync.fetchTelephonyData()}
+          allViewMode={allViewMode} onChangeAllViewMode={handleChangeAllViewMode} showAllViewModeToggle={activeTab === 'all'}
         />
       )}
 
@@ -200,22 +218,22 @@ function CommsHubComponent({
           <SmsThreadPane
             mode="thread" {...sharedSmsProps}
             activeContactSummary={messaging.activeContactSummary} activeContactRecord={messaging.activeContactRecord}
-            threadCrmContext={messaging.threadCrmContext} trips={trips}
+            threadCrmContext={messaging.threadCrmContext} trips={trips} drivers={drivers}
             onOpenContactEmailInDock={messaging.handleOpenContactEmailInDock} onMarkThreadUnread={messaging.handleMarkThreadUnread}
-            onOpenTripById={messaging.handleOpenTripById} onFocusTripOnMap={messaging.handleFocusTripOnMap}
-            onRebookLastRide={messaging.handleRebookFromCrm} selectedInteractions={messaging.allSelectedContactInteractions}
-            messagesEndRef={messaging.messagesEndRef} onOpenEmailInDock={messaging.handleOpenEmailInDock}
-            onRetrySms={messaging.handleRetrySms} retryingSmsId={messaging.retryingSmsId}
-            onInsertTrackingLink={() => messaging.handleInsertTrackingLink('thread')}
-            onInsertPayLink={() => messaging.handleInsertPayLink('thread')}
-            isGeneratingPayLink={messaging.isGeneratingPayLink} noteDraftText={messaging.noteDraftText}
-            onChangeNoteDraftText={messaging.setNoteDraftText} onAddInternalNote={messaging.handleAddThreadInternalNote}
+            onOpenTripById={messaging.handleOpenTripById} onOpenTripDetails={onOpenTripDetails}
+            onFocusTripOnMap={messaging.handleFocusTripOnMap} onRebookLastRide={messaging.handleRebookFromCrm}
+            selectedInteractions={messaging.allSelectedContactInteractions} messagesEndRef={messaging.messagesEndRef}
+            onOpenEmailInDock={messaging.handleOpenEmailInDock} onRetrySms={messaging.handleRetrySms}
+            retryingSmsId={messaging.retryingSmsId} onInsertTrackingLink={() => messaging.handleInsertTrackingLink('thread')}
+            onInsertPayLink={() => messaging.handleInsertPayLink('thread')} isGeneratingPayLink={messaging.isGeneratingPayLink}
+            noteDraftText={messaging.noteDraftText} onChangeNoteDraftText={messaging.setNoteDraftText}
+            onAddInternalNote={messaging.handleAddThreadInternalNote}
           />
-        ) : activeTab === 'messages' ? (
+        ) : activeTab === 'messages' || (activeTab === 'all' && allViewMode === 'grouped') ? (
           <SmsThreadPane
             mode="list" {...sharedSmsProps} selectedInteractions={[]}
-            conversationRows={sync.conversationRows} messageConversations={sync.messageConversations}
-            threadUnreadCountMap={sync.threadUnreadCountMap}
+            conversationRows={activeTab === 'all' ? sync.filteredAllConversationRows : sync.conversationRows}
+            messageConversations={sync.messageConversations} threadUnreadCountMap={sync.threadUnreadCountMap}
           />
         ) : activeTab === 'phone' && softphone.callsSubTab === 'keypad' ? (
           <SoftphoneDialerPane
@@ -247,6 +265,18 @@ function CommsHubComponent({
         )}
       </div>
 
+      {showListToolbar && !messaging.isNewMessageModalOpen && (
+        <button
+          type="button"
+          data-comms-new-sms-fab="true"
+          onClick={messaging.handleOpenFreshNewMessageModal}
+          title="Compose New SMS"
+          className="absolute bottom-3.5 right-3.5 z-30 h-9 px-3.5 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-extrabold shadow-lg ring-1 ring-blue-700/20 inline-flex items-center gap-1.5 cursor-pointer"
+        >
+          <PlusIcon className="w-3.5 h-3.5" /><span>New SMS</span>
+        </button>
+      )}
+
       <AgentPhoneSetupModal
         isOpen={softphone.showAgentSetupModal} pendingCallTarget={softphone.pendingCallTarget}
         setupAgentPhoneInput={softphone.setupAgentPhoneInput} setupAgentPhoneError={softphone.setupAgentPhoneError}
@@ -254,14 +284,15 @@ function CommsHubComponent({
         onSaveAndCall={softphone.handleSaveAgentAndCall} onClose={softphone.handleCloseAgentSetupModal}
       />
 
-      <NewSmsMessageModal
-        isOpen={messaging.isNewMessageModalOpen} newMsgError={messaging.newMsgError} msgContactSearch={messaging.msgContactSearch}
+      <CommsBottomNewSmsSheet
+        isOpen={messaging.isNewMessageModalOpen} trips={trips} newMsgError={messaging.newMsgError} msgContactSearch={messaging.msgContactSearch}
         newMsgRecipientPhone={messaging.newMsgRecipientPhone} newMsgRecipientName={messaging.newMsgRecipientName}
         newMsgBody={messaging.newMsgBody} isSendingNewMsg={messaging.isSendingNewMsg}
         isMsgContactDropdownOpen={messaging.isMsgContactDropdownOpen} filteredContactsForMsg={messaging.filteredContactsForMsg}
         recipientCrmContext={messaging.newMsgRecipientCrmContext}
         onInsertTrackingLink={() => messaging.handleInsertTrackingLink('modal')}
         onInsertPayLink={() => messaging.handleInsertPayLink('modal')} isGeneratingPayLink={messaging.isGeneratingPayLink}
+        onSelectActiveRideChip={(chip) => { messaging.setNewMsgRecipientPhone(chip.phone); messaging.setNewMsgRecipientName(chip.passengerName); messaging.setMsgContactSearch(`${chip.passengerName} (${chip.phone})`); messaging.setIsMsgContactDropdownOpen(false); messaging.setNewMsgError(null); }}
         onRecipientInputChange={(val) => { messaging.setMsgContactSearch(val); messaging.setNewMsgRecipientPhone(val); messaging.setIsMsgContactDropdownOpen(true); messaging.setNewMsgError(null); }}
         onRecipientInputFocus={() => messaging.setIsMsgContactDropdownOpen(true)}
         onSelectContactOption={(c) => { const ph = c.mobilePhone || c.phone; messaging.setNewMsgRecipientPhone(ph); messaging.setNewMsgRecipientName(c.name); messaging.setMsgContactSearch(`${c.name} (${ph})`); messaging.setIsMsgContactDropdownOpen(false); }}

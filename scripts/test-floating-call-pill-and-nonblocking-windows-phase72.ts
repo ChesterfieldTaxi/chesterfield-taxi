@@ -194,13 +194,13 @@ function testUnifiedClientProfileEditTabAndRetiredContactModal(): void {
   const winOverviewHtml = renderToStaticMarkup(
     React.createElement(ClientProfileWindow, { trips: [makeSampleTrip('trip-7201')], corporateAccounts: corpAccounts, initialOpen: true, initialTarget: { phone: '+13145550144' }, initialTab: 'overview', onLoadTripIntoNewTab: () => {} })
   );
-  assert.equal(winOverviewHtml.includes('Overview &amp; Trips') && winOverviewHtml.includes('Edit Profile') && winOverviewHtml.includes('Recent Trips (1 of 1)'), true);
+  assert.equal(winOverviewHtml.includes('>Trips<') && winOverviewHtml.includes('>Places<') && winOverviewHtml.includes('>Contact<') && winOverviewHtml.includes('Recent Trips (1 of 1)'), true);
 
   const winEditHtml = renderToStaticMarkup(
     React.createElement(ClientProfileWindow, { trips: [makeSampleTrip('trip-7201')], corporateAccounts: corpAccounts, initialOpen: true, initialTarget: { phone: '+13145550144' }, initialTab: 'edit', onLoadTripIntoNewTab: () => {} })
   );
   assert.equal(winEditHtml.includes('Save Profile') && winEditHtml.includes('VIP Priority Client'), true);
-  assert.equal(readRel('app/components/domain/dispatch/ClientProfileWindow.tsx').includes("p.initialTab === 'edit' ? 'edit' : 'overview'"), true);
+  assert.equal(readRel('app/components/domain/dispatch/ClientProfileWindow.tsx').includes('normalizeClientProfileTab(p.initialTab)'), true);
   assert.equal(readRel('app/components/domain/dispatch/comms/useCommsMessagingAndContacts.ts').includes("initialTab: 'edit'"), true);
   svc.resetForTests();
 }

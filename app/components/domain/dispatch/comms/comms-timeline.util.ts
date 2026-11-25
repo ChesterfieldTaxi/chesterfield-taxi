@@ -1,10 +1,10 @@
 /**
- * Pure Omnichannel Timeline, Call Audio Guard & Email Snippet Utilities (`comms-timeline.util.ts`)
+ * Pure Omnichannel Timeline, Call Audio Guard, Cab/Ride Chip & Email Snippet Utilities (`comms-timeline.util.ts`)
  * Zero React/DOM, `*.server`, or `node:*` imports.
  */
 import type { WorkspaceEventMap } from '../../../../core/services/workspace-bus.service';
 import type { Trip } from '../../../../core/types/trip';
-import type { InteractionEvent, ThreadTab } from './comms-types';
+import type { InteractionEvent, ThreadTab, ThreadTimelineType } from './comms-types';
 
 const TERMINAL_TRIP_STATUSES = new Set(['completed', 'cancelled', 'declined']);
 const LIVE_TRIP_STATUSES = new Set(['in_progress', 'arrived', 'en_route']);
@@ -20,6 +20,7 @@ export interface BuildOmnichannelTimelineOptions {
   contactEmail?: string | null;
   contactId?: string | null;
   threadTab?: ThreadTab;
+  timelineFilters?: ReadonlyArray<ThreadTimelineType>;
   nowMs?: number;
 }
 
@@ -27,6 +28,14 @@ export interface BuildOmnichannelTimelineResult {
   matchedTrips: Trip[];
   pinnedUpcomingTrip: Trip | null;
   items: OmnichannelTimelineItem[];
+}
+
+export interface ActiveRideSmsPassengerChip {
+  tripId: string;
+  shortTripId: string;
+  passengerName: string;
+  phone: string;
+  status: Trip['status'];
 }
 
 export function hasPlayableCallAudio(
@@ -42,10 +51,7 @@ export function hasPlayableCallAudio(
 
 export function cleanCommsEmailSnippet(raw?: string | null): string {
   if (!raw) return '';
-  return String(raw)
-    .replace(/[=-]{3,}/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return String(raw).replace(/[=-]{3,}/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function extractLast10Digits(raw?: string | null): string {
@@ -77,40 +83,67 @@ export function formatShortRouteEndpoint(address?: string | null): string {
 }
 
 export function formatTripTimelineDateTime(trip: Trip): string {
-  if (!trip.scheduledPickupTime) {
-    return trip.bookingType === 'asap' ? 'ASAP' : 'Scheduled';
-  }
+  if (!trip.scheduledPickupTime) return trip.bookingType === 'asap' ? 'ASAP' : 'Scheduled';
   const dt = new Date(trip.scheduledPickupTime);
   if (Number.isNaN(dt.getTime())) return 'Scheduled';
-  const datePart = dt.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  const timePart = dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  return `${datePart}, ${timePart}`;
+  return `${dt.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
 }
 
-export function buildReturnTripDraftPayload(
+export function resolveTripCabBadgeLabel(
   trip: Trip,
-  _nowMs: number = Date.now()
-): WorkspaceEventMap['POPULATE_BOOKING'] {
+  drivers?: ReadonlyArray<any>
+): { label: string; tone: 'assigned' | 'staged' | 'unassigned' } {
+  const stripCab = (raw?: string | null) => String(raw || '').replace(/^car\s*#?\s*/i, '').replace(/^#/, '').trim();
+  if (trip.assignedDriverId || trip.assignedVehicle?.vehicleNumber) {
+    const drv = trip.assignedDriverId ? drivers?.find((d) => d.id === trip.assignedDriverId) : undefined;
+    const unit = stripCab(drv?.cabNumber || drv?.vehicleUnit || trip.assignedVehicle?.vehicleNumber);
+    return { label: unit ? `#${unit}` : drv?.name || 'Assigned', tone: 'assigned' };
+  }
+  if (trip.plannedDriverId) {
+    const drv = drivers?.find((d) => d.id === trip.plannedDriverId);
+    const unit = stripCab(drv?.cabNumber || drv?.vehicleUnit);
+    return { label: unit ? `#${unit} staged` : `${drv?.name || 'Driver'} staged`, tone: 'staged' };
+  }
+  return { label: 'Unassigned', tone: 'unassigned' };
+}
+
+export function buildActiveRideSmsPassengerChips(
+  trips: ReadonlyArray<Trip> = [],
+  nowMs: number = Date.now()
+): ActiveRideSmsPassengerChip[] {
+  const candidates = trips
+    .filter((t) => t && !t.isArchived && !TERMINAL_TRIP_STATUSES.has(String(t.status || '').toLowerCase()) && extractLast10Digits(t.passenger?.phone))
+    .sort((a, b) => {
+      const liveA = LIVE_TRIP_STATUSES.has(String(a.status || '').toLowerCase()) ? 1 : 0;
+      const liveB = LIVE_TRIP_STATUSES.has(String(b.status || '').toLowerCase()) ? 1 : 0;
+      if (liveA !== liveB) return liveB - liveA;
+      return Math.abs(resolveTripTimelineTimestampMs(a) - nowMs) - Math.abs(resolveTripTimelineTimestampMs(b) - nowMs);
+    });
+  const seenPhones = new Set<string>();
+  const chips: ActiveRideSmsPassengerChip[] = [];
+  for (const t of candidates) {
+    const digits = extractLast10Digits(t.passenger?.phone);
+    if (!digits || seenPhones.has(digits)) continue;
+    seenPhones.add(digits);
+    const name = `${t.passenger?.firstName || ''} ${t.passenger?.lastName || ''}`.trim() || t.passenger?.phone || 'Passenger';
+    chips.push({ tripId: t.id, shortTripId: formatShortTripId(t.id), passengerName: name, phone: t.passenger?.phone || digits, status: t.status });
+    if (chips.length >= 6) break;
+  }
+  return chips;
+}
+
+export function buildReturnTripDraftPayload(trip: Trip, _nowMs: number = Date.now()): WorkspaceEventMap['POPULATE_BOOKING'] {
   const passengerName = `${trip.passenger?.firstName || ''} ${trip.passenger?.lastName || ''}`.trim();
   const meta = (trip.metadata || {}) as Record<string, any>;
   const corpDetails = (meta.corporateDetails || {}) as Record<string, any>;
-
   return {
-    passengerName: passengerName || undefined,
-    passengerPhone: trip.passenger?.phone || undefined,
-    passengerEmail: trip.passenger?.email || undefined,
-    pickupAddress: trip.dropoffLocation?.address || '',
-    pickupCoordinates: trip.dropoffLocation?.coordinates
-      ? { ...trip.dropoffLocation.coordinates }
-      : undefined,
+    passengerName: passengerName || undefined, passengerPhone: trip.passenger?.phone || undefined,
+    passengerEmail: trip.passenger?.email || undefined, pickupAddress: trip.dropoffLocation?.address || '',
+    pickupCoordinates: trip.dropoffLocation?.coordinates ? { ...trip.dropoffLocation.coordinates } : undefined,
     dropoffAddress: trip.pickupLocation?.address || '',
-    dropoffCoordinates: trip.pickupLocation?.coordinates
-      ? { ...trip.pickupLocation.coordinates }
-      : undefined,
-    vehicleTier: trip.vehicleTier || undefined,
-    corporateAccount: corpDetails.corporateAccount || meta.corporateOrgName || undefined,
-    corporateAccountNumber: meta.corporateAccountNumber || undefined,
-    billingPo: corpDetails.billingPo || undefined,
+    dropoffCoordinates: trip.pickupLocation?.coordinates ? { ...trip.pickupLocation.coordinates } : undefined,
+    vehicleTier: trip.vehicleTier || undefined, corporateAccount: corpDetails.corporateAccount || meta.corporateOrgName || undefined,
+    corporateAccountNumber: meta.corporateAccountNumber || undefined, billingPo: corpDetails.billingPo || undefined,
     notes: `Return ride from ${formatShortTripId(trip.id)}`,
   };
 }
@@ -126,31 +159,19 @@ function matchesEventChannelTab(evt: InteractionEvent, tab: ThreadTab): boolean 
 }
 
 export function buildOmnichannelTimelineItems({
-  events,
-  trips = [],
-  contactPhone,
-  contactEmail,
-  contactId,
-  threadTab = 'all',
-  nowMs = Date.now(),
+  events, trips = [], contactPhone, contactEmail, contactId, threadTab = 'all', timelineFilters, nowMs = Date.now(),
 }: BuildOmnichannelTimelineOptions): BuildOmnichannelTimelineResult {
   const phoneNeedles = new Set<string>();
   const primaryDigits = extractLast10Digits(contactPhone);
   if (primaryDigits) phoneNeedles.add(primaryDigits);
   for (const evt of events) {
-    const d1 = extractLast10Digits(evt.contactPhone);
-    const d2 = extractLast10Digits(evt.mobilePhone);
-    const d3 = extractLast10Digits(evt.homePhone);
-    if (d1) phoneNeedles.add(d1);
-    if (d2) phoneNeedles.add(d2);
-    if (d3) phoneNeedles.add(d3);
+    for (const raw of [evt.contactPhone, evt.mobilePhone, evt.homePhone]) {
+      const d = extractLast10Digits(raw);
+      if (d) phoneNeedles.add(d);
+    }
   }
-
-  const emailNeedle =
-    normalizeEmailLower(contactEmail) ||
-    normalizeEmailLower(events.find((e) => e.contactEmail)?.contactEmail);
-  const cleanContactId =
-    contactId && !String(contactId).startsWith('temp_') ? String(contactId).trim() : '';
+  const emailNeedle = normalizeEmailLower(contactEmail) || normalizeEmailLower(events.find((e) => e.contactEmail)?.contactEmail);
+  const cleanContactId = contactId && !String(contactId).startsWith('temp_') ? String(contactId).trim() : '';
 
   const seenTripIds = new Set<string>();
   const matchedTrips: Trip[] = [];
@@ -158,19 +179,13 @@ export function buildOmnichannelTimelineItems({
     if (!trip || seenTripIds.has(trip.id)) continue;
     const paxDigits = extractLast10Digits(trip.passenger?.phone || (trip as any).passengerPhone);
     const paxEmail = normalizeEmailLower(trip.passenger?.email);
-    const idMatch = Boolean(cleanContactId && trip.customerId === cleanContactId);
-    const phoneMatch = Boolean(paxDigits && phoneNeedles.has(paxDigits));
-    const emailMatch = Boolean(emailNeedle && paxEmail && paxEmail === emailNeedle);
-
-    if (idMatch || phoneMatch || emailMatch) {
+    if ((cleanContactId && trip.customerId === cleanContactId) || (paxDigits && phoneNeedles.has(paxDigits)) || (emailNeedle && paxEmail && paxEmail === emailNeedle)) {
       seenTripIds.add(trip.id);
       matchedTrips.push(trip);
     }
   }
 
-  const nonTerminal = matchedTrips.filter(
-    (t) => !TERMINAL_TRIP_STATUSES.has(String(t.status || '').trim().toLowerCase())
-  );
+  const nonTerminal = matchedTrips.filter((t) => !TERMINAL_TRIP_STATUSES.has(String(t.status || '').trim().toLowerCase()));
   const sortedUpcoming = [...nonTerminal].sort((a, b) => {
     const stA = String(a.status || '').trim().toLowerCase();
     const stB = String(b.status || '').trim().toLowerCase();
@@ -183,18 +198,17 @@ export function buildOmnichannelTimelineItems({
   });
   const pinnedUpcomingTrip = sortedUpcoming[0] ?? null;
 
+  const hasMulti = Boolean(timelineFilters && timelineFilters.length > 0);
   const items: OmnichannelTimelineItem[] = [];
-  if (threadTab !== 'trips') {
-    for (const evt of events) {
-      if (matchesEventChannelTab(evt, threadTab)) {
-        items.push({ kind: 'event', timestampMs: evt.timestampMs || 0, event: evt });
-      }
-    }
+  for (const evt of events) {
+    const keep = hasMulti
+      ? timelineFilters!.some((ft) => ft !== 'trips' && matchesEventChannelTab(evt, ft))
+      : threadTab !== 'trips' && matchesEventChannelTab(evt, threadTab);
+    if (keep) items.push({ kind: 'event', timestampMs: evt.timestampMs || 0, event: evt });
   }
-  if (threadTab === 'all' || threadTab === 'trips') {
-    for (const trip of matchedTrips) {
-      items.push({ kind: 'trip', timestampMs: resolveTripTimelineTimestampMs(trip), trip });
-    }
+  const includeTrips = hasMulti ? timelineFilters!.includes('trips') : threadTab === 'all' || threadTab === 'trips';
+  if (includeTrips) {
+    for (const trip of matchedTrips) items.push({ kind: 'trip', timestampMs: resolveTripTimelineTimestampMs(trip), trip });
   }
 
   items.sort((a, b) => a.timestampMs - b.timestampMs);

@@ -220,7 +220,7 @@ export function DispatchPassengerCrmSection({
             title="Open Client Profile & Past Trips window"
           >
             <UserIcon className="w-3.5 h-3.5" />
-            <span>Client Profile</span>
+            <span>Profile</span>
           </button>
           <button
             type="button"

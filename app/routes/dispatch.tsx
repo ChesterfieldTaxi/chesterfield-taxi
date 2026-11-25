@@ -465,6 +465,15 @@ export default function DispatchRoute() {
     showDispatchToast,
   });
 
+  const handleOpenReviewModal = useCallback(
+    (trip: Trip, initialTab: 'details' | 'audit' = 'details') => {
+      setReviewTrip(trip);
+      setReviewModalTab(initialTab);
+      setReviewOpenSeq((seq) => seq + 1);
+    },
+    []
+  );
+
   useDispatchWorkspaceSync({
     navigate,
     urlTripId,
@@ -523,6 +532,7 @@ export default function DispatchRoute() {
     setIncomingCallAlert,
     populateActiveDraftFromPayload,
     onOpenEditTrip: handleOpenEditTrip,
+    onOpenReviewModal: handleOpenReviewModal,
     autoOfferContextRef,
     autoOfferStartedIdsRef,
   });
@@ -559,15 +569,6 @@ export default function DispatchRoute() {
       return false;
     });
   }, [drafts]);
-
-  const handleOpenReviewModal = useCallback(
-    (trip: Trip, initialTab: 'details' | 'audit' = 'details') => {
-      setReviewTrip(trip);
-      setReviewModalTab(initialTab);
-      setReviewOpenSeq((seq) => seq + 1);
-    },
-    []
-  );
 
   const handleOpenDriverModal = useCallback((trip: Trip) => {
     setDriverModalTrip(trip);
@@ -1256,6 +1257,7 @@ export default function DispatchRoute() {
                       : 'all'
                   }
                   onOpenEditTrip={stableCommsOpenEditTrip}
+                  onOpenTripDetails={stableOpenTripDetailsById}
                   onPopulateBooking={stableCommsPopulateBooking}
                   onPopOut={() => getWorkspaceBus().popOutModule('comms')}
                 />
@@ -1310,6 +1312,7 @@ export default function DispatchRoute() {
           onCommsPopOut={stableCommsPopOut}
           onCommsClose={stableCommsClose}
           onOpenEditTripById={stableCommsOpenEditTrip}
+          onOpenTripDetailsById={stableOpenTripDetailsById}
           onCommsPopulateBooking={stableCommsPopulateBooking}
           onEmailPopulateBooking={() => {
             setActiveMobileTab('booking');

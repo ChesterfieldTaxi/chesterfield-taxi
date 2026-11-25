@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getContactService } from '../../../core/services/customer/contact.service';
 import type { DriverRosterItem } from '../../../core/services/operator.service';
 import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
-import type { FleetCarConfig, VehicleTierConfig, CorporateAccountConfig } from '../../../core/types/config';
+import type { CorporateAccountConfig, FleetCarConfig, VehicleTierConfig } from '../../../core/types/config';
 import type { Trip } from '../../../core/types/trip';
 import { formatTripVehicleColumnDisplay } from '../../../core/utils/vehicle-tier-format.util';
 import { FloatingWindow } from '../../ui/FloatingWindow';
-import { CopyIcon, MapPinIcon, PencilIcon, UserIcon } from '../../ui/Icons';
+import { CarIcon, CopyIcon, MapPinIcon, PencilIcon, UserIcon } from '../../ui/Icons';
 import {
   CLIENT_TRIPS_PAGE_SIZE,
   buildNewTabValuesFromClientTrip,
@@ -36,7 +36,14 @@ export {
   shouldAutoOpenClientProfileOnCall,
 };
 
-export type ClientProfileTab = 'overview' | 'edit';
+export type ClientProfileTab = 'trips' | 'places' | 'contact';
+export type LegacyClientProfileTab = ClientProfileTab | 'overview' | 'edit';
+
+export function normalizeClientProfileTab(tab?: LegacyClientProfileTab | null): ClientProfileTab {
+  if (tab === 'edit' || tab === 'contact') return 'contact';
+  if (tab === 'places') return 'places';
+  return 'trips';
+}
 
 export interface ClientProfileTarget {
   phone?: string;
@@ -53,7 +60,7 @@ export interface ClientProfileWindowProps {
   nowMs?: number;
   initialOpen?: boolean;
   initialTarget?: ClientProfileTarget | null;
-  initialTab?: ClientProfileTab;
+  initialTab?: LegacyClientProfileTab;
   onLoadTripIntoNewTab: (values: DispatchFormValues, trip: Trip) => void;
   onOpenTripDetails?: (trip: Trip) => void;
   onEditTrip?: (trip: Trip) => void;
@@ -71,25 +78,13 @@ function formatCompactTripDate(trip: Trip): string {
 }
 
 export function ClientProfileWindow({
-  trips,
-  vehicles,
-  drivers,
-  fleetCars,
-  corporateAccounts,
-  nowMs,
-  initialOpen = false,
-  initialTarget = null,
-  initialTab = 'overview',
-  onLoadTripIntoNewTab,
-  onOpenTripDetails,
-  onEditTrip,
-  onFocusTripOnMap,
-  onPopulateBookingDraft,
-  onCallClient,
+  trips, vehicles, drivers, fleetCars, corporateAccounts, nowMs,
+  initialOpen = false, initialTarget = null, initialTab = 'trips',
+  onLoadTripIntoNewTab, onOpenTripDetails, onEditTrip, onFocusTripOnMap, onPopulateBookingDraft, onCallClient,
 }: ClientProfileWindowProps) {
   const [isOpen, setIsOpen] = useState(initialOpen);
   const [target, setTarget] = useState<ClientProfileTarget | null>(initialTarget);
-  const [activeTab, setActiveTab] = useState<ClientProfileTab>(initialTab);
+  const [activeTab, setActiveTab] = useState<ClientProfileTab>(() => normalizeClientProfileTab(initialTab));
   const [visibleCount, setVisibleCount] = useState<number>(CLIENT_TRIPS_PAGE_SIZE);
   const [contactsVersion, setContactsVersion] = useState(0);
 
@@ -106,31 +101,25 @@ export function ClientProfileWindow({
         const p = msg.payload;
         if (p.source === 'incoming_call' || p.source === 'answered_call' || p.source === 'outbound_call') {
           const check = shouldAutoOpenClientProfileOnCall({
-            phone: p.phone,
-            callSid: p.callSid,
-            seenCallKeys: seenCallKeysRef.current,
-            contacts: getContactService().getAllContacts(),
-            trips: tripsRef.current,
+            phone: p.phone, callSid: p.callSid, seenCallKeys: seenCallKeysRef.current,
+            contacts: getContactService().getAllContacts(), trips: tripsRef.current,
           });
           if (!check.shouldOpen) return;
         }
         setTarget({ phone: p.phone, email: p.email, name: p.name });
-        setActiveTab(p.initialTab === 'edit' ? 'edit' : 'overview');
+        setActiveTab(normalizeClientProfileTab(p.initialTab));
         setVisibleCount(CLIENT_TRIPS_PAGE_SIZE);
         setIsOpen(true);
       } else if (msg.type === 'INCOMING_CALL' || msg.type === 'CALL_INCOMING' || msg.type === 'CALL_ANSWERED') {
         const callerPhone = msg.type === 'INCOMING_CALL' ? msg.payload?.from : msg.payload?.callerNumber;
         const callSid = msg.payload?.callSid;
         const check = shouldAutoOpenClientProfileOnCall({
-          phone: callerPhone,
-          callSid,
-          seenCallKeys: seenCallKeysRef.current,
-          contacts: getContactService().getAllContacts(),
-          trips: tripsRef.current,
+          phone: callerPhone, callSid, seenCallKeys: seenCallKeysRef.current,
+          contacts: getContactService().getAllContacts(), trips: tripsRef.current,
         });
         if (check.shouldOpen) {
           setTarget({ phone: callerPhone, name: check.profile?.displayName, email: check.profile?.displayEmail });
-          setActiveTab('overview');
+          setActiveTab('trips');
           setVisibleCount(CLIENT_TRIPS_PAGE_SIZE);
           setIsOpen(true);
         }
@@ -161,6 +150,11 @@ export function ClientProfileWindow({
     onPopulateBookingDraft?.(payload);
   };
 
+  const openTripDetails = (trip: Trip) => {
+    getWorkspaceBus().publish('OPEN_TRIP_DETAILS', { tripId: trip.id, initialTab: 'details' });
+    onOpenTripDetails?.(trip);
+  };
+
   return (
     <FloatingWindow
       id="client_profile"
@@ -174,60 +168,57 @@ export function ClientProfileWindow({
       minHeight={340}
       zIndex={220}
     >
-      <div className="p-3 space-y-3 text-xs">
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-200/75 border border-slate-200">
-          <button
-            type="button"
-            onClick={() => setActiveTab('overview')}
-            className={`py-1.5 px-2.5 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeTab === 'overview' ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <UserIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span>Overview &amp; Trips</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('edit')}
-            className={`py-1.5 px-2.5 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeTab === 'edit' ? 'bg-white text-blue-700 shadow-2xs ring-1 ring-slate-200/80' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <PencilIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span>Edit Profile</span>
-          </button>
+      <div className="p-3 space-y-2.5 text-xs">
+        <ClientProfileHeaderCard profile={profile} onCallClient={onCallClient} />
+
+        <div data-client-profile-tabs="v2.1" className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-slate-200/75 border border-slate-200">
+          {([
+            { id: 'trips' as const, label: 'Trips', count: profile.sortedTrips.length, icon: <CarIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" /> },
+            { id: 'places' as const, label: 'Places', count: places.length, icon: <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> },
+            { id: 'contact' as const, label: 'Contact', count: null, icon: <PencilIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> },
+          ] as const).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`py-1.5 px-2 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                activeTab === tab.id ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+              {tab.count !== null && tab.count > 0 && (
+                <span className="px-1.5 rounded-full bg-slate-100 text-slate-600 text-[9.5px] font-bold">{tab.count}</span>
+              )}
+            </button>
+          ))}
         </div>
 
-        {activeTab === 'edit' ? (
+        {activeTab === 'contact' ? (
           <ClientProfileEditTab
             profile={profile}
             vehicles={vehicles}
             corporateAccounts={corporateAccounts}
-            onSaved={(saved) => {
-              setTarget({ phone: saved.phone, email: saved.email, name: saved.name });
-              setActiveTab('overview');
-            }}
-            onCancel={() => setActiveTab('overview')}
+            onSaved={(saved) => setTarget({ phone: saved.phone, email: saved.email, name: saved.name })}
+            onCancel={() => setActiveTab('trips')}
+          />
+        ) : activeTab === 'places' ? (
+          <ClientSavedPlacesSection
+            key={profile.contact?.id || profile.rawPhone || profile.displayEmail || 'client'}
+            places={places}
+            contactId={profile.contact?.id}
+            identity={{ phone: profile.rawPhone, email: profile.displayEmail, name: profile.displayName }}
+            onSetEndpoint={handleSetPlaceEndpoint}
           />
         ) : (
-          <>
-            <ClientProfileHeaderCard profile={profile} onCallClient={onCallClient} />
-
+          <div className="space-y-2.5">
             <ClientUpcomingRidesStrip
               trips={activeUpcomingTrips}
               nowMs={nowMs}
               drivers={drivers}
-              onOpenTripDetails={onOpenTripDetails}
+              onOpenTripDetails={openTripDetails}
               onEditTrip={onEditTrip}
               onFocusTripOnMap={onFocusTripOnMap}
-            />
-
-            <ClientSavedPlacesSection
-              key={profile.contact?.id || profile.rawPhone || profile.displayEmail || 'client'}
-              places={places}
-              contactId={profile.contact?.id}
-              identity={{ phone: profile.rawPhone, email: profile.displayEmail, name: profile.displayName }}
-              onSetEndpoint={handleSetPlaceEndpoint}
             />
 
             <div className="space-y-1.5">
@@ -253,13 +244,15 @@ export function ClientProfileWindow({
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <DispatchStatusBadge status={trip.status} trip={trip} nowMs={nowMs} compact />
-                            {onOpenTripDetails ? (
-                              <button type="button" onClick={() => onOpenTripDetails(trip)} className="font-mono font-bold text-[10.5px] text-blue-600 hover:underline cursor-pointer" title="Open Trip Details & Audit">
-                                #{shortId}
-                              </button>
-                            ) : (
-                              <span className="font-mono font-bold text-[10.5px] text-slate-500">#{shortId}</span>
-                            )}
+                            <button
+                              type="button"
+                              data-open-trip-details={trip.id}
+                              onClick={() => openTripDetails(trip)}
+                              className="font-mono font-bold text-[10.5px] text-blue-700 hover:underline cursor-pointer"
+                              title="Open Trip Details & Audit"
+                            >
+                              #{shortId}
+                            </button>
                             <span className="font-bold text-slate-800 text-[11px]">{formatCompactTripDate(trip)}</span>
                             <span className="text-[10.5px] font-semibold text-slate-500">· {vehicleLabel}</span>
                             <span className="font-mono font-extrabold text-slate-900 text-[11px]">· ${fare}</span>
@@ -308,7 +301,7 @@ export function ClientProfileWindow({
                 </button>
               )}
             </div>
-          </>
+          </div>
         )}
       </div>
     </FloatingWindow>

@@ -1,16 +1,29 @@
 import React from 'react';
-import { BuildingIcon, MailIcon, PhoneIcon, ShieldCheckIcon } from '../../ui/Icons';
+import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
+import { BuildingIcon, ChatBubbleLeftRightIcon, MailIcon, PhoneIcon, ShieldCheckIcon } from '../../ui/Icons';
 import type { ResolvedClientProfileData } from './client-trip-history.util';
 
 export interface ClientProfileHeaderCardProps {
   profile: ResolvedClientProfileData;
   onCallClient?: (phone: string, name?: string) => void;
+  onOpenThread?: (target: { phone?: string; email?: string }) => void;
 }
 
-/** CRM badges, contact lines, metrics, and dispatcher notes for the Client Profile window. */
-export function ClientProfileHeaderCard({ profile, onCallClient }: ClientProfileHeaderCardProps) {
+/** Persistent CRM badges, contact lines, [Call] + [Thread] actions, and dispatcher notes. */
+export function ClientProfileHeaderCard({ profile, onCallClient, onOpenThread }: ClientProfileHeaderCardProps) {
+  const canOpenThread = Boolean(profile.rawPhone || profile.displayEmail);
+  const handleJumpToThread = () => {
+    const bus = getWorkspaceBus();
+    bus.publish('OPEN_COMMS_THREAD', {
+      phone: profile.rawPhone || undefined,
+      email: profile.displayEmail || undefined,
+    });
+    bus.publish('FOCUS_MODULE', { moduleKey: 'comms' });
+    onOpenThread?.({ phone: profile.rawPhone || undefined, email: profile.displayEmail || undefined });
+  };
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs space-y-2">
+    <div className="bg-white rounded-xl border border-slate-200/90 p-2.5 shadow-2xs space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           {profile.isVip && (
@@ -36,21 +49,34 @@ export function ClientProfileHeaderCard({ profile, onCallClient }: ClientProfile
             </span>
           )}
           <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-800 border border-slate-200">
-            {profile.totalTrips} {profile.totalTrips === 1 ? 'Trip' : 'Trips'} · $
-            {profile.totalSpend.toFixed(2)} Spend
+            {profile.totalTrips} {profile.totalTrips === 1 ? 'Trip' : 'Trips'} · ${profile.totalSpend.toFixed(2)} Spend
           </span>
         </div>
 
-        {profile.rawPhone && onCallClient && (
-          <button
-            type="button"
-            onClick={() => onCallClient(profile.rawPhone, profile.displayName)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] border border-blue-200 cursor-pointer"
-          >
-            <PhoneIcon className="w-3 h-3" />
-            <span>Call</span>
-          </button>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {profile.rawPhone && onCallClient && (
+            <button
+              type="button"
+              onClick={() => onCallClient(profile.rawPhone, profile.displayName)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] border border-emerald-200 cursor-pointer"
+            >
+              <PhoneIcon className="w-3 h-3" />
+              <span>Call</span>
+            </button>
+          )}
+          {canOpenThread && (
+            <button
+              type="button"
+              data-client-profile-thread-btn="true"
+              onClick={handleJumpToThread}
+              title="Open unified Comms thread"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] border border-blue-200 cursor-pointer"
+            >
+              <ChatBubbleLeftRightIcon className="w-3 h-3" />
+              <span>Thread</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {(profile.displayPhone || profile.displayEmail) && (
