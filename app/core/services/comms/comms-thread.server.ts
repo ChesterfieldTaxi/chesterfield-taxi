@@ -18,6 +18,9 @@ import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import {
   buildCommsEventId,
   createEmptyUnreadByChannel,
+  reconcileCommsEventStatus,
+  reconcileCommsThreadStatus,
+  type CommsChannel,
   type CommsEvent,
   type CommsThread,
   type RecordCommsEventInput,
@@ -131,9 +134,18 @@ function findMatchingServerThreads(criteria: {
   return matches;
 }
 
-function getServerThreadEvents(threadId: string, includeArchived = true): CommsEvent[] {
+function getServerThreadEvents(
+  threadId: string,
+  includeArchived = true,
+  includeDeleted = false
+): CommsEvent[] {
   return Array.from(commsServerStore.events.values())
-    .filter((e) => e.threadId === threadId && (includeArchived || !e.isArchived))
+    .filter(
+      (e) =>
+        e.threadId === threadId &&
+        (includeDeleted || !e.isDeleted) &&
+        (includeArchived || !e.isArchived)
+    )
     .sort((a, b) => (a.timestampMs || 0) - (b.timestampMs || 0));
 }
 
@@ -291,7 +303,7 @@ export async function ingestCommsEventServer(
   const defaultUnread =
     input.direction === 'inbound' && input.channel !== 'note' ? true : false;
 
-  const nextEvent: CommsEvent = {
+  const candidateEvent: CommsEvent = {
     ...(existingEvent || {}),
     id: eventId,
     threadId: effectiveThreadId,
@@ -359,14 +371,28 @@ export async function ingestCommsEventServer(
         : defaultUnread,
     isArchived:
       input.isArchived !== undefined ? input.isArchived : existingEvent?.isArchived ?? false,
+    isDeleted:
+      input.isDeleted !== undefined ? input.isDeleted : existingEvent?.isDeleted ?? false,
+    ...(input.statusUpdatedAtMs !== undefined
+      ? { statusUpdatedAtMs: input.statusUpdatedAtMs }
+      : {}),
     actorId: input.actorId || existingEvent?.actorId,
     actorName: input.actorName || existingEvent?.actorName,
     timestampIso: tsIso,
     timestampMs: tsMs,
   };
 
+  // Reconcile status with LWW + sticky isDeleted tombstone so retries/syncs never resurrect deleted or read items
+  const nextEvent = reconcileCommsEventStatus(existingEvent, candidateEvent);
+
   commsServerStore.events.set(eventId, nextEvent);
   enforceBoundedMap(commsServerStore.events, MAX_SERVER_EVENTS);
+
+  const shouldWakeThread =
+    !existingEvent &&
+    !nextEvent.isDeleted &&
+    !nextEvent.isArchived &&
+    nextEvent.timestampMs > (activeThread?.statusUpdatedAtMs || 0);
 
   const seedThread: CommsThread = activeThread
     ? {
@@ -392,7 +418,8 @@ export async function ingestCommsEventServer(
           ...resolution.emails,
           ...(activeThread.emails || []),
         ]),
-        isArchived: false,
+        isArchived: shouldWakeThread ? false : Boolean(activeThread.isArchived),
+        isDeleted: shouldWakeThread ? false : Boolean(activeThread.isDeleted),
       }
     : {
         id: effectiveThreadId,
@@ -416,14 +443,18 @@ export async function ingestCommsEventServer(
         unreadCountTotal: 0,
         unreadByChannel: createEmptyUnreadByChannel(),
         isStarred: false,
-        isArchived: false,
+        isArchived: Boolean(nextEvent.isArchived),
+        isDeleted: Boolean(nextEvent.isDeleted),
+        ...(nextEvent.statusUpdatedAtMs !== undefined
+          ? { statusUpdatedAtMs: nextEvent.statusUpdatedAtMs }
+          : {}),
         createdAt: tsIso,
         updatedAt: nowIso,
       };
 
   const updatedThread = recomputeCommsThreadRollups(
     seedThread,
-    getServerThreadEvents(effectiveThreadId, true),
+    getServerThreadEvents(effectiveThreadId, true, false),
     nowIso
   );
   commsServerStore.threads.set(effectiveThreadId, updatedThread);
@@ -690,6 +721,287 @@ export async function attachCallRecordingServer(input: {
   );
 }
 
+export interface UpdateCommsStatusServerInput {
+  eventIds?: string[];
+  threadIds?: string[];
+  channels?: CommsChannel[];
+  isUnread?: boolean;
+  isArchived?: boolean;
+  isDeleted?: boolean;
+  statusUpdatedAtMs?: number;
+  events?: CommsEvent[];
+  threads?: CommsThread[];
+  staffBearerToken?: string;
+  skipFirestore?: boolean;
+  nowMs?: number;
+}
+
+export interface UpdateCommsStatusServerResult {
+  threads: CommsThread[];
+  events: CommsEvent[];
+  persistedToFirestore: boolean;
+}
+
+function resolveServerStoredEvent(rawId: string): CommsEvent | undefined {
+  const direct = commsServerStore.events.get(rawId);
+  if (direct) return direct;
+  for (const prefix of ['sms_', 'vm_', 'call_', 'em_', 'note_']) {
+    const prefixed = commsServerStore.events.get(`${prefix}${rawId}`);
+    if (prefixed) return prefixed;
+  }
+  return undefined;
+}
+
+/**
+ * Authoritatively mutates read/unread, archive/unarchive, and soft-delete status on
+ * `commsServerStore` with `statusUpdatedAtMs` LWW + sticky `isDeleted` tombstones,
+ * recomputes parent thread rollups, and flushes dirty records to Firestore REST.
+ */
+export async function updateCommsStatusServer(
+  input: UpdateCommsStatusServerInput
+): Promise<UpdateCommsStatusServerResult> {
+  const nowMs = input.nowMs ?? Date.now();
+  const mutationTs = input.statusUpdatedAtMs ?? nowMs;
+  const nowIso = new Date(nowMs).toISOString();
+
+  const touchedThreadIds = new Set<string>();
+  const mutatedEventsMap = new Map<string, CommsEvent>();
+
+  // 1. Reconcile any client-provided thread snapshots (handles cold-start server store)
+  if (Array.isArray(input.threads)) {
+    for (const ct of input.threads) {
+      if (!ct || !ct.id || ct.mergedIntoThreadId) continue;
+      const existing = commsServerStore.threads.get(ct.id);
+      const reconciled = reconcileCommsThreadStatus(existing, {
+        ...ct,
+        statusUpdatedAtMs: ct.statusUpdatedAtMs ?? mutationTs,
+      });
+      commsServerStore.threads.set(ct.id, reconciled);
+      enforceBoundedMap(commsServerStore.threads, MAX_SERVER_THREADS);
+      commsServerStore.dirtyThreadIds.add(ct.id);
+      touchedThreadIds.add(ct.id);
+    }
+  }
+
+  // 2. Reconcile any client-provided event snapshots (handles cold-start server store)
+  if (Array.isArray(input.events)) {
+    for (const ce of input.events) {
+      if (!ce || !ce.id) continue;
+      const existing = commsServerStore.events.get(ce.id);
+      const reconciled = reconcileCommsEventStatus(existing, {
+        ...ce,
+        statusUpdatedAtMs: ce.statusUpdatedAtMs ?? mutationTs,
+      });
+      commsServerStore.events.set(ce.id, reconciled);
+      enforceBoundedMap(commsServerStore.events, MAX_SERVER_EVENTS);
+      commsServerStore.dirtyEventIds.add(ce.id);
+      mutatedEventsMap.set(ce.id, reconciled);
+      if (reconciled.threadId) touchedThreadIds.add(reconciled.threadId);
+    }
+  }
+
+  // 3. Apply explicit eventIds status mutations
+  if (Array.isArray(input.eventIds)) {
+    for (const rawId of input.eventIds) {
+      if (!rawId) continue;
+      const existing = resolveServerStoredEvent(rawId);
+      if (!existing) continue;
+      const candidate: CommsEvent = {
+        ...existing,
+        isDeleted:
+          input.isDeleted !== undefined
+            ? Boolean(existing.isDeleted || input.isDeleted)
+            : existing.isDeleted,
+        isArchived:
+          input.isArchived !== undefined ? input.isArchived : existing.isArchived,
+        isUnread:
+          input.isDeleted || existing.isDeleted || input.isArchived
+            ? false
+            : input.isUnread !== undefined
+            ? input.isUnread
+            : existing.isUnread,
+        statusUpdatedAtMs: mutationTs,
+      };
+      const reconciled = reconcileCommsEventStatus(existing, candidate);
+      commsServerStore.events.set(reconciled.id, reconciled);
+      commsServerStore.dirtyEventIds.add(reconciled.id);
+      mutatedEventsMap.set(reconciled.id, reconciled);
+      if (reconciled.threadId) touchedThreadIds.add(reconciled.threadId);
+    }
+  }
+
+  // 4. Apply explicit threadIds status mutations
+  const channelSet =
+    Array.isArray(input.channels) && input.channels.length > 0
+      ? new Set<CommsChannel>(input.channels)
+      : null;
+
+  if (Array.isArray(input.threadIds)) {
+    for (const tid of input.threadIds) {
+      if (!tid) continue;
+      touchedThreadIds.add(tid);
+      const existingThread = commsServerStore.threads.get(tid);
+      const threadEvents = getServerThreadEvents(tid, true, true);
+
+      if (input.isUnread === true && !input.isDeleted && !input.isArchived) {
+        const targetEvt = [...threadEvents]
+          .reverse()
+          .find(
+            (e) =>
+              !e.isDeleted &&
+              e.channel !== 'note' &&
+              (!channelSet || channelSet.has(e.channel))
+          );
+        if (targetEvt) {
+          const reconciled = reconcileCommsEventStatus(targetEvt, {
+            ...targetEvt,
+            isUnread: true,
+            statusUpdatedAtMs: mutationTs,
+          });
+          commsServerStore.events.set(reconciled.id, reconciled);
+          commsServerStore.dirtyEventIds.add(reconciled.id);
+          mutatedEventsMap.set(reconciled.id, reconciled);
+        }
+      } else {
+        for (const evt of threadEvents) {
+          if (channelSet && !channelSet.has(evt.channel)) continue;
+          if (
+            input.isDeleted === undefined &&
+            input.isArchived === undefined &&
+            input.isUnread === undefined
+          ) {
+            continue;
+          }
+          const candidate: CommsEvent = {
+            ...evt,
+            isDeleted:
+              input.isDeleted !== undefined
+                ? Boolean(evt.isDeleted || input.isDeleted)
+                : evt.isDeleted,
+            isArchived:
+              input.isArchived !== undefined ? input.isArchived : evt.isArchived,
+            isUnread:
+              input.isDeleted || evt.isDeleted || input.isArchived
+                ? false
+                : input.isUnread !== undefined
+                ? input.isUnread
+                : evt.isUnread,
+            statusUpdatedAtMs: mutationTs,
+          };
+          const reconciled = reconcileCommsEventStatus(evt, candidate);
+          commsServerStore.events.set(reconciled.id, reconciled);
+          commsServerStore.dirtyEventIds.add(reconciled.id);
+          mutatedEventsMap.set(reconciled.id, reconciled);
+        }
+      }
+
+      if (existingThread && !channelSet) {
+        const candidateThread: CommsThread = {
+          ...existingThread,
+          isDeleted:
+            input.isDeleted !== undefined
+              ? Boolean(existingThread.isDeleted || input.isDeleted)
+              : existingThread.isDeleted,
+          isArchived:
+            input.isArchived !== undefined
+              ? input.isArchived
+              : existingThread.isArchived,
+          statusUpdatedAtMs: mutationTs,
+          updatedAt: nowIso,
+        };
+        const reconciledThread = reconcileCommsThreadStatus(existingThread, candidateThread);
+        commsServerStore.threads.set(tid, reconciledThread);
+        commsServerStore.dirtyThreadIds.add(tid);
+      }
+    }
+  }
+
+  // 5. Recompute rollups for all touched threads
+  const updatedThreads: CommsThread[] = [];
+  for (const tid of touchedThreadIds) {
+    const thr = commsServerStore.threads.get(tid);
+    if (!thr) continue;
+    const allThrEvents = getServerThreadEvents(tid, true, true);
+    const nonDeletedEvents = allThrEvents.filter((e) => !e.isDeleted);
+    const activeNonArchivedEvents = nonDeletedEvents.filter((e) => !e.isArchived);
+
+    const allEventsDeleted = allThrEvents.length > 0 && nonDeletedEvents.length === 0;
+    const allActiveArchived =
+      nonDeletedEvents.length > 0 &&
+      activeNonArchivedEvents.length === 0 &&
+      input.isArchived === true;
+
+    const recomputed: CommsThread = {
+      ...recomputeCommsThreadRollups(thr, nonDeletedEvents, nowIso),
+      isDeleted: Boolean(thr.isDeleted || allEventsDeleted),
+      isArchived:
+        input.isArchived === false
+          ? false
+          : Boolean(thr.isArchived || allActiveArchived),
+      statusUpdatedAtMs: Math.max(thr.statusUpdatedAtMs ?? 0, mutationTs),
+    };
+    commsServerStore.threads.set(tid, recomputed);
+    commsServerStore.dirtyThreadIds.add(tid);
+    updatedThreads.push(recomputed);
+  }
+
+  const updatedEvents = Array.from(mutatedEventsMap.values());
+
+  // 6. Flush dirty mutations to Firestore REST when configured
+  let persistedToFirestore = false;
+  if (!input.skipFirestore && isFirebaseConfigured()) {
+    const token = await resolveServerFirestoreToken(input.staffBearerToken);
+    if (token) {
+      let allOk = true;
+      for (const evt of updatedEvents) {
+        const ok = await patchFirestoreDocumentRest(
+          'commsEvents',
+          evt.id,
+          evt as unknown as Record<string, unknown>,
+          token
+        );
+        if (ok) commsServerStore.dirtyEventIds.delete(evt.id);
+        else allOk = false;
+      }
+      for (const thr of updatedThreads) {
+        const ok = await patchFirestoreDocumentRest(
+          'commsThreads',
+          thr.id,
+          thr as unknown as Record<string, unknown>,
+          token
+        );
+        if (ok) commsServerStore.dirtyThreadIds.delete(thr.id);
+        else allOk = false;
+      }
+      persistedToFirestore = allOk && (updatedEvents.length > 0 || updatedThreads.length > 0);
+    }
+  }
+
+  return {
+    threads: updatedThreads,
+    events: updatedEvents,
+    persistedToFirestore,
+  };
+}
+
+function eventStatusDiffers(a: CommsEvent, b: CommsEvent): boolean {
+  return (
+    Boolean(a.isUnread) !== Boolean(b.isUnread) ||
+    Boolean(a.isArchived) !== Boolean(b.isArchived) ||
+    Boolean(a.isDeleted) !== Boolean(b.isDeleted) ||
+    (a.statusUpdatedAtMs ?? 0) !== (b.statusUpdatedAtMs ?? 0)
+  );
+}
+
+function threadStatusDiffers(a: CommsThread, b: CommsThread): boolean {
+  return (
+    Boolean(a.isArchived) !== Boolean(b.isArchived) ||
+    Boolean(a.isDeleted) !== Boolean(b.isDeleted) ||
+    (a.statusUpdatedAtMs ?? 0) !== (b.statusUpdatedAtMs ?? 0) ||
+    (a.unreadCountTotal ?? 0) !== (b.unreadCountTotal ?? 0)
+  );
+}
+
 /**
  * Flushes any buffered `commsServerStore` records to Firestore REST using an authenticated
  * dispatcher's `staffBearerToken` (or service account token) and returns unified threads & events.
@@ -704,10 +1016,26 @@ export async function flushAndSyncCommsServer(options?: {
   events: CommsEvent[];
   flushedCount: number;
 }> {
+  const touchedThreadIds = new Set<string>();
+
+  if (Array.isArray(options?.clientThreads)) {
+    for (const ct of options.clientThreads) {
+      if (!ct || !ct.id || ct.mergedIntoThreadId) continue;
+      const existing = commsServerStore.threads.get(ct.id);
+      const reconciled = reconcileCommsThreadStatus(existing, ct);
+      if (!existing || threadStatusDiffers(existing, reconciled)) {
+        commsServerStore.threads.set(ct.id, reconciled);
+        commsServerStore.dirtyThreadIds.add(ct.id);
+        touchedThreadIds.add(ct.id);
+      }
+    }
+  }
+
   if (Array.isArray(options?.clientEvents)) {
     for (const evt of options.clientEvents) {
       if (!evt || !evt.id || !evt.channel) continue;
-      if (!commsServerStore.events.has(evt.id)) {
+      const existing = commsServerStore.events.get(evt.id);
+      if (!existing) {
         await ingestCommsEventServer(
           {
             ...evt,
@@ -718,6 +1046,13 @@ export async function flushAndSyncCommsServer(options?: {
             skipFirestore: true,
           }
         );
+      } else {
+        const reconciled = reconcileCommsEventStatus(existing, evt);
+        if (eventStatusDiffers(existing, reconciled)) {
+          commsServerStore.events.set(evt.id, reconciled);
+          commsServerStore.dirtyEventIds.add(evt.id);
+          touchedThreadIds.add(reconciled.threadId);
+        }
       }
     }
   }
@@ -728,7 +1063,65 @@ export async function flushAndSyncCommsServer(options?: {
     : null;
 
   if (token && !options?.skipFirestore && isFirebaseConfigured()) {
-    // 1. Flush dirty events
+    // 1. Read remote Firestore docs first and reconcile LWW + tombstones before flushing
+    // so cold-start in-memory state never overwrites newer Firestore mutations or tombstones.
+    const [remoteThreads, remoteEvents] = await Promise.all([
+      listFirestoreCollectionRest<CommsThread>('commsThreads', token, 100),
+      listFirestoreCollectionRest<CommsEvent>('commsEvents', token, 200),
+    ]);
+
+    if (Array.isArray(remoteThreads)) {
+      for (const rt of remoteThreads) {
+        if (!rt?.id || rt.mergedIntoThreadId) continue;
+        const existing = commsServerStore.threads.get(rt.id);
+        if (!existing) {
+          commsServerStore.threads.set(rt.id, rt);
+        } else {
+          const reconciled = reconcileCommsThreadStatus(existing, rt);
+          commsServerStore.threads.set(rt.id, reconciled);
+          // If Firestore already matches the reconciled winner, no need to re-patch unless local had newer changes
+          if (!threadStatusDiffers(rt, reconciled) && (rt.lastEventAtMs || 0) >= (existing.lastEventAtMs || 0)) {
+            commsServerStore.dirtyThreadIds.delete(rt.id);
+          } else if (threadStatusDiffers(rt, reconciled)) {
+            commsServerStore.dirtyThreadIds.add(rt.id);
+          }
+          touchedThreadIds.add(rt.id);
+        }
+      }
+    }
+
+    if (Array.isArray(remoteEvents)) {
+      for (const re of remoteEvents) {
+        if (!re?.id) continue;
+        const existing = commsServerStore.events.get(re.id);
+        if (!existing) {
+          commsServerStore.events.set(re.id, re);
+          if (re.threadId) touchedThreadIds.add(re.threadId);
+        } else {
+          const reconciled = reconcileCommsEventStatus(existing, re);
+          commsServerStore.events.set(re.id, reconciled);
+          if (!eventStatusDiffers(re, reconciled) && re.transcription === reconciled.transcription && re.deliveryStatus === reconciled.deliveryStatus) {
+            commsServerStore.dirtyEventIds.delete(re.id);
+          } else if (eventStatusDiffers(re, reconciled)) {
+            commsServerStore.dirtyEventIds.add(re.id);
+          }
+          if (reconciled.threadId) touchedThreadIds.add(reconciled.threadId);
+        }
+      }
+    }
+
+    for (const tid of touchedThreadIds) {
+      const thr = commsServerStore.threads.get(tid);
+      if (thr) {
+        const recomputed = recomputeCommsThreadRollups(
+          thr,
+          getServerThreadEvents(tid, true, false)
+        );
+        commsServerStore.threads.set(tid, recomputed);
+      }
+    }
+
+    // 2. Flush dirty events
     for (const evtId of Array.from(commsServerStore.dirtyEventIds)) {
       const evt = commsServerStore.events.get(evtId);
       if (!evt) {
@@ -747,7 +1140,7 @@ export async function flushAndSyncCommsServer(options?: {
       }
     }
 
-    // 2. Flush dirty threads
+    // 3. Flush dirty threads
     for (const thrId of Array.from(commsServerStore.dirtyThreadIds)) {
       const thr = commsServerStore.threads.get(thrId);
       if (!thr) {
@@ -766,7 +1159,7 @@ export async function flushAndSyncCommsServer(options?: {
       }
     }
 
-    // 3. Flush dirty webhook logs
+    // 4. Flush dirty webhook logs
     for (const whId of Array.from(commsServerStore.dirtyWebhookEventIds)) {
       const wh = commsServerStore.webhookEvents.get(whId);
       if (!wh) {
@@ -783,36 +1176,27 @@ export async function flushAndSyncCommsServer(options?: {
         commsServerStore.dirtyWebhookEventIds.delete(whId);
       }
     }
-
-    // 4. Hydrate any persisted Firestore docs not yet in this serverless instance's memory
-    const [remoteThreads, remoteEvents] = await Promise.all([
-      listFirestoreCollectionRest<CommsThread>('commsThreads', token, 100),
-      listFirestoreCollectionRest<CommsEvent>('commsEvents', token, 200),
-    ]);
-
-    if (Array.isArray(remoteThreads)) {
-      for (const rt of remoteThreads) {
-        if (rt?.id && !rt.mergedIntoThreadId && !commsServerStore.threads.has(rt.id)) {
-          commsServerStore.threads.set(rt.id, rt);
-        }
-      }
-    }
-    if (Array.isArray(remoteEvents)) {
-      for (const re of remoteEvents) {
-        if (re?.id && !commsServerStore.events.has(re.id)) {
-          commsServerStore.events.set(re.id, re);
-        }
+  } else if (touchedThreadIds.size > 0) {
+    for (const tid of touchedThreadIds) {
+      const thr = commsServerStore.threads.get(tid);
+      if (thr) {
+        commsServerStore.threads.set(
+          tid,
+          recomputeCommsThreadRollups(thr, getServerThreadEvents(tid, true, false))
+        );
       }
     }
   }
 
+  // Return all non-merged threads and events (including isArchived and isDeleted tombstones)
+  // so clients receive authoritative status tombstones and never resurrect deleted/read items.
   const threads = Array.from(commsServerStore.threads.values())
-    .filter((t) => !t.mergedIntoThreadId && !t.isArchived)
+    .filter((t) => !t.mergedIntoThreadId)
     .sort((a, b) => (b.lastEventAtMs || 0) - (a.lastEventAtMs || 0));
 
-  const events = Array.from(commsServerStore.events.values())
-    .filter((e) => !e.isArchived)
-    .sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
+  const events = Array.from(commsServerStore.events.values()).sort(
+    (a, b) => (b.timestampMs || 0) - (a.timestampMs || 0)
+  );
 
   return {
     threads,

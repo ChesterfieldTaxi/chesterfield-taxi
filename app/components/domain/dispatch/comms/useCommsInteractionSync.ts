@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import { authorizedFetch } from '../../../../core/services/auth/auth-headers';
 import {
   buildUnifiedCommsThreadSummaries,
@@ -15,21 +23,22 @@ import { getContactService } from '../../../../core/services/customer/contact.se
 import { getDispatchEmailService } from '../../../../core/services/email/dispatch-email.service';
 import { normalizePhone } from '../../../../core/services/passenger.service';
 import { getWorkspaceBus } from '../../../../core/services/workspace-bus.service';
-import type { CommsEvent, CommsThread } from '../../../../core/types/comms';
+import { buildCommsEventId, type CommsEvent, type CommsThread } from '../../../../core/types/comms';
 import { formatDisplayPhone } from '../../../../core/utils/phone';
-import {
-  STORAGE_KEY_INTERACTIONS,
-  type CallTypeFilter,
-  type ChannelFilter,
-  type ContactFilter,
-  type InteractionEvent,
-  type MultiChannelKey,
-  type MultiContactKey,
-  type PlaybackSpeed,
+import type {
+  CallTypeFilter,
+  ChannelFilter,
+  ContactFilter,
+  InteractionEvent,
+  MultiChannelKey,
+  MultiContactKey,
+  PlaybackSpeed,
 } from './comms-types';
 import { playInboundSmsChime } from './useTwilioSoftphoneDevice';
 
 const INITIAL_INTERACTIONS: InteractionEvent[] = [];
+const LEGACY_INTERACTIONS_STORAGE_KEY = 'ct_comms_interactions';
+const RESYNC_THROTTLE_MS = 4_000;
 
 function sortInteractionsDesc(items: InteractionEvent[]): InteractionEvent[] {
   return [...items].sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
@@ -49,69 +58,84 @@ function filterLegacySeedInteractions(items: unknown[]): InteractionEvent[] {
   return sortInteractionsDesc(cleaned);
 }
 
-function readStoredInteractionsClientOnly(): InteractionEvent[] {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return INITIAL_INTERACTIONS;
-  }
+/**
+ * One-time migration helper that drains and removes the retired `ct_comms_interactions`
+ * storage key into `CommsThreadService` so deleted/read state can never diverge across refreshes.
+ */
+function migrateAndRetireLegacyInteractionsStorage(
+  commsService = getCommsThreadService()
+): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
   try {
-    const stored = localStorage.getItem(STORAGE_KEY_INTERACTIONS);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        const cleaned = filterLegacySeedInteractions(parsed);
-        if (cleaned.length !== parsed.length) {
-          localStorage.setItem(STORAGE_KEY_INTERACTIONS, JSON.stringify(cleaned.slice(0, 100)));
-        }
-        return cleaned;
-      }
+    const raw = localStorage.getItem(LEGACY_INTERACTIONS_STORAGE_KEY);
+    if (!raw) return;
+    localStorage.removeItem(LEGACY_INTERACTIONS_STORAGE_KEY);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return;
+    const cleaned = filterLegacySeedInteractions(parsed);
+    if (cleaned.length > 0 && commsService.getAllEvents({ includeArchived: true, includeDeleted: true }).length === 0) {
+      const migrated = cleaned.map((item) => interactionEventToCommsEvent(item));
+      commsService.hydrateFromServerSync({ events: migrated });
     }
   } catch {
-    // Ignore storage parse failures
+    try {
+      localStorage.removeItem(LEGACY_INTERACTIONS_STORAGE_KEY);
+    } catch {}
   }
-  return INITIAL_INTERACTIONS;
 }
 
-function mergeAdaptedEventsWithInteractions(
-  prev: InteractionEvent[],
-  threads: CommsThread[],
-  events: CommsEvent[],
+function mergeEphemeralWithCanonical(
+  ephemeral: InteractionEvent[],
+  adaptedCanonical: InteractionEvent[],
   commsService = getCommsThreadService()
 ): InteractionEvent[] {
-  const threadMap = new Map(threads.map((t) => [t.id, t]));
-  const adapted = events
-    .filter((evt) => !evt.isDeleted)
-    .map((evt) => commsEventToInteractionEvent(evt, threadMap.get(evt.threadId)));
+  if (ephemeral.length === 0) {
+    return sortInteractionsDesc(adaptedCanonical);
+  }
 
-  const mergedById = new Map<string, InteractionEvent>();
-  for (const item of prev) {
+  const canonicalIds = new Set(adaptedCanonical.map((a) => a.id));
+  const canonicalCallSids = new Set(
+    adaptedCanonical.map((a) => a.callSid).filter((s): s is string => Boolean(s))
+  );
+
+  const activeEphemeral = ephemeral.filter((item) => {
     if (
+      item.isDeleted ||
       commsService.isEventDeleted(item.id) ||
       (item.threadId && commsService.isThreadDeleted(item.threadId))
     ) {
-      continue;
+      return false;
     }
-    const prefixedSms = `sms_${item.id}`;
-    const prefixedCall = `call_${item.id}`;
-    const prefixedVm = `vm_${item.id}`;
     if (
-      adapted.some(
-        (a) =>
-          a.id === item.id ||
-          a.id === prefixedSms ||
-          a.id === prefixedCall ||
-          a.id === prefixedVm
-      )
+      canonicalIds.has(item.id) ||
+      canonicalIds.has(`sms_${item.id}`) ||
+      canonicalIds.has(`call_${item.id}`) ||
+      canonicalIds.has(`vm_${item.id}`) ||
+      canonicalIds.has(`em_${item.id}`)
     ) {
-      continue;
+      return false;
     }
-    mergedById.set(item.id, item);
+    if (item.callSid && canonicalCallSids.has(item.callSid)) {
+      return false;
+    }
+    if (item.id.startsWith('sms_out_')) {
+      const normItemPhone = normalizePhone(item.contactPhone);
+      const matchedOutbound = adaptedCanonical.some(
+        (a) =>
+          a.type === 'sms_outbound' &&
+          normalizePhone(a.contactPhone) === normItemPhone &&
+          a.snippet === item.snippet &&
+          Math.abs((a.timestampMs || 0) - (item.timestampMs || 0)) < 120_000
+      );
+      if (matchedOutbound) return false;
+    }
+    return true;
+  });
+
+  if (activeEphemeral.length === 0) {
+    return sortInteractionsDesc(adaptedCanonical);
   }
-  for (const a of adapted) {
-    mergedById.set(a.id, a);
-  }
-  return Array.from(mergedById.values()).sort(
-    (x, y) => (y.timestampMs || 0) - (x.timestampMs || 0)
-  );
+  return sortInteractionsDesc([...activeEphemeral, ...adaptedCanonical]);
 }
 
 export interface UseCommsInteractionSyncOptions {
@@ -121,16 +145,40 @@ export interface UseCommsInteractionSyncOptions {
 export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOptions) {
   const workspaceBus = getWorkspaceBus();
 
-  // SSR-deterministic initializers — localStorage & service snapshots hydrate inside useEffect
-  const [interactions, setInteractionsRaw] = useState<InteractionEvent[]>(INITIAL_INTERACTIONS);
+  // Canonical state derived strictly from CommsThreadService; ephemeralInteractions holds only in-flight live call/SMS bubbles
+  const [commsThreads, setCommsThreads] = useState<CommsThread[]>([]);
+  const [commsEvents, setCommsEvents] = useState<CommsEvent[]>([]);
+  const [ephemeralInteractions, setEphemeralInteractions] = useState<InteractionEvent[]>(
+    INITIAL_INTERACTIONS
+  );
+
+  const adaptedCanonicalEvents = useMemo(() => {
+    const threadMap = new Map(commsThreads.map((t) => [t.id, t]));
+    return commsEvents
+      .filter((evt) => !evt.isDeleted && !threadMap.get(evt.threadId)?.isDeleted)
+      .map((evt) => commsEventToInteractionEvent(evt, threadMap.get(evt.threadId)));
+  }, [commsEvents, commsThreads]);
+
+  const adaptedRef = useRef<InteractionEvent[]>(adaptedCanonicalEvents);
+  adaptedRef.current = adaptedCanonicalEvents;
+
+  const interactions = useMemo(
+    () => mergeEphemeralWithCanonical(ephemeralInteractions, adaptedCanonicalEvents),
+    [ephemeralInteractions, adaptedCanonicalEvents]
+  );
+
   const setInteractions: Dispatch<SetStateAction<InteractionEvent[]>> = useCallback((updater) => {
-    setInteractionsRaw((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      return next === prev ? prev : sortInteractionsDesc(next);
+    setEphemeralInteractions((prevEphemeral) => {
+      const currentCombined = mergeEphemeralWithCanonical(prevEphemeral, adaptedRef.current);
+      const nextCombined =
+        typeof updater === 'function' ? updater(currentCombined) : updater;
+      if (nextCombined === currentCombined) return prevEphemeral;
+      const canonicalIdSet = new Set(adaptedRef.current.map((a) => a.id));
+      return sortInteractionsDesc(
+        nextCombined.filter((item) => !canonicalIdSet.has(item.id) && !item.isDeleted)
+      );
     });
   }, []);
-  const [commsThreads, setCommsThreads] = useState<CommsThread[]>([]);
-  const hasHydratedStorageRef = useRef(false);
 
   // Filter state
   const [filterUnreadOnly, setFilterUnreadOnly] = useState(false);
@@ -157,55 +205,19 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
   const [playingCallId, setPlayingCallId] = useState<string | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
 
-  // Persist interactions to localStorage strictly after initial client hydration
-  useEffect(() => {
-    if (
-      hasHydratedStorageRef.current &&
-      typeof window !== 'undefined' &&
-      window.localStorage &&
-      interactions.length > 0
-    ) {
-      try {
-        localStorage.setItem(STORAGE_KEY_INTERACTIONS, JSON.stringify(interactions.slice(0, 100)));
-      } catch {
-        // Ignore storage quota errors
-      }
-    }
-  }, [interactions]);
-
-  // Hydrate localStorage + subscribe to CommsThreadService & DispatchEmailService live mirror
+  // Hydrate & subscribe to CommsThreadService + DispatchEmailService live mirror
   useEffect(() => {
     const commsService = getCommsThreadService();
     const emailService = getDispatchEmailService();
 
-    const storedItems = readStoredInteractionsClientOnly();
-    hasHydratedStorageRef.current = true;
+    migrateAndRetireLegacyInteractionsStorage(commsService);
 
-    if (storedItems.length > 0 && commsService.getAllEvents().length === 0) {
-      const seeded = storedItems.map((item) => interactionEventToCommsEvent(item));
-      commsService.hydrateFromServerSync({ events: seeded });
-    }
-
-    const initialThreads = commsService.getThreads({ includeArchived: true });
-    const initialEvents = commsService.getAllEvents({ includeArchived: true });
-    setCommsThreads(initialThreads);
-
-    if (storedItems.length > 0 || initialEvents.length > 0) {
-      setInteractions((prev) => {
-        const base = storedItems.length > 0 && prev.length === 0 ? storedItems : prev;
-        const combined =
-          prev.length > 0 && storedItems.length > 0
-            ? sortInteractionsDesc(
-                Array.from(new Map([...storedItems, ...prev].map((i) => [i.id, i])).values())
-              )
-            : sortInteractionsDesc(base);
-        return mergeAdaptedEventsWithInteractions(combined, initialThreads, initialEvents, commsService);
-      });
-    }
+    setCommsThreads(commsService.getThreads({ includeArchived: true }));
+    setCommsEvents(commsService.getAllEvents({ includeArchived: true }));
 
     const unsubComms = commsService.subscribe(({ threads, events }) => {
       setCommsThreads(threads);
-      setInteractions((prev) => mergeAdaptedEventsWithInteractions(prev, threads, events, commsService));
+      setCommsEvents(events);
     });
 
     // Mirror DispatchEmailService (`dispatch@chesterfieldtaxi.com`) into CommsThreadService even before EmailDock opens
@@ -258,8 +270,9 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
     }
   }, [playingVoicemailId, playingCallId, playbackSpeed, interactions]);
 
-  // Unified telephony & multi-channel comms fetcher
-  const fetchTelephonyData = async () => {
+  // Unified telephony & multi-channel comms fetcher routed strictly through CommsThreadService
+  const fetchTelephonyData = useCallback(async () => {
+    const commsService = getCommsThreadService();
     try {
       const [syncResp, vmResp, msgResp, recResp] = await Promise.all([
         authorizedFetch('/api/telephony?action=sync_comms'),
@@ -272,7 +285,7 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
       if (syncResp.ok) {
         const syncData = (await syncResp.json()) as any;
         if (syncData?.success) {
-          getCommsThreadService().hydrateFromServerSync({
+          commsService.hydrateFromServerSync({
             threads: syncData.threads,
             events: syncData.events,
           });
@@ -282,187 +295,225 @@ export function useCommsInteractionSync({ isVisible }: UseCommsInteractionSyncOp
       if (vmResp.ok) {
         const vmData = (await vmResp.json()) as any;
         if (vmData.success && Array.isArray(vmData.voicemails)) {
-          setInteractions((prev) => {
-            const existingIds = new Set(prev.map((p) => p.id));
-            const newVms = vmData.voicemails
-              .filter((v: any) => !existingIds.has(v.id))
-              .map((v: any) => ({
-                id: v.id,
-                type: 'voicemail' as const,
-                contactName: v.contactName,
-                contactPhone: v.contactPhone,
-                contactType: (v.contactType as InteractionEvent['contactType']) || 'passenger',
-                timestamp: v.timestamp,
-                timestampMs: v.timestampMs || Date.now(),
-                durationSeconds: parseInt(v.audioDuration || '30', 10),
-                audioDuration: v.audioDuration || '0:30',
-                snippet: `Voicemail: ${v.transcription ? v.transcription.slice(0, 50) + '...' : 'Audio message'}`,
-                transcription: v.transcription,
-                recordingSid: v.recordingSid,
-                suggestedBooking: v.suggestedBooking,
-                isUnread: v.isUnread ?? true,
-              }));
-            if (newVms.length === 0) return prev;
-            return sortInteractionsDesc([...newVms, ...prev]);
-          });
+          for (const v of vmData.voicemails) {
+            if (!v || v.isDeleted) continue;
+            const rawSid = v.recordingSid || v.id;
+            if (!rawSid) continue;
+            const evtId = buildCommsEventId('voicemail', rawSid);
+            if (commsService.isEventDeleted(evtId)) continue;
+
+            const existing = commsService.getEventById(evtId);
+            if (
+              !existing ||
+              existing.transcription !== v.transcription ||
+              existing.audioUrl !== v.audioUrl
+            ) {
+              await commsService.recordCommsEvent(
+                {
+                  id: evtId,
+                  recordingSid: v.recordingSid,
+                  externalSid: rawSid,
+                  channel: 'voicemail',
+                  direction: 'inbound',
+                  eventType: 'voicemail',
+                  contactName: v.contactName,
+                  contactPhone: v.contactPhone,
+                  contactType: (v.contactType as InteractionEvent['contactType']) || 'passenger',
+                  durationSeconds: parseInt(v.audioDuration || '30', 10),
+                  audioDuration: v.audioDuration || '0:30',
+                  audioUrl: v.audioUrl,
+                  snippet: `Voicemail: ${
+                    v.transcription ? v.transcription.slice(0, 50) + '...' : 'Audio message'
+                  }`,
+                  bodyText: v.transcription || '',
+                  transcription: v.transcription,
+                  suggestedBooking: v.suggestedBooking,
+                  isUnread: existing ? existing.isUnread : (v.isUnread ?? true),
+                  isArchived: existing ? existing.isArchived : v.isArchived,
+                  statusUpdatedAtMs: existing?.statusUpdatedAtMs ?? v.statusUpdatedAtMs,
+                  timestampMs: v.timestampMs || Date.now(),
+                },
+                { skipBroadcast: true }
+              );
+            }
+          }
         }
       }
 
       if (msgResp.ok) {
         const msgData = (await msgResp.json()) as any;
         if (msgData.success && Array.isArray(msgData.messages)) {
-          setInteractions((prev) => {
-            const existingIds = new Set(prev.map((p) => p.id));
-            const newMsgs: InteractionEvent[] = [];
-            let hasNewInbound = false;
-            let hasStateUpdates = false;
-            const updatedPrev = [...prev];
+          let hasNewInbound = false;
+          for (const m of msgData.messages) {
+            if (
+              !m ||
+              m.isDeleted ||
+              m.body?.includes('Thank you for contacting our dispatch desk')
+            ) {
+              continue;
+            }
+            const rawSid = m.sid || m.id;
+            if (!rawSid) continue;
+            const evtId = buildCommsEventId('sms', rawSid);
+            if (commsService.isEventDeleted(evtId)) continue;
 
-            msgData.messages.forEach((m: any) => {
-              if (m.body?.includes('Thank you for contacting our dispatch desk')) {
-                return;
-              }
-
-              const phone = m.direction === 'inbound' ? m.from : m.to;
-
-              // Update delivery status & error details if already present by SID
-              const existingIdx = updatedPrev.findIndex((p) => p.id === m.id);
-              if (existingIdx !== -1) {
-                const existing = updatedPrev[existingIdx];
-                if (
-                  (m.status && existing.deliveryStatus !== m.status) ||
-                  (m.errorCode !== undefined && existing.errorCode !== m.errorCode) ||
-                  (m.errorMessage !== undefined && existing.errorMessage !== m.errorMessage)
-                ) {
-                  hasStateUpdates = true;
-                  updatedPrev[existingIdx] = {
+            const existing = commsService.getEventById(evtId);
+            if (existing) {
+              const deliveryChanged =
+                (m.status && existing.deliveryStatus !== m.status) ||
+                (m.errorCode !== undefined && existing.errorCode !== m.errorCode) ||
+                (m.errorMessage !== undefined && existing.errorMessage !== m.errorMessage);
+              if (deliveryChanged) {
+                await commsService.recordCommsEvent(
+                  {
                     ...existing,
                     deliveryStatus: m.status || existing.deliveryStatus,
                     errorCode: m.errorCode !== undefined ? m.errorCode : existing.errorCode,
                     errorMessage:
                       m.errorMessage !== undefined ? m.errorMessage : existing.errorMessage,
-                  };
-                }
-                return;
+                    isUnread: existing.isUnread,
+                    isArchived: existing.isArchived,
+                    isDeleted: existing.isDeleted,
+                    statusUpdatedAtMs: existing.statusUpdatedAtMs,
+                  },
+                  { skipBroadcast: true }
+                );
               }
+              continue;
+            }
 
-              // Reconcile optimistic outbound SMS bubbles
-              const optimisticIdx = updatedPrev.findIndex(
-                (p) =>
-                  p.id.startsWith('sms_out_') &&
-                  normalizePhone(p.contactPhone) === normalizePhone(phone) &&
-                  p.snippet === m.body &&
-                  Math.abs((p.timestampMs || 0) - (m.timestampMs || 0)) < 120000
-              );
+            const phone = m.direction === 'inbound' ? m.from : m.to;
+            const contact = getContactService().getContactByPhone(phone);
+            const displayName = contact?.name || formatDisplayPhone(phone);
+            const isInboundUnread = m.direction === 'inbound' ? (m.isUnread ?? true) : false;
 
-              if (optimisticIdx !== -1) {
-                hasStateUpdates = true;
-                updatedPrev[optimisticIdx] = {
-                  ...updatedPrev[optimisticIdx],
-                  id: m.id,
-                  deliveryStatus: m.status || updatedPrev[optimisticIdx].deliveryStatus,
-                  errorCode:
-                    m.errorCode !== undefined
-                      ? m.errorCode
-                      : updatedPrev[optimisticIdx].errorCode,
-                  errorMessage:
-                    m.errorMessage !== undefined
-                      ? m.errorMessage
-                      : updatedPrev[optimisticIdx].errorMessage,
-                };
-                existingIds.add(m.id);
-                return;
-              }
+            if (m.direction === 'inbound' && isInboundUnread) {
+              hasNewInbound = true;
+            }
 
-              const contact = getContactService().getContactByPhone(phone);
-              const displayName = contact?.name || formatDisplayPhone(phone);
-
-              if (m.direction === 'inbound') {
-                hasNewInbound = true;
-              }
-
-              newMsgs.push({
-                id: m.id,
-                type: (m.direction === 'inbound' ? 'sms_inbound' : 'sms_outbound') as any,
+            await commsService.recordCommsEvent(
+              {
+                id: evtId,
+                externalSid: rawSid,
+                channel: 'sms',
+                direction: m.direction === 'inbound' ? 'inbound' : 'outbound',
+                eventType: m.direction === 'inbound' ? 'sms_inbound' : 'sms_outbound',
                 contactName: displayName,
                 contactPhone: phone,
                 contactType: ((contact as any)?.type as any) || 'passenger',
-                timestamp: m.timestamp,
-                timestampMs: m.timestampMs || Date.now(),
+                fromAddress: m.from,
+                toAddress: m.to,
                 snippet: m.body,
+                bodyText: m.body,
                 deliveryStatus: m.status,
                 errorCode: m.errorCode,
                 errorMessage: m.errorMessage,
-                isUnread: m.direction === 'inbound' ? (m.isUnread ?? true) : false,
-              });
-            });
-
-            if (newMsgs.length === 0 && !hasStateUpdates) return prev;
-
-            if (hasNewInbound) {
-              playInboundSmsChime();
-            }
-
-            return [...newMsgs, ...updatedPrev].sort(
-              (a, b) => (b.timestampMs || 0) - (a.timestampMs || 0)
+                isUnread: isInboundUnread,
+                isArchived: m.isArchived,
+                statusUpdatedAtMs: m.statusUpdatedAtMs,
+                timestampMs: m.timestampMs || Date.now(),
+              },
+              { skipBroadcast: true }
             );
-          });
+          }
+
+          if (hasNewInbound) {
+            playInboundSmsChime();
+          }
         }
       }
 
       if (recResp.ok) {
         const recData = (await recResp.json()) as any;
         if (recData.success && Array.isArray(recData.recordings)) {
-          setInteractions((prev) => {
-            let anyRecAttached = false;
-            const updated = prev.map((item) => {
-              if (item.type.startsWith('call_')) {
-                const match = recData.recordings.find(
-                  (r: any) =>
-                    (item.callSid && r.callSid === item.callSid) ||
-                    (item.recordingSid && r.sid === item.recordingSid)
-                );
-                if (
-                  match &&
-                  (item.recordingSid !== match.sid ||
-                    item.audioUrl !== match.audioUrl ||
-                    item.durationSeconds !== match.durationSeconds)
-                ) {
-                  anyRecAttached = true;
-                  return {
-                    ...item,
-                    recordingSid: match.sid,
-                    audioDuration: match.duration,
-                    durationSeconds: match.durationSeconds,
-                    audioUrl: match.audioUrl,
-                  };
-                }
-              }
-              return item;
-            });
+          const callEvents = commsService
+            .getAllEvents({ includeArchived: true })
+            .filter((e) => e.channel === 'call' && !e.isDeleted);
 
-            if (!anyRecAttached) return prev;
-            return sortInteractionsDesc(updated);
-          });
+          for (const r of recData.recordings) {
+            if (!r) continue;
+            const matchedCall = callEvents.find(
+              (c) =>
+                (r.callSid && c.externalSid === r.callSid) ||
+                (r.sid && c.recordingSid === r.sid)
+            );
+            if (
+              matchedCall &&
+              (matchedCall.recordingSid !== r.sid ||
+                matchedCall.audioUrl !== r.audioUrl ||
+                matchedCall.durationSeconds !== r.durationSeconds)
+            ) {
+              await commsService.recordCommsEvent(
+                {
+                  ...matchedCall,
+                  recordingSid: r.sid,
+                  audioDuration: r.duration,
+                  durationSeconds: r.durationSeconds,
+                  audioUrl: r.audioUrl,
+                  isUnread: matchedCall.isUnread,
+                  isArchived: matchedCall.isArchived,
+                  isDeleted: matchedCall.isDeleted,
+                  statusUpdatedAtMs: matchedCall.statusUpdatedAtMs,
+                },
+                { skipBroadcast: true }
+              );
+            }
+          }
         }
       }
     } catch {
       // Tolerated offline/background fetch error
     }
-  };
+  }, []);
 
-  // Hydrate telephony once on initial open + on CommsHub visibility transition (live Firestore handles realtime updates)
+  // Hydrate telephony on initial open + throttled visibilitychange / focus / online re-sync triggers
   const lastTelephonyFetchRef = useRef<number>(0);
+  const isVisibleRef = useRef<boolean>(isVisible);
+  isVisibleRef.current = isVisible;
+
+  const triggerThrottledResync = useCallback(
+    (minIntervalMs = RESYNC_THROTTLE_MS) => {
+      const now = Date.now();
+      if (now - lastTelephonyFetchRef.current > minIntervalMs) {
+        lastTelephonyFetchRef.current = now;
+        getCommsThreadService().startRealtimeSync();
+        void fetchTelephonyData();
+      }
+    },
+    [fetchTelephonyData]
+  );
 
   useEffect(() => {
     if (isVisible) {
-      const now = Date.now();
-      if (now - lastTelephonyFetchRef.current > 4_000) {
-        lastTelephonyFetchRef.current = now;
-        void fetchTelephonyData();
-      }
+      triggerThrottledResync(RESYNC_THROTTLE_MS);
     }
-  }, [isVisible]);
+  }, [isVisible, triggerThrottledResync]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isVisibleRef.current) {
+        triggerThrottledResync(RESYNC_THROTTLE_MS);
+      }
+    };
+    const onWindowFocus = () => {
+      if (isVisibleRef.current) {
+        triggerThrottledResync(RESYNC_THROTTLE_MS);
+      }
+    };
+    const onOnline = () => {
+      triggerThrottledResync(1_000);
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', onWindowFocus);
+    window.addEventListener('online', onOnline);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', onWindowFocus);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [triggerThrottledResync]);
 
   // Exclude soft-deleted items and respect showArchived filter across all derived lists & unread counts
   const visibleInteractions = useMemo(

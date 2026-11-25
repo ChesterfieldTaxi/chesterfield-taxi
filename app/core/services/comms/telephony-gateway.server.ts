@@ -14,6 +14,7 @@
  *   `telephony-outbound-rest.server.ts`.
  */
 
+import { buildCommsEventId } from '../../types/comms';
 import {
   formatDisplayPhone,
   sanitizePhoneNumber,
@@ -28,6 +29,7 @@ import {
 import {
   getCommsServerStore,
   ingestCommsEventServer,
+  updateCommsStatusServer,
 } from './comms-thread.server';
 import {
   DISPATCHER_ONLY_TELEPHONY_ACTIONS,
@@ -94,6 +96,97 @@ export type {
   TelephonyHttpHandlerOptions,
   TwilioWebhookSignatureResult,
 };
+
+function buildActiveSignedVoicemails(signOpts: {
+  nowMs?: number;
+  env?: Record<string, string | undefined>;
+}) {
+  const serverStore = getCommsServerStore();
+  return telephonyStore.voicemails
+    .filter((vm) => {
+      const evt =
+        serverStore.events.get(buildCommsEventId('voicemail', vm.recordingSid || vm.id)) ||
+        serverStore.events.get(vm.id);
+      if (evt?.isDeleted) return false;
+      if (evt?.threadId && serverStore.threads.get(evt.threadId)?.isDeleted) return false;
+      return true;
+    })
+    .map((vm) => {
+      const evt =
+        serverStore.events.get(buildCommsEventId('voicemail', vm.recordingSid || vm.id)) ||
+        serverStore.events.get(vm.id);
+      return {
+        ...vm,
+        isUnread: evt ? evt.isUnread : vm.isUnread,
+        ...(evt?.isArchived !== undefined ? { isArchived: evt.isArchived } : {}),
+        ...(evt?.statusUpdatedAtMs !== undefined
+          ? { statusUpdatedAtMs: evt.statusUpdatedAtMs }
+          : {}),
+        transcription: evt?.transcription || vm.transcription,
+        audioUrl:
+          vm.recordingSid && RECORDING_SID_PATTERN.test(vm.recordingSid)
+            ? buildSignedAudioProxyUrl(vm.recordingSid, signOpts)
+            : vm.audioUrl,
+      };
+    });
+}
+
+function enrichAndFilterMessagesWithServerStore(msgs: any[]) {
+  const serverStore = getCommsServerStore();
+  return msgs
+    .filter((m: any) => {
+      if (m?.body?.includes('Thank you for contacting our dispatch desk')) return false;
+      const rawSid = m?.sid || m?.id;
+      const evt =
+        (rawSid ? serverStore.events.get(buildCommsEventId('sms', rawSid)) : undefined) ||
+        (m?.id ? serverStore.events.get(m.id) : undefined);
+      if (evt?.isDeleted) return false;
+      if (evt?.threadId && serverStore.threads.get(evt.threadId)?.isDeleted) return false;
+      return true;
+    })
+    .map((m: any) => {
+      const rawSid = m?.sid || m?.id;
+      const evt =
+        (rawSid ? serverStore.events.get(buildCommsEventId('sms', rawSid)) : undefined) ||
+        (m?.id ? serverStore.events.get(m.id) : undefined);
+      return {
+        ...m,
+        isUnread: evt ? evt.isUnread : m.direction === 'inbound' ? (m.isUnread ?? true) : false,
+        ...(evt?.isArchived !== undefined ? { isArchived: evt.isArchived } : {}),
+        ...(evt?.statusUpdatedAtMs !== undefined
+          ? { statusUpdatedAtMs: evt.statusUpdatedAtMs }
+          : {}),
+      };
+    });
+}
+
+function syncLegacyTelephonyStoreWithCommsStore(): void {
+  const serverStore = getCommsServerStore();
+  telephonyStore.voicemails = telephonyStore.voicemails
+    .filter((vm) => {
+      const evt =
+        serverStore.events.get(buildCommsEventId('voicemail', vm.recordingSid || vm.id)) ||
+        serverStore.events.get(vm.id);
+      if (evt?.isDeleted) return false;
+      if (evt?.threadId && serverStore.threads.get(evt.threadId)?.isDeleted) return false;
+      return true;
+    })
+    .map((vm) => {
+      const evt =
+        serverStore.events.get(buildCommsEventId('voicemail', vm.recordingSid || vm.id)) ||
+        serverStore.events.get(vm.id);
+      return evt ? { ...vm, isUnread: evt.isUnread } : vm;
+    });
+
+  telephonyStore.messages = telephonyStore.messages.filter((m) => {
+    const evt =
+      serverStore.events.get(buildCommsEventId('sms', m.sid || m.id)) ||
+      serverStore.events.get(m.id);
+    if (evt?.isDeleted) return false;
+    if (evt?.threadId && serverStore.threads.get(evt.threadId)?.isDeleted) return false;
+    return true;
+  });
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. `GET /api/telephony` Handler
@@ -299,16 +392,9 @@ export async function handleTelephonyGet(
 
   // ─── LIST VOICEMAILS (GET) ───
   if (action === 'list_voicemails') {
-    const signedVoicemails = telephonyStore.voicemails.map((vm) => ({
-      ...vm,
-      audioUrl:
-        vm.recordingSid && RECORDING_SID_PATTERN.test(vm.recordingSid)
-          ? buildSignedAudioProxyUrl(vm.recordingSid, signOpts)
-          : vm.audioUrl,
-    }));
     return Response.json({
       success: true,
-      voicemails: signedVoicemails,
+      voicemails: buildActiveSignedVoicemails(signOpts),
     });
   }
 
@@ -377,11 +463,11 @@ export async function handleTelephonyGet(
     const authToken =
       (allowClientCreds ? url.searchParams.get('authToken') : null) || resolved.authToken;
 
-    const filterOutThankYou = (msgs: any[]) =>
-      msgs.filter((m: any) => !m.body?.includes('Thank you for contacting our dispatch desk'));
-
     if (!accountSid || !authToken || !accountSid.startsWith('AC')) {
-      return Response.json({ success: true, messages: filterOutThankYou(telephonyStore.messages) });
+      return Response.json({
+        success: true,
+        messages: enrichAndFilterMessagesWithServerStore(telephonyStore.messages),
+      });
     }
 
     try {
@@ -414,11 +500,25 @@ export async function handleTelephonyGet(
             timestampMs: new Date(m.date_sent || m.date_created).getTime(),
           }));
 
-        // Persist newly seen Twilio messages into unified CommsThreadServer store
+        // Persist newly seen or status-progressed Twilio messages into CommsThreadServer store
+        // without overwriting existing isDeleted, isArchived, or read status.
         const serverStore = getCommsServerStore();
         for (const lm of liveMessages) {
-          const evtId = `sms_${lm.sid}`;
-          if (!serverStore.events.has(evtId)) {
+          const evtId = buildCommsEventId('sms', lm.sid);
+          const existingEvt = serverStore.events.get(evtId);
+          const existingThr = existingEvt
+            ? serverStore.threads.get(existingEvt.threadId)
+            : undefined;
+          if (existingEvt?.isDeleted || existingThr?.isDeleted) {
+            continue;
+          }
+          const deliveryChanged =
+            existingEvt &&
+            ((lm.status && existingEvt.deliveryStatus !== lm.status) ||
+              (lm.errorCode !== undefined && existingEvt.errorCode !== lm.errorCode) ||
+              (lm.errorMessage !== undefined && existingEvt.errorMessage !== lm.errorMessage));
+
+          if (!existingEvt || deliveryChanged) {
             await ingestCommsEventServer(
               {
                 channel: 'sms',
@@ -433,7 +533,10 @@ export async function handleTelephonyGet(
                 deliveryStatus: lm.status,
                 errorCode: lm.errorCode,
                 errorMessage: lm.errorMessage,
-                isUnread: lm.direction === 'inbound',
+                isUnread: existingEvt ? existingEvt.isUnread : lm.direction === 'inbound',
+                isArchived: existingEvt?.isArchived,
+                isDeleted: existingEvt?.isDeleted,
+                statusUpdatedAtMs: existingEvt?.statusUpdatedAtMs,
                 timestampMs: lm.timestampMs,
               },
               {
@@ -446,17 +549,24 @@ export async function handleTelephonyGet(
         }
 
         const seenSids = new Set(liveMessages.map((m) => m.sid || m.id));
-        const pendingLocal = filterOutThankYou(telephonyStore.messages).filter(
+        const pendingLocal = telephonyStore.messages.filter(
           (m: any) => !seenSids.has(m.sid || m.id)
         );
-        const combined = [...pendingLocal, ...liveMessages].sort(
-          (a: any, b: any) => (b.timestampMs || 0) - (a.timestampMs || 0)
-        );
+        const combined = enrichAndFilterMessagesWithServerStore([
+          ...pendingLocal,
+          ...liveMessages,
+        ]).sort((a: any, b: any) => (b.timestampMs || 0) - (a.timestampMs || 0));
         return Response.json({ success: true, messages: combined });
       }
-      return Response.json({ success: true, messages: filterOutThankYou(telephonyStore.messages) });
+      return Response.json({
+        success: true,
+        messages: enrichAndFilterMessagesWithServerStore(telephonyStore.messages),
+      });
     } catch {
-      return Response.json({ success: true, messages: filterOutThankYou(telephonyStore.messages) });
+      return Response.json({
+        success: true,
+        messages: enrichAndFilterMessagesWithServerStore(telephonyStore.messages),
+      });
     }
   }
 
@@ -735,6 +845,29 @@ export async function handleTelephonyPost(
       return Response.json(payload);
     }
 
+    // ─── AUTHORITATIVE STATUS MUTATION (POST) ───
+    if (effectiveAction === 'update_comms_status') {
+      const statusResult = await updateCommsStatusServer({
+        eventIds: data.eventIds,
+        threadIds: data.threadIds,
+        channels: data.channels,
+        isUnread: data.isUnread,
+        isArchived: data.isArchived,
+        isDeleted: data.isDeleted,
+        statusUpdatedAtMs: data.statusUpdatedAtMs,
+        events: data.events,
+        threads: data.threads,
+        staffBearerToken: auth.isDispatcher ? auth.rawToken : undefined,
+        skipFirestore: options?.skipFirestore,
+        nowMs: options?.nowMs,
+      });
+      syncLegacyTelephonyStoreWithCommsStore();
+      return Response.json({
+        success: true,
+        ...statusResult,
+      });
+    }
+
     // ─── GET TWILIO WEBRTC VOICE ACCESS TOKEN (POST) ───
     if (effectiveAction === 'get_voice_token') {
       const allowClientCreds = readEnv('NODE_ENV') !== 'production' || auth.isAdmin;
@@ -860,14 +993,10 @@ export async function handleTelephonyPost(
 
     // ─── LIST VOICEMAILS VIA POST ───
     if (effectiveAction === 'list_voicemails') {
-      const signedVoicemails = telephonyStore.voicemails.map((vm) => ({
-        ...vm,
-        audioUrl:
-          vm.recordingSid && RECORDING_SID_PATTERN.test(vm.recordingSid)
-            ? buildSignedAudioProxyUrl(vm.recordingSid, signOpts)
-            : vm.audioUrl,
-      }));
-      return Response.json({ success: true, voicemails: signedVoicemails });
+      return Response.json({
+        success: true,
+        voicemails: buildActiveSignedVoicemails(signOpts),
+      });
     }
 
     const isConfigured = Boolean(
@@ -1015,7 +1144,10 @@ export async function handleTelephonyPost(
     // ─── LIST MESSAGES VIA POST ───
     if (effectiveAction === 'list_messages') {
       if (!isConfigured) {
-        return Response.json({ success: true, messages: telephonyStore.messages });
+        return Response.json({
+          success: true,
+          messages: enrichAndFilterMessagesWithServerStore(telephonyStore.messages),
+        });
       }
       try {
         const msgResp = await fetchFn(
@@ -1032,6 +1164,9 @@ export async function handleTelephonyPost(
             from: m.from,
             to: m.to,
             body: m.body,
+            status: m.status,
+            errorCode: m.error_code,
+            errorMessage: m.error_message,
             direction: m.direction && m.direction.includes('inbound') ? 'inbound' : 'outbound',
             timestamp: new Date(m.date_sent || m.date_created).toLocaleTimeString([], {
               hour: '2-digit',
@@ -1039,11 +1174,20 @@ export async function handleTelephonyPost(
             }),
             timestampMs: new Date(m.date_sent || m.date_created).getTime(),
           }));
-          return Response.json({ success: true, messages: liveMessages });
+          return Response.json({
+            success: true,
+            messages: enrichAndFilterMessagesWithServerStore(liveMessages),
+          });
         }
-        return Response.json({ success: true, messages: telephonyStore.messages });
+        return Response.json({
+          success: true,
+          messages: enrichAndFilterMessagesWithServerStore(telephonyStore.messages),
+        });
       } catch {
-        return Response.json({ success: true, messages: telephonyStore.messages });
+        return Response.json({
+          success: true,
+          messages: enrichAndFilterMessagesWithServerStore(telephonyStore.messages),
+        });
       }
     }
 

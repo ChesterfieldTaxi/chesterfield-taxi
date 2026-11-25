@@ -70,20 +70,6 @@ export function TripQueueOverflowMenu({
   showAssignmentInMenu = true,
   showColumnsInMenu = true,
 }: TripQueueOverflowMenuProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const closeMenu = useCallback(() => setIsOpen(false), []);
-  const { triggerRef, menuRef, coords, setCoords, computeCoords } = usePortalDropdownPosition({
-    isOpen,
-    onClose: closeMenu,
-    menuWidth: 280,
-    estimatedHeight: 460,
-    align: 'right',
-  });
-
-  const { visibleColumns, setVisibleColumns } = useQueueTableColumns();
-  const isDefaultColumns = areQueueColumnsEqual(visibleColumns, DEFAULT_QUEUE_COLUMNS);
-  const activePresetKey = resolveActiveQueueColumnPreset(visibleColumns);
-  const nonActionSelectedCount = visibleColumns.filter((k) => k !== 'action').length;
   const showColumnsSection =
     showColumnsInMenu &&
     (effectiveDisplayLayout === 'table' || displayLayout === 'table' || displayLayout === 'auto');
@@ -93,6 +79,27 @@ export function TripQueueOverflowMenu({
   const hasAssignModeToggle = Boolean(stagedPlanner && effectiveDisplayLayout !== 'table');
   const hasDispatchSection =
     showAssignmentInMenu && (hasAssignModeToggle || hasAutoStageReady || hasAutoDispatchReady);
+
+  const estimatedMenuHeight =
+    112 +
+    (showFiltersInMenu ? 148 : 0) +
+    (showColumnsSection ? 176 : 0) +
+    (hasDispatchSection ? 92 : 0);
+
+  const [isOpen, setIsOpen] = useState(false);
+  const closeMenu = useCallback(() => setIsOpen(false), []);
+  const { triggerRef, menuRef, coords, setCoords, computeCoords } = usePortalDropdownPosition({
+    isOpen,
+    onClose: closeMenu,
+    menuWidth: 280,
+    estimatedHeight: estimatedMenuHeight,
+    align: 'right',
+  });
+
+  const { visibleColumns, setVisibleColumns } = useQueueTableColumns();
+  const isDefaultColumns = areQueueColumnsEqual(visibleColumns, DEFAULT_QUEUE_COLUMNS);
+  const activePresetKey = resolveActiveQueueColumnPreset(visibleColumns);
+  const nonActionSelectedCount = visibleColumns.filter((k) => k !== 'action').length;
 
   const showFilterBadgeOnTrigger = showFiltersInMenu && activeFilterKeys.length > 0;
   const hasActiveState =
@@ -171,7 +178,9 @@ export function TripQueueOverflowMenu({
             data-ui-select-portal="true"
             style={{
               position: 'fixed',
-              top: `${coords.top}px`,
+              ...(coords.openUpward
+                ? { bottom: `${coords.bottom}px` }
+                : { top: `${coords.top}px` }),
               left: `${coords.left}px`,
               width: '280px',
               zIndex: 99999,

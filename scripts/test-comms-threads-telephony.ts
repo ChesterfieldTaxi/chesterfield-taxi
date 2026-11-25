@@ -51,6 +51,12 @@ import {
   resolveCanonicalThreadId,
   resolveUnifiedContact,
 } from '../app/core/services/customer/contact.service';
+import { getDispatchEmailService } from '../app/core/services/email/dispatch-email.service';
+import {
+  reconcileCommsEventStatus,
+  reconcileCommsThreadStatus,
+} from '../app/core/types/comms';
+import { DISPATCH_MAILBOX_ADDRESS, buildDeterministicRfcMessageId, buildDispatchEmailCommsEventId } from '../app/core/types/dispatch-email';
 
 const UNAUTH: VerifiedServerAuth = {
   authenticated: false,
@@ -667,6 +673,7 @@ async function runTests() {
     'list_recordings',
     'list_voicemails',
     'sync_comms',
+    'update_comms_status',
     'verify_credentials',
     'save_credentials',
     'make_call',
@@ -861,7 +868,418 @@ async function runTests() {
   assert.equal(vercelJson.crons?.[0]?.schedule, '0 10 * * *');
 
   console.log('   ✅ Passed firestore.rules & vercel.json assertions.\n');
-  console.log('🎉 All Phase 39 Comms Threading & Telephony Security checks passed (100%)!');
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 6. Phase 81: Status Persistence, `statusUpdatedAtMs` LWW, `update_comms_status` & Bidirectional Email Sync
+  // ───────────────────────────────────────────────────────────────────────────
+  console.log('6️⃣  Testing Phase 81 status persistence, LWW tombstones, update_comms_status & email sync...');
+
+  // 6A. Role gate on POST `update_comms_status` (403 for customer & driver)
+  for (const nonDispatcherAuth of [CUSTOMER_AUTH, DRIVER_AUTH]) {
+    const forbiddenStatusRes = await handleTelephonyPost(
+      new Request('https://chesterfieldtaxi.vercel.app/api/telephony', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_comms_status',
+          eventIds: ['sms_SM9988776655'],
+          isUnread: false,
+        }),
+      }),
+      {
+        env: TEST_TWILIO_ENV,
+        enforceAuth: true,
+        authResolver: async () => nonDispatcherAuth,
+        skipFirestore: true,
+      }
+    );
+    assert.equal(forbiddenStatusRes.status, 403, 'Expected 403 for non-dispatcher update_comms_status');
+  }
+
+  // 6B. Pure `statusUpdatedAtMs` LWW & sticky `isDeleted` tombstone invariants
+  const baseEvt = serverStore.events.get('sms_SM9988776655')!;
+  assert.ok(baseEvt);
+
+  const readAt200 = reconcileCommsEventStatus(baseEvt, {
+    ...baseEvt,
+    isUnread: false,
+    statusUpdatedAtMs: 200,
+  });
+  assert.equal(readAt200.isUnread, false);
+  assert.equal(readAt200.statusUpdatedAtMs, 200);
+
+  // Older sync payload (statusUpdatedAtMs: 100 or undefined) must NOT mark unread again
+  const staleUnreadAt100 = reconcileCommsEventStatus(readAt200, {
+    ...baseEvt,
+    isUnread: true,
+    statusUpdatedAtMs: 100,
+  });
+  assert.equal(staleUnreadAt100.isUnread, false);
+  assert.equal(staleUnreadAt100.statusUpdatedAtMs, 200);
+
+  const staleUnreadNoTs = reconcileCommsEventStatus(readAt200, {
+    ...baseEvt,
+    isUnread: true,
+  });
+  assert.equal(staleUnreadNoTs.isUnread, false);
+  assert.equal(staleUnreadNoTs.statusUpdatedAtMs, 200);
+
+  // Newer explicit mark-unread mutation (statusUpdatedAtMs: 300) wins LWW
+  const unreadAt300 = reconcileCommsEventStatus(readAt200, {
+    ...baseEvt,
+    isUnread: true,
+    statusUpdatedAtMs: 300,
+  });
+  assert.equal(unreadAt300.isUnread, true);
+  assert.equal(unreadAt300.statusUpdatedAtMs, 300);
+
+  // Sticky `isDeleted: true` tombstone wins even against newer non-deleted payloads
+  const deletedAt400 = reconcileCommsEventStatus(unreadAt300, {
+    ...unreadAt300,
+    isDeleted: true,
+    statusUpdatedAtMs: 400,
+  });
+  assert.equal(deletedAt400.isDeleted, true);
+  assert.equal(deletedAt400.isUnread, false);
+
+  const attemptedResurrectAt900 = reconcileCommsEventStatus(deletedAt400, {
+    ...baseEvt,
+    isDeleted: false,
+    isUnread: true,
+    statusUpdatedAtMs: 900,
+  });
+  assert.equal(attemptedResurrectAt900.isDeleted, true, 'isDeleted must remain a sticky tombstone');
+  assert.equal(attemptedResurrectAt900.isUnread, false);
+
+  const sampleThr = Array.from(serverStore.threads.values())[0]!;
+  const archivedThrAt500 = reconcileCommsThreadStatus(sampleThr, {
+    ...sampleThr,
+    isArchived: true,
+    statusUpdatedAtMs: 500,
+  });
+  assert.equal(archivedThrAt500.isArchived, true);
+  const unarchivedThrAt600 = reconcileCommsThreadStatus(archivedThrAt500, {
+    ...archivedThrAt500,
+    isArchived: false,
+    statusUpdatedAtMs: 600,
+  });
+  assert.equal(unarchivedThrAt600.isArchived, false);
+  assert.equal(unarchivedThrAt600.statusUpdatedAtMs, 600);
+
+  // 6C. End-to-End Read & Soft-Delete Persistence Across `update_comms_status`, `list_messages`, `list_voicemails`, and `sync_comms`
+  resetCommsServerStoreForTests();
+  resetTelephonyGatewayStoreForTests();
+  commsService.resetForTests();
+
+  const mockPhase81TwilioFetch: typeof fetch = async (input) => {
+    const urlStr = String(input);
+    if (urlStr.includes('/Messages.json')) {
+      return new Response(
+        JSON.stringify({
+          messages: [
+            {
+              sid: 'SM_P81_READ_KEEP',
+              from: '+13145550199',
+              to: '+13147380100',
+              body: 'Please confirm my 7am pickup.',
+              status: 'received',
+              direction: 'inbound',
+              date_sent: new Date(1_700_050_001_000).toUTCString(),
+            },
+            {
+              sid: 'SM_P81_DELETE_ME',
+              from: '+16365550144',
+              to: '+13147380100',
+              body: 'Wrong number test message.',
+              status: 'received',
+              direction: 'inbound',
+              date_sent: new Date(1_700_050_002_000).toUTCString(),
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    return new Response(JSON.stringify({ recordings: [] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  // Wire CommsThreadService mutations directly to `handleTelephonyPost` (`update_comms_status`)
+  commsService.setServerSyncFetchForTests(async (input, init) => {
+    const rawUrl = typeof input === 'string' ? input : input.toString();
+    const fullUrl = rawUrl.startsWith('http')
+      ? rawUrl
+      : `https://chesterfieldtaxi.vercel.app${rawUrl}`;
+    return handleTelephonyPost(new Request(fullUrl, init), {
+      env: TEST_TWILIO_ENV,
+      enforceAuth: true,
+      authResolver: async () => DISPATCHER_AUTH,
+      fetchImpl: mockPhase81TwilioFetch,
+      skipFirestore: true,
+    });
+  });
+
+  // Ingest a voicemail webhook + fetch initial Twilio messages
+  await handleTelephonyPost(
+    makeSignedFormPost('voicemail_recorded', {
+      CallSid: 'CA_P81_VM_01',
+      RecordingSid: 'RE_P81_VM_01',
+      From: '+16365550144',
+      To: '+13147380100',
+      RecordingDuration: '25',
+    }),
+    {
+      env: TEST_TWILIO_ENV,
+      enforceWebhookSignature: true,
+      skipFirestore: true,
+      nowMs: 1_700_050_003_000,
+    }
+  );
+
+  const initialListMsgRes = await handleTelephonyGet(
+    new Request('https://chesterfieldtaxi.vercel.app/api/telephony?action=list_messages'),
+    {
+      env: TEST_TWILIO_ENV,
+      enforceAuth: true,
+      authResolver: async () => DISPATCHER_AUTH,
+      fetchImpl: mockPhase81TwilioFetch,
+      skipFirestore: true,
+      nowMs: 1_700_050_004_000,
+    }
+  );
+  const initialListMsgJson = (await initialListMsgRes.json()) as any;
+  assert.equal(initialListMsgJson.messages.length, 2);
+
+  const initialSyncRes = await handleTelephonyGet(
+    new Request('https://chesterfieldtaxi.vercel.app/api/telephony?action=sync_comms'),
+    {
+      env: TEST_TWILIO_ENV,
+      enforceAuth: true,
+      authResolver: async () => DISPATCHER_AUTH,
+      skipFirestore: true,
+      nowMs: 1_700_050_005_000,
+    }
+  );
+  const initialSyncJson = (await initialSyncRes.json()) as any;
+  commsService.hydrateFromServerSync({
+    threads: initialSyncJson.threads,
+    events: initialSyncJson.events,
+  });
+  assert.equal(commsService.getAllEvents().length, 3);
+  assert.equal(commsService.getEventById('sms_SM_P81_READ_KEEP')?.isUnread, true);
+
+  // Mark `sms_SM_P81_READ_KEEP` read and soft-delete `sms_SM_P81_DELETE_ME` + `vm_RE_P81_VM_01`
+  await commsService.markEventsRead(['sms_SM_P81_READ_KEEP'], 1_700_050_010_000);
+  await commsService.deleteEvents(['sms_SM_P81_DELETE_ME', 'vm_RE_P81_VM_01'], 1_700_050_011_000);
+
+  assert.equal(serverStore.events.get('sms_SM_P81_READ_KEEP')?.isUnread, false);
+  assert.equal(serverStore.events.get('sms_SM_P81_READ_KEEP')?.statusUpdatedAtMs, 1_700_050_010_000);
+  assert.equal(serverStore.events.get('sms_SM_P81_DELETE_ME')?.isDeleted, true);
+  assert.equal(serverStore.events.get('vm_RE_P81_VM_01')?.isDeleted, true);
+
+  // Subsequent `list_messages` (Twilio still returns both SMS!) + `list_voicemails` + `sync_comms`
+  // must NEVER resurrect deleted items or flip read SMS back to unread
+  const afterListMsgRes = await handleTelephonyGet(
+    new Request('https://chesterfieldtaxi.vercel.app/api/telephony?action=list_messages'),
+    {
+      env: TEST_TWILIO_ENV,
+      enforceAuth: true,
+      authResolver: async () => DISPATCHER_AUTH,
+      fetchImpl: mockPhase81TwilioFetch,
+      skipFirestore: true,
+      nowMs: 1_700_050_020_000,
+    }
+  );
+  const afterListMsgJson = (await afterListMsgRes.json()) as any;
+  assert.equal(
+    afterListMsgJson.messages.length,
+    1,
+    'Deleted SMS must not be resurrected by list_messages'
+  );
+  assert.equal(afterListMsgJson.messages[0].sid, 'SM_P81_READ_KEEP');
+  assert.equal(
+    afterListMsgJson.messages[0].isUnread,
+    false,
+    'Read SMS must remain read after list_messages sync'
+  );
+
+  const afterListVmRes = await handleTelephonyGet(
+    new Request('https://chesterfieldtaxi.vercel.app/api/telephony?action=list_voicemails'),
+    {
+      env: TEST_TWILIO_ENV,
+      enforceAuth: true,
+      authResolver: async () => DISPATCHER_AUTH,
+      skipFirestore: true,
+      nowMs: 1_700_050_021_000,
+    }
+  );
+  const afterListVmJson = (await afterListVmRes.json()) as any;
+  assert.equal(
+    afterListVmJson.voicemails.length,
+    0,
+    'Deleted voicemail must not be resurrected by list_voicemails'
+  );
+
+  // Simulate browser refresh: clear client CommsThreadService and re-hydrate from server `sync_comms`
+  commsService.resetForTests();
+  const refreshSyncRes = await handleTelephonyGet(
+    new Request('https://chesterfieldtaxi.vercel.app/api/telephony?action=sync_comms'),
+    {
+      env: TEST_TWILIO_ENV,
+      enforceAuth: true,
+      authResolver: async () => DISPATCHER_AUTH,
+      skipFirestore: true,
+      nowMs: 1_700_050_025_000,
+    }
+  );
+  const refreshSyncJson = (await refreshSyncRes.json()) as any;
+  commsService.hydrateFromServerSync({
+    threads: refreshSyncJson.threads,
+    events: refreshSyncJson.events,
+  });
+
+  const visibleEventsAfterRefresh = commsService.getAllEvents();
+  assert.equal(visibleEventsAfterRefresh.length, 1);
+  assert.equal(visibleEventsAfterRefresh[0].id, 'sms_SM_P81_READ_KEEP');
+  assert.equal(visibleEventsAfterRefresh[0].isUnread, false);
+  assert.equal(commsService.isEventDeleted('sms_SM_P81_DELETE_ME'), true);
+  assert.equal(commsService.isEventDeleted('vm_RE_P81_VM_01'), true);
+
+  // Now delete the LAST remaining item so visible list becomes empty and verify empty state persists
+  commsService.setServerSyncFetchForTests(async (input, init) => {
+    const rawUrl = typeof input === 'string' ? input : input.toString();
+    const fullUrl = rawUrl.startsWith('http')
+      ? rawUrl
+      : `https://chesterfieldtaxi.vercel.app${rawUrl}`;
+    return handleTelephonyPost(new Request(fullUrl, init), {
+      env: TEST_TWILIO_ENV,
+      enforceAuth: true,
+      authResolver: async () => DISPATCHER_AUTH,
+      fetchImpl: mockPhase81TwilioFetch,
+      skipFirestore: true,
+    });
+  });
+  await commsService.deleteEvents(['sms_SM_P81_READ_KEEP'], 1_700_050_030_000);
+  assert.equal(commsService.getAllEvents().length, 0);
+
+  commsService.resetForTests();
+  const emptyRefreshRes = await handleTelephonyGet(
+    new Request('https://chesterfieldtaxi.vercel.app/api/telephony?action=sync_comms'),
+    {
+      env: TEST_TWILIO_ENV,
+      enforceAuth: true,
+      authResolver: async () => DISPATCHER_AUTH,
+      skipFirestore: true,
+      nowMs: 1_700_050_035_000,
+    }
+  );
+  const emptyRefreshJson = (await emptyRefreshRes.json()) as any;
+  commsService.hydrateFromServerSync({
+    threads: emptyRefreshJson.threads,
+    events: emptyRefreshJson.events,
+  });
+  assert.equal(
+    commsService.getAllEvents().length,
+    0,
+    'Deleting the last item must persist cleanly across refresh with zero resurrections'
+  );
+
+  // 6D. Bidirectional Status Sync Between `CommsThreadService` (`CommsHub`) & `DispatchEmailService` (`EmailDock`)
+  const emailService = getDispatchEmailService();
+  emailService.resetForTests();
+  commsService.resetForTests();
+
+  const biEmailId = 'em_p81_bi_01';
+  const biCommsId = buildDispatchEmailCommsEventId(biEmailId);
+  const biIso = new Date(1_700_060_000_000).toISOString();
+  await emailService.upsertEmailRecord(
+    {
+      id: biEmailId,
+      threadId: 'thr_contact_sample_p1',
+      commsEventId: biCommsId,
+      rfcMessageId: buildDeterministicRfcMessageId(biEmailId),
+      references: [],
+      normalizedSubject: 'Airport Sedan Tomorrow',
+      direction: 'inbound',
+      category: 'booking_request',
+      folder: 'bookings',
+      fromName: 'Amanda Vance',
+      fromEmail: 'amanda.vance@bayer.com',
+      toEmail: DISPATCH_MAILBOX_ADDRESS,
+      subject: 'Airport Sedan Tomorrow',
+      textBody: 'Need pickup at 9:00 AM from STL T1.',
+      sanitizedHtmlBody: '<p>Need pickup at 9:00 AM from STL T1.</p>',
+      snippet: 'Need pickup at 9:00 AM from STL T1.',
+      attachments: [],
+      deliveryStatus: 'received',
+      isUnread: true,
+      isStarred: false,
+      createdAt: biIso,
+      timestampMs: 1_700_060_000_000,
+      updatedAt: biIso,
+    },
+    { skipFirestore: true }
+  );
+
+  assert.equal(commsService.getEventById(biCommsId)?.isUnread, true);
+  assert.equal(emailService.getEmailById(biEmailId)?.isUnread, true);
+
+  // CommsHub -> EmailDock: mark read
+  await commsService.markEventsRead([biCommsId], 1_700_060_005_000);
+  assert.equal(emailService.getEmailById(biEmailId)?.isUnread, false);
+
+  // CommsHub -> EmailDock: mark unread
+  await commsService.markEventsUnread([biCommsId], 1_700_060_006_000);
+  assert.equal(emailService.getEmailById(biEmailId)?.isUnread, true);
+
+  // CommsHub -> EmailDock: archive
+  await commsService.archiveEvents([biCommsId], 1_700_060_007_000);
+  assert.equal(emailService.getEmailById(biEmailId)?.folder, 'archive');
+  assert.equal(emailService.getEmailById(biEmailId)?.isUnread, false);
+
+  // CommsHub -> EmailDock: unarchive restores booking_request back to 'bookings'
+  await commsService.unarchiveEvents([biCommsId], 1_700_060_008_000);
+  assert.equal(emailService.getEmailById(biEmailId)?.folder, 'bookings');
+
+  // CommsHub -> EmailDock: delete moves email to 'trash' and ensureCommsMirrorSynced never resurrects it
+  await commsService.deleteEvents([biCommsId], 1_700_060_009_000);
+  assert.equal(emailService.getEmailById(biEmailId)?.folder, 'trash');
+  assert.equal(emailService.getEmailById(biEmailId)?.isUnread, false);
+  await emailService.ensureCommsMirrorSynced();
+  assert.equal(commsService.isEventDeleted(biCommsId), true);
+  assert.equal(commsService.getAllEvents().length, 0);
+
+  // 6E. Structural Guardrails (`STORAGE_KEY_INTERACTIONS` retired + auth-aware `onSnapshot` + fallback triggers)
+  const syncHookSrc = fs.readFileSync(
+    path.resolve(process.cwd(), 'app/components/domain/dispatch/comms/useCommsInteractionSync.ts'),
+    'utf8'
+  );
+  assert.equal(
+    syncHookSrc.includes('STORAGE_KEY_INTERACTIONS'),
+    false,
+    'STORAGE_KEY_INTERACTIONS must be retired from useCommsInteractionSync.ts'
+  );
+  assert.ok(syncHookSrc.includes('visibilitychange'), 'Expected visibilitychange resync trigger');
+  assert.ok(syncHookSrc.includes("'focus'"), 'Expected window focus resync trigger');
+  assert.ok(syncHookSrc.includes("'online'"), 'Expected window online resync trigger');
+
+  const commsSvcSrc = fs.readFileSync(
+    path.resolve(process.cwd(), 'app/core/services/comms/comms-thread.service.ts'),
+    'utf8'
+  );
+  assert.ok(
+    commsSvcSrc.includes('onAuthStateChanged'),
+    'CommsThreadService must re-attach Firestore onSnapshot via onAuthStateChanged'
+  );
+  assert.ok(
+    commsSvcSrc.includes('update_comms_status'),
+    'CommsThreadService must sync status mutations via update_comms_status'
+  );
+
+  console.log('   ✅ Passed Phase 81 status persistence, LWW tombstones & bidirectional email sync.\n');
+  console.log('🎉 All Phase 39 & Phase 81 Comms Threading & Telephony checks passed (100%)!');
 }
 
 runTests().catch((err) => {

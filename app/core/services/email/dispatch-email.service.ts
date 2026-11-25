@@ -220,31 +220,85 @@ export class DispatchEmailService {
   private realtimeStarted = false;
   private isHandlingExternalSync = false;
   private isSyncingComms = false;
+  private isApplyingFromComms = false;
 
   constructor() {
     this.loadFromStorage();
 
-    // Keep email read/archive states synchronized if dispatchers triage `em_*` events inside CommsHub
-    getCommsThreadService().subscribe((commsSnap) => {
-      if (this.isSyncingComms || this.emails.size === 0) return;
-      let changed = false;
-      for (const evt of commsSnap.events) {
+    // Keep email read, archive, unarchive, and trash states synchronized if dispatchers triage `em_*` events inside CommsHub
+    getCommsThreadService().subscribe(() => {
+      if (this.isSyncingComms || this.isApplyingFromComms || this.emails.size === 0) return;
+      const allCommsEvents = getCommsThreadService().getAllEvents({
+        includeArchived: true,
+        includeDeleted: true,
+      });
+      const pendingUpdates: Array<{
+        emailId?: string;
+        commsEventId: string;
+        isUnread?: boolean;
+        folder?: 'inbox' | 'archive' | 'trash';
+        statusUpdatedAtMs?: number;
+      }> = [];
+
+      for (const evt of allCommsEvents) {
         if (evt.channel !== 'email') continue;
         const rawEmailId = evt.emailMessageId || evt.id.replace(/^em_/, '');
-        const existing = this.emails.get(rawEmailId);
+        const existing = this.findEmailForCommsEvent(rawEmailId, evt.id);
         if (!existing) continue;
-        if (existing.folder === 'archive' || existing.folder === 'trash') continue;
-        if (Boolean(evt.isUnread) !== Boolean(existing.isUnread)) {
-          this.emails.set(existing.id, {
-            ...existing,
+
+        if (evt.isDeleted) {
+          if (existing.folder !== 'trash' || existing.isUnread) {
+            pendingUpdates.push({
+              emailId: existing.id,
+              commsEventId: evt.id,
+              folder: 'trash',
+              isUnread: false,
+              statusUpdatedAtMs: evt.statusUpdatedAtMs,
+            });
+          }
+          continue;
+        }
+
+        if (evt.isArchived) {
+          if (existing.folder !== 'archive' && existing.folder !== 'trash') {
+            pendingUpdates.push({
+              emailId: existing.id,
+              commsEventId: evt.id,
+              folder: 'archive',
+              isUnread: false,
+              statusUpdatedAtMs: evt.statusUpdatedAtMs,
+            });
+          }
+          continue;
+        }
+
+        // Event is neither deleted nor archived in Comms
+        if (existing.folder === 'archive') {
+          const existingUpdatedMs = Date.parse(existing.updatedAt || existing.createdAt || '') || 0;
+          if ((evt.statusUpdatedAtMs ?? 0) >= existingUpdatedMs) {
+            pendingUpdates.push({
+              emailId: existing.id,
+              commsEventId: evt.id,
+              folder: 'inbox',
+              isUnread: Boolean(evt.isUnread),
+              statusUpdatedAtMs: evt.statusUpdatedAtMs,
+            });
+          }
+          continue;
+        }
+
+        if (existing.folder !== 'trash' && Boolean(evt.isUnread) !== Boolean(existing.isUnread)) {
+          pendingUpdates.push({
+            emailId: existing.id,
+            commsEventId: evt.id,
             isUnread: Boolean(evt.isUnread),
+            statusUpdatedAtMs: evt.statusUpdatedAtMs,
           });
-          changed = true;
         }
       }
-      if (changed) {
-        this.saveToStorage();
-        this.notifyListeners();
+
+      if (pendingUpdates.length > 0) {
+        void this.applyStatusFromComms(pendingUpdates);
       }
     });
 
@@ -438,6 +492,107 @@ export class DispatchEmailService {
     }
   }
 
+  private findEmailForCommsEvent(
+    rawEmailId: string,
+    commsEventId: string
+  ): DispatchEmailRecord | undefined {
+    const direct = this.emails.get(rawEmailId);
+    if (direct) return direct;
+    for (const rec of this.emails.values()) {
+      if (rec.commsEventId === commsEventId) return rec;
+    }
+    return undefined;
+  }
+
+  private resolveActiveFolderForEmail(existing: DispatchEmailRecord): DispatchEmailFolder {
+    if (existing.direction === 'outbound') {
+      return existing.category === 'trip_receipt' || existing.category === 'corporate_invoice'
+        ? 'receipts'
+        : 'sent';
+    }
+    if (existing.category === 'booking_request') return 'bookings';
+    if (existing.category === 'website_inquiry') return 'inquiries';
+    return 'inbox';
+  }
+
+  /**
+   * Re-entrancy-guarded reverse status bridge invoked by `CommsThreadService` when dispatchers
+   * mark email events read/unread, archive/unarchive, or delete them from `CommsHub`.
+   */
+  public async applyStatusFromComms(
+    updates: Array<{
+      emailId?: string;
+      commsEventId: string;
+      isUnread?: boolean;
+      folder?: 'inbox' | 'archive' | 'trash';
+      statusUpdatedAtMs?: number;
+    }>
+  ): Promise<void> {
+    if (
+      this.isSyncingComms ||
+      this.isApplyingFromComms ||
+      updates.length === 0 ||
+      this.emails.size === 0
+    ) {
+      return;
+    }
+
+    this.isApplyingFromComms = true;
+    try {
+      const changedRecords: DispatchEmailRecord[] = [];
+      for (const item of updates) {
+        const rawEmailId = item.emailId || item.commsEventId.replace(/^em_/, '');
+        const existing = this.findEmailForCommsEvent(rawEmailId, item.commsEventId);
+        if (!existing) continue;
+
+        let nextFolder: DispatchEmailFolder = existing.folder;
+        if (item.folder === 'trash') {
+          nextFolder = 'trash';
+        } else if (item.folder === 'archive') {
+          nextFolder = 'archive';
+        } else if (
+          item.folder === 'inbox' &&
+          (existing.folder === 'archive' || existing.folder === 'trash')
+        ) {
+          nextFolder = this.resolveActiveFolderForEmail(existing);
+        }
+
+        const nextUnread =
+          nextFolder === 'archive' || nextFolder === 'trash'
+            ? false
+            : item.isUnread !== undefined
+            ? Boolean(item.isUnread)
+            : Boolean(existing.isUnread);
+
+        if (
+          existing.folder !== nextFolder ||
+          Boolean(existing.isUnread) !== Boolean(nextUnread)
+        ) {
+          const updatedIso = new Date(item.statusUpdatedAtMs || Date.now()).toISOString();
+          const updated: DispatchEmailRecord = {
+            ...existing,
+            folder: nextFolder,
+            isUnread: nextUnread,
+            updatedAt: updatedIso,
+          };
+          this.emails.set(existing.id, updated);
+          changedRecords.push(updated);
+        }
+      }
+
+      if (changedRecords.length > 0) {
+        for (const rec of changedRecords) {
+          await this.persistEmailRecordToFirestore(rec);
+        }
+        this.saveToStorage();
+        this.notifyListeners();
+        this.broadcastStateChanged();
+      }
+    } finally {
+      this.isApplyingFromComms = false;
+    }
+  }
+
   private async syncEmailRecordToComms(
     record: DispatchEmailRecord,
     options?: { skipFirestore?: boolean; skipBroadcast?: boolean }
@@ -446,6 +601,10 @@ export class DispatchEmailService {
     try {
       const commsService = getCommsThreadService();
       const commsEventId = record.commsEventId || buildDispatchEmailCommsEventId(record.id);
+      const existingCommsEvt = commsService.getEventById(commsEventId);
+      if (existingCommsEvt?.isDeleted) {
+        return;
+      }
       const isArchivedFolder = record.folder === 'archive' || record.folder === 'trash';
       const counterpartyEmail =
         record.direction === 'outbound'
@@ -460,6 +619,8 @@ export class DispatchEmailService {
         record.direction === 'outbound'
           ? record.suggestedBooking?.passengerName || parseEmailDisplayAddress(record.toEmail).name
           : record.suggestedBooking?.passengerName || record.fromName;
+
+      const recordUpdatedMs = Date.parse(record.updatedAt || record.createdAt || '') || undefined;
 
       await commsService.recordCommsEvent(
         {
@@ -484,6 +645,7 @@ export class DispatchEmailService {
           suggestedBooking: record.suggestedBooking,
           isUnread: isArchivedFolder ? false : Boolean(record.isUnread),
           isArchived: isArchivedFolder,
+          statusUpdatedAtMs: recordUpdatedMs,
           timestampIso: record.createdAt,
           timestampMs: record.timestampMs,
         },
@@ -515,9 +677,10 @@ export class DispatchEmailService {
     for (const record of sortedChrono) {
       if (!record || !record.id) continue;
       const commsEventId = record.commsEventId || buildDispatchEmailCommsEventId(record.id);
-      const existingCommsEvt = commsService.getAllEvents({ includeArchived: true }).find(
-        (e) => e.id === commsEventId
-      );
+      const existingCommsEvt = commsService.getEventById(commsEventId);
+      if (existingCommsEvt?.isDeleted) {
+        continue;
+      }
       if (
         !existingCommsEvt ||
         existingCommsEvt.deliveryStatus !== record.deliveryStatus ||
@@ -907,6 +1070,7 @@ export class DispatchEmailService {
   ): Promise<void> {
     const nowIso = new Date().toISOString();
     const archivedCommsEventIds: string[] = [];
+    const restoredCommsEventIds: string[] = [];
     const restoredRecords: DispatchEmailRecord[] = [];
     const changedRecords: DispatchEmailRecord[] = [];
 
@@ -915,17 +1079,7 @@ export class DispatchEmailService {
       if (!existing) continue;
 
       const resolvedFolder: DispatchEmailFolder =
-        targetFolder === 'inbox'
-          ? existing.direction === 'outbound'
-            ? existing.category === 'trip_receipt' || existing.category === 'corporate_invoice'
-              ? 'receipts'
-              : 'sent'
-            : existing.category === 'booking_request'
-            ? 'bookings'
-            : existing.category === 'website_inquiry'
-            ? 'inquiries'
-            : 'inbox'
-          : targetFolder;
+        targetFolder === 'inbox' ? this.resolveActiveFolderForEmail(existing) : targetFolder;
 
       const nextUnread =
         targetFolder === 'archive' || targetFolder === 'trash' ? false : existing.isUnread;
@@ -940,11 +1094,11 @@ export class DispatchEmailService {
       this.emails.set(id, updated);
       changedRecords.push(updated);
 
+      const commsId = updated.commsEventId || buildDispatchEmailCommsEventId(updated.id);
       if (targetFolder === 'archive' || targetFolder === 'trash') {
-        archivedCommsEventIds.push(
-          updated.commsEventId || buildDispatchEmailCommsEventId(updated.id)
-        );
+        archivedCommsEventIds.push(commsId);
       } else {
+        restoredCommsEventIds.push(commsId);
         restoredRecords.push(updated);
       }
     }
@@ -953,6 +1107,15 @@ export class DispatchEmailService {
       this.isSyncingComms = true;
       try {
         await getCommsThreadService().archiveEvents(archivedCommsEventIds);
+      } finally {
+        this.isSyncingComms = false;
+      }
+    }
+
+    if (restoredCommsEventIds.length > 0) {
+      this.isSyncingComms = true;
+      try {
+        await getCommsThreadService().unarchiveEvents(restoredCommsEventIds);
       } finally {
         this.isSyncingComms = false;
       }

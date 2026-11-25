@@ -28,6 +28,8 @@ import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import {
   buildCommsEventId,
   createEmptyUnreadByChannel,
+  reconcileCommsEventStatus,
+  reconcileCommsThreadStatus,
   type CommsChannel,
   type CommsContactType,
   type CommsDirection,
@@ -37,6 +39,8 @@ import {
   type RecordCommsEventInput,
 } from '../../types/comms';
 import { formatDisplayPhone } from '../../utils/phone';
+import { getAdminAuthService } from '../auth/admin-auth.service';
+import { authorizedFetch } from '../auth/auth-headers';
 import {
   collectContactEmailsNormalized,
   collectContactPhonesE164,
@@ -49,6 +53,7 @@ import {
   resolveCanonicalThreadId,
   type ContactRecord,
 } from '../customer/contact.service';
+import { getDispatchEmailService } from '../email/dispatch-email.service';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
 import { getWorkspaceBus } from '../workspace-bus.service';
@@ -222,6 +227,8 @@ export function interactionEventToCommsEvent(interaction: InteractionEvent): Com
     transcription: interaction.transcription,
     suggestedBooking: interaction.suggestedBooking,
     isUnread: Boolean(interaction.isUnread),
+    ...(interaction.isArchived !== undefined ? { isArchived: interaction.isArchived } : {}),
+    ...(interaction.isDeleted !== undefined ? { isDeleted: interaction.isDeleted } : {}),
     actorName: interaction.actorName,
     timestampIso: tsIso,
     timestampMs: tsMs,
@@ -238,7 +245,11 @@ export class CommsThreadService {
   private events: Map<string, CommsEvent> = new Map();
   private listeners: Set<(snapshot: CommsThreadSnapshot) => void> = new Set();
   private firestoreUnsubs: Unsubscribe[] = [];
+  private authUnsub: (() => void) | null = null;
+  private activeRealtimeUid: string | null = null;
   private realtimeStarted = false;
+  private isPublishingBus = false;
+  private serverSyncFetchImpl: typeof fetch | null = null;
 
   constructor() {
     this.loadFromStorage();
@@ -260,7 +271,7 @@ export class CommsThreadService {
 
       const bus = getWorkspaceBus();
       bus.subscribe((msg) => {
-        if (msg.type === 'COMMS_EVENT_RECORDED') {
+        if (msg.type === 'COMMS_EVENT_RECORDED' && !this.isPublishingBus) {
           this.loadFromStorage();
           this.notifyListeners();
         }
@@ -276,7 +287,10 @@ export class CommsThreadService {
         const parsed = JSON.parse(rawThreads) as CommsThread[];
         if (Array.isArray(parsed)) {
           for (const t of parsed) {
-            if (t && t.id) this.threads.set(t.id, t);
+            if (t && t.id && !t.mergedIntoThreadId) {
+              const existing = this.threads.get(t.id);
+              this.threads.set(t.id, reconcileCommsThreadStatus(existing, t));
+            }
           }
         }
       }
@@ -285,7 +299,10 @@ export class CommsThreadService {
         const parsed = JSON.parse(rawEvents) as CommsEvent[];
         if (Array.isArray(parsed)) {
           for (const e of parsed) {
-            if (e && e.id) this.events.set(e.id, e);
+            if (e && e.id) {
+              const existing = this.events.get(e.id);
+              this.events.set(e.id, reconcileCommsEventStatus(existing, e));
+            }
           }
         }
       }
@@ -310,6 +327,22 @@ export class CommsThreadService {
     }
   }
 
+  private broadcastStatusChanged(threadId = '*', eventId = '*'): void {
+    if (this.isPublishingBus) return;
+    try {
+      this.isPublishingBus = true;
+      getWorkspaceBus().publish('COMMS_EVENT_RECORDED', {
+        threadId,
+        eventId,
+        channel: 'status_sync',
+      });
+    } catch {
+      // Non-blocking broadcast
+    } finally {
+      this.isPublishingBus = false;
+    }
+  }
+
   private notifyListeners(): void {
     if (this.listeners.size === 0) return;
     const snap: CommsThreadSnapshot = {
@@ -323,7 +356,18 @@ export class CommsThreadService {
     });
   }
 
-  public startRealtimeSync(): void {
+  private teardownFirestoreListeners(): void {
+    for (const unsub of this.firestoreUnsubs) {
+      try {
+        unsub();
+      } catch {}
+    }
+    this.firestoreUnsubs = [];
+    this.realtimeStarted = false;
+    this.activeRealtimeUid = null;
+  }
+
+  private attachFirestoreListeners(uid: string | null): void {
     if (this.realtimeStarted || typeof window === 'undefined' || !isFirebaseConfigured()) {
       return;
     }
@@ -331,6 +375,7 @@ export class CommsThreadService {
     if (!db) return;
 
     this.realtimeStarted = true;
+    this.activeRealtimeUid = uid;
     try {
       const threadsQuery = query(
         collection(db, 'commsThreads'),
@@ -344,10 +389,16 @@ export class CommsThreadService {
           snap.docChanges().forEach((change) => {
             const data = change.doc.data() as CommsThread;
             const id = data.id || change.doc.id;
-            if (change.type === 'removed' || data.mergedIntoThreadId) {
+            const existing = this.threads.get(id);
+            if (data.mergedIntoThreadId) {
               if (this.threads.delete(id)) changed = true;
+            } else if (change.type === 'removed') {
+              if (!existing?.isDeleted && this.threads.delete(id)) {
+                changed = true;
+              }
             } else {
-              this.threads.set(id, { ...data, id });
+              const reconciled = reconcileCommsThreadStatus(existing, { ...data, id });
+              this.threads.set(id, reconciled);
               changed = true;
             }
           });
@@ -357,7 +408,8 @@ export class CommsThreadService {
           }
         },
         () => {
-          // Graceful fallback when staff auth is not yet initialized
+          // Tear down and reset realtimeStarted so onAuthStateChanged / visibility re-attaches cleanly
+          this.teardownFirestoreListeners();
         }
       );
 
@@ -371,50 +423,78 @@ export class CommsThreadService {
         (snap) => {
           let changed = false;
           const touchedThreadIds = new Set<string>();
+          const changedEmailEvents: CommsEvent[] = [];
           snap.docChanges().forEach((change) => {
             const data = change.doc.data() as CommsEvent;
             const id = data.id || change.doc.id;
+            const existing = this.events.get(id);
             if (change.type === 'removed') {
-              const existing = this.events.get(id);
-              if (existing) touchedThreadIds.add(existing.threadId);
-              if (this.events.delete(id)) changed = true;
+              if (!existing?.isDeleted) {
+                if (existing) touchedThreadIds.add(existing.threadId);
+                if (this.events.delete(id)) changed = true;
+              }
             } else {
-              this.events.set(id, { ...data, id });
-              if (data.threadId) touchedThreadIds.add(data.threadId);
+              const reconciled = reconcileCommsEventStatus(existing, { ...data, id });
+              this.events.set(id, reconciled);
+              if (reconciled.threadId) touchedThreadIds.add(reconciled.threadId);
+              if (reconciled.channel === 'email') changedEmailEvents.push(reconciled);
               changed = true;
             }
           });
           if (changed) {
             for (const tid of touchedThreadIds) {
-              const parent = this.threads.get(tid);
-              if (parent) {
-                const threadEvents = this.getThreadEvents(tid, true);
-                this.threads.set(tid, recomputeCommsThreadRollups(parent, threadEvents));
-              }
+              this.recomputeOrSynthesizeThread(tid);
             }
             this.saveToStorage();
             this.notifyListeners();
+            if (changedEmailEvents.length > 0) {
+              void this.propagateEmailEventsStatus(changedEmailEvents);
+            }
           }
         },
         () => {
-          // Graceful fallback when staff auth is not yet initialized
+          // Tear down and reset realtimeStarted so onAuthStateChanged / visibility re-attaches cleanly
+          this.teardownFirestoreListeners();
         }
       );
 
       this.firestoreUnsubs.push(unsubThreads, unsubEvents);
     } catch {
-      this.realtimeStarted = false;
+      this.teardownFirestoreListeners();
+    }
+  }
+
+  public startRealtimeSync(): void {
+    if (typeof window === 'undefined' || !isFirebaseConfigured()) {
+      return;
+    }
+
+    if (!this.authUnsub) {
+      this.authUnsub = getAdminAuthService().onAuthStateChanged((user) => {
+        const nextUid = user?.uid || null;
+        if (nextUid && (nextUid !== this.activeRealtimeUid || !this.realtimeStarted)) {
+          this.teardownFirestoreListeners();
+          this.attachFirestoreListeners(nextUid);
+        } else if (!nextUid && this.activeRealtimeUid) {
+          this.teardownFirestoreListeners();
+        }
+      });
+    }
+
+    if (!this.realtimeStarted) {
+      const currentUid = getAdminAuthService().getCurrentUser()?.uid || null;
+      this.attachFirestoreListeners(currentUid);
     }
   }
 
   public stopRealtimeSync(): void {
-    for (const unsub of this.firestoreUnsubs) {
+    this.teardownFirestoreListeners();
+    if (this.authUnsub) {
       try {
-        unsub();
+        this.authUnsub();
       } catch {}
+      this.authUnsub = null;
     }
-    this.firestoreUnsubs = [];
-    this.realtimeStarted = false;
   }
 
   public subscribe(listener: (snapshot: CommsThreadSnapshot) => void): () => void {
@@ -599,7 +679,7 @@ export class CommsThreadService {
     const defaultUnread =
       input.direction === 'inbound' && input.channel !== 'note' ? true : false;
 
-    const nextEvent: CommsEvent = {
+    const candidateEvent: CommsEvent = {
       ...(existingEvent || {}),
       id: eventId,
       threadId: effectiveThreadId,
@@ -669,13 +749,24 @@ export class CommsThreadService {
         input.isArchived !== undefined ? input.isArchived : existingEvent?.isArchived ?? false,
       isDeleted:
         input.isDeleted !== undefined ? input.isDeleted : existingEvent?.isDeleted ?? false,
+      ...(input.statusUpdatedAtMs !== undefined
+        ? { statusUpdatedAtMs: input.statusUpdatedAtMs }
+        : {}),
       actorId: input.actorId || existingEvent?.actorId,
       actorName: input.actorName || existingEvent?.actorName,
       timestampIso: tsIso,
       timestampMs: tsMs,
     };
 
+    const nextEvent = reconcileCommsEventStatus(existingEvent, candidateEvent);
+
     this.events.set(eventId, nextEvent);
+
+    const shouldWakeThread =
+      !existingEvent &&
+      !nextEvent.isDeleted &&
+      !nextEvent.isArchived &&
+      nextEvent.timestampMs > (activeThread?.statusUpdatedAtMs || 0);
 
     const nowIso = new Date().toISOString();
     const seedThread: CommsThread = activeThread
@@ -703,7 +794,8 @@ export class CommsThreadService {
             ...resolution.emails,
             ...(activeThread.emails || []),
           ]),
-          isArchived: false,
+          isArchived: shouldWakeThread ? false : Boolean(activeThread.isArchived),
+          isDeleted: shouldWakeThread ? false : Boolean(activeThread.isDeleted),
         }
       : {
           id: effectiveThreadId,
@@ -727,12 +819,16 @@ export class CommsThreadService {
           unreadCountTotal: 0,
           unreadByChannel: createEmptyUnreadByChannel(),
           isStarred: false,
-          isArchived: false,
+          isArchived: Boolean(nextEvent.isArchived),
+          isDeleted: Boolean(nextEvent.isDeleted),
+          ...(nextEvent.statusUpdatedAtMs !== undefined
+            ? { statusUpdatedAtMs: nextEvent.statusUpdatedAtMs }
+            : {}),
           createdAt: tsIso,
           updatedAt: nowIso,
         };
 
-    const threadEvents = this.getThreadEvents(effectiveThreadId, true);
+    const threadEvents = this.getThreadEvents(effectiveThreadId, true, false);
     const updatedThread = recomputeCommsThreadRollups(seedThread, threadEvents, nowIso);
     this.threads.set(effectiveThreadId, updatedThread);
 
@@ -741,12 +837,16 @@ export class CommsThreadService {
 
     if (!options?.skipBroadcast) {
       try {
+        this.isPublishingBus = true;
         getWorkspaceBus().publish('COMMS_EVENT_RECORDED', {
           threadId: effectiveThreadId,
           eventId,
           channel: nextEvent.channel,
         });
-      } catch {}
+      } catch {
+      } finally {
+        this.isPublishingBus = false;
+      }
     }
 
     if (!options?.skipFirestore) {
@@ -800,9 +900,122 @@ export class CommsThreadService {
     return { thread: res.thread, event: res.event };
   }
 
+  private resolveStoredEvent(rawId: string): CommsEvent | undefined {
+    const direct = this.events.get(rawId);
+    if (direct) return direct;
+    for (const prefix of ['sms_', 'vm_', 'call_', 'em_', 'note_']) {
+      const prefixed = this.events.get(`${prefix}${rawId}`);
+      if (prefixed) return prefixed;
+    }
+    return undefined;
+  }
+
+  private recomputeOrSynthesizeThread(threadId: string, nowIso = new Date().toISOString()): CommsThread | null {
+    const nonDeletedEvents = this.getThreadEvents(threadId, true, false);
+    const existing = this.threads.get(threadId);
+    if (existing) {
+      const updated = recomputeCommsThreadRollups(existing, nonDeletedEvents, nowIso);
+      this.threads.set(threadId, updated);
+      return updated;
+    }
+    if (nonDeletedEvents.length === 0) return null;
+    const latest = nonDeletedEvents[nonDeletedEvents.length - 1];
+    const resolution = getContactService().resolveUnifiedContact({
+      phone: latest.contactPhone,
+      email: latest.contactEmail,
+      name: latest.contactName,
+      autoLink: false,
+    });
+    const seed: CommsThread = {
+      id: threadId,
+      contactId: resolution.contactId || latest.contactId,
+      contactName: resolution.contactName || latest.contactName || 'Customer',
+      contactType: resolution.contactType,
+      primaryPhone: resolution.primaryPhone || latest.contactPhone,
+      phones: resolution.phones,
+      primaryEmail: resolution.primaryEmail || latest.contactEmail,
+      emails: resolution.emails,
+      corporateAccountId: resolution.corporateAccountId,
+      corporateAccountName: resolution.corporateAccountName,
+      linkedTripIds: [],
+      channels: [latest.channel],
+      lastEventAt: latest.timestampIso,
+      lastEventAtMs: latest.timestampMs,
+      lastChannel: latest.channel,
+      lastDirection: latest.direction,
+      lastSubject: latest.subject,
+      lastSnippet: latest.snippet,
+      unreadCountTotal: 0,
+      unreadByChannel: createEmptyUnreadByChannel(),
+      isStarred: false,
+      isArchived: nonDeletedEvents.every((e) => Boolean(e.isArchived)),
+      isDeleted: false,
+      createdAt: nonDeletedEvents[0].timestampIso || nowIso,
+      updatedAt: nowIso,
+    };
+    const synthesized = recomputeCommsThreadRollups(seed, nonDeletedEvents, nowIso);
+    this.threads.set(threadId, synthesized);
+    return synthesized;
+  }
+
+  private async propagateEmailEventsStatus(
+    events: CommsEvent[],
+    explicitFolder?: 'inbox' | 'archive' | 'trash'
+  ): Promise<void> {
+    const emailUpdates = events
+      .filter((e) => e.channel === 'email')
+      .map((e) => ({
+        emailId: e.emailMessageId || e.id.replace(/^em_/, ''),
+        commsEventId: e.id,
+        isUnread: Boolean(e.isUnread),
+        folder:
+          explicitFolder ||
+          (e.isDeleted ? ('trash' as const) : e.isArchived ? ('archive' as const) : undefined),
+        statusUpdatedAtMs: e.statusUpdatedAtMs,
+      }));
+    if (emailUpdates.length === 0) return;
+    try {
+      await getDispatchEmailService().applyStatusFromComms(emailUpdates);
+    } catch {
+      // Non-blocking mirror sync
+    }
+  }
+
+  private async syncStatusMutationToServer(payload: {
+    eventIds?: string[];
+    threadIds?: string[];
+    channels?: CommsChannel[];
+    isUnread?: boolean;
+    isArchived?: boolean;
+    isDeleted?: boolean;
+    statusUpdatedAtMs: number;
+    events?: CommsEvent[];
+    threads?: CommsThread[];
+  }): Promise<void> {
+    if (typeof window === 'undefined' && !this.serverSyncFetchImpl) return;
+    const fetchFn = this.serverSyncFetchImpl ?? authorizedFetch;
+    try {
+      await fetchFn('/api/telephony', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_comms_status',
+          ...payload,
+        }),
+      });
+    } catch {
+      // Tolerated offline / background sync failure; localStorage + Firestore retain state
+    }
+  }
+
+  public setServerSyncFetchForTests(fetchFn: typeof fetch | null): void {
+    this.serverSyncFetchImpl = fetchFn;
+  }
+
   public async markThreadRead(
     threadId: string,
-    channels?: CommsChannel[]
+    channels?: CommsChannel[],
+    nowMs = Date.now()
   ): Promise<CommsThread | null> {
     const thread = this.threads.get(threadId);
     if (!thread) return null;
@@ -814,274 +1027,492 @@ export class CommsThreadService {
       if (evt.threadId !== threadId) continue;
       if (channelFilter && !channelFilter.has(evt.channel)) continue;
       if (evt.isUnread) {
-        const updated = { ...evt, isUnread: false };
+        const updated: CommsEvent = {
+          ...evt,
+          isUnread: false,
+          statusUpdatedAtMs: nowMs,
+        };
         this.events.set(evt.id, updated);
         changedEvents.push(updated);
       }
     }
 
-    const updatedThread = recomputeCommsThreadRollups(
-      thread,
-      this.getThreadEvents(threadId, true)
-    );
+    const updatedThread: CommsThread = {
+      ...recomputeCommsThreadRollups(
+        thread,
+        this.getThreadEvents(threadId, true, false)
+      ),
+      statusUpdatedAtMs: nowMs,
+    };
     this.threads.set(threadId, updatedThread);
     this.saveToStorage();
     this.notifyListeners();
-    await this.persistThreadAndEventsToFirestore(updatedThread, changedEvents);
+    this.broadcastStatusChanged(threadId, changedEvents[0]?.id);
+    await this.propagateEmailEventsStatus(changedEvents);
+    await Promise.all([
+      this.persistThreadAndEventsToFirestore(updatedThread, changedEvents),
+      this.syncStatusMutationToServer({
+        threadIds: [threadId],
+        eventIds: changedEvents.map((e) => e.id),
+        channels,
+        isUnread: false,
+        statusUpdatedAtMs: nowMs,
+        events: changedEvents,
+        threads: [updatedThread],
+      }),
+    ]);
     return updatedThread;
   }
 
-  public async markEventsRead(eventIds: string[]): Promise<void> {
+  public async markEventsRead(eventIds: string[], nowMs = Date.now()): Promise<void> {
     const touchedThreads = new Map<string, CommsEvent[]>();
+    const allChangedEvents: CommsEvent[] = [];
     for (const id of eventIds) {
-      const evt = this.events.get(id);
+      const evt = this.resolveStoredEvent(id);
       if (evt && evt.isUnread) {
-        const updated = { ...evt, isUnread: false };
-        this.events.set(id, updated);
+        const updated: CommsEvent = {
+          ...evt,
+          isUnread: false,
+          statusUpdatedAtMs: nowMs,
+        };
+        this.events.set(evt.id, updated);
+        allChangedEvents.push(updated);
         const list = touchedThreads.get(evt.threadId) || [];
         list.push(updated);
         touchedThreads.set(evt.threadId, list);
       }
     }
-    for (const [tid, evts] of touchedThreads.entries()) {
+    const updatedThreads: CommsThread[] = [];
+    for (const [tid] of touchedThreads.entries()) {
       const parent = this.threads.get(tid);
       if (parent) {
-        const recomputed = recomputeCommsThreadRollups(parent, this.getThreadEvents(tid, true));
+        const recomputed: CommsThread = {
+          ...recomputeCommsThreadRollups(parent, this.getThreadEvents(tid, true, false)),
+          statusUpdatedAtMs: nowMs,
+        };
         this.threads.set(tid, recomputed);
-        await this.persistThreadAndEventsToFirestore(recomputed, evts);
+        updatedThreads.push(recomputed);
       }
     }
-    if (touchedThreads.size > 0) {
+    if (allChangedEvents.length > 0) {
       this.saveToStorage();
       this.notifyListeners();
+      this.broadcastStatusChanged(updatedThreads[0]?.id, allChangedEvents[0]?.id);
+      await this.propagateEmailEventsStatus(allChangedEvents);
+      for (const [tid, evts] of touchedThreads.entries()) {
+        const thr = this.threads.get(tid);
+        if (thr) await this.persistThreadAndEventsToFirestore(thr, evts);
+      }
+      await this.syncStatusMutationToServer({
+        eventIds: allChangedEvents.map((e) => e.id),
+        isUnread: false,
+        statusUpdatedAtMs: nowMs,
+        events: allChangedEvents,
+        threads: updatedThreads,
+      });
     }
   }
 
   public async markThreadsUnread(
     threadIds: string[],
-    channel?: CommsChannel
+    channel?: CommsChannel,
+    nowMs = Date.now()
   ): Promise<void> {
+    const allChangedEvents: CommsEvent[] = [];
+    const updatedThreads: CommsThread[] = [];
     for (const tid of threadIds) {
       const thread = this.threads.get(tid);
-      if (!thread) continue;
-      const events = this.getThreadEvents(tid);
+      if (!thread || thread.isDeleted) continue;
+      const events = this.getThreadEvents(tid, false, false);
       const target = [...events]
         .reverse()
         .find((e) => e.channel !== 'note' && (!channel || e.channel === channel));
       const changed: CommsEvent[] = [];
       if (target && !target.isUnread) {
-        const updated = { ...target, isUnread: true };
+        const updated: CommsEvent = {
+          ...target,
+          isUnread: true,
+          statusUpdatedAtMs: nowMs,
+        };
         this.events.set(updated.id, updated);
         changed.push(updated);
+        allChangedEvents.push(updated);
       }
-      const recomputed = recomputeCommsThreadRollups(thread, this.getThreadEvents(tid, true));
+      const recomputed: CommsThread = {
+        ...recomputeCommsThreadRollups(thread, this.getThreadEvents(tid, true, false)),
+        statusUpdatedAtMs: nowMs,
+      };
       this.threads.set(tid, recomputed);
+      updatedThreads.push(recomputed);
       await this.persistThreadAndEventsToFirestore(recomputed, changed);
     }
-    this.saveToStorage();
-    this.notifyListeners();
+    if (updatedThreads.length > 0) {
+      this.saveToStorage();
+      this.notifyListeners();
+      this.broadcastStatusChanged(updatedThreads[0]?.id, allChangedEvents[0]?.id);
+      await this.propagateEmailEventsStatus(allChangedEvents);
+      await this.syncStatusMutationToServer({
+        threadIds,
+        eventIds: allChangedEvents.map((e) => e.id),
+        channels: channel ? [channel] : undefined,
+        isUnread: true,
+        statusUpdatedAtMs: nowMs,
+        events: allChangedEvents,
+        threads: updatedThreads,
+      });
+    }
   }
 
-  public async markEventsUnread(eventIds: string[]): Promise<void> {
+  public async markEventsUnread(eventIds: string[], nowMs = Date.now()): Promise<void> {
     const touchedThreads = new Map<string, CommsEvent[]>();
+    const allChangedEvents: CommsEvent[] = [];
     for (const id of eventIds) {
-      const evt = this.events.get(id);
-      if (evt && !evt.isUnread && evt.channel !== 'note') {
-        const updated = { ...evt, isUnread: true };
-        this.events.set(id, updated);
+      const evt = this.resolveStoredEvent(id);
+      if (evt && !evt.isDeleted && !evt.isArchived && !evt.isUnread && evt.channel !== 'note') {
+        const updated: CommsEvent = {
+          ...evt,
+          isUnread: true,
+          statusUpdatedAtMs: nowMs,
+        };
+        this.events.set(evt.id, updated);
+        allChangedEvents.push(updated);
         const list = touchedThreads.get(evt.threadId) || [];
         list.push(updated);
         touchedThreads.set(evt.threadId, list);
       }
     }
-    for (const [tid, evts] of touchedThreads.entries()) {
+    const updatedThreads: CommsThread[] = [];
+    for (const [tid] of touchedThreads.entries()) {
       const parent = this.threads.get(tid);
       if (parent) {
-        const recomputed = recomputeCommsThreadRollups(parent, this.getThreadEvents(tid, true));
+        const recomputed: CommsThread = {
+          ...recomputeCommsThreadRollups(parent, this.getThreadEvents(tid, true, false)),
+          statusUpdatedAtMs: nowMs,
+        };
         this.threads.set(tid, recomputed);
-        await this.persistThreadAndEventsToFirestore(recomputed, evts);
+        updatedThreads.push(recomputed);
       }
     }
-    if (touchedThreads.size > 0) {
+    if (allChangedEvents.length > 0) {
       this.saveToStorage();
       this.notifyListeners();
+      this.broadcastStatusChanged(updatedThreads[0]?.id, allChangedEvents[0]?.id);
+      await this.propagateEmailEventsStatus(allChangedEvents);
+      for (const [tid, evts] of touchedThreads.entries()) {
+        const thr = this.threads.get(tid);
+        if (thr) await this.persistThreadAndEventsToFirestore(thr, evts);
+      }
+      await this.syncStatusMutationToServer({
+        eventIds: allChangedEvents.map((e) => e.id),
+        isUnread: true,
+        statusUpdatedAtMs: nowMs,
+        events: allChangedEvents,
+        threads: updatedThreads,
+      });
     }
   }
 
   public async toggleEventReadStatus(eventId: string): Promise<CommsEvent | null> {
-    const evt = this.events.get(eventId);
+    const evt = this.resolveStoredEvent(eventId);
     if (!evt) return null;
     if (evt.isUnread) {
-      await this.markEventsRead([eventId]);
+      await this.markEventsRead([evt.id]);
     } else {
-      await this.markEventsUnread([eventId]);
+      await this.markEventsUnread([evt.id]);
     }
-    return this.events.get(eventId) || null;
+    return this.events.get(evt.id) || null;
   }
 
-  public async archiveThreads(threadIds: string[]): Promise<void> {
+  public async archiveThreads(threadIds: string[], nowMs = Date.now()): Promise<void> {
+    const allChangedEvents: CommsEvent[] = [];
+    const updatedThreads: CommsThread[] = [];
     for (const tid of threadIds) {
       const thread = this.threads.get(tid);
       if (!thread) continue;
       const changedEvents: CommsEvent[] = [];
       for (const evt of this.events.values()) {
-        if (evt.threadId === tid && (!evt.isArchived || evt.isUnread)) {
-          const updated = { ...evt, isArchived: true, isUnread: false };
+        if (evt.threadId === tid && !evt.isDeleted && (!evt.isArchived || evt.isUnread)) {
+          const updated: CommsEvent = {
+            ...evt,
+            isArchived: true,
+            isUnread: false,
+            statusUpdatedAtMs: nowMs,
+          };
           this.events.set(evt.id, updated);
           changedEvents.push(updated);
+          allChangedEvents.push(updated);
         }
       }
       const recomputed: CommsThread = {
-        ...recomputeCommsThreadRollups(thread, this.getThreadEvents(tid, true)),
+        ...recomputeCommsThreadRollups(thread, this.getThreadEvents(tid, true, false)),
         isArchived: true,
+        statusUpdatedAtMs: nowMs,
       };
       this.threads.set(tid, recomputed);
+      updatedThreads.push(recomputed);
       await this.persistThreadAndEventsToFirestore(recomputed, changedEvents);
     }
-    this.saveToStorage();
-    this.notifyListeners();
+    if (updatedThreads.length > 0) {
+      this.saveToStorage();
+      this.notifyListeners();
+      this.broadcastStatusChanged(updatedThreads[0]?.id, allChangedEvents[0]?.id);
+      await this.propagateEmailEventsStatus(allChangedEvents, 'archive');
+      await this.syncStatusMutationToServer({
+        threadIds,
+        eventIds: allChangedEvents.map((e) => e.id),
+        isArchived: true,
+        isUnread: false,
+        statusUpdatedAtMs: nowMs,
+        events: allChangedEvents,
+        threads: updatedThreads,
+      });
+    }
   }
 
-  public async archiveEvents(eventIds: string[]): Promise<void> {
+  public async archiveEvents(eventIds: string[], nowMs = Date.now()): Promise<void> {
     const touchedThreads = new Map<string, CommsEvent[]>();
+    const allChangedEvents: CommsEvent[] = [];
     for (const id of eventIds) {
-      const evt = this.events.get(id);
-      if (evt && !evt.isArchived) {
-        const updated = { ...evt, isArchived: true, isUnread: false };
-        this.events.set(id, updated);
+      const evt = this.resolveStoredEvent(id);
+      if (evt && !evt.isDeleted && (!evt.isArchived || evt.isUnread)) {
+        const updated: CommsEvent = {
+          ...evt,
+          isArchived: true,
+          isUnread: false,
+          statusUpdatedAtMs: nowMs,
+        };
+        this.events.set(evt.id, updated);
+        allChangedEvents.push(updated);
         const list = touchedThreads.get(evt.threadId) || [];
         list.push(updated);
         touchedThreads.set(evt.threadId, list);
       }
     }
-    for (const [tid, evts] of touchedThreads.entries()) {
+    const updatedThreads: CommsThread[] = [];
+    for (const [tid] of touchedThreads.entries()) {
       const parent = this.threads.get(tid);
       if (parent) {
-        const remainingActive = this.getThreadEvents(tid, false);
+        const remainingActive = this.getThreadEvents(tid, false, false);
         const recomputed: CommsThread = {
-          ...recomputeCommsThreadRollups(parent, this.getThreadEvents(tid, true)),
+          ...recomputeCommsThreadRollups(parent, this.getThreadEvents(tid, true, false)),
           isArchived: remainingActive.length === 0 ? true : parent.isArchived,
+          statusUpdatedAtMs: nowMs,
         };
         this.threads.set(tid, recomputed);
-        await this.persistThreadAndEventsToFirestore(recomputed, evts);
+        updatedThreads.push(recomputed);
       }
     }
-    if (touchedThreads.size > 0) {
+    if (allChangedEvents.length > 0) {
       this.saveToStorage();
       this.notifyListeners();
+      this.broadcastStatusChanged(updatedThreads[0]?.id, allChangedEvents[0]?.id);
+      await this.propagateEmailEventsStatus(allChangedEvents, 'archive');
+      for (const [tid, evts] of touchedThreads.entries()) {
+        const thr = this.threads.get(tid);
+        if (thr) await this.persistThreadAndEventsToFirestore(thr, evts);
+      }
+      await this.syncStatusMutationToServer({
+        eventIds: allChangedEvents.map((e) => e.id),
+        isArchived: true,
+        isUnread: false,
+        statusUpdatedAtMs: nowMs,
+        events: allChangedEvents,
+        threads: updatedThreads,
+      });
     }
   }
 
-  public async unarchiveThreads(threadIds: string[]): Promise<void> {
-    let anyChanged = false;
+  public async unarchiveThreads(threadIds: string[], nowMs = Date.now()): Promise<void> {
+    const allChangedEvents: CommsEvent[] = [];
+    const updatedThreads: CommsThread[] = [];
     for (const tid of threadIds) {
       const thread = this.threads.get(tid);
       if (!thread || thread.isDeleted) continue;
       const changedEvents: CommsEvent[] = [];
       for (const evt of this.events.values()) {
         if (evt.threadId === tid && !evt.isDeleted && evt.isArchived) {
-          const updated = { ...evt, isArchived: false };
+          const updated: CommsEvent = {
+            ...evt,
+            isArchived: false,
+            statusUpdatedAtMs: nowMs,
+          };
           this.events.set(evt.id, updated);
           changedEvents.push(updated);
+          allChangedEvents.push(updated);
         }
       }
       const recomputed: CommsThread = {
-        ...recomputeCommsThreadRollups(thread, this.getThreadEvents(tid, true)),
+        ...recomputeCommsThreadRollups(thread, this.getThreadEvents(tid, true, false)),
         isArchived: false,
+        statusUpdatedAtMs: nowMs,
       };
       this.threads.set(tid, recomputed);
-      anyChanged = true;
+      updatedThreads.push(recomputed);
       await this.persistThreadAndEventsToFirestore(recomputed, changedEvents);
     }
-    if (anyChanged) {
+    if (updatedThreads.length > 0) {
       this.saveToStorage();
       this.notifyListeners();
+      this.broadcastStatusChanged(updatedThreads[0]?.id, allChangedEvents[0]?.id);
+      await this.propagateEmailEventsStatus(allChangedEvents, 'inbox');
+      await this.syncStatusMutationToServer({
+        threadIds,
+        eventIds: allChangedEvents.map((e) => e.id),
+        isArchived: false,
+        statusUpdatedAtMs: nowMs,
+        events: allChangedEvents,
+        threads: updatedThreads,
+      });
     }
   }
 
-  public async unarchiveEvents(eventIds: string[]): Promise<void> {
+  public async unarchiveEvents(eventIds: string[], nowMs = Date.now()): Promise<void> {
     const touchedThreads = new Map<string, CommsEvent[]>();
+    const allChangedEvents: CommsEvent[] = [];
     for (const id of eventIds) {
-      const evt = this.events.get(id);
+      const evt = this.resolveStoredEvent(id);
       if (evt && !evt.isDeleted && evt.isArchived) {
-        const updated = { ...evt, isArchived: false };
-        this.events.set(id, updated);
+        const updated: CommsEvent = {
+          ...evt,
+          isArchived: false,
+          statusUpdatedAtMs: nowMs,
+        };
+        this.events.set(evt.id, updated);
+        allChangedEvents.push(updated);
         const list = touchedThreads.get(evt.threadId) || [];
         list.push(updated);
         touchedThreads.set(evt.threadId, list);
       }
     }
-    for (const [tid, evts] of touchedThreads.entries()) {
+    const updatedThreads: CommsThread[] = [];
+    for (const [tid] of touchedThreads.entries()) {
       const parent = this.threads.get(tid);
       if (parent && !parent.isDeleted) {
         const recomputed: CommsThread = {
-          ...recomputeCommsThreadRollups(parent, this.getThreadEvents(tid, true)),
+          ...recomputeCommsThreadRollups(parent, this.getThreadEvents(tid, true, false)),
           isArchived: false,
+          statusUpdatedAtMs: nowMs,
         };
         this.threads.set(tid, recomputed);
-        await this.persistThreadAndEventsToFirestore(recomputed, evts);
+        updatedThreads.push(recomputed);
       }
     }
-    if (touchedThreads.size > 0) {
+    if (allChangedEvents.length > 0) {
       this.saveToStorage();
       this.notifyListeners();
+      this.broadcastStatusChanged(updatedThreads[0]?.id, allChangedEvents[0]?.id);
+      await this.propagateEmailEventsStatus(allChangedEvents, 'inbox');
+      for (const [tid, evts] of touchedThreads.entries()) {
+        const thr = this.threads.get(tid);
+        if (thr) await this.persistThreadAndEventsToFirestore(thr, evts);
+      }
+      await this.syncStatusMutationToServer({
+        eventIds: allChangedEvents.map((e) => e.id),
+        isArchived: false,
+        statusUpdatedAtMs: nowMs,
+        events: allChangedEvents,
+        threads: updatedThreads,
+      });
     }
   }
 
-  public async deleteThreads(threadIds: string[]): Promise<void> {
-    let anyChanged = false;
+  public async deleteThreads(threadIds: string[], nowMs = Date.now()): Promise<void> {
+    const allChangedEvents: CommsEvent[] = [];
+    const updatedThreads: CommsThread[] = [];
     for (const tid of threadIds) {
       const thread = this.threads.get(tid);
-      if (!thread) continue;
       const changedEvents: CommsEvent[] = [];
       for (const evt of this.events.values()) {
         if (evt.threadId === tid && (!evt.isDeleted || evt.isUnread)) {
-          const updated = { ...evt, isDeleted: true, isUnread: false };
+          const updated: CommsEvent = {
+            ...evt,
+            isDeleted: true,
+            isUnread: false,
+            statusUpdatedAtMs: nowMs,
+          };
           this.events.set(evt.id, updated);
           changedEvents.push(updated);
+          allChangedEvents.push(updated);
         }
       }
-      const recomputed: CommsThread = {
-        ...recomputeCommsThreadRollups(thread, this.getThreadEvents(tid, true)),
-        isDeleted: true,
-      };
-      this.threads.set(tid, recomputed);
-      anyChanged = true;
-      await this.persistThreadAndEventsToFirestore(recomputed, changedEvents);
+      if (thread) {
+        const recomputed: CommsThread = {
+          ...recomputeCommsThreadRollups(thread, this.getThreadEvents(tid, true, false)),
+          isDeleted: true,
+          statusUpdatedAtMs: nowMs,
+        };
+        this.threads.set(tid, recomputed);
+        updatedThreads.push(recomputed);
+        await this.persistThreadAndEventsToFirestore(recomputed, changedEvents);
+      }
     }
-    if (anyChanged) {
+    if (updatedThreads.length > 0 || allChangedEvents.length > 0) {
       this.saveToStorage();
       this.notifyListeners();
+      this.broadcastStatusChanged(updatedThreads[0]?.id, allChangedEvents[0]?.id);
+      await this.propagateEmailEventsStatus(allChangedEvents, 'trash');
+      await this.syncStatusMutationToServer({
+        threadIds,
+        eventIds: allChangedEvents.map((e) => e.id),
+        isDeleted: true,
+        isUnread: false,
+        statusUpdatedAtMs: nowMs,
+        events: allChangedEvents,
+        threads: updatedThreads,
+      });
     }
   }
 
-  public async deleteEvents(eventIds: string[]): Promise<void> {
+  public async deleteEvents(eventIds: string[], nowMs = Date.now()): Promise<void> {
     const touchedThreads = new Map<string, CommsEvent[]>();
+    const allChangedEvents: CommsEvent[] = [];
     for (const id of eventIds) {
-      const evt = this.events.get(id);
-      if (evt && !evt.isDeleted) {
-        const updated = { ...evt, isDeleted: true, isUnread: false };
-        this.events.set(id, updated);
+      const evt = this.resolveStoredEvent(id);
+      if (evt && (!evt.isDeleted || evt.isUnread)) {
+        const updated: CommsEvent = {
+          ...evt,
+          isDeleted: true,
+          isUnread: false,
+          statusUpdatedAtMs: nowMs,
+        };
+        this.events.set(evt.id, updated);
+        allChangedEvents.push(updated);
         const list = touchedThreads.get(evt.threadId) || [];
         list.push(updated);
         touchedThreads.set(evt.threadId, list);
       }
     }
-    for (const [tid, evts] of touchedThreads.entries()) {
+    const updatedThreads: CommsThread[] = [];
+    for (const [tid] of touchedThreads.entries()) {
       const parent = this.threads.get(tid);
       if (parent) {
         const remainingNonDeleted = this.getThreadEvents(tid, true, false);
         const recomputed: CommsThread = {
           ...recomputeCommsThreadRollups(parent, remainingNonDeleted),
           isDeleted: remainingNonDeleted.length === 0 ? true : parent.isDeleted,
+          statusUpdatedAtMs: nowMs,
         };
         this.threads.set(tid, recomputed);
-        await this.persistThreadAndEventsToFirestore(recomputed, evts);
+        updatedThreads.push(recomputed);
       }
     }
-    if (touchedThreads.size > 0) {
+    if (allChangedEvents.length > 0) {
       this.saveToStorage();
       this.notifyListeners();
+      this.broadcastStatusChanged(updatedThreads[0]?.id, allChangedEvents[0]?.id);
+      await this.propagateEmailEventsStatus(allChangedEvents, 'trash');
+      for (const [tid, evts] of touchedThreads.entries()) {
+        const thr = this.threads.get(tid);
+        if (thr) await this.persistThreadAndEventsToFirestore(thr, evts);
+      }
+      await this.syncStatusMutationToServer({
+        eventIds: allChangedEvents.map((e) => e.id),
+        isDeleted: true,
+        isUnread: false,
+        statusUpdatedAtMs: nowMs,
+        events: allChangedEvents,
+        threads: updatedThreads,
+      });
     }
   }
 
@@ -1239,13 +1670,21 @@ export class CommsThreadService {
   }): void {
     let changed = false;
     const touchedThreadIds = new Set<string>();
+    const changedEmailEvents: CommsEvent[] = [];
 
     if (Array.isArray(payload.threads)) {
       for (const t of payload.threads) {
         if (!t || !t.id || t.mergedIntoThreadId) continue;
         const existing = this.threads.get(t.id);
-        if (!existing || (t.lastEventAtMs || 0) >= (existing.lastEventAtMs || 0)) {
-          this.threads.set(t.id, { ...existing, ...t });
+        const reconciled = reconcileCommsThreadStatus(existing, t);
+        if (
+          !existing ||
+          (t.lastEventAtMs || 0) >= (existing.lastEventAtMs || 0) ||
+          Boolean(existing.isArchived) !== Boolean(reconciled.isArchived) ||
+          Boolean(existing.isDeleted) !== Boolean(reconciled.isDeleted) ||
+          (existing.statusUpdatedAtMs ?? 0) !== (reconciled.statusUpdatedAtMs ?? 0)
+        ) {
+          this.threads.set(t.id, reconciled);
           touchedThreadIds.add(t.id);
           changed = true;
         }
@@ -1256,21 +1695,21 @@ export class CommsThreadService {
       for (const evt of payload.events) {
         if (!evt || !evt.id) continue;
         const existing = this.events.get(evt.id);
-        if (
+        const reconciled = reconcileCommsEventStatus(existing, evt);
+        const statusOrMetaChanged =
           !existing ||
-          existing.transcription !== evt.transcription ||
-          existing.deliveryStatus !== evt.deliveryStatus ||
-          existing.audioUrl !== evt.audioUrl
-        ) {
-          this.events.set(evt.id, {
-            ...existing,
-            ...evt,
-            // Preserve local read, archive, and soft-delete state
-            isUnread: existing && !existing.isUnread ? false : evt.isUnread,
-            isArchived: existing?.isArchived ? true : evt.isArchived,
-            isDeleted: existing?.isDeleted ? true : evt.isDeleted,
-          });
-          touchedThreadIds.add(evt.threadId);
+          existing.transcription !== reconciled.transcription ||
+          existing.deliveryStatus !== reconciled.deliveryStatus ||
+          existing.audioUrl !== reconciled.audioUrl ||
+          Boolean(existing.isUnread) !== Boolean(reconciled.isUnread) ||
+          Boolean(existing.isArchived) !== Boolean(reconciled.isArchived) ||
+          Boolean(existing.isDeleted) !== Boolean(reconciled.isDeleted) ||
+          (existing.statusUpdatedAtMs ?? 0) !== (reconciled.statusUpdatedAtMs ?? 0);
+
+        if (statusOrMetaChanged) {
+          this.events.set(evt.id, reconciled);
+          if (reconciled.threadId) touchedThreadIds.add(reconciled.threadId);
+          if (reconciled.channel === 'email') changedEmailEvents.push(reconciled);
           changed = true;
         }
       }
@@ -1278,13 +1717,13 @@ export class CommsThreadService {
 
     if (changed) {
       for (const tid of touchedThreadIds) {
-        const parent = this.threads.get(tid);
-        if (parent) {
-          this.threads.set(tid, recomputeCommsThreadRollups(parent, this.getThreadEvents(tid, true)));
-        }
+        this.recomputeOrSynthesizeThread(tid);
       }
       this.saveToStorage();
       this.notifyListeners();
+      if (changedEmailEvents.length > 0) {
+        void this.propagateEmailEventsStatus(changedEmailEvents);
+      }
     }
   }
 
@@ -1362,8 +1801,15 @@ export class CommsThreadService {
     );
   }
 
+  public getEventById(eventId: string): CommsEvent | null {
+    return this.resolveStoredEvent(eventId) || null;
+  }
+
   public isEventDeleted(eventId: string): boolean {
-    return Boolean(this.events.get(eventId)?.isDeleted);
+    const evt = this.resolveStoredEvent(eventId);
+    if (evt?.isDeleted) return true;
+    if (evt?.threadId && this.threads.get(evt.threadId)?.isDeleted) return true;
+    return false;
   }
 
   public isThreadDeleted(threadId: string): boolean {
@@ -1372,6 +1818,7 @@ export class CommsThreadService {
 
   public resetForTests(): void {
     this.stopRealtimeSync();
+    this.serverSyncFetchImpl = null;
     this.threads.clear();
     this.events.clear();
     if (typeof window !== 'undefined' && window.localStorage) {

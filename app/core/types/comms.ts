@@ -66,6 +66,7 @@ export interface CommsThread {
   isStarred?: boolean;
   isArchived?: boolean;
   isDeleted?: boolean;
+  statusUpdatedAtMs?: number;
   mergedIntoThreadId?: string;
   createdAt: string;
   updatedAt: string;
@@ -109,6 +110,7 @@ export interface CommsEvent {
   isUnread: boolean;
   isArchived?: boolean;
   isDeleted?: boolean;
+  statusUpdatedAtMs?: number;
   actorId?: string;
   actorName?: string;
   timestampIso: string;
@@ -161,6 +163,7 @@ export interface RecordCommsEventInput {
   isUnread?: boolean;
   isArchived?: boolean;
   isDeleted?: boolean;
+  statusUpdatedAtMs?: number;
   actorId?: string;
   actorName?: string;
   timestampIso?: string;
@@ -207,4 +210,140 @@ export function createEmptyUnreadByChannel(): CommsUnreadByChannel {
     voicemail: 0,
     email: 0,
   };
+}
+
+/**
+ * Reconciles `isUnread`, `isArchived`, and `isDeleted` across `CommsEvent` versions using
+ * `statusUpdatedAtMs` last-write-wins, with `isDeleted: true` enforced as a sticky tombstone.
+ */
+export function reconcileCommsEventStatus(
+  existing: CommsEvent | undefined,
+  incoming: CommsEvent
+): CommsEvent {
+  if (!existing) {
+    const isDeleted = Boolean(incoming.isDeleted);
+    const isArchived = Boolean(incoming.isArchived);
+    return {
+      ...incoming,
+      isDeleted,
+      isArchived,
+      isUnread: isDeleted || isArchived ? false : Boolean(incoming.isUnread),
+    };
+  }
+
+  const stickyDeleted = Boolean(existing.isDeleted || incoming.isDeleted);
+  const existingTs = existing.statusUpdatedAtMs ?? 0;
+  const incomingTs = incoming.statusUpdatedAtMs ?? 0;
+
+  let isUnread: boolean;
+  let isArchived: boolean;
+  let statusUpdatedAtMs: number | undefined;
+
+  if (stickyDeleted) {
+    isUnread = false;
+    isArchived =
+      incomingTs > existingTs
+        ? Boolean(incoming.isArchived)
+        : Boolean(existing.isArchived ?? incoming.isArchived);
+    statusUpdatedAtMs = Math.max(existingTs, incomingTs) || undefined;
+  } else if (existingTs > 0 || incomingTs > 0) {
+    if (incomingTs > existingTs) {
+      isArchived = Boolean(incoming.isArchived);
+      isUnread = isArchived ? false : Boolean(incoming.isUnread);
+      statusUpdatedAtMs = incomingTs;
+    } else if (existingTs > incomingTs) {
+      isArchived = Boolean(existing.isArchived);
+      isUnread = isArchived ? false : Boolean(existing.isUnread);
+      statusUpdatedAtMs = existingTs;
+    } else {
+      isArchived = Boolean(existing.isArchived || incoming.isArchived);
+      isUnread = isArchived ? false : Boolean(existing.isUnread && incoming.isUnread);
+      statusUpdatedAtMs = existingTs;
+    }
+  } else {
+    isArchived = Boolean(existing.isArchived || incoming.isArchived);
+    isUnread = isArchived
+      ? false
+      : !existing.isUnread
+      ? false
+      : Boolean(incoming.isUnread);
+    statusUpdatedAtMs = undefined;
+  }
+
+  const reconciled: CommsEvent = {
+    ...existing,
+    ...incoming,
+    isUnread,
+    isArchived,
+    isDeleted: stickyDeleted,
+  };
+  if (statusUpdatedAtMs !== undefined) {
+    reconciled.statusUpdatedAtMs = statusUpdatedAtMs;
+  } else {
+    delete reconciled.statusUpdatedAtMs;
+  }
+  return reconciled;
+}
+
+/**
+ * Reconciles `isArchived` and `isDeleted` across `CommsThread` versions using
+ * `statusUpdatedAtMs` last-write-wins, with `isDeleted: true` enforced as a sticky tombstone.
+ */
+export function reconcileCommsThreadStatus(
+  existing: CommsThread | undefined,
+  incoming: CommsThread
+): CommsThread {
+  if (!existing) {
+    return {
+      ...incoming,
+      isArchived: Boolean(incoming.isArchived),
+      isDeleted: Boolean(incoming.isDeleted),
+    };
+  }
+
+  const stickyDeleted = Boolean(existing.isDeleted || incoming.isDeleted);
+  const existingTs = existing.statusUpdatedAtMs ?? 0;
+  const incomingTs = incoming.statusUpdatedAtMs ?? 0;
+
+  let isArchived: boolean;
+  let statusUpdatedAtMs: number | undefined;
+
+  if (existingTs > 0 || incomingTs > 0) {
+    if (incomingTs > existingTs) {
+      isArchived = Boolean(incoming.isArchived);
+      statusUpdatedAtMs = incomingTs;
+    } else if (existingTs > incomingTs) {
+      isArchived = Boolean(existing.isArchived);
+      statusUpdatedAtMs = existingTs;
+    } else {
+      isArchived = Boolean(existing.isArchived || incoming.isArchived);
+      statusUpdatedAtMs = existingTs;
+    }
+  } else {
+    isArchived = Boolean(existing.isArchived || incoming.isArchived);
+    statusUpdatedAtMs = undefined;
+  }
+
+  const existingUpdatedMs = Date.parse(existing.updatedAt || '') || 0;
+  const incomingUpdatedMs = Date.parse(incoming.updatedAt || '') || 0;
+  const existingNewerMeta =
+    (existing.lastEventAtMs || 0) > (incoming.lastEventAtMs || 0) ||
+    ((existing.lastEventAtMs || 0) === (incoming.lastEventAtMs || 0) &&
+      existingUpdatedMs > incomingUpdatedMs);
+
+  const mergedBase: CommsThread = existingNewerMeta
+    ? { ...incoming, ...existing }
+    : { ...existing, ...incoming };
+
+  const reconciled: CommsThread = {
+    ...mergedBase,
+    isArchived,
+    isDeleted: stickyDeleted,
+  };
+  if (statusUpdatedAtMs !== undefined) {
+    reconciled.statusUpdatedAtMs = statusUpdatedAtMs;
+  } else {
+    delete reconciled.statusUpdatedAtMs;
+  }
+  return reconciled;
 }

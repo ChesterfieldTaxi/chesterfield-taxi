@@ -14,13 +14,18 @@
 
 import crypto from 'node:crypto';
 import twilio from 'twilio';
-import type { CommsEvent, CommsThread } from '../../types/comms';
+import {
+  buildCommsEventId,
+  type CommsChannel,
+  type CommsEvent,
+  type CommsThread,
+} from '../../types/comms';
 import {
   verifyServerRequestAuth,
   type VerifiedServerAuth,
 } from '../auth/server-auth.server';
 import { isFirebaseConfigured } from '../firebase';
-import { flushAndSyncCommsServer } from './comms-thread.server';
+import { flushAndSyncCommsServer, getCommsServerStore } from './comms-thread.server';
 import {
   resolveTelephonyInboundMode,
   type TelephonyInboundMode,
@@ -47,7 +52,8 @@ export type TelephonyActionName =
   | 'list_messages'
   | 'call_recording_status'
   | 'audio_proxy'
-  | 'sync_comms';
+  | 'sync_comms'
+  | 'update_comms_status';
 
 export interface TelephonyApiRequest {
   action: TelephonyActionName;
@@ -63,6 +69,13 @@ export interface TelephonyApiRequest {
   customTwiml?: string;
   recordingSid?: string;
   tripId?: string;
+  eventIds?: string[];
+  threadIds?: string[];
+  channels?: CommsChannel[];
+  isUnread?: boolean;
+  isArchived?: boolean;
+  isDeleted?: boolean;
+  statusUpdatedAtMs?: number;
   events?: CommsEvent[];
   threads?: CommsThread[];
   credentials?: {
@@ -158,6 +171,7 @@ export const DISPATCHER_ONLY_TELEPHONY_ACTIONS = new Set<string>([
   'list_recordings',
   'list_voicemails',
   'sync_comms',
+  'update_comms_status',
   'verify_credentials',
   'save_credentials',
 ]);
@@ -818,14 +832,58 @@ export async function buildSyncCommsPayload(
 
   const signOpts = { nowMs: options?.nowMs, env: options?.env };
   const signedEvents = synced.events.map((e) => attachSignedAudioUrlsToEvent(e, signOpts));
+  const serverStore = getCommsServerStore();
 
-  const signedVoicemails = telephonyStore.voicemails.map((vm) => ({
-    ...vm,
-    audioUrl:
-      vm.recordingSid && RECORDING_SID_PATTERN.test(vm.recordingSid)
-        ? buildSignedAudioProxyUrl(vm.recordingSid, signOpts)
-        : vm.audioUrl,
-  }));
+  const signedVoicemails = telephonyStore.voicemails
+    .filter((vm) => {
+      const evt =
+        serverStore.events.get(buildCommsEventId('voicemail', vm.recordingSid || vm.id)) ||
+        serverStore.events.get(vm.id);
+      if (evt?.isDeleted) return false;
+      if (evt?.threadId && serverStore.threads.get(evt.threadId)?.isDeleted) return false;
+      return true;
+    })
+    .map((vm) => {
+      const evt =
+        serverStore.events.get(buildCommsEventId('voicemail', vm.recordingSid || vm.id)) ||
+        serverStore.events.get(vm.id);
+      return {
+        ...vm,
+        isUnread: evt ? evt.isUnread : vm.isUnread,
+        ...(evt?.isArchived !== undefined ? { isArchived: evt.isArchived } : {}),
+        ...(evt?.statusUpdatedAtMs !== undefined
+          ? { statusUpdatedAtMs: evt.statusUpdatedAtMs }
+          : {}),
+        transcription: evt?.transcription || vm.transcription,
+        audioUrl:
+          vm.recordingSid && RECORDING_SID_PATTERN.test(vm.recordingSid)
+            ? buildSignedAudioProxyUrl(vm.recordingSid, signOpts)
+            : vm.audioUrl,
+      };
+    });
+
+  const activeMessages = telephonyStore.messages
+    .filter((m) => {
+      const evt =
+        serverStore.events.get(buildCommsEventId('sms', m.sid || m.id)) ||
+        serverStore.events.get(m.id);
+      if (evt?.isDeleted) return false;
+      if (evt?.threadId && serverStore.threads.get(evt.threadId)?.isDeleted) return false;
+      return true;
+    })
+    .map((m) => {
+      const evt =
+        serverStore.events.get(buildCommsEventId('sms', m.sid || m.id)) ||
+        serverStore.events.get(m.id);
+      return {
+        ...m,
+        ...(evt ? { isUnread: evt.isUnread } : {}),
+        ...(evt?.isArchived !== undefined ? { isArchived: evt.isArchived } : {}),
+        ...(evt?.statusUpdatedAtMs !== undefined
+          ? { statusUpdatedAtMs: evt.statusUpdatedAtMs }
+          : {}),
+      };
+    });
 
   const signedRecordings = (telephonyStore.recordings || []).map((rec: any) => ({
     ...rec,
@@ -840,7 +898,7 @@ export async function buildSyncCommsPayload(
     threads: synced.threads,
     events: signedEvents,
     voicemails: signedVoicemails,
-    messages: telephonyStore.messages,
+    messages: activeMessages,
     recordings: signedRecordings,
     flushedCount: synced.flushedCount,
     syncedAt: new Date(options?.nowMs ?? Date.now()).toISOString(),

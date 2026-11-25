@@ -69,6 +69,9 @@ export function MenuCheckIndicator({ checked, indeterminate = false }: { checked
   );
 }
 
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect;
+
 export function usePortalDropdownPosition(params: {
   isOpen: boolean;
   onClose: () => void;
@@ -79,7 +82,7 @@ export function usePortalDropdownPosition(params: {
   const { isOpen, onClose, menuWidth, estimatedHeight, align = 'left' } = params;
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const [coords, setCoords] = useState<{ top: number; left: number; openUpward: boolean } | null>(null);
+  const [coords, setCoords] = useState<{ top: number; bottom: number; left: number; openUpward: boolean } | null>(null);
 
   const computeCoords = useCallback(() => {
     const triggerEl = triggerRef.current;
@@ -91,15 +94,16 @@ export function usePortalDropdownPosition(params: {
     const spaceBelow = vh - rect.bottom;
     const openUpward = spaceBelow < menuHeight + 10 && rect.top > spaceBelow;
     const top = openUpward ? Math.max(8, rect.top - menuHeight - 4) : Math.min(vh - menuHeight - 8, rect.bottom + 4);
+    const bottom = Math.max(8, vh - rect.top + 4);
 
     let left = align === 'right' ? rect.right - menuWidth : rect.left;
     if (align === 'right' && left < 8) left = Math.max(8, rect.left);
     if (left + menuWidth > vw - 8) left = Math.max(8, vw - menuWidth - 8);
     if (left < 8) left = 8;
-    return { top, left, openUpward };
+    return { top, bottom, left, openUpward };
   }, [menuWidth, estimatedHeight, align]);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!isOpen) { setCoords(null); return; }
     const initial = computeCoords();
     if (initial) setCoords(initial);

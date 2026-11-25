@@ -166,22 +166,45 @@ function CommsHubComponent({
     if (selectedRowKeys.size === 0) return false;
     const svc = getCommsThreadService();
     if (isGroupedView) {
-      return Array.from(selectedRowKeys).every((tid) => Boolean(svc.getThreadById(tid)?.isArchived));
+      return Array.from(selectedRowKeys).every((tid) => {
+        const thr = svc.getThreadById(tid);
+        if (thr) return Boolean(thr.isArchived);
+        const row = activeGroupedRows.find((r) => r.threadId === tid);
+        return Boolean(row?.latestEvent.isArchived);
+      });
     }
     return activeEventRows
       .filter((e) => selectedRowKeys.has(e.id))
-      .every((e) => Boolean(e.isArchived));
-  }, [selectedRowKeys, isGroupedView, activeEventRows]);
+      .every((e) => Boolean(svc.getEventById(e.id)?.isArchived ?? e.isArchived));
+  }, [selectedRowKeys, isGroupedView, activeGroupedRows, activeEventRows]);
+
+  const resolveGroupedFallbackEventIds = useCallback(
+    (threadKeys: string[]) => {
+      const svc = getCommsThreadService();
+      const fallbackIds: string[] = [];
+      for (const tid of threadKeys) {
+        if (!svc.getThreadById(tid)) {
+          const row = activeGroupedRows.find((r) => r.threadId === tid);
+          if (row?.latestEvent?.id) fallbackIds.push(row.latestEvent.id);
+        }
+      }
+      return fallbackIds;
+    },
+    [activeGroupedRows]
+  );
 
   const handleBulkMarkReadUnread = useCallback(() => {
     const keys = Array.from(selectedRowKeys);
     if (keys.length === 0) return;
     const svc = getCommsThreadService();
     if (isGroupedView) {
+      const fallbackIds = resolveGroupedFallbackEventIds(keys);
       if (selectedHasUnread) {
         keys.forEach((tid) => void svc.markThreadRead(tid));
+        if (fallbackIds.length > 0) void svc.markEventsRead(fallbackIds);
       } else {
         void svc.markThreadsUnread(keys);
+        if (fallbackIds.length > 0) void svc.markEventsUnread(fallbackIds);
       }
     } else {
       const keySet = new Set(keys);
@@ -195,15 +218,21 @@ function CommsHubComponent({
       }
     }
     setSelectedRowKeys(new Set());
-  }, [selectedRowKeys, isGroupedView, selectedHasUnread, sync]);
+  }, [selectedRowKeys, isGroupedView, selectedHasUnread, resolveGroupedFallbackEventIds, sync]);
 
   const handleBulkArchive = useCallback(() => {
     const keys = Array.from(selectedRowKeys);
     if (keys.length === 0) return;
     const svc = getCommsThreadService();
     if (isGroupedView) {
-      if (selectedAllArchived) void svc.unarchiveThreads(keys);
-      else void svc.archiveThreads(keys);
+      const fallbackIds = resolveGroupedFallbackEventIds(keys);
+      if (selectedAllArchived) {
+        void svc.unarchiveThreads(keys);
+        if (fallbackIds.length > 0) void svc.unarchiveEvents(fallbackIds);
+      } else {
+        void svc.archiveThreads(keys);
+        if (fallbackIds.length > 0) void svc.archiveEvents(fallbackIds);
+      }
     } else {
       const keySet = new Set(keys);
       sync.setInteractions((prev) =>
@@ -217,7 +246,7 @@ function CommsHubComponent({
       else void svc.archiveEvents(keys);
     }
     setSelectedRowKeys(new Set());
-  }, [selectedRowKeys, isGroupedView, selectedAllArchived, sync]);
+  }, [selectedRowKeys, isGroupedView, selectedAllArchived, resolveGroupedFallbackEventIds, sync]);
 
   const handleBulkDelete = useCallback(() => {
     const keys = Array.from(selectedRowKeys);
@@ -225,34 +254,43 @@ function CommsHubComponent({
     const svc = getCommsThreadService();
     const keySet = new Set(keys);
     if (isGroupedView) {
+      const fallbackIds = resolveGroupedFallbackEventIds(keys);
       sync.setInteractions((prev) =>
-        prev.filter((i) => !i.threadId || !keySet.has(i.threadId))
+        prev.filter((i) => (!i.threadId || !keySet.has(i.threadId)) && !fallbackIds.includes(i.id))
       );
       void svc.deleteThreads(keys);
+      if (fallbackIds.length > 0) void svc.deleteEvents(fallbackIds);
     } else {
       sync.setInteractions((prev) => prev.filter((i) => !keySet.has(i.id)));
       void svc.deleteEvents(keys);
     }
     setSelectedRowKeys(new Set());
-  }, [selectedRowKeys, isGroupedView, sync]);
+  }, [selectedRowKeys, isGroupedView, resolveGroupedFallbackEventIds, sync]);
 
   const handleToggleRowReadStatus = useCallback(
     (key: string, currentlyUnread: boolean) => {
       const svc = getCommsThreadService();
       if (isGroupedView) {
+        const fallbackIds = resolveGroupedFallbackEventIds([key]);
         if (currentlyUnread) {
           void svc.markThreadRead(key);
+          if (fallbackIds.length > 0) void svc.markEventsRead(fallbackIds);
         } else {
           void svc.markThreadsUnread([key]);
+          if (fallbackIds.length > 0) void svc.markEventsUnread(fallbackIds);
         }
       } else {
         sync.setInteractions((prev) =>
           prev.map((i) => (i.id === key ? { ...i, isUnread: !currentlyUnread } : i))
         );
-        void svc.toggleEventReadStatus(key);
+        if (currentlyUnread) {
+          void svc.markEventsRead([key]);
+        } else {
+          void svc.markEventsUnread([key]);
+        }
       }
     },
-    [isGroupedView, sync]
+    [isGroupedView, resolveGroupedFallbackEventIds, sync]
   );
 
   const keyboardRef = useRef({
