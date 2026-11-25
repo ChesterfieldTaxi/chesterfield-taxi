@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import type {
   TariffProfile,
+  ZipMatrixRow,
   TariffCorridor,
   TariffTaximeterRate,
   DistanceRoundingMode,
@@ -76,6 +77,7 @@ import type { PricingInput } from './types';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
 import { doesVehicleMatchAllowedList } from './vehicle-matching';
+import { getRoleColumn } from './zip-matrix-schema.service';
 
 const TARIFFS_STORAGE_KEY = 'chesterfield_taxi_tariff_profiles_v6';
 
@@ -221,9 +223,6 @@ export const DEFAULT_TARIFF_PROFILES: TariffProfile[] = [
  */
 export function normalizeTariffProfile(tariff: TariffProfile): TariffProfile {
   const taximeter = tariff.taximeter || tariff.taximeterRate;
-  const zipMatrix =
-    (tariff.zipMatrix && tariff.zipMatrix.length > 0 ? tariff.zipMatrix : tariff.zipMatrixRates) ||
-    [];
   const hourlyConfig = tariff.hourlyConfig || tariff.hourlyRate;
 
   // Unify vehicle type restrictions (eligibleVehicleTypes <-> triggers.vehicleTypes)
@@ -262,8 +261,6 @@ export function normalizeTariffProfile(tariff: TariffProfile): TariffProfile {
     cancellationPolicy,
     taximeter,
     taximeterRate: taximeter,
-    zipMatrix: zipMatrix.length > 0 ? zipMatrix : undefined,
-    zipMatrixRates: zipMatrix.length > 0 ? zipMatrix : undefined,
     hourlyConfig,
     hourlyRate: hourlyConfig,
     corridors: Array.isArray(tariff.corridors) ? tariff.corridors : [],
@@ -832,29 +829,41 @@ export function evaluateZipMatrixFare(
   pickupZip?: string,
   dropoffZip?: string
 ): {
-  matchedEntry: import('../../types/tariff').ZipRateMatrixEntry;
+  matchedRow: ZipMatrixRow;
+  zip: string;
+  price: number;
   subtotal: number;
   auditDetails: string[];
 } | null {
-  const matrix =
-    tariff.zipMatrix && tariff.zipMatrix.length > 0 ? tariff.zipMatrix : tariff.zipMatrixRates;
-  if (!matrix || matrix.length === 0) return null;
+  const rows = tariff.zipMatrixRows;
+  const zipCol = getRoleColumn(tariff.zipMatrixColumns, 'zip');
+  const priceCol = getRoleColumn(tariff.zipMatrixColumns, 'price');
+  if (!rows || rows.length === 0 || !zipCol || !priceCol) return null;
   const cleanDropoff = dropoffZip?.trim().slice(0, 5);
   const cleanPickup = pickupZip?.trim().slice(0, 5);
 
-  let entry = cleanDropoff
-    ? matrix.find((e) => e.zip.trim().slice(0, 5) === cleanDropoff)
-    : undefined;
-  if (!entry && cleanPickup) {
-    entry = matrix.find((e) => e.zip.trim().slice(0, 5) === cleanPickup);
-  }
-  if (!entry) return null;
+  const findRow = (zip: string | undefined) =>
+    zip
+      ? rows.find(
+          (r) =>
+            String(r.values[zipCol.key] ?? '')
+              .trim()
+              .slice(0, 5) === zip && typeof r.values[priceCol.key] === 'number'
+        )
+      : undefined;
+
+  const row = findRow(cleanDropoff) ?? findRow(cleanPickup);
+  if (!row) return null;
+  const zip = String(row.values[zipCol.key]).trim();
+  const price = row.values[priceCol.key] as number;
 
   return {
-    matchedEntry: entry,
-    subtotal: entry.customerCharge,
+    matchedRow: row,
+    zip,
+    price,
+    subtotal: price,
     auditDetails: [
-      `Zip-Code Flat Matrix (${tariff.name}): Zip ${entry.zip} (${entry.city}) -> Customer Charge $${entry.customerCharge.toFixed(2)} (Driver Pay $${(entry.driverPay ?? entry.customerCharge).toFixed(2)})`,
+      `Zip-Code Flat Matrix (${tariff.name}): Zip ${zip} -> Price $${price.toFixed(2)} (Driver Pay $${price.toFixed(2)})`,
     ],
   };
 }

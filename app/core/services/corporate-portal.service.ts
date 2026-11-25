@@ -316,7 +316,7 @@ export class CorporatePortalService {
    */
   public async listCorporateAccountsForAdmin(): Promise<CorporateAccountConfig[]> {
     if (this.injectedAccounts) {
-      return Array.from(this.injectedAccounts.values());
+      return Array.from(this.injectedAccounts.values()).filter((a) => !a.isArchived);
     }
 
     const byId = new Map<string, CorporateAccountConfig>();
@@ -344,7 +344,9 @@ export class CorporatePortalService {
       }
     }
 
-    return Array.from(byId.values()).sort((a, b) => a.companyName.localeCompare(b.companyName));
+    return Array.from(byId.values())
+      .filter((a) => !a.isArchived)
+      .sort((a, b) => a.companyName.localeCompare(b.companyName));
   }
 
   /**
@@ -761,6 +763,11 @@ export class CorporatePortalService {
     nowMs: number = Date.now()
   ): Promise<CorporateDashboardSummary> {
     const account = await this.resolveCorporateAccount(corporateAccountId);
+    if (account.isArchived) {
+      throw new Error(
+        'This corporate account has been archived. Please contact dispatch or an administrator.'
+      );
+    }
     const [allTrips, invoices] = await Promise.all([
       this.getCorporateTrips(account.id),
       this.getCorporateInvoices(account.id),
@@ -868,6 +875,9 @@ export class CorporatePortalService {
     actorEmail?: string
   ): Promise<CorporateAccountConfig> {
     const current = await this.resolveCorporateAccount(corporateAccountId);
+    if (current.isArchived) {
+      throw new Error('This corporate account is archived and cannot be modified.');
+    }
     const nowIso = new Date().toISOString();
 
     const safeFirestoreUpdate: Record<string, any> = {
@@ -977,8 +987,12 @@ export class CorporatePortalService {
       'Self-service anti-fraud PO rotation via Corporate Portal';
     const cleanActor = sanitizeTextInput(actorEmail || '', 120) || 'corporate-manager';
 
+    const current = await this.resolveCorporateAccount(corporateAccountId);
+    if (current.isArchived) {
+      throw new Error('Cannot rotate PO for an archived corporate account.');
+    }
+
     if (this.injectedAccounts) {
-      const current = await this.resolveCorporateAccount(corporateAccountId);
       const corpSvc = this.getCorpAcctSvc();
       const oldPo = current.currentPoNumber || null;
       const nowIso = new Date().toISOString();

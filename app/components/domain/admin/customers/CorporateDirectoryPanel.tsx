@@ -1,19 +1,28 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import type { AppSettings, CorporateAccountConfig } from '../../../../core/types/config';
+import {
+  getCorporateAccountService,
+  type CorporateArchivalExposure,
+  type CorporateJsonMergeResult,
+} from '../../../../core/services/corporate-account.service';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../../ui/Card';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
 import {
+  AlertTriangleIcon,
+  ArchiveBoxIcon,
   CheckIcon,
   CopyIcon,
   CreditCardIcon,
   EditIcon,
   ExternalLinkIcon,
+  FileTextIcon,
   MapPinIcon,
   PlusIcon,
   RefreshCwIcon,
   ShieldCheckIcon,
+  SpinnerIcon,
   UserCheckIcon,
   UsersIcon,
   XIcon,
@@ -22,6 +31,7 @@ import {
   RegeneratePoModal,
   PoHistoryModal,
   CorporateBookingPinModal,
+  CorporateImportJsonModal,
 } from '../corporate/CorporateAccountModals';
 import { CorporateGovernanceCard } from './CorporateGovernanceCard';
 
@@ -36,6 +46,10 @@ export interface CorporateDirectoryPanelProps {
   onOpenProvisionModal: (corp: CorporateAccountConfig) => void;
   onTogglePoRequired: (corp: CorporateAccountConfig) => Promise<void>;
   onPoRegenerateSuccess: (updatedAccount: CorporateAccountConfig) => Promise<void>;
+  onImportCorporateAccounts?: (mergeResult: CorporateJsonMergeResult) => Promise<void>;
+  onArchiveCorporate?: (corp: CorporateAccountConfig, reason?: string) => Promise<void>;
+  pendingArchiveCorp?: CorporateAccountConfig | null;
+  onClearPendingArchiveCorp?: () => void;
 }
 
 export function CorporateDirectoryPanel({
@@ -47,6 +61,10 @@ export function CorporateDirectoryPanel({
   onOpenProvisionModal,
   onTogglePoRequired,
   onPoRegenerateSuccess,
+  onImportCorporateAccounts,
+  onArchiveCorporate,
+  pendingArchiveCorp,
+  onClearPendingArchiveCorp,
 }: CorporateDirectoryPanelProps) {
   const [corpSearchTerm, setCorpSearchTerm] = useState('');
   const [corpFilter, setCorpFilter] = useState<'all' | 'po_enforced' | 'po_disabled'>('all');
@@ -56,6 +74,59 @@ export function CorporateDirectoryPanel({
   const [isRegeneratePoOpen, setIsRegeneratePoOpen] = useState(false);
   const [isPoHistoryOpen, setIsPoHistoryOpen] = useState(false);
   const [isBookingPinOpen, setIsBookingPinOpen] = useState(false);
+  const [isImportJsonOpen, setIsImportJsonOpen] = useState(false);
+  const [archivingCorp, setArchivingCorp] = useState<CorporateAccountConfig | null>(null);
+  const [archiveReason, setArchiveReason] = useState('');
+  const [archiveExposure, setArchiveExposure] = useState<CorporateArchivalExposure | null>(null);
+  const [isCheckingExposure, setIsCheckingExposure] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
+
+  const openArchiveModal = async (corp: CorporateAccountConfig) => {
+    setArchivingCorp(corp);
+    setArchiveReason('');
+    setArchiveExposure(null);
+    setIsCheckingExposure(true);
+    try {
+      const exposure = await getCorporateAccountService().checkArchivalExposure(
+        corp,
+        settings.invoices
+      );
+      setArchiveExposure(exposure);
+    } catch {
+      setArchiveExposure(null);
+    } finally {
+      setIsCheckingExposure(false);
+    }
+  };
+
+  useEffect(() => {
+    if (pendingArchiveCorp) {
+      void openArchiveModal(pendingArchiveCorp);
+      onClearPendingArchiveCorp?.();
+    }
+  }, [pendingArchiveCorp]);
+
+  const closeArchiveModal = () => {
+    if (isArchiving) return;
+    setArchivingCorp(null);
+    setArchiveReason('');
+    setArchiveExposure(null);
+  };
+
+  const confirmArchive = async () => {
+    if (!archivingCorp || !onArchiveCorporate) return;
+    setIsArchiving(true);
+    try {
+      await onArchiveCorporate(archivingCorp, archiveReason.trim() || undefined);
+      setArchivingCorp(null);
+      setArchiveReason('');
+      setArchiveExposure(null);
+    } finally {
+      setIsArchiving(false);
+    }
+  };
+
+  const activeCorporateClients = corporateClients.filter((corp) => !corp.isArchived);
 
   const handleCopyPo = (po: string, id: string) => {
     navigator.clipboard?.writeText(po);
@@ -63,7 +134,7 @@ export function CorporateDirectoryPanel({
     setTimeout(() => setCopiedPoId(null), 2000);
   };
 
-  const filteredCorp = corporateClients.filter((corp) => {
+  const filteredCorp = activeCorporateClients.filter((corp) => {
     if (corpFilter === 'po_enforced' && !corp.poRequired) return false;
     if (corpFilter === 'po_disabled' && corp.poRequired) return false;
     if (!corpSearchTerm.trim()) return true;
@@ -94,7 +165,7 @@ export function CorporateDirectoryPanel({
           <div className="relative w-full sm:w-64 lg:w-80">
             <input
               type="text"
-              placeholder={`Search ${corporateClients.length} corporate accounts...`}
+              placeholder={`Search ${activeCorporateClients.length} corporate accounts...`}
               value={corpSearchTerm}
               onChange={(e) => {
                 setCorpSearchTerm(e.target.value);
@@ -132,27 +203,39 @@ export function CorporateDirectoryPanel({
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                {mode === 'all' && `All (${corporateClients.length})`}
+                {mode === 'all' && `All (${activeCorporateClients.length})`}
                 {mode === 'po_enforced' &&
-                  `PO Enforced (${corporateClients.filter((a) => a.poRequired).length})`}
+                  `PO Enforced (${activeCorporateClients.filter((a) => a.poRequired).length})`}
                 {mode === 'po_disabled' &&
-                  `PO Optional (${corporateClients.filter((a) => !a.poRequired).length})`}
+                  `PO Optional (${activeCorporateClients.filter((a) => !a.poRequired).length})`}
               </button>
             ))}
           </div>
         </div>
 
         {onSave && (
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            leftIcon={<PlusIcon className="w-4 h-4" />}
-            onClick={onAddNewCorporate}
-            className="text-xs font-bold w-full lg:w-auto justify-center shrink-0"
-          >
-            Add Corporate Account
-          </Button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              leftIcon={<FileTextIcon className="w-4 h-4" />}
+              onClick={() => setIsImportJsonOpen(true)}
+              className="text-xs font-bold justify-center"
+            >
+              Import JSON
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              leftIcon={<PlusIcon className="w-4 h-4" />}
+              onClick={onAddNewCorporate}
+              className="text-xs font-bold justify-center"
+            >
+              Add Corporate Account
+            </Button>
+          </div>
         )}
       </div>
 
@@ -186,14 +269,26 @@ export function CorporateDirectoryPanel({
                         {corp.isActive ? 'Active' : 'Paused'}
                       </Badge>
                       {onSave && (
-                        <button
-                          type="button"
-                          onClick={() => onEditCorporate(corp)}
-                          className="p-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                          title="Edit Corporate Directory Profile"
-                        >
-                          <EditIcon className="w-3.5 h-3.5" />
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onEditCorporate(corp)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                            title="Edit Corporate Directory Profile"
+                          >
+                            <EditIcon className="w-3.5 h-3.5" />
+                          </button>
+                          {onArchiveCorporate && (
+                            <button
+                              type="button"
+                              onClick={() => void openArchiveModal(corp)}
+                              className="p-1 rounded-lg text-slate-400 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+                              title="Archive Corporate Account"
+                            >
+                              <ArchiveBoxIcon className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -445,6 +540,139 @@ export function CorporateDirectoryPanel({
           onSuccess={(updated) => void onPoRegenerateSuccess(updated)}
           operatorEmail="admin@chesterfieldtaxi.com"
         />
+      )}
+
+      {onSave && (
+        <CorporateImportJsonModal
+          isOpen={isImportJsonOpen}
+          onClose={() => setIsImportJsonOpen(false)}
+          existingAccounts={corporateClients}
+          onImportSuccess={async (mergeResult) => {
+            if (onImportCorporateAccounts) {
+              await onImportCorporateAccounts(mergeResult);
+            } else {
+              await onSave({ corporateAccounts: mergeResult.merged });
+            }
+          }}
+        />
+      )}
+
+      {archivingCorp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <ArchiveBoxIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">
+                    Archive Corporate Account
+                  </h3>
+                  <p className="text-[11px] font-mono text-slate-500">
+                    {archivingCorp.companyName} ({archivingCorp.accountNumber})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeArchiveModal}
+                disabled={isArchiving}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3.5 text-xs">
+              {isCheckingExposure ? (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600">
+                  <SpinnerIcon className="w-4 h-4 animate-spin text-slate-500" />
+                  <span>Checking open invoices and unbilled rides...</span>
+                </div>
+              ) : (
+                archiveExposure?.hasExposure && (
+                  <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-extrabold text-amber-900">
+                      <AlertTriangleIcon className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Open Billing Exposure Detected</span>
+                    </div>
+                    <ul className="list-disc pl-5 space-y-0.5 text-[11px] text-amber-900">
+                      {archiveExposure.openInvoiceCount > 0 && (
+                        <li>
+                          <strong>{archiveExposure.openInvoiceCount}</strong> open invoice
+                          {archiveExposure.openInvoiceCount === 1 ? '' : 's'} totaling{' '}
+                          <strong>${archiveExposure.openInvoiceBalance.toFixed(2)}</strong>
+                          {archiveExposure.overdueInvoiceCount > 0 && (
+                            <span className="text-rose-700 font-bold">
+                              {' '}
+                              ({archiveExposure.overdueInvoiceCount} overdue)
+                            </span>
+                          )}
+                        </li>
+                      )}
+                      {archiveExposure.unbilledRideCount > 0 && (
+                        <li>
+                          <strong>{archiveExposure.unbilledRideCount}</strong> unbilled ride
+                          {archiveExposure.unbilledRideCount === 1 ? '' : 's'} totaling{' '}
+                          <strong>${archiveExposure.unbilledAmount.toFixed(2)}</strong>
+                        </li>
+                      )}
+                    </ul>
+                    <p className="text-[11px] text-amber-800 pt-0.5">
+                      Historical trips, invoices, and AR balances will remain intact in Invoicing &amp;
+                      Analytics. You can still proceed with archival.
+                    </p>
+                  </div>
+                )
+              )}
+
+              <p className="text-slate-600 leading-relaxed">
+                Archiving immediately blocks new bookings, public{' '}
+                <code className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">
+                  /api/corporate/verify
+                </code>{' '}
+                checks, Dispatch selection, and Corporate Portal access. You can restore this account
+                anytime from <strong>Admin &rarr; System &amp; Governance &rarr; Universal Archive</strong>.
+              </p>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  Archive Reason (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={archiveReason}
+                  onChange={(e) => setArchiveReason(e.target.value)}
+                  placeholder="e.g. Contract ended, account consolidated..."
+                  className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={closeArchiveModal}
+                disabled={isArchiving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                isLoading={isArchiving}
+                onClick={() => void confirmArchive()}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
+              >
+                Archive Account
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

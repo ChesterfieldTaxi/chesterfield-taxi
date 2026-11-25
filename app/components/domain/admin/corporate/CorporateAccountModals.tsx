@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import type { CorporateAccountConfig, PoHistoryRecord } from '../../../../core/types/config';
-import { getCorporateAccountService } from '../../../../core/services/corporate-account.service';
+import {
+  getCorporateAccountService,
+  type CorporateJsonMergeResult,
+} from '../../../../core/services/corporate-account.service';
 import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
 import {
   isValidCorporateBookingPin,
@@ -700,6 +703,272 @@ export function CorporateBookingPinModal({
             />
           </div>
         </section>
+      </div>
+    </AdminSlideOverDrawer>
+  );
+}
+
+// ============================================================================
+// 5. CORPORATE JSON IMPORT MODAL (WITH DRY-RUN MERGE PREVIEW)
+// ============================================================================
+
+interface CorporateImportJsonModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  existingAccounts: CorporateAccountConfig[];
+  onImportSuccess: (mergeResult: CorporateJsonMergeResult) => Promise<void>;
+}
+
+export function CorporateImportJsonModal({
+  isOpen,
+  onClose,
+  existingAccounts,
+  onImportSuccess,
+}: CorporateImportJsonModalProps) {
+  const [jsonRaw, setJsonRaw] = useState('');
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [previewAccounts, setPreviewAccounts] = useState<CorporateAccountConfig[]>([]);
+  const [mergePreview, setMergePreview] = useState<CorporateJsonMergeResult | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const resetAndClose = () => {
+    setJsonRaw('');
+    setFileName(null);
+    setPreviewAccounts([]);
+    setMergePreview(null);
+    setError(null);
+    onClose();
+  };
+
+  const handleParse = (text: string) => {
+    setJsonRaw(text);
+    if (!text.trim()) {
+      setPreviewAccounts([]);
+      setMergePreview(null);
+      setError(null);
+      return;
+    }
+    try {
+      const service = getCorporateAccountService();
+      const parsed = service.parseCorporateAccountsJson(text, {
+        poRequired: false,
+        discountPercent: 0,
+        creditLimit: 5000,
+        billingCycle: 'net30',
+      });
+      if (parsed.length === 0) {
+        setPreviewAccounts([]);
+        setMergePreview(null);
+        setError('No valid corporate accounts were found in the provided JSON.');
+        return;
+      }
+      const dryRun = service.mergeCorporateAccounts(existingAccounts, parsed);
+      setPreviewAccounts(parsed);
+      setMergePreview(dryRun);
+      setError(null);
+    } catch (err: unknown) {
+      setPreviewAccounts([]);
+      setMergePreview(null);
+      setError(err instanceof Error ? err.message : 'Failed to parse JSON');
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = (event.target?.result as string) || '';
+      handleParse(content);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleCommitImport = async () => {
+    if (!mergePreview || (mergePreview.addedCount === 0 && mergePreview.updatedCount === 0)) return;
+    try {
+      setIsProcessing(true);
+      setError(null);
+      await onImportSuccess(mergePreview);
+      resetAndClose();
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to save imported corporate accounts to database.'
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const totalActionable = mergePreview
+    ? mergePreview.addedCount + mergePreview.updatedCount
+    : 0;
+
+  return (
+    <AdminSlideOverDrawer
+      isOpen={isOpen}
+      onClose={resetAndClose}
+      title="Import Corporate Accounts (JSON)"
+      subtitle="Upload corporate_accounts.json to preview dry-run merge and upsert directory profiles"
+      size="xl"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            size="md"
+            onClick={resetAndClose}
+            disabled={isProcessing}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            onClick={handleCommitImport}
+            disabled={totalActionable === 0 || isProcessing}
+            className="font-bold"
+          >
+            {isProcessing ? 'Importing...' : `Import ${totalActionable} Accounts`}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-medium flex items-start gap-2">
+            <AlertCircleIcon className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Upload JSON File (.json)
+            </label>
+            <input
+              type="file"
+              accept=".json,application/json"
+              onChange={handleFileUpload}
+              className="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+            />
+            {fileName && (
+              <p className="mt-1 text-[11px] text-slate-500">
+                Loaded file: <span className="font-mono font-semibold text-slate-700">{fileName}</span>
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Or Paste Raw JSON Data
+            </label>
+            <textarea
+              rows={4}
+              value={jsonRaw}
+              onChange={(e) => handleParse(e.target.value)}
+              placeholder={`{\n  "100": {\n    "name": "Liberty Mutual Group",\n    "address": "Attn: Accounts Payable<br>10733 Sunset Office Dr. Suite 410<br>St. Louis, MO 63127",\n    "type": "standard"\n  }\n}`}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            />
+          </div>
+        </section>
+
+        {mergePreview && previewAccounts.length > 0 && (
+          <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <span className="font-bold text-slate-800">Dry-Run Merge Preview</span>
+              <span className="text-[11px] text-emerald-700 font-semibold inline-flex items-center gap-1">
+                <CheckIcon className="w-3.5 h-3.5 shrink-0" />
+                Preserves existing POs, PINs, limits &amp; portal users
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[10px] font-bold uppercase text-slate-500">Parsed</div>
+                <div className="text-base font-black text-slate-900">{previewAccounts.length}</div>
+              </div>
+              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                <div className="text-[10px] font-bold uppercase text-emerald-700">New Accounts</div>
+                <div className="text-base font-black text-emerald-800">{mergePreview.addedCount}</div>
+              </div>
+              <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200">
+                <div className="text-[10px] font-bold uppercase text-blue-700">Updated</div>
+                <div className="text-base font-black text-blue-800">{mergePreview.updatedCount}</div>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="text-[10px] font-bold uppercase text-slate-500">Skipped</div>
+                <div className="text-base font-black text-slate-700">{mergePreview.skippedCount}</div>
+              </div>
+            </div>
+
+            {/* Mobile Preview Cards (< sm) */}
+            <div className="sm:hidden border border-slate-200 rounded-xl max-h-56 overflow-y-auto divide-y divide-slate-100">
+              {previewAccounts.slice(0, 50).map((acc, i) => (
+                <div key={i} className="p-2.5 text-[11px] space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-slate-900 truncate">{acc.companyName}</span>
+                    <span className="font-mono font-bold text-blue-600 shrink-0">
+                      {acc.accountNumber}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-600 truncate">
+                    Contact: {acc.billingContactName}
+                    {acc.billingContactEmail ? ` (${acc.billingContactEmail})` : ''}
+                  </div>
+                  {acc.billingAddress && (
+                    <div className="text-[10px] text-slate-500 whitespace-pre-line">
+                      {acc.billingAddress}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Preview Table (sm+) */}
+            <div className="hidden sm:block border border-slate-200 rounded-xl overflow-x-auto max-h-56 overflow-y-auto">
+              <table className="w-full text-left border-collapse text-[11px] min-w-[540px]">
+                <thead className="bg-slate-100 border-b border-slate-200 text-slate-600 sticky top-0">
+                  <tr>
+                    <th className="p-2">Account #</th>
+                    <th className="p-2">Company</th>
+                    <th className="p-2">Billing Contact</th>
+                    <th className="p-2">Email</th>
+                    <th className="p-2">Address</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {previewAccounts.slice(0, 50).map((acc, i) => (
+                    <tr key={i} className="hover:bg-slate-50 align-top">
+                      <td className="p-2 font-mono font-bold text-blue-600 whitespace-nowrap">
+                        {acc.accountNumber}
+                      </td>
+                      <td className="p-2 font-medium text-slate-800">{acc.companyName}</td>
+                      <td className="p-2 text-slate-700">{acc.billingContactName}</td>
+                      <td className="p-2 text-blue-600">{acc.billingContactEmail || '—'}</td>
+                      <td className="p-2 text-slate-500 whitespace-pre-line">
+                        {acc.billingAddress || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {previewAccounts.length > 50 && (
+              <p className="text-[10px] text-slate-400 italic">
+                Showing first 50 accounts of {previewAccounts.length} total.
+              </p>
+            )}
+          </section>
+        )}
       </div>
     </AdminSlideOverDrawer>
   );

@@ -4,12 +4,31 @@ import { DEFAULT_TARIFF_PROFILES } from '../app/core/services/pricing/tariff.ser
 import { DEFAULT_NAMED_PRICING_RULES } from '../app/core/services/pricing/pricing-rules.service';
 import { DEFAULT_UNIVERSAL_EXTRAS } from '../app/core/services/pricing/extras.service';
 import { DEFAULT_SURCHARGES_CONFIG } from '../app/core/services/pricing/surcharges.service';
+import { createDefaultZipColumns } from '../app/core/services/pricing/zip-matrix-schema.service';
+import type { TariffProfile } from '../app/core/types/tariff';
 
 console.log('=== RUNNING 4-PILLAR PRICING ENGINE VERIFICATION ===\n');
 
+// Zip-matrix fixture (role-based columns: zip + price)
+const smokeHouseTariff: TariffProfile = {
+  ...DEFAULT_TARIFF_PROFILES[0],
+  id: 'tariff-smoke-house-rates',
+  name: 'Smoke House Agreed Rates',
+  rateModel: 'zip_matrix',
+  priority: 99,
+  isDefault: false,
+  rounding: { distanceMode: 'exact', fareMode: 'exact_cents' },
+  triggers: { accountIds: ['corp-smoke-house'] },
+  zipMatrixColumns: createDefaultZipColumns(),
+  zipMatrixRows: [
+    { id: 'zip-63005', values: { zip: '63005', price: 35.0 } },
+    { id: 'zip-63011', values: { zip: '63011', price: 39.5 } },
+  ],
+};
+
 const baseConfig = {
   ...DEFAULT_PRICING_CONFIG,
-  tariffs: DEFAULT_TARIFF_PROFILES,
+  tariffs: [...DEFAULT_TARIFF_PROFILES, smokeHouseTariff],
   namedPricingRules: DEFAULT_NAMED_PRICING_RULES,
   universalExtras: DEFAULT_UNIVERSAL_EXTRAS,
   surchargesCatalog: DEFAULT_SURCHARGES_CONFIG,
@@ -92,7 +111,7 @@ const smokeRes = calculateTripPricing(
     corporateAccountId: 'corp-smoke-house',
     passengers: 1,
   },
-  baseConfig
+  { ...baseConfig, activeTariffId: 'tariff-smoke-house-rates' }
 );
 const smokeContext = smokeRes.context;
 

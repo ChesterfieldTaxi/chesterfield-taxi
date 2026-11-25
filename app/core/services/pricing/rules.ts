@@ -319,11 +319,8 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
   };
 
   // 1. Zip-Code Flat Rate Matrix
-  const zipEntries =
-    matchedProfile.zipMatrix && matchedProfile.zipMatrix.length > 0
-      ? matchedProfile.zipMatrix
-      : matchedProfile.zipMatrixRates;
-  if (matchedProfile.rateModel === 'zip_matrix' || (zipEntries && zipEntries.length > 0)) {
+  const zipRows = matchedProfile.zipMatrixRows;
+  if (matchedProfile.rateModel === 'zip_matrix' || (zipRows && zipRows.length > 0)) {
     const zipResult = evaluateZipMatrixFare(
       matchedProfile,
       context.input.pickupZipCode,
@@ -335,7 +332,7 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
         id: 'base-fare',
         category: 'base',
         label: 'Base Fare',
-        detail: `${matchedProfile.name} (${zipResult.matchedEntry.zip})`,
+        detail: `${matchedProfile.name} (${zipResult.zip})`,
         amount: flatFare,
         sourceType: 'zip_matrix',
         sourceId: matchedProfile.id,
@@ -355,7 +352,7 @@ export const applyUnifiedTariffEngine: PricingPipelineStep = (context) => {
         timeFare: 0,
         effectiveDistanceRate: 0,
         effectiveTimeRate: 0,
-        driverPay: zipResult.matchedEntry.driverPay ?? zipResult.matchedEntry.customerCharge,
+        driverPay: zipResult.price,
         surcharges: newSurcharges,
         lineItems: newLineItems,
         subtotal: flatFare,

@@ -12,12 +12,15 @@ import {
   normalizeCorporatePortalPolicy,
   type CorporateAccountConfig,
   type CreditLimitEnforcementMode,
+  type InvoiceRecord,
   type PoHistoryRecord,
 } from '../types/config';
+import type { CorporateUnbilledTransaction } from '../types/invoicing';
 import { getAdminConfigService } from './config/admin-config.service';
 import { isFirebaseConfigured, getFirestoreDb } from './firebase';
 import { deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { sanitizePayload } from './firestore-sanitizer';
+import { getInvoicingService } from './invoicing.service';
 
 export interface CsvImportOptions {
   poRequired?: boolean;
@@ -25,6 +28,16 @@ export interface CsvImportOptions {
   creditLimit?: number;
   billingCycle?: 'net15' | 'net30' | 'net60' | 'immediate';
   defaultBillingContactName?: string;
+}
+
+export type JsonImportOptions = CsvImportOptions;
+
+export interface CorporateJsonMergeResult {
+  merged: CorporateAccountConfig[];
+  addedCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  changedAccounts: CorporateAccountConfig[];
 }
 
 export interface PoValidationResult {
@@ -43,6 +56,109 @@ export interface CreditLimitEvaluationResult {
   overageAmount: number;
   warning?: string;
   error?: string;
+}
+
+export interface CorporateArchivalExposure {
+  hasExposure: boolean;
+  openInvoiceCount: number;
+  overdueInvoiceCount: number;
+  openInvoiceBalance: number;
+  unbilledRideCount: number;
+  unbilledAmount: number;
+}
+
+/**
+ * Pure helper returning an archived copy of a CorporateAccountConfig.
+ */
+export function archiveCorporateAccountRecord(
+  account: CorporateAccountConfig,
+  reason?: string
+): CorporateAccountConfig {
+  const nowIso = new Date().toISOString();
+  const cleanReason = typeof reason === 'string' && reason.trim()
+    ? reason.trim()
+    : 'Archived by administrator';
+  return {
+    ...account,
+    isArchived: true,
+    isActive: false,
+    archivedAt: nowIso,
+    archiveReason: cleanReason,
+    updatedAt: nowIso,
+  };
+}
+
+/**
+ * Pure helper returning a restored active copy of an archived CorporateAccountConfig.
+ */
+export function restoreCorporateAccountRecord(
+  account: CorporateAccountConfig
+): CorporateAccountConfig {
+  const nowIso = new Date().toISOString();
+  return {
+    ...account,
+    isArchived: false,
+    isActive: true,
+    archivedAt: undefined,
+    archiveReason: undefined,
+    updatedAt: nowIso,
+  };
+}
+
+/**
+ * Pure helper computing open/overdue invoice and unbilled ride exposure for archival confirmation.
+ */
+export function evaluateCorporateArchivalExposure(params: {
+  account: CorporateAccountConfig;
+  invoices?: InvoiceRecord[];
+  unbilledTransactions?: CorporateUnbilledTransaction[];
+}): CorporateArchivalExposure {
+  const { account } = params;
+  const targetId = (account.id || '').trim();
+  const targetAcctNum = (account.accountNumber || '').trim().toUpperCase();
+
+  const matchingInvoices = (params.invoices || []).filter((inv) => {
+    if (inv.corporateAccountId && inv.corporateAccountId.trim()) {
+      return inv.corporateAccountId.trim() === targetId;
+    }
+    if (targetAcctNum && inv.accountNumber && inv.accountNumber.trim()) {
+      return inv.accountNumber.trim().toUpperCase() === targetAcctNum;
+    }
+    return false;
+  });
+
+  const openInvoices = matchingInvoices.filter((inv) => inv.status !== 'paid');
+  const overdueInvoiceCount = openInvoices.filter((inv) => inv.status === 'overdue').length;
+  const openInvoiceBalance = Number(
+    openInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0).toFixed(2)
+  );
+
+  const matchingUnbilled = (params.unbilledTransactions || []).filter((tx) => {
+    const isBillable = tx.status === 'unbilled' || tx.status === 'pending_invoice';
+    if (!isBillable) return false;
+    if (tx.corporateAccountId && tx.corporateAccountId.trim()) {
+      return tx.corporateAccountId.trim() === targetId;
+    }
+    if (targetAcctNum && tx.accountNumber && tx.accountNumber.trim()) {
+      return tx.accountNumber.trim().toUpperCase() === targetAcctNum;
+    }
+    return false;
+  });
+
+  const unbilledAmount = Number(
+    matchingUnbilled
+      .reduce((sum, tx) => sum + Number(tx.totalAmount || 0), 0)
+      .toFixed(2)
+  );
+
+  return {
+    hasExposure: openInvoices.length > 0 || matchingUnbilled.length > 0,
+    openInvoiceCount: openInvoices.length,
+    overdueInvoiceCount,
+    openInvoiceBalance,
+    unbilledRideCount: matchingUnbilled.length,
+    unbilledAmount,
+  };
 }
 
 /**
@@ -635,6 +751,187 @@ export class CorporateAccountService {
   }
 
   /**
+   * Parses a corporate accounts JSON dictionary (keyed by account ID, e.g. `corporate_accounts.json`)
+   * into normalized `CorporateAccountConfig` records with safe defaults applied.
+   */
+  public parseCorporateAccountsJson(
+    jsonText: string,
+    options: JsonImportOptions = {}
+  ): CorporateAccountConfig[] {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch (err) {
+      throw new Error(
+        `Invalid JSON format: ${err instanceof Error ? err.message : 'Unable to parse JSON'}`
+      );
+    }
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Expected a JSON object keyed by corporate account ID.');
+    }
+
+    const nowIso = new Date().toISOString();
+    const defaultContact = options.defaultBillingContactName || 'Accounts Payable';
+    const accounts: CorporateAccountConfig[] = [];
+
+    for (const [rawKey, rawEntry] of Object.entries(parsed as Record<string, unknown>)) {
+      const accountKey = String(rawKey || '').trim();
+      if (!accountKey || !rawEntry || typeof rawEntry !== 'object' || Array.isArray(rawEntry)) {
+        continue;
+      }
+
+      const entry = rawEntry as {
+        name?: unknown;
+        address?: unknown;
+        type?: unknown;
+        email?: unknown;
+      };
+
+      const companyName = typeof entry.name === 'string' ? entry.name.trim() : '';
+      if (!companyName) continue;
+
+      const rawAddress = typeof entry.address === 'string' ? entry.address : '';
+      const normalizedLines = rawAddress
+        .replace(/<br\s*\/?>/gi, '\n')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      let billingContactName = defaultContact;
+      if (normalizedLines.length > 0) {
+        const attnMatch = normalizedLines[0].match(/^attn:\s*(.*)$/i);
+        if (attnMatch) {
+          const extracted = attnMatch[1].trim();
+          normalizedLines.shift();
+          if (extracted && extracted.toLowerCase() !== 'accounts payable') {
+            billingContactName = extracted;
+          }
+        }
+      }
+
+      const billingAddress = normalizedLines.length > 0 ? normalizedLines.join('\n') : undefined;
+      const email = typeof entry.email === 'string' ? entry.email.trim() : '';
+      const entryType = typeof entry.type === 'string' ? entry.type.trim().toLowerCase() : 'standard';
+
+      const accountNumber = /^corp-/i.test(accountKey)
+        ? accountKey.toUpperCase()
+        : `CORP-${accountKey}`;
+      const id = /^corp-/i.test(accountKey)
+        ? accountKey.toLowerCase()
+        : `corp-${accountKey}`;
+
+      accounts.push({
+        id,
+        companyName,
+        accountNumber,
+        billingCycle: options.billingCycle ?? 'net30',
+        creditLimit: options.creditLimit ?? 5000,
+        billingContactName,
+        billingContactEmail: email,
+        billingAddress,
+        discountPercent: options.discountPercent ?? 0,
+        poRequired: options.poRequired ?? false,
+        currentPoNumber: this.generateSecurePoNumber(companyName, accountNumber),
+        poGeneratedAt: nowIso,
+        poNumberHistory: [],
+        isActive: true,
+        notes: entryType === 'delivery' ? 'Account Type: delivery' : undefined,
+        authorizedBookers: email ? [email] : [],
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      });
+    }
+
+    return accounts;
+  }
+
+  /**
+   * Upserts incoming corporate accounts into an existing directory list.
+   * Matches by `accountNumber` (case-insensitive) or `id`, updating directory metadata
+   * while preserving operational state (POs, PINs, credit limits, discounts, riders, etc.).
+   */
+  public mergeCorporateAccounts(
+    existing: CorporateAccountConfig[],
+    incoming: CorporateAccountConfig[]
+  ): CorporateJsonMergeResult {
+    const nowIso = new Date().toISOString();
+    const merged: CorporateAccountConfig[] = existing.map((acc) => ({ ...acc }));
+    const changedAccounts: CorporateAccountConfig[] = [];
+
+    let addedCount = 0;
+    let updatedCount = 0;
+    let skippedCount = 0;
+
+    const findMatchIndex = (target: CorporateAccountConfig): number => {
+      const targetAcctNum = (target.accountNumber || '').trim().toLowerCase();
+      const targetId = (target.id || '').trim().toLowerCase();
+      return merged.findIndex((item) => {
+        const itemAcctNum = (item.accountNumber || '').trim().toLowerCase();
+        const itemId = (item.id || '').trim().toLowerCase();
+        return (
+          (targetAcctNum && itemAcctNum && itemAcctNum === targetAcctNum) ||
+          (targetId && itemId && itemId === targetId)
+        );
+      });
+    };
+
+    for (const inc of incoming) {
+      if (!inc || !inc.companyName?.trim() || (!inc.accountNumber?.trim() && !inc.id?.trim())) {
+        skippedCount++;
+        continue;
+      }
+
+      const matchIdx = findMatchIndex(inc);
+      if (matchIdx >= 0) {
+        const cur = merged[matchIdx];
+        const curContact = (cur.billingContactName || '').trim();
+        const shouldUpdateContact =
+          !curContact || curContact.toLowerCase() === 'accounts payable';
+
+        const updated: CorporateAccountConfig = {
+          ...cur,
+          companyName: inc.companyName.trim(),
+          billingAddress: inc.billingAddress !== undefined ? inc.billingAddress : cur.billingAddress,
+          billingContactEmail: inc.billingContactEmail?.trim()
+            ? inc.billingContactEmail.trim()
+            : cur.billingContactEmail,
+          billingContactName: shouldUpdateContact
+            ? inc.billingContactName || cur.billingContactName || 'Accounts Payable'
+            : cur.billingContactName,
+          notes: cur.notes || inc.notes,
+          updatedAt: nowIso,
+        };
+
+        merged[matchIdx] = updated;
+        changedAccounts.push(updated);
+        updatedCount++;
+      } else {
+        const created: CorporateAccountConfig = {
+          ...inc,
+          currentPoNumber:
+            inc.currentPoNumber ||
+            this.generateSecurePoNumber(inc.companyName, inc.accountNumber),
+          poGeneratedAt: inc.poGeneratedAt || nowIso,
+          poNumberHistory: inc.poNumberHistory || [],
+          updatedAt: nowIso,
+        };
+        merged.push(created);
+        changedAccounts.push(created);
+        addedCount++;
+      }
+    }
+
+    return {
+      merged,
+      addedCount,
+      updatedCount,
+      skippedCount,
+      changedAccounts,
+    };
+  }
+
+  /**
    * Public helper to sync a corporate account to BOTH `/corporateAccounts/{id}` (staff-only)
    * AND zero-PII hashed `/corporateLookup/{accountNumberHash}` (for rate-limited web checkout verification).
    */
@@ -651,6 +948,32 @@ export class CorporateAccountService {
   }
 
   /**
+   * Checks open/overdue invoice and unbilled ride exposure for a corporate account prior to archival.
+   */
+  public async checkArchivalExposure(
+    account: CorporateAccountConfig,
+    invoices?: InvoiceRecord[]
+  ): Promise<CorporateArchivalExposure> {
+    const invoicingService = getInvoicingService();
+    const [resolvedInvoices, unbilledTransactions] = await Promise.all([
+      invoices
+        ? Promise.resolve(invoices)
+        : invoicingService.getInvoices
+          ? invoicingService.getInvoices().catch(() => [])
+          : Promise.resolve([]),
+      invoicingService.getUnbilledTransactions
+        ? invoicingService.getUnbilledTransactions(account.id).catch(() => [])
+        : Promise.resolve([]),
+    ]);
+
+    return evaluateCorporateArchivalExposure({
+      account,
+      invoices: resolvedInvoices,
+      unbilledTransactions,
+    });
+  }
+
+  /**
    * Helper to write a single account document to the 'corporateAccounts' Firestore collection
    * plus its zero-PII hashed verification projection at 'corporateLookup/{accountHash}'.
    */
@@ -659,10 +982,17 @@ export class CorporateAccountService {
     try {
       const db = getFirestoreDb();
       const docRef = doc(db, 'corporateAccounts', account.id);
-      // `deleteField()` strips a removed Verbal Booking PIN from /corporateAccounts/{id} on merge writes
+      // `deleteField()` strips a removed Verbal Booking PIN or cleared archival metadata on merge writes
       await setDoc(
         docRef,
-        { ...sanitizePayload(account), bookingPin: account.bookingPin ? account.bookingPin : deleteField() },
+        {
+          ...sanitizePayload(account),
+          bookingPin: account.bookingPin ? account.bookingPin : deleteField(),
+          isArchived: Boolean(account.isArchived),
+          archivedAt: account.isArchived ? account.archivedAt || new Date().toISOString() : deleteField(),
+          archiveReason:
+            account.isArchived && account.archiveReason ? account.archiveReason : deleteField(),
+        },
         { merge: true }
       );
 
@@ -679,6 +1009,7 @@ export class CorporateAccountService {
         const lookupDoc = {
           corporateAccountId: account.id,
           isActive: Boolean(account.isActive),
+          isArchived: Boolean(account.isArchived),
           poRequired: Boolean(account.poRequired),
           currentPoHash: currentPoHash || null,
           revokedPoHashes: revokedPoHashes.filter(Boolean),

@@ -15,7 +15,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
-import { CorporateAccountService } from '../app/core/services/corporate-account.service';
+import {
+  CorporateAccountService,
+  hashCorporateLookupValue,
+} from '../app/core/services/corporate-account.service';
 import { sanitizePayload } from '../app/core/services/firestore-sanitizer';
 import type { CorporateAccountConfig, AppSettings } from '../app/core/types/config';
 
@@ -61,18 +64,21 @@ async function main() {
   console.log('🏢 CHESTERFIELD TAXI: CORPORATE ACCOUNTS DATABASE IMPORTER');
   console.log('===============================================================\n');
 
-  // Determine CSV file path
+  // Determine input file path (.json or .csv)
   const args = process.argv.slice(2);
-  const csvFileName = args[0] || 'corporate_accounts_all.csv';
-  const csvPath = path.isAbsolute(csvFileName) ? csvFileName : path.join(process.cwd(), csvFileName);
+  const inputFileName = args[0] || 'corporate_accounts_all.csv';
+  const inputPath = path.isAbsolute(inputFileName)
+    ? inputFileName
+    : path.join(process.cwd(), inputFileName);
 
-  if (!fs.existsSync(csvPath)) {
-    console.error(`❌ Error: CSV file not found at: ${csvPath}`);
+  if (!fs.existsSync(inputPath)) {
+    console.error(`❌ Error: Input file not found at: ${inputPath}`);
     process.exit(1);
   }
 
-  console.log(`📄 Reading CSV file: ${csvPath}`);
-  const csvContent = fs.readFileSync(csvPath, 'utf-8');
+  const isJson = inputPath.toLowerCase().endsWith('.json');
+  console.log(`📄 Reading ${isJson ? 'JSON' : 'CSV'} file: ${inputPath}`);
+  const fileContent = fs.readFileSync(inputPath, 'utf-8');
 
   // Initialize service
   const corpService = new CorporateAccountService();
@@ -82,13 +88,16 @@ async function main() {
   // - discountPercent: 0
   // - creditLimit: 5000 (standard default)
   // - billingCycle: 'net30'
-  console.log('⚙️  Parsing CSV and generating schema extensions...');
-  const importedAccounts = corpService.parseCorporateAccountsCsv(csvContent, {
+  const parseOptions = {
     poRequired: false, // Per user directive
     discountPercent: 0, // Per user directive
     creditLimit: 5000,
-    billingCycle: 'net30',
-  });
+    billingCycle: 'net30' as const,
+  };
+  console.log(`⚙️  Parsing ${isJson ? 'JSON' : 'CSV'} and generating schema extensions...`);
+  const importedAccounts = isJson
+    ? corpService.parseCorporateAccountsJson(fileContent, parseOptions)
+    : corpService.parseCorporateAccountsCsv(fileContent, parseOptions);
 
   console.log(`✅ Successfully parsed ${importedAccounts.length} corporate accounts.\n`);
 
@@ -151,31 +160,15 @@ async function main() {
       console.log(`ℹ️  No existing appSettings doc found; initializing new one.`);
     }
 
-    // Merge or replace corporate accounts:
-    // We retain existing manual accounts if not matching by accountNumber or ID, then append/update
-    const existingList: CorporateAccountConfig[] = (existingSettings.corporateAccounts as CorporateAccountConfig[]) || [];
-    const mergedMap = new Map<string, CorporateAccountConfig>();
+    // Merge corporate accounts while preserving operational state (POs, PINs, limits, riders, etc.)
+    const existingList: CorporateAccountConfig[] =
+      (existingSettings.corporateAccounts as CorporateAccountConfig[]) || [];
+    const mergeResult = corpService.mergeCorporateAccounts(existingList, importedAccounts);
+    const finalCorporateAccounts = mergeResult.merged;
 
-    // Add existing
-    for (const item of existingList) {
-      mergedMap.set(item.accountNumber || item.id, item);
-    }
-
-    // Overwrite/Add imported
-    for (const item of importedAccounts) {
-      mergedMap.set(item.accountNumber || item.id, item);
-    }
-
-    const finalCorporateAccounts = Array.from(mergedMap.values()).map(acc => {
-      if (!acc.currentPoNumber) {
-        acc.currentPoNumber = corpService.generateSecurePoNumber(acc.companyName, acc.accountNumber);
-        acc.poGeneratedAt = acc.poGeneratedAt || new Date().toISOString();
-      }
-      if (!acc.poNumberHistory) {
-        acc.poNumberHistory = [];
-      }
-      return acc;
-    });
+    console.log(
+      `🔀 Merge summary: +${mergeResult.addedCount} new, ~${mergeResult.updatedCount} updated, ${mergeResult.skippedCount} skipped.`
+    );
 
     console.log(`💾 Writing ${finalCorporateAccounts.length} total corporate accounts to config/appSettings in Firestore...`);
     const sanitizedSettingsUpdate = sanitizePayload(
@@ -189,16 +182,46 @@ async function main() {
     await setDoc(settingsDocRef, sanitizedSettingsUpdate, { merge: true });
     console.log(`✅ config/appSettings successfully updated with ${finalCorporateAccounts.length} corporate accounts!`);
 
-    // 2. Also write to dedicated 'corporateAccounts' collection in batches of 400
-    console.log(`📂 Writing individual accounts to 'corporateAccounts' collection...`);
-    const batchSize = 400;
-    for (let i = 0; i < importedAccounts.length; i += batchSize) {
-      const chunk = importedAccounts.slice(i, i + batchSize);
+    // 2. Also write changed accounts to 'corporateAccounts' and 'corporateLookup' collections in batches of 200 (400 ops)
+    console.log(`📂 Syncing ${mergeResult.changedAccounts.length} added/updated accounts to 'corporateAccounts' and 'corporateLookup'...`);
+    const batchSize = 200;
+    for (let i = 0; i < mergeResult.changedAccounts.length; i += batchSize) {
+      const chunk = mergeResult.changedAccounts.slice(i, i + batchSize);
       const batch = writeBatch(db);
       for (const acc of chunk) {
         const accDocRef = doc(db, 'corporateAccounts', acc.id);
         const sanitizedAcc = sanitizePayload(acc, { mode: 'omit' });
         batch.set(accDocRef, sanitizedAcc, { merge: true });
+
+        const acctHash = await hashCorporateLookupValue(acc.accountNumber);
+        if (acctHash) {
+          const currentPoHash = acc.currentPoNumber
+            ? await hashCorporateLookupValue(acc.currentPoNumber)
+            : '';
+          const revokedPoHashes = (
+            await Promise.all(
+              (acc.poNumberHistory || [])
+                .filter((h) => h.poNumber)
+                .map((h) => hashCorporateLookupValue(h.poNumber))
+            )
+          ).filter(Boolean);
+
+          const lookupDoc = sanitizePayload(
+            {
+              corporateAccountId: acc.id,
+              isActive: Boolean(acc.isActive),
+              poRequired: Boolean(acc.poRequired),
+              currentPoHash: currentPoHash || null,
+              revokedPoHashes,
+              creditLimit: Number(acc.creditLimit || 0),
+              billingCycle: acc.billingCycle || 'net30',
+              discountPercent: Number(acc.discountPercent || 0),
+              updatedAt: new Date().toISOString(),
+            },
+            { mode: 'omit' }
+          );
+          batch.set(doc(db, 'corporateLookup', acctHash), lookupDoc, { merge: true });
+        }
       }
       await batch.commit();
       console.log(`   → Batch ${Math.floor(i / batchSize) + 1} (${chunk.length} accounts) committed.`);
@@ -206,12 +229,12 @@ async function main() {
 
     console.log('\n===============================================================');
     console.log('🎉 DIRECT DATABASE IMPORT COMPLETED SUCCESSFULLY!');
-    console.log(`   • Total Imported Accounts: ${importedAccounts.length}`);
+    console.log(`   • Total Parsed Accounts: ${importedAccounts.length}`);
+    console.log(`   • Added: ${mergeResult.addedCount} | Updated: ${mergeResult.updatedCount} | Skipped: ${mergeResult.skippedCount}`);
     console.log(`   • Active in Database: ${finalCorporateAccounts.length}`);
-    console.log(`   • PO Required Status: false (until updated with account holders)`);
-    console.log(`   • Contract Discount: 0%`);
-    console.log(`   • Default Credit Limit: $5,000`);
-    console.log(`   • Initial PO Numbers Generated: ${importedAccounts.length}`);
+    console.log(`   • PO Required Status: false (for new accounts)`);
+    console.log(`   • Contract Discount: 0% (for new accounts)`);
+    console.log(`   • Default Credit Limit: $5,000 (for new accounts)`);
     console.log('===============================================================\n');
 
   } catch (error) {

@@ -21,7 +21,8 @@ export type GovernanceEntityType =
   | 'zone'
   | 'zone_group'
   | 'collection'
-  | 'tariff';
+  | 'tariff'
+  | 'corporate_account';
 
 export interface EntityGovernanceRecord {
   entityId: string;

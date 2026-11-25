@@ -27,6 +27,7 @@ import {
 } from '~/components/ui/Icons';
 import { TaximeterEditor } from './TaximeterEditor';
 import { ZipRateMatrixEditor } from './ZipRateMatrixEditor';
+import { createDefaultZipColumns } from '~/core/services/pricing/zip-matrix-schema.service';
 import { HourlyRateEditor } from './HourlyRateEditor';
 import { CorridorEditor } from './CorridorEditor';
 
@@ -134,7 +135,6 @@ export function RatesPanel({
       eligibleVehicleTypes: undefined,
       eligibleVehicleClasses: undefined,
       taximeterRate: workingCopy.taximeter,
-      zipMatrixRates: workingCopy.zipMatrix,
       hourlyRate: workingCopy.hourlyConfig,
     };
     await onSaveTariff(cleaned);
@@ -217,8 +217,11 @@ export function RatesPanel({
         excessMileageRate: 2.5,
       };
     }
-    if (newModel === 'zip_matrix' && !next.zipMatrix) {
-      next.zipMatrix = [];
+    if (newModel === 'zip_matrix') {
+      if (!next.zipMatrixColumns || next.zipMatrixColumns.length === 0) {
+        next.zipMatrixColumns = createDefaultZipColumns();
+      }
+      if (!next.zipMatrixRows) next.zipMatrixRows = [];
     }
     setWorkingCopy(next);
   };
@@ -266,7 +269,7 @@ export function RatesPanel({
             const meter = t.taximeter || t.taximeterRate;
             const summaryLine =
               t.rateModel === 'zip_matrix'
-                ? `${(t.zipMatrix || t.zipMatrixRates || []).length} zip flat rates`
+                ? `${(t.zipMatrixRows || []).length} zip flat rates`
                 : t.rateModel === 'hourly'
                 ? `$${(t.hourlyConfig?.ratePerHour ?? 75).toFixed(0)}/hr · min ${t.hourlyConfig?.minimumHours ?? 2}h`
                 : t.rateModel === 'corridor'
@@ -540,12 +543,13 @@ export function RatesPanel({
 
               {workingCopy.rateModel === 'zip_matrix' && (
                 <ZipRateMatrixEditor
-                  entries={workingCopy.zipMatrix || workingCopy.zipMatrixRates || []}
-                  onChange={(updatedEntries) =>
+                  columns={workingCopy.zipMatrixColumns || createDefaultZipColumns()}
+                  rows={workingCopy.zipMatrixRows || []}
+                  onChange={(updatedColumns, updatedRows) =>
                     setWorkingCopy({
                       ...workingCopy,
-                      zipMatrix: updatedEntries,
-                      zipMatrixRates: updatedEntries,
+                      zipMatrixColumns: updatedColumns,
+                      zipMatrixRows: updatedRows,
                     })
                   }
                 />

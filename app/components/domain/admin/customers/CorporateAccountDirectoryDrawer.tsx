@@ -17,6 +17,7 @@ import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
 import {
+  ArchiveBoxIcon,
   BuildingIcon,
   CheckIcon,
   CreditCardIcon,
@@ -34,6 +35,7 @@ export interface CorporateAccountDirectoryDrawerProps {
   onClose: () => void;
   onSaveCorporateAccount: (updated: CorporateAccountConfig) => Promise<void>;
   onOpenProvisionModal: (corp: CorporateAccountConfig) => void;
+  onRequestArchive?: (corp: CorporateAccountConfig) => void;
 }
 
 export function CorporateAccountDirectoryDrawer({
@@ -44,6 +46,7 @@ export function CorporateAccountDirectoryDrawer({
   onClose,
   onSaveCorporateAccount,
   onOpenProvisionModal,
+  onRequestArchive,
 }: CorporateAccountDirectoryDrawerProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -115,22 +118,38 @@ export function CorporateAccountDirectoryDrawer({
       }
       size="lg"
       footer={
-        <>
-          <Button type="button" variant="outline" size="md" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="corporate-directory-form"
-            variant="primary"
-            size="md"
-            isLoading={isSaving}
-            leftIcon={isNewCorp ? <PlusIcon className="w-4 h-4" /> : <CheckIcon className="w-4 h-4" />}
-            className="font-bold"
-          >
-            {isNewCorp ? 'Add Corporate Account' : 'Save Directory Profile'}
-          </Button>
-        </>
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div>
+            {!isNewCorp && onRequestArchive && (
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={() => onRequestArchive(editingCorp)}
+                leftIcon={<ArchiveBoxIcon className="w-4 h-4" />}
+                className="text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100 font-bold"
+              >
+                Archive Account
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="md" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="corporate-directory-form"
+              variant="primary"
+              size="md"
+              isLoading={isSaving}
+              leftIcon={isNewCorp ? <PlusIcon className="w-4 h-4" /> : <CheckIcon className="w-4 h-4" />}
+              className="font-bold"
+            >
+              {isNewCorp ? 'Add Corporate Account' : 'Save Directory Profile'}
+            </Button>
+          </div>
+        </div>
       }
     >
       <form id="corporate-directory-form" onSubmit={handleSubmit} className="space-y-4 text-xs">

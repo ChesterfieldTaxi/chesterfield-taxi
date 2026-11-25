@@ -47,6 +47,7 @@ import { sanitizePayload } from '../firestore-sanitizer';
 import { getAdminAuthService } from '../auth/admin-auth.service';
 import { getSurchargeCatalogItems } from './surcharges.service';
 import { normalizeTariffProfile } from './tariff.service';
+import { getRoleColumn } from './zip-matrix-schema.service';
 
 export const PRICING_AUDIT_STORAGE_KEY = 'ct_pricing_audit_log_v1';
 export const MAX_PRICING_AUDIT_EVENTS = 500;
@@ -543,10 +544,15 @@ function summarizeCorridors(t: TariffProfile): string {
 }
 
 function summarizeZipMatrix(t: TariffProfile): string {
-  const entries = t.zipMatrix || t.zipMatrixRates || [];
-  if (entries.length === 0) return 'None';
-  return `${entries.length} zip${entries.length === 1 ? '' : 's'} (${entries
-    .map((z) => `${z.zip}: $${(z.customerCharge ?? z.total ?? 0).toFixed(2)}`)
+  const rows = t.zipMatrixRows || [];
+  const zipCol = getRoleColumn(t.zipMatrixColumns, 'zip');
+  const priceCol = getRoleColumn(t.zipMatrixColumns, 'price');
+  if (rows.length === 0 || !zipCol || !priceCol) return 'None';
+  return `${rows.length} zip${rows.length === 1 ? '' : 's'} (${rows
+    .map((r) => {
+      const price = r.values[priceCol.key];
+      return `${String(r.values[zipCol.key] ?? '')}: $${(typeof price === 'number' ? price : 0).toFixed(2)}`;
+    })
     .join(', ')})`;
 }
 

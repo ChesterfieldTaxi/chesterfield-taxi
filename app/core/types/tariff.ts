@@ -89,18 +89,23 @@ export interface RateCancellationPolicy {
   noShowFee: number;
 }
 
-export interface ZipRateMatrixEntry {
-  id?: string; // e.g. "zip-63005"
-  zip: string; // "63005"
-  city: string; // "Chesterfield"
-  car: number; // Driver base fare e.g. 12.00
-  tip: number; // Agreed tip e.g. 2.50
-  total: number; // Car + Tip e.g. 14.50
-  customerCharge: number; // Invoiced Customer Charge e.g. 17.00
-  driverPay?: number; // Driver payout (defaults to customerCharge)
-  notes?: string;
+export type ZipColumnType = 'text' | 'currency' | 'integer' | 'boolean' | 'select';
+export type ZipColumnRole = 'zip' | 'price';
+
+export interface ZipMatrixColumn {
+  key: string; // stable slug derived from header/label at creation; NOT changed on rename
+  label: string; // display label (freely renamable)
+  type: ZipColumnType;
+  role?: ZipColumnRole;
+  options?: string[]; // for 'select'
+  required?: boolean;
+  order: number;
 }
 
+export interface ZipMatrixRow {
+  id: string;
+  values: Record<string, string | number | boolean | null>;
+}
 export interface HourlyRateConfig {
   ratePerHour: number; // e.g. 75.00
   minimumHours: number; // e.g. 2 hours
@@ -156,8 +161,8 @@ export interface TariffProfile {
   extras: TariffExtras;
 
   // Optional rate-model specific payloads
-  zipMatrix?: ZipRateMatrixEntry[];
-  zipMatrixRates?: ZipRateMatrixEntry[]; // alias
+  zipMatrixColumns?: ZipMatrixColumn[];
+  zipMatrixRows?: ZipMatrixRow[];
   hourlyConfig?: HourlyRateConfig;
   hourlyRate?: HourlyRateConfig; // alias
   taximeterRate?: TariffTaximeterRate; // alias

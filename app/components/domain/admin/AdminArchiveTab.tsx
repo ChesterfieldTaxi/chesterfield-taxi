@@ -6,6 +6,7 @@ import { Badge } from '../../ui/Badge';
 import { Alert } from '../../ui/Alert';
 import {
   ArchiveBoxIcon,
+  BuildingIcon,
   UserIcon,
   CarIcon,
   ShieldCheckIcon,
@@ -24,6 +25,11 @@ import {
 import { getZoneService } from '../../../core/services/zones/zone.service';
 import { getTariffService } from '../../../core/services/pricing/tariff.service';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
+import {
+  getCorporateAccountService,
+  restoreCorporateAccountRecord,
+} from '../../../core/services/corporate-account.service';
+import type { CorporateAccountConfig } from '../../../core/types/config';
 
 export interface AdminArchiveTabProps {
   initialSubTab?: string;
@@ -124,11 +130,14 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
         console.warn('Failed to load auxiliary tariff archives:', err);
       }
 
-      // Check settings for archived vehicle tiers
+      // Check settings for archived vehicle tiers and corporate accounts
       try {
-        const cachedSettings = getAdminConfigService().getCachedSettings();
-        if (cachedSettings.vehicles) {
-          cachedSettings.vehicles
+        const configService = getAdminConfigService();
+        const settingsSnapshot = await configService
+          .getSettings()
+          .catch(() => configService.getCachedSettings());
+        if (settingsSnapshot.vehicles) {
+          settingsSnapshot.vehicles
             .filter((v) => !!v.isArchived)
             .forEach((v) => {
               if (!govRecords.some((r) => r.entityId === v.id && r.entityType === 'vehicle_type')) {
@@ -145,8 +154,32 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
               }
             });
         }
+
+        if (settingsSnapshot.corporateAccounts) {
+          const archivedCorps = settingsSnapshot.corporateAccounts.filter((c) => !!c.isArchived);
+          archivedCorps.forEach((corp) => {
+            const existingIdx = govRecords.findIndex(
+              (r) => r.entityId === corp.id && r.entityType === 'corporate_account'
+            );
+            const enrichedRecord: EntityGovernanceRecord = {
+              entityId: corp.id,
+              entityType: 'corporate_account',
+              displayName: `${corp.companyName} (${corp.accountNumber})`,
+              isBlacklisted: false,
+              isArchived: true,
+              archivedAt: corp.archivedAt || new Date().toISOString(),
+              archiveReason: corp.archiveReason || 'Archived in Corporate Directory',
+              updatedAt: corp.updatedAt || new Date().toISOString(),
+            };
+            if (existingIdx >= 0) {
+              govRecords[existingIdx] = { ...govRecords[existingIdx], ...enrichedRecord };
+            } else {
+              auxiliary.push(enrichedRecord);
+            }
+          });
+        }
       } catch (err) {
-        console.warn('Failed to load auxiliary vehicle archives:', err);
+        console.warn('Failed to load auxiliary settings archives:', err);
       }
 
       setArchivedRecords([...govRecords, ...auxiliary]);
@@ -191,6 +224,7 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
           return false;
         if (activeFilter === 'collections' && record.entityType !== 'collection') return false;
         if (activeFilter === 'tariffs' && record.entityType !== 'tariff') return false;
+        if (activeFilter === 'corporate' && record.entityType !== 'corporate_account') return false;
       }
 
       // Text search query
@@ -232,6 +266,25 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
           );
           await configService.updateSettings({ vehicles: updated });
         }
+      } else if (record.entityType === 'corporate_account') {
+        const configService = getAdminConfigService();
+        const settings = await configService
+          .getSettings()
+          .catch(() => configService.getCachedSettings());
+        if (settings.corporateAccounts) {
+          let restoredAccount: CorporateAccountConfig | null = null;
+          const updated = settings.corporateAccounts.map((a) => {
+            if (a.id === record.entityId) {
+              restoredAccount = restoreCorporateAccountRecord(a);
+              return restoredAccount;
+            }
+            return a;
+          });
+          await configService.updateSettings({ corporateAccounts: updated });
+          if (restoredAccount) {
+            await getCorporateAccountService().syncAccountToFirestore(restoredAccount);
+          }
+        }
       }
 
       setToastMessage({
@@ -262,6 +315,7 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
     (r) => r.entityType === 'zone' || r.entityType === 'zone_group' || r.entityType === 'collection'
   ).length;
   const tariffCount = archivedRecords.filter((r) => r.entityType === 'tariff').length;
+  const corporateCount = archivedRecords.filter((r) => r.entityType === 'corporate_account').length;
 
   const getTypeBadge = (type: GovernanceEntityType) => {
     switch (type) {
@@ -269,6 +323,8 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
         return <Badge variant="neutral" size="sm" className="bg-slate-100 text-slate-800">Trip</Badge>;
       case 'passenger':
         return <Badge variant="info" size="sm" className="bg-blue-100 text-blue-800">Client</Badge>;
+      case 'corporate_account':
+        return <Badge variant="primary" size="sm" className="bg-blue-100 text-blue-800 font-bold">Corporate</Badge>;
       case 'driver':
         return <Badge variant="success" size="sm" className="bg-emerald-100 text-emerald-800">Driver</Badge>;
       case 'staff':
@@ -309,6 +365,8 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
         return <CompassIcon className="w-4 h-4 text-teal-600" />;
       case 'tariff':
         return <DollarSignIcon className="w-4 h-4 text-purple-600" />;
+      case 'corporate_account':
+        return <BuildingIcon className="w-4 h-4 text-blue-600" />;
       default:
         return <ArchiveBoxIcon className="w-4 h-4 text-slate-500" />;
     }
@@ -328,6 +386,32 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
       {/* ─── Single Clean Toolbar + Mobile Cards / Desktop Table ─── */}
       <Card variant="elevated" className="border-slate-200/90 shadow-xs overflow-hidden">
         <CardContent className="p-3 sm:p-4 space-y-4">
+          <div className="flex flex-wrap items-center gap-1.5 pb-1 border-b border-slate-100">
+            {[
+              { id: 'all', label: 'All', count: archivedRecords.length },
+              { id: 'corporate', label: 'Corporate', count: corporateCount },
+              { id: 'customers', label: 'Clients', count: customerCount },
+              { id: 'operators', label: 'Operators', count: operatorCount },
+              { id: 'vehicles', label: 'Vehicles', count: vehicleCount },
+              { id: 'zones', label: 'Zones', count: zoneCount },
+              { id: 'tariffs', label: 'Tariffs', count: tariffCount },
+              { id: 'trips', label: 'Trips', count: tripCount },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveFilter(tab.id)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                  activeFilter === tab.id
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                }`}
+              >
+                {tab.label} ({tab.count})
+              </button>
+            ))}
+          </div>
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
             <div className="w-full sm:w-80">
               <Input

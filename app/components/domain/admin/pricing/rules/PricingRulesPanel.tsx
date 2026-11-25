@@ -153,7 +153,7 @@ export function PricingRulesPanel({
         source = [];
       }
     }
-    return (source || []).filter((c) => c.isActive !== false);
+    return (source || []).filter((c) => c.isActive !== false && !c.isArchived);
   }, [corporateAccounts]);
 
   const sortedRules = useMemo(

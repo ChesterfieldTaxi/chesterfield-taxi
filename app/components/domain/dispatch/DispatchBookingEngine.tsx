@@ -362,11 +362,12 @@ function DispatchBookingEngineComponent({
       setSurchargesVersion((v) => v + 1);
     });
     const unsubSettings = getAdminConfigService().subscribeToSettings((settings) => {
-      if (settings?.corporateAccounts && settings.corporateAccounts.length > 0) {
-        setCorporateAccountList(settings.corporateAccounts);
+      if (settings?.corporateAccounts) {
+        const activeCorps = settings.corporateAccounts.filter((c) => !c.isArchived);
+        setCorporateAccountList(activeCorps);
         setCorporateAccount((prev) => {
-          const exists = Boolean(findMatchingCorporateAccount(settings.corporateAccounts!, prev));
-          return exists ? prev : settings.corporateAccounts![0].companyName;
+          const exists = Boolean(findMatchingCorporateAccount(activeCorps, prev));
+          return exists ? prev : activeCorps[0]?.companyName || '';
         });
       }
       if (settings?.vehicles && settings.vehicles.length > 0) {

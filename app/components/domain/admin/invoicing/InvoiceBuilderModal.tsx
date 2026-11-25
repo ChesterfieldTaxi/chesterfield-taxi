@@ -309,11 +309,13 @@ export function InvoiceBuilderModal({
                   }}
                 >
                   <option value="">Custom / Direct Client</option>
-                  {corporateAccounts.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.companyName} ({c.accountNumber})
-                    </option>
-                  ))}
+                  {corporateAccounts
+                    .filter((c) => !c.isArchived)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.companyName} ({c.accountNumber})
+                      </option>
+                    ))}
                 </Select>
               </div>
 

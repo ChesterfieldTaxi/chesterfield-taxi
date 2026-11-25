@@ -790,6 +790,11 @@ export interface CorporateAccountConfig {
   costCenters?: string[];
   savedCompanyLocations?: CorporateSavedLocation[];
   portalManagers?: CorporatePortalManagerRecord[];
+
+  // Phase 85: Corporate Account Archival
+  isArchived?: boolean;
+  archivedAt?: string;
+  archiveReason?: string;
 }
 
 

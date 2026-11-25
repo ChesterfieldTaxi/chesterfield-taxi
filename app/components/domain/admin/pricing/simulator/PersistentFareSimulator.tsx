@@ -82,7 +82,7 @@ export function PersistentFareSimulator({
         source = [];
       }
     }
-    return (source || []).filter((c) => c.isActive !== false);
+    return (source || []).filter((c) => c.isActive !== false && !c.isArchived);
   }, [corporateAccounts]);
 
   // Simulator input state

@@ -5,7 +5,10 @@ import {
 } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
 import { getBookingService } from '../../../../core/services/booking';
-import { getCorporateAccountService } from '../../../../core/services/corporate-account.service';
+import {
+  archiveCorporateAccountRecord,
+  getCorporateAccountService,
+} from '../../../../core/services/corporate-account.service';
 import { getContactService } from '../../../../core/services/customer/contact.service';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
 import {
@@ -40,6 +43,7 @@ export function AdminCustomersSubpage({
   const [editingCorp, setEditingCorp] = useState<CorporateAccountConfig | null>(null);
   const [isNewCorp, setIsNewCorp] = useState(false);
   const [provisioningCorp, setProvisioningCorp] = useState<CorporateAccountConfig | null>(null);
+  const [pendingArchiveCorp, setPendingArchiveCorp] = useState<CorporateAccountConfig | null>(null);
 
   useEffect(() => {
     setActiveSub(initialSubTab);
@@ -152,6 +156,29 @@ export function AdminCustomersSubpage({
     setIsNewCorp(false);
   };
 
+  const handleArchiveCorporateAccount = async (
+    account: CorporateAccountConfig,
+    reason?: string
+  ) => {
+    if (!onSave) return;
+    const archivedAccount = archiveCorporateAccountRecord(account, reason);
+    const nextAccounts = corporateClients.map((a) =>
+      a.id === archivedAccount.id ? archivedAccount : a
+    );
+    await onSave({ corporateAccounts: nextAccounts });
+    await getCorporateAccountService().syncAccountToFirestore(archivedAccount);
+    await getUniversalGovernanceService().setArchiveStatus(
+      'corporate_account',
+      archivedAccount.id,
+      true
+    );
+    if (editingCorp?.id === archivedAccount.id) {
+      setEditingCorp(null);
+      setIsNewCorp(false);
+    }
+    setPendingArchiveCorp(null);
+  };
+
   return (
     <div className="space-y-4">
       {activeSub === 'directory' && (
@@ -208,6 +235,16 @@ export function AdminCustomersSubpage({
               ),
             });
           }}
+          onImportCorporateAccounts={async (mergeResult) => {
+            if (!onSave) return;
+            await onSave({ corporateAccounts: mergeResult.merged });
+            await getCorporateAccountService().syncAccountsBatchToFirestore(
+              mergeResult.changedAccounts
+            );
+          }}
+          onArchiveCorporate={handleArchiveCorporateAccount}
+          pendingArchiveCorp={pendingArchiveCorp}
+          onClearPendingArchiveCorp={() => setPendingArchiveCorp(null)}
         />
       )}
 
@@ -240,6 +277,15 @@ export function AdminCustomersSubpage({
         }}
         onSaveCorporateAccount={handleSaveCorporateAccount}
         onOpenProvisionModal={(corp) => setProvisioningCorp(corp)}
+        onRequestArchive={
+          onSave
+            ? (corp) => {
+                setEditingCorp(null);
+                setIsNewCorp(false);
+                setPendingArchiveCorp(corp);
+              }
+            : undefined
+        }
       />
 
       <CorporatePortalManagersModal

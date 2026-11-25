@@ -81,6 +81,17 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
+    if (lookupDoc.isArchived === true) {
+      return Response.json(
+        {
+          verified: false,
+          poStatus: 'archived',
+          error: 'This corporate billing account has been archived. Please contact dispatch.',
+        },
+        { status: 403 }
+      );
+    }
+
     if (lookupDoc.isActive === false) {
       return Response.json(
         {
