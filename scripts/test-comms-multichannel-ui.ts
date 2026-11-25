@@ -746,7 +746,7 @@ async function runVerification() {
     'app/core/services/comms/comms-thread.service.ts',
     'app/core/services/comms/index.ts',
     'app/components/domain/dispatch/CommsHub.tsx',
-    'app/components/domain/dispatch/comms/CommsCrmContextBanner.tsx',
+    'app/components/domain/dispatch/comms/CommsComposerBar.tsx',
     'app/components/domain/dispatch/comms/CommsFilterToolbar.tsx',
     'app/components/domain/dispatch/comms/SmsThreadPane.tsx',
     'app/components/domain/dispatch/comms/SoftphoneDialerPane.tsx',

@@ -424,6 +424,7 @@ export function useTwilioSoftphoneDevice({
         timestampMs: Date.now(),
         durationSeconds: 0,
         audioDuration: '0:00',
+        callSid: call.parameters?.CallSid || undefined,
         snippet: `Inbound Call Answered (${displayNum})`,
         isUnread: false,
       },
@@ -480,12 +481,8 @@ export function useTwilioSoftphoneDevice({
     const displayNum = phoneValidation.isValid ? formatDisplayPhone(phoneValidation.e164) : num;
     const callerDisplayName = contactName || displayNum;
     const creds = getClientTelephonyCredentials();
-    const hasWebRtcCreds = Boolean(
-      creds.accountSid && creds.apiKeySid && creds.apiKeySecret && creds.twimlAppSid
-    );
-
     let activeDevice = deviceRef.current && softphoneStatus === 'ready' ? deviceRef.current : null;
-    if (!activeDevice && hasWebRtcCreds && softphoneStatus !== 'error') {
+    if (!activeDevice && softphoneStatus !== 'error') {
       activeDevice = await ensureWebRtcDevice();
     }
 
@@ -495,8 +492,7 @@ export function useTwilioSoftphoneDevice({
       activeCallInteractionIdRef.current = callId;
 
       callStatusRef.current = 'calling';
-      callStatusRef.current = 'calling';
-    setCallStatus('calling');
+      setCallStatus('calling');
       setActiveCallContact(callerDisplayName);
       setActiveCallPhone(targetE164);
       setCallNotice({
@@ -553,7 +549,7 @@ export function useTwilioSoftphoneDevice({
               i.id === callId
                 ? {
                     ...i,
-                    recordingSid: twCallSid || undefined,
+                    callSid: twCallSid || undefined,
                     snippet: `Outbound Call Connected (${displayNum})`,
                   }
                 : i
@@ -672,7 +668,7 @@ export function useTwilioSoftphoneDevice({
             i.id === callId
               ? {
                   ...i,
-                  recordingSid: resData.callSid,
+                  callSid: resData.callSid || undefined,
                   snippet: `Outbound Call Connected (${displayNum})`,
                 }
               : i
@@ -769,16 +765,16 @@ export function useTwilioSoftphoneDevice({
       if (activeCallInteractionIdRef.current) {
         const activeId = activeCallInteractionIdRef.current;
         setInteractions((prev) =>
-          prev.map((i) =>
-            i.id === activeId
-              ? {
-                  ...i,
-                  durationSeconds: finalSecs,
-                  audioDuration: durationLabel,
-                  snippet: `Outbound Call (${durationLabel})`,
-                }
-              : i
-          )
+          prev.map((i) => {
+            if (i.id !== activeId) return i;
+            const callLabel = i.type === 'call_inbound' ? 'Inbound Call' : 'Outbound Call';
+            return {
+              ...i,
+              durationSeconds: finalSecs,
+              audioDuration: durationLabel,
+              snippet: `${callLabel} (${durationLabel})`,
+            };
+          })
         );
       }
 

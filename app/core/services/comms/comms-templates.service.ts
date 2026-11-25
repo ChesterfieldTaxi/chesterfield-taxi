@@ -7,7 +7,7 @@
  * - Config-driven `CANNED_DISPATCH_SMS_TEMPLATES` + `interpolateCommsSmsTemplate`
  *   with STL Terminal 1 Exit Door 6 / Terminal 2 Exit Door 12 / SUS FBO curbside
  *   intelligence (`resolveStlTerminalInfo`) and zero leftover `{...}` placeholders.
- * - Pure `resolveCommsCrmContext` powering `CommsCrmContextBanner` across
+ * - Pure `resolveCommsCrmContext` powering live CRM context across
  *   `SmsThreadPane` and `SoftphoneDialerPane` (live dialpad + active/ringing calls).
  * - Pure multi-channel thread list grouping & `All` tab filtering across
  *   `Calls + SMS + Voicemails + Emails + Internal Notes`.

@@ -16,7 +16,7 @@ export type SoftphoneStatus =
   | 'connecting'
   | 'on_call'
   | 'error';
-export type ThreadTab = 'all' | 'sms' | 'calls' | 'emails' | 'notes';
+export type ThreadTab = 'all' | 'sms' | 'calls' | 'emails' | 'trips' | 'notes';
 export type PlaybackSpeed = 1 | 1.5 | 2;
 
 export interface CallNotice {

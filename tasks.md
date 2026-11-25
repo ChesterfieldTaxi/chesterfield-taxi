@@ -1200,3 +1200,21 @@
   - [x] 72.4.1 Convert `DispatchBookingConflictGuard`, `DispatchCompleteTripModal`, `DispatchDriverFareModal`, `DispatchTripQueueSheets`, `DispatchDriverSheets`, `StagedDriverConflictModal`, `NewSmsMessageModal`, `CommsRowActionSheet` / `VoicemailCallLogPane`, `AgentPhoneSetupModal`, `EmailMessageListPane`, and `dispatch.tsx` lazy fallback to non-blocking `FloatingWindow` / non-blocking UI.
 - [x] 72.5 Verification & Build Gate (`scripts/test-floating-call-pill-and-nonblocking-windows-phase72.ts < 360`L):
   - [x] 72.5.1 Create `scripts/test-floating-call-pill-and-nonblocking-windows-phase72.ts` (`< 360`L) and pass `npm run typecheck`, Phases 69–72 suites, and `npm run build` with exit code `0`, leaving Phase 72 uncommitted in the working tree for review.
+
+## Phase 73 (Wave 6 Phase 8): Clean-Slate Dispatch Comms Dock v2 Rebuild
+- [x] 73.0 Baseline Commit & Spec-Driven Documentation:
+  - [x] 73.0.1 Stage and commit verified Phase 72 baseline on `main` (`feat(phase-72): add draggable FloatingCallPill, unify ClientProfileWindow with Edit Profile tab, deduplicate end-call events, and complete non-blocking FloatingWindow sweep`).
+  - [x] 73.0.2 Document Platform Phase 73 (Wave 6.8) deliverables and verification gates in `spec.md`, `plan.md`, and `tasks.md`.
+- [x] 73.1 Retire Legacy Comms Bloat & Harden Softphone + Pure Timeline Utilities:
+  - [x] 73.1.1 Delete `CommsCrmContextBanner.tsx`, `CommsRowActionSheet.tsx`, and `CommsBatchActionBar.tsx`, extract `CommsModals.tsx` (`< 220`L) with re-exports from `SoftphoneDialerPane.tsx` & `SmsThreadPane.tsx`, and update file references in `test-floating-call-pill-and-nonblocking-windows-phase72.ts` & `test-comms-multichannel-ui.ts`.
+  - [x] 73.1.2 Fix `useTwilioSoftphoneDevice.ts` (`handleStartCall` WebRTC check without `apiKeySecret`, `callSid` vs `recordingSid` separation, and `handleEndCall` inbound/outbound snippet preservation).
+  - [x] 73.1.3 Expand `ThreadTab` with `'trips'` in `comms-types.ts`, create pure `comms-timeline.util.ts` (`< 220`L: `hasPlayableCallAudio`, `cleanCommsEmailSnippet`, `buildReturnTripDraftPayload`, `buildOmnichannelTimelineItems`), and streamline `useCommsMessagingAndContacts.ts` (`< 360`L).
+- [x] 73.2 Rebuild 2-Row `CommsHub.tsx` (`< 340`L) & `CommsFilterToolbar.tsx` (`< 240`L):
+  - [x] 73.2.1 Rebuild `CommsFilterToolbar.tsx` (`< 240`L) with `h-7` `/` search input and portaled `Filter ▾` (`z-[260]`, Channel, Contact, `Unread Only` `<Switch />`, `Mark All Read`, `Refresh`).
+  - [x] 73.2.2 Rebuild `CommsHub.tsx` (`< 340`L) with Row 1 `h-10` header (`Phone & SMS`, WebRTC status pill, `+ New`, 4-segment `All | Calls | SMS | VM`) and Row 2 `h-9` list-only toolbar, preserving `CommsHubProps`, `'Client Profile'`, and `'flex-1 min-h-0 flex flex-col min-w-0 overflow-hidden'`.
+- [x] 73.3 Rebuild `SmsThreadPane.tsx` (`< 360`L), `CommsComposerBar.tsx` (`< 240`L), `VoicemailCallLogPane.tsx` (`< 320`L) & `SoftphoneDialerPane.tsx` (`< 320`L):
+  - [x] 73.3.1 Create `CommsComposerBar.tsx` (`< 240`L) with `[SMS | Note]` toggle (`voiceOnlyMode` `Note` default + `"Voice-Only"` badge), 1-row input, portaled `Templates ▾`, and `[Send]`.
+  - [x] 73.3.2 Rebuild `SmsThreadPane.tsx` (`< 360`L) with ~`52px` thread list rows, 1-bar `h-10` sticky thread header + portaled `Filter ▾`, 1-line `pinnedUpcomingTrip` pill, interleaved chronological Trip Cards (`[Edit]` + `[⇄ Return]`), `hasPlayableCallAudio`-gated 1-row call logs, and `cleanCommsEmailSnippet` email cards.
+  - [x] 73.3.3 Rebuild `VoicemailCallLogPane.tsx` (`< 320`L) and `SoftphoneDialerPane.tsx` (`< 320`L) with 1-row call history (`hasPlayableCallAudio` gated), voicemail transcript/player cards, and compact dialpad + live caller chip (`[Book]` / `[Client Profile]`).
+- [x] 73.4 Verification Suite (`scripts/test-comms-dock-v2-rebuild-phase73.ts < 360`L) & Build Gate:
+  - [x] 73.4.1 Create `scripts/test-comms-dock-v2-rebuild-phase73.ts` (`< 360`L) and pass `npm run typecheck`, `test-comms-multichannel-ui.ts`, Phases 69–73 suites, and `npm run build` with `0` errors.

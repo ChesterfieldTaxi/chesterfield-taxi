@@ -166,7 +166,7 @@ export interface WorkspaceEventMap {
     threadId?: string;
     phone?: string;
     email?: string;
-    tab?: 'all' | 'sms' | 'calls' | 'emails' | 'notes';
+    tab?: 'all' | 'sms' | 'calls' | 'emails' | 'trips' | 'notes';
   };
   OPEN_EMAIL_MESSAGE: {
     emailMessageId?: string;

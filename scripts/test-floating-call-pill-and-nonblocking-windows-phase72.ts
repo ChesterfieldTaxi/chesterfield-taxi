@@ -215,7 +215,7 @@ function testNonBlockingFloatingWindowsSweep(): void {
     'app/components/domain/dispatch/DispatchDriverRosterPane.tsx',
     'app/components/domain/dispatch/StagedDriverConflictModal.tsx',
     'app/components/domain/dispatch/comms/VoicemailCallLogPane.tsx',
-    'app/components/domain/dispatch/comms/CommsRowActionSheet.tsx',
+    'app/components/domain/dispatch/comms/CommsModals.tsx',
     'app/components/domain/dispatch/comms/SoftphoneDialerPane.tsx',
     'app/components/domain/dispatch/comms/SmsThreadPane.tsx',
     'app/components/domain/dispatch/email/EmailMessageListPane.tsx',
