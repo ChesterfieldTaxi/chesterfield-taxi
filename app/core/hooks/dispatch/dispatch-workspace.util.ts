@@ -467,10 +467,16 @@ export function matchesQueueStatusFilter(
       return selectedSet.has('late');
     }
     const normalizedObjStatus = String(tripOrStatus.status || '').trim().toLowerCase();
-    return selectedSet.has(normalizedObjStatus as CanonicalQueueStatusKey);
+    return (
+      selectedSet.has(normalizedObjStatus as CanonicalQueueStatusKey) ||
+      (normalizedObjStatus === 'pending' && selectedSet.has('confirmed'))
+    );
   }
   const normalizedTripStatus = String(tripOrStatus || '').trim().toLowerCase();
-  return selectedSet.has(normalizedTripStatus as CanonicalQueueStatusKey);
+  return (
+    selectedSet.has(normalizedTripStatus as CanonicalQueueStatusKey) ||
+    (normalizedTripStatus === 'pending' && selectedSet.has('confirmed'))
+  );
 }
 
 export function isUnconfirmedQuickFilterActive(statusFilter: string): boolean {

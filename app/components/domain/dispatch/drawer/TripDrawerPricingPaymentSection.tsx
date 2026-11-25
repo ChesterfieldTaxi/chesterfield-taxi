@@ -74,14 +74,15 @@ export function TripDrawerPricingPaymentSection({
           <span className="text-[11px] text-slate-500 font-medium">
             Current:{' '}
             <strong className="text-slate-900 capitalize">
-              {reviewTrip.status.replace(/_/g, ' ')}
+              {reviewTrip.status.toLowerCase() === 'pending'
+                ? 'Confirmed'
+                : reviewTrip.status.replace(/_/g, ' ')}
             </strong>
           </span>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {(
             [
-              { status: 'pending', label: 'Pending' },
               { status: 'confirmed', label: 'Confirmed' },
               { status: 'assigned', label: 'Assigned' },
               { status: 'en_route', label: 'En Route' },
@@ -89,7 +90,9 @@ export function TripDrawerPricingPaymentSection({
               { status: 'in_progress', label: 'In Progress' },
             ] as { status: TripStatus; label: string }[]
           ).map((step) => {
-            const isCurrent = reviewTrip.status.toLowerCase() === step.status;
+            const normCur = reviewTrip.status.toLowerCase();
+            const isCurrent =
+              normCur === step.status || (step.status === 'confirmed' && normCur === 'pending');
             return (
               <button
                 key={step.status}

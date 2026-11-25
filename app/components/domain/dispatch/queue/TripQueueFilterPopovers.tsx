@@ -26,7 +26,6 @@ export const STATUS_FILTER_OPTIONS: ReadonlyArray<{
 }> = [
   { key: 'late', label: 'Late', dotClass: 'bg-rose-600' },
   { key: 'confirmed', label: 'Confirmed', dotClass: 'bg-emerald-500' },
-  { key: 'pending', label: 'Pending', dotClass: 'bg-yellow-500' },
   { key: 'offered', label: 'Offered', dotClass: 'bg-sky-500' },
   { key: 'assigned', label: 'Assigned', dotClass: 'bg-blue-600' },
   { key: 'accepted', label: 'Accepted', dotClass: 'bg-purple-500' },

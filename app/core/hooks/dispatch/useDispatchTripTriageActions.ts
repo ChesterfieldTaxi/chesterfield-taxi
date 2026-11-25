@@ -250,7 +250,7 @@ export function useDispatchTripTriageActions({
 
       const nextStatus: TripStatus = isUnassigning
         ? tripToUpdate.status === 'assigned'
-          ? 'pending'
+          ? 'CONFIRMED'
           : tripToUpdate.status
         : ['pending', 'unconfirmed', 'UNCONFIRMED', 'CONFIRMED', 'confirmed'].includes(
             tripToUpdate.status

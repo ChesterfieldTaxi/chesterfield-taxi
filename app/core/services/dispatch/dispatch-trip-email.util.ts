@@ -17,7 +17,7 @@ export function getContextualEmailMeta(status?: string): {
   if (norm === 'cancelled' || norm === 'declined') {
     return { label: 'Send Cancellation Notice', shortLabel: 'Cancel Notice', kind: 'status' };
   }
-  return { label: 'Send Confirmation Email', shortLabel: 'Send Confirmation', kind: 'confirmation' };
+  return { label: 'Resend Confirmation Email', shortLabel: 'Resend Confirmation', kind: 'confirmation' };
 }
 
 export async function sendDispatchContextualTripEmail(params: {
