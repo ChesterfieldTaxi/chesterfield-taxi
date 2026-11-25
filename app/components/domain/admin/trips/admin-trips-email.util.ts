@@ -36,6 +36,7 @@ export async function notifyAdminTripStatusEmail(params: {
     if (newStatus === 'CONFIRMED' || newStatus === 'confirmed') {
       sendResult = await emailService.sendBookingConfirmation({
         tripId: currentTrip.id,
+        customerId: currentTrip.customerId ?? null,
         trackingToken: currentTrip.trackingToken,
         status: 'CONFIRMED',
         passenger: {
@@ -86,6 +87,7 @@ export async function notifyAdminTripStatusEmail(params: {
     } else {
       sendResult = await emailService.sendStatusUpdateNotification({
         tripId: currentTrip.id,
+        customerId: currentTrip.customerId ?? null,
         trackingToken: currentTrip.trackingToken,
         passenger: {
           firstName: currentTrip.passenger?.firstName || 'Valued',

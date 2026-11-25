@@ -1241,3 +1241,21 @@
   - [x] 74.2.3 Propagate `clientPreferredDriverIds` & `clientExcludedDriverIds` onto `Trip.metadata` in `useDispatchBookingSubmission.ts` and enforce `'EXCLUDED_BY_CLIENT'` + `preferredDriverRank` in `evaluateAutoDispatchCandidates` (`auto-dispatch-ranking.ts`).
 - [x] 74.3 Verification Suite (`scripts/test-call-hud-and-driver-prefs-phase74.ts < 360`L) & Build Gate:
   - [x] 74.3.1 Create `scripts/test-call-hud-and-driver-prefs-phase74.ts` (`< 360`L), mark all Phase 74 tasks `[x]`, and pass `npm run typecheck`, Phases 69–74 suites, and `npm run build`.
+
+## Phase 75 (User Phase 76): Zero-Flash Call HUD Keypad Sync, Upgraded Complete Trip Modal, Locked-Height Hero Fare Slot, Platform-Wide Rounding Elimination & Guest-to-User Conversion Loop
+- [x] 75.0 Baseline Commit & Spec-Driven Documentation:
+  - [x] 75.0.1 Stage and commit verified Phase 74 baseline on `main` (`feat(phase-74): simplify Call HUD flydown, rename SMS to Messages, add Keypad FAB, and add client preferred/excluded drivers`).
+  - [x] 75.0.2 Document Platform Phase 75 scope, architecture, and verification tasks in `spec.md`, `plan.md`, and `tasks.md`.
+- [x] 75.1 Call HUD Frame-1 Keypad Sync & Complete Trip Modal Upgrade:
+  - [x] 75.1.1 Cache `SOFTPHONE_VIEW_STATE_CHANGED` in `workspace-bus.service.ts` (`getLatestSoftphoneViewState` + reset helper), sync `onTabChange?.(activeTab)` in `CommsHub.tsx`, and prefer `liveCommsTab` / `liveCallsSubTab` when `hasLiveBusState` is `true` in `DispatchHeaderCallHud.tsx`.
+  - [x] 75.1.2 Upgrade `DispatchCompleteTripModal.tsx` (`< 435`L, `hasBackdrop={false}`) with searchable Completing Driver `<Select />` + `ModernDatePicker`/`ModernTimePicker` (`data-complete-trip-datetime="true"`, `Now` & `Scheduled Dropoff` chips) and wire `AdminTripsSubpage.tsx` `onCompleteTrip` to open it.
+- [x] 75.2 Landing Page Hero Locked-Height Estimated Fare Slot (`app/routes/_index.tsx`):
+  - [x] 75.2.1 Remove `showBreakdown` toggle/list and mount locked-height `h-[68px]` `data-hero-fare-slot="true"` across Idle, Calculating, and Quoted states (`0px` shift).
+- [x] 75.3 Platform-Wide `Rounding` Elimination (`fare-breakdown.util.ts < 120`L & All Producers/Renderers):
+  - [x] 75.3.1 Create pure `app/core/utils/fare-breakdown.util.ts` (`< 120`L) exporting `reconcileBreakdownWithoutRounding` and fold `roundingAdj` directly into `'base'` in `rules.ts`, `multi-car.util.ts`, and `booking-form.utils.ts`.
+  - [x] 75.3.2 Wire `reconcileBreakdownWithoutRounding` across `PriceBreakdownPanel.tsx`, `email-templates.ts`, `pay-token.util.ts`, `DriverTripManifest.tsx`, and `PersistentFareSimulator.tsx`.
+- [x] 75.4 Guest-to-User Conversion Loop (`guest-trip-claim.util.ts < 120`L, `GuestAccountActivationCard.tsx < 230`L, Auth & Emails):
+  - [x] 75.4.1 Create `app/core/utils/guest-trip-claim.util.ts` (`< 120`L), replace `.toUpperCase()` claiming in `app.register.tsx` & `app.login.tsx`, and extend `registerWithEmail` in `admin-auth.service.ts`.
+  - [x] 75.4.2 Create `GuestAccountActivationCard.tsx` (`< 230`L) near the top of `BookingConfirmation.tsx` (replacing bottom CTA box) and wire `customerId` + `shouldRenderGuestSignupCta` across booking request, confirmation, non-cancelled/declined status update, and receipt emails.
+- [x] 75.5 Verification Suite (`scripts/test-hero-quote-rounding-and-guest-claim-phase75.ts < 350`L) & Build Gate:
+  - [x] 75.5.1 Create `scripts/test-hero-quote-rounding-and-guest-claim-phase75.ts` (`< 350`L) and verify `test-call-hud-and-driver-prefs-phase74.ts`, `test-pricing-audit-trail.ts`, `npm run typecheck`, and `npm run build` exit `0`.

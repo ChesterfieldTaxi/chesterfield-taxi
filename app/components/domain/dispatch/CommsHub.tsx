@@ -57,6 +57,10 @@ function CommsHubComponent({
     }
   }, [initialTab]);
 
+  useEffect(() => {
+    onTabChange?.(activeTab);
+  }, [activeTab]);
+
   const handleSelectTab = (tab: CommsTab) => {
     setActiveTab(tab);
     if (tab === 'phone' && softphone.callStatus === 'idle') softphone.setCallsSubTab('history');

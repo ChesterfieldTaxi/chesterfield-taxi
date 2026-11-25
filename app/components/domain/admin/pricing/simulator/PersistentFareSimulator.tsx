@@ -12,6 +12,7 @@ import {
   PlaneLandingIcon,
 } from '~/components/ui/Icons';
 import { calculateTripPricing } from '~/core/services/pricing/pipeline';
+import { reconcileBreakdownWithoutRounding } from '~/core/utils/fare-breakdown.util';
 import { getAdminConfigService } from '~/core/services/config/admin-config.service';
 import { getZoneService, DEFAULT_ZONES } from '~/core/services/zones/zone.service';
 import type { PricingConfig, PricingInput } from '~/core/services/pricing/types';
@@ -273,7 +274,9 @@ export function PersistentFareSimulator({
 
   const pricing = calculationResult?.pricing;
   const ctx = calculationResult?.context;
-  const breakdownItems = pricing?.breakdown || [];
+  const breakdownItems = pricing
+    ? reconcileBreakdownWithoutRounding(pricing.breakdown, pricing.totalFare, pricing)
+    : [];
 
   return (
     <div className={`flex flex-col h-full bg-white lg:border-l border-slate-200 text-slate-900 ${className}`}>

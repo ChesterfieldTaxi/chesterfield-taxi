@@ -157,12 +157,10 @@ export default function IndexRoute() {
   const [timing, setTiming] = useState<'later' | 'asap'>('later');
   const [quickQuote, setQuickQuote] = useState<QuoteResponse | null>(null);
   const [isQuoting, setIsQuoting] = useState(false);
-  const [showBreakdown, setShowBreakdown] = useState(false);
 
   useEffect(() => {
     if (!pickupAddress.trim() || !dropoffAddress.trim()) {
       setQuickQuote(null);
-      setShowBreakdown(false);
       return;
     }
 
@@ -404,87 +402,61 @@ export default function IndexRoute() {
                     </div>
                   </div>
 
-                  {/* Live Estimated Fare Preview */}
-                  {(isQuoting || quickQuote) && (
-                    <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/90 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 block">
-                            Estimated Fare (Sedan / Any)
+                  {/* Locked-Height Live Estimated Fare Slot (0px layout shift across Idle / Calculating / Quoted) */}
+                  <div
+                    data-hero-fare-slot="true"
+                    data-hero-fare-state={isQuoting ? 'calculating' : quickQuote ? 'quoted' : 'idle'}
+                    className={`h-[68px] min-h-[68px] max-h-[68px] overflow-hidden flex items-center justify-between gap-3 px-3.5 rounded-xl border transition-colors ${
+                      !isQuoting && !quickQuote
+                        ? 'bg-slate-50 border-slate-200/90'
+                        : 'bg-blue-50/70 border-blue-200/90'
+                    }`}
+                  >
+                    {!isQuoting && !quickQuote ? (
+                      <>
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block truncate">
+                            ESTIMATED FARE
                           </span>
-                          {quickQuote && (
-                            <span className="text-[11px] text-slate-600 font-medium">
-                              {quickQuote.pricing.distanceMiles.toFixed(1)} mi &bull; ~{quickQuote.pricing.durationMinutes} min
-                            </span>
-                          )}
+                          <span className="text-[11px] text-slate-500 font-medium block truncate">
+                            Enter pickup &amp; dropoff above
+                          </span>
                         </div>
-                        <div className="text-right">
-                          {isQuoting ? (
-                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700">
-                              <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
-                              Calculating...
-                            </span>
-                          ) : estimatedTotal !== null ? (
-                            <span className="text-2xl font-mono font-black text-slate-950">
-                              ${estimatedTotal.toFixed(2)}
-                            </span>
-                          ) : null}
+                        <span className="font-mono font-bold text-slate-300 text-xl shrink-0">
+                          $—
+                        </span>
+                      </>
+                    ) : isQuoting ? (
+                      <>
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 block truncate">
+                            ESTIMATED FARE (SEDAN / ANY)
+                          </span>
+                          <span className="text-[11px] text-slate-600 font-medium block truncate">
+                            Calculating optimal route...
+                          </span>
                         </div>
-                      </div>
-
-                      {quickQuote && !isQuoting && (
-                        <>
-                          <div className="flex items-center justify-between pt-1.5 border-t border-blue-200/60">
-                            <span className="text-[10px] text-slate-500">
-                              Final fare confirmed by dispatch
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setShowBreakdown((prev) => !prev)}
-                              className="text-[11px] font-bold text-blue-700 hover:text-blue-900 underline cursor-pointer"
-                            >
-                              {showBreakdown ? 'Hide Breakdown ▲' : 'Price Breakdown ▾'}
-                            </button>
-                          </div>
-
-                          {showBreakdown && (
-                            <div className="pt-2 border-t border-blue-200/60 space-y-1 text-[11px] text-slate-700">
-                              {(quickQuote.pricing.breakdown && quickQuote.pricing.breakdown.length > 0
-                                ? quickQuote.pricing.breakdown
-                                : [
-                                    {
-                                      id: 'base-fare',
-                                      category: 'base' as const,
-                                      label: 'Base Fare',
-                                      amount: quickQuote.pricing.subtotal || quickQuote.pricing.baseFare,
-                                    },
-                                  ]
-                              ).map((item) => {
-                                const isDiscount = item.category === 'discount' || item.amount < 0;
-                                return (
-                                  <div
-                                    key={item.id}
-                                    className={`flex justify-between ${isDiscount ? 'text-emerald-700 font-semibold' : ''}`}
-                                  >
-                                    <span>{item.category === 'base' ? 'Base Fare' : item.label}</span>
-                                    <span className="font-mono font-semibold">
-                                      {isDiscount
-                                        ? `-$${Math.abs(item.amount).toFixed(2)}`
-                                        : `$${item.amount.toFixed(2)}`}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                              <div className="flex justify-between pt-1 border-t border-blue-200/70 font-bold text-slate-900">
-                                <span>Estimated Total</span>
-                                <span className="font-mono">${estimatedTotal?.toFixed(2)}</span>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 shrink-0">
+                          <SpinnerIcon className="w-3.5 h-3.5 animate-spin shrink-0" />
+                          <span>Calculating...</span>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 block truncate">
+                            ESTIMATED FARE (SEDAN / ANY)
+                          </span>
+                          <span className="text-[11px] text-slate-600 font-medium block truncate">
+                            {quickQuote!.pricing.distanceMiles.toFixed(1)} mi &bull; ~{quickQuote!.pricing.durationMinutes} min &bull; Confirmed by dispatch
+                          </span>
+                        </div>
+                        <span className="text-2xl font-mono font-black text-slate-950 shrink-0 tabular-nums">
+                          ${(estimatedTotal ?? 0).toFixed(2)}
+                        </span>
+                      </>
+                    )}
+                  </div>
 
                   <div className="pt-1">
                     <button

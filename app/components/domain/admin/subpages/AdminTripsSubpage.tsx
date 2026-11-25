@@ -7,6 +7,7 @@ import { Select } from '../../../ui/Select';
 import { Alert } from '../../../ui/Alert';
 import { DownloadIcon, SearchIcon, SpinnerIcon } from '../../../ui/Icons';
 import { TripAuditModal } from '../TripAuditModal';
+import { DispatchCompleteTripModal } from '../../dispatch/drawer/DispatchCompleteTripModal';
 import { AdminTripsTablePanel } from '../trips/AdminTripsTablePanel';
 import { AdminTripsExceptionsPanel } from '../trips/AdminTripsExceptionsPanel';
 import { AdminTripDetailsSlideOver } from '../trips/AdminTripDetailsSlideOver';
@@ -164,7 +165,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                 ctrl.setSelectedTrip(trip);
               }}
               onResolveGuestChangeRequest={ctrl.handleResolveGuestChangeRequest}
-              onCompleteTrip={(t) => ctrl.handleStatusTransition(t.id, 'completed')}
+              onCompleteTrip={(t) => ctrl.openCompleteTripModal(t)}
               onCancelTrip={(t) =>
                 ctrl.handleStatusTransition(t.id, 'cancelled', {
                   reason: 'Admin cancelled from console',
@@ -199,7 +200,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                 ctrl.setSelectedTrip(trip);
               }}
               onConfirmTrip={(t) => ctrl.handleStatusTransition(t.id, 'CONFIRMED')}
-              onCompleteTrip={(t) => ctrl.handleStatusTransition(t.id, 'completed')}
+              onCompleteTrip={(t) => ctrl.openCompleteTripModal(t)}
               onCancelTrip={(t) =>
                 ctrl.handleStatusTransition(t.id, 'cancelled', {
                   reason: 'Admin cancelled from console',
@@ -227,7 +228,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
         onClearStaged={ctrl.handleClearStaged}
         onResolveGuestChangeRequest={ctrl.handleResolveGuestChangeRequest}
         onConfirmTrip={(t) => ctrl.handleStatusTransition(t.id, 'CONFIRMED')}
-        onCompleteTrip={(t) => ctrl.handleStatusTransition(t.id, 'completed')}
+        onCompleteTrip={(t) => ctrl.openCompleteTripModal(t)}
         onCancelTrip={(t) =>
           ctrl.handleStatusTransition(t.id, 'cancelled', {
             reason: 'Admin cancelled from console',
@@ -235,6 +236,21 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
         }
         onAuditTrip={ctrl.setAuditModalTrip}
         onToggleArchive={ctrl.handleToggleArchiveTrip}
+      />
+
+      <DispatchCompleteTripModal
+        user={ctrl.currentUser}
+        settings={ctrl.appSettings}
+        drivers={ctrl.drivers}
+        completeTripTarget={ctrl.completeTripTarget}
+        completeModalOpenSeq={ctrl.completeModalOpenSeq}
+        onTripsChange={ctrl.setTrips}
+        onReviewTripChange={ctrl.setSelectedTrip}
+        onCloseCompleteTripModal={ctrl.closeCompleteTripModal}
+        onShowToast={(text, type) => {
+          if (type === 'error') ctrl.setError(text);
+          else ctrl.showSuccess(text);
+        }}
       />
 
       {ctrl.auditModalTrip && (

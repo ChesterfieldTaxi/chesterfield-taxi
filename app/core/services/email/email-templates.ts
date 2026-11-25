@@ -12,6 +12,8 @@
 
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import type { PriceLineItem } from '../../types';
+import { reconcileBreakdownWithoutRounding } from '../../utils/fare-breakdown.util';
+import { buildGuestAccountSignupHref } from '../../utils/guest-trip-claim.util';
 import { formatVehicleTier, formatVehicleTierDisplay } from '../../utils/vehicle-tier-format.util';
 import type {
   BookingConfirmationEmailPayload,
@@ -284,30 +286,75 @@ function renderFlightSummaryBox(
 }
 
 /**
- * Renders the canonical Admin Tariff price breakdown (Base Fare + Extras + Surcharges + Discounts + Rounding)
- * as clean inline-CSS HTML rows for email clients.
+ * Determines whether a transactional rider email should display the Guest-to-User Account Signup CTA.
+ * Hidden when `customerId` is already linked or when the trip status is `cancelled` / `declined`.
  */
-function renderPriceBreakdownHtml(breakdown?: PriceLineItem[], tariffProfileName?: string): string {
+export function shouldRenderGuestSignupCta(
+  input?: {
+    customerId?: string | null;
+    status?: string | null;
+    newStatus?: string | null;
+    tripId?: string | null;
+  } | null
+): boolean {
+  if (!input || !String(input.tripId || '').trim()) return false;
+  if (typeof input.customerId === 'string' && input.customerId.trim().length > 0) {
+    return false;
+  }
+  const rawStatus = String(input.newStatus ?? input.status ?? '')
+    .trim()
+    .toLowerCase();
+  if (rawStatus === 'cancelled' || rawStatus === 'declined') {
+    return false;
+  }
+  return true;
+}
+
+function renderGuestSignupCtaHtml(registerUrl: string): string {
+  return `
+    <!-- Client Portal Account CTA -->
+    <div data-guest-signup-cta="true" style="background-color: #0f172a; border-radius: 14px; padding: 22px 20px; margin: 20px 0 18px 0; text-align: center; color: #ffffff;">
+      <div style="font-size: 10px; font-weight: 800; color: #60a5fa; text-transform: uppercase; letter-spacing: 0.1em;">
+        Client Portal
+      </div>
+      <div style="font-size: 16px; font-weight: 800; color: #ffffff; margin-top: 6px; letter-spacing: -0.01em;">
+        Save this ride &amp; rebook in seconds
+      </div>
+      <div style="font-size: 13px; color: #cbd5e1; line-height: 1.5; margin: 6px auto 16px auto; max-width: 420px;">
+        Create a free account to link this trip to your ride history, save favorite addresses, and access instant receipts.
+      </div>
+      <a href="${escapeHtml(registerUrl)}" style="display: inline-block; background-color: #2563eb; color: #ffffff; font-size: 13px; font-weight: 700; text-decoration: none; padding: 10px 22px; border-radius: 10px;">
+        Create Free Account &rarr;
+      </a>
+    </div>
+  `;
+}
+
+function renderGuestSignupCtaText(registerUrl: string): string {
+  return `\nCLIENT PORTAL ACCOUNT:\nSave this ride & rebook in seconds: ${registerUrl}\n`;
+}
+
+/**
+ * Renders the canonical Admin Tariff price breakdown (Base Fare + Extras + Surcharges + Discounts,
+ * with any rounding folded silently into Base Fare) as clean inline-CSS HTML rows for email clients.
+ */
+function renderPriceBreakdownHtml(
+  breakdown?: PriceLineItem[],
+  tariffProfileName?: string,
+  targetTotalFare?: number
+): string {
   if (!breakdown || breakdown.length === 0) return '';
-  const baseLine = breakdown.find((i) => i.category === 'base');
-  const extras = breakdown.filter((i) => i.category === 'extra' && i.amount !== 0);
-  const surcharges = breakdown.filter((i) => i.category === 'surcharge' && i.amount !== 0);
-  const discounts = breakdown.filter((i) => i.category === 'discount' && i.amount !== 0);
-  const rounding = breakdown.filter((i) => i.category === 'rounding' && i.amount !== 0);
-  const ordered = [
-    ...(baseLine ? [{ ...baseLine, label: 'Base Fare' }] : []),
-    ...extras,
-    ...surcharges,
-    ...discounts,
-    ...rounding,
-  ];
+  const ordered = reconcileBreakdownWithoutRounding(breakdown, targetTotalFare);
   if (ordered.length === 0) return '';
 
   const rowsHtml = ordered
     .map((item) => {
-      const isDiscount = item.category === 'discount' || item.amount < 0;
-      const color = isDiscount ? '#047857' : '#475569';
-      const formattedAmt = isDiscount
+      const isWaived = Boolean(item.isWaived);
+      const isDiscount = !isWaived && (item.category === 'discount' || item.amount < 0);
+      const color = isDiscount || isWaived ? '#047857' : '#475569';
+      const formattedAmt = isWaived
+        ? '$0.00'
+        : isDiscount
         ? `-$${Math.abs(item.amount).toFixed(2)}`
         : `$${item.amount.toFixed(2)}`;
       return `
@@ -318,7 +365,7 @@ function renderPriceBreakdownHtml(breakdown?: PriceLineItem[], tariffProfileName
             ${escapeHtml(item.label)}
           </td>
           <td align="right" style="padding: 4px 0; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: ${
-        isDiscount ? '#047857' : '#0f172a'
+        isDiscount || isWaived ? '#047857' : '#0f172a'
       };">
             ${formattedAmt}
           </td>
@@ -340,25 +387,22 @@ function renderPriceBreakdownHtml(breakdown?: PriceLineItem[], tariffProfileName
   `;
 }
 
-function renderPriceBreakdownText(breakdown?: PriceLineItem[]): string {
+function renderPriceBreakdownText(
+  breakdown?: PriceLineItem[],
+  targetTotalFare?: number
+): string {
   if (!breakdown || breakdown.length === 0) return '';
-  const baseLine = breakdown.find((i) => i.category === 'base');
-  const ordered = [
-    ...(baseLine ? [{ ...baseLine, label: 'Base Fare' }] : []),
-    ...breakdown.filter((i) => i.category === 'extra' && i.amount !== 0),
-    ...breakdown.filter((i) => i.category === 'surcharge' && i.amount !== 0),
-    ...breakdown.filter((i) => i.category === 'discount' && i.amount !== 0),
-    ...breakdown.filter((i) => i.category === 'rounding' && i.amount !== 0),
-  ];
+  const ordered = reconcileBreakdownWithoutRounding(breakdown, targetTotalFare);
   if (ordered.length === 0) return '';
   return (
     '\nFARE BREAKDOWN:\n' +
     ordered
       .map((item) => {
-        const amt =
-          item.amount < 0
-            ? `-$${Math.abs(item.amount).toFixed(2)}`
-            : `$${item.amount.toFixed(2)}`;
+        const amt = item.isWaived
+          ? '$0.00'
+          : item.amount < 0
+          ? `-$${Math.abs(item.amount).toFixed(2)}`
+          : `$${item.amount.toFixed(2)}`;
         return `- ${item.label}: ${amt}`;
       })
       .join('\n')
@@ -902,8 +946,22 @@ export function renderBookingRequestReceivedEmail(
           </td>
         </tr>
       </table>
-      ${renderPriceBreakdownHtml(payload.breakdown, payload.tariffProfileName)}
+      ${renderPriceBreakdownHtml(payload.breakdown, payload.tariffProfileName, payload.totalFare)}
     </div>
+
+    ${
+      shouldRenderGuestSignupCta(payload)
+        ? renderGuestSignupCtaHtml(
+            buildGuestAccountSignupHref({
+              baseUrl: getAppBaseUrl(),
+              tripIds: [payload.tripId, payload.returnTripDetails?.tripId],
+              email: payload.passenger.email,
+              name: `${payload.passenger.firstName} ${payload.passenger.lastName}`.trim(),
+              phone: payload.passenger.phone,
+            })
+          )
+        : ''
+    }
 
     <!-- Assistance Callout -->
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-top: 18px;">
@@ -987,8 +1045,20 @@ PAYMENT & FARE:
 - Payment Method: ${formatPaymentMethod(payload.paymentMethod)}
 - ${hasReturn ? 'Combined Fare' : 'Estimated Fare'}: $${totalCombinedFare.toFixed(2)} ${
     payload.currency
-  }${renderPriceBreakdownText(payload.breakdown)}
-
+  }${renderPriceBreakdownText(payload.breakdown, payload.totalFare)}
+${
+  shouldRenderGuestSignupCta(payload)
+    ? renderGuestSignupCtaText(
+        buildGuestAccountSignupHref({
+          baseUrl: getAppBaseUrl(),
+          tripIds: [payload.tripId, payload.returnTripDetails?.tripId],
+          email: payload.passenger.email,
+          name: `${payload.passenger.firstName} ${payload.passenger.lastName}`.trim(),
+          phone: payload.passenger.phone,
+        })
+      )
+    : ''
+}
 Questions or changes? Call 24/7 Dispatch at ${companyPhone}.
 ========================================
 (c) ${new Date().getFullYear()} ${companyName}
@@ -1029,13 +1099,14 @@ export function renderBookingConfirmedEmail(
     ? `Round-Trip Booking Confirmed: #${payload.tripId} & #${payload.returnTripDetails?.tripId} | ${companyName}`
     : `Booking Confirmed: #${payload.tripId} | ${companyName}`;
 
-  const registerUrl = `${getAppBaseUrl()}/app/register?email=${encodeURIComponent(
-    payload.passenger.email
-  )}&name=${encodeURIComponent(
-    `${payload.passenger.firstName} ${payload.passenger.lastName}`.trim()
-  )}&phone=${encodeURIComponent(payload.passenger.phone || '')}&claimTrip=${encodeURIComponent(
-    payload.tripId
-  )}`;
+  const registerUrl = buildGuestAccountSignupHref({
+    baseUrl: getAppBaseUrl(),
+    tripIds: [payload.tripId, payload.returnTripDetails?.tripId],
+    email: payload.passenger.email,
+    name: `${payload.passenger.firstName} ${payload.passenger.lastName}`.trim(),
+    phone: payload.passenger.phone,
+  });
+  const showGuestSignupCta = shouldRenderGuestSignupCta(payload);
 
   const html = renderEmailShell(
     `
@@ -1214,24 +1285,10 @@ export function renderBookingConfirmedEmail(
           </td>
         </tr>
       </table>
-      ${renderPriceBreakdownHtml(payload.breakdown, payload.tariffProfileName)}
+      ${renderPriceBreakdownHtml(payload.breakdown, payload.tariffProfileName, payload.totalFare)}
     </div>
 
-    <!-- Client Portal Account CTA -->
-    <div style="background-color: #0f172a; border-radius: 14px; padding: 22px 20px; margin: 22px 0 18px 0; text-align: center; color: #ffffff;">
-      <div style="font-size: 10px; font-weight: 800; color: #60a5fa; text-transform: uppercase; letter-spacing: 0.1em;">
-        Client Portal
-      </div>
-      <div style="font-size: 16px; font-weight: 800; color: #ffffff; margin-top: 6px; letter-spacing: -0.01em;">
-        Save time on your future rides
-      </div>
-      <div style="font-size: 13px; color: #cbd5e1; line-height: 1.5; margin: 6px auto 16px auto; max-width: 420px;">
-        Create a free account to track live driver arrivals, save frequent addresses, and rebook in seconds.
-      </div>
-      <a href="${escapeHtml(registerUrl)}" style="display: inline-block; background-color: #2563eb; color: #ffffff; font-size: 13px; font-weight: 700; text-decoration: none; padding: 10px 22px; border-radius: 10px;">
-        Create Free Account &rarr;
-      </a>
-    </div>
+    ${showGuestSignupCta ? renderGuestSignupCtaHtml(registerUrl) : ''}
 
     <!-- Assistance Callout -->
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px;">
@@ -1308,11 +1365,8 @@ PAYMENT & TOTAL:
 - Payment Method: ${formatPaymentMethod(payload.paymentMethod)}
 - ${hasReturn ? 'Combined Fare' : 'Quoted Total'}: $${totalCombinedFare.toFixed(2)} ${
     payload.currency
-  }${renderPriceBreakdownText(payload.breakdown)}
-
-CLIENT PORTAL ACCOUNT:
-Save time on future rides: ${registerUrl}
-
+  }${renderPriceBreakdownText(payload.breakdown, payload.totalFare)}
+${showGuestSignupCta ? renderGuestSignupCtaText(registerUrl) : ''}
 Need assistance or changes? Call 24/7 Dispatch at ${companyPhone}.
 ========================================
 (c) ${new Date().getFullYear()} ${companyName}
@@ -1484,7 +1538,7 @@ export function renderDispatcherAlertEmail(
           </td>
         </tr>
       </table>
-      ${renderPriceBreakdownHtml(payload.breakdown, payload.tariffProfileName)}
+      ${renderPriceBreakdownHtml(payload.breakdown, payload.tariffProfileName, payload.totalFare)}
     </div>
     `,
     `[ALERT] New Ride #${payload.tripId} (${payload.bookingType.toUpperCase()}) for ${payload.passengerName}. Pickup: ${payload.pickupAddress}`,
@@ -1527,7 +1581,8 @@ ${
 FARE:
 - Quoted Fare: $${payload.totalFare.toFixed(2)} ${payload.currency}
 - Payment: ${payload.paymentMethod ? formatPaymentMethod(payload.paymentMethod) : 'Standard'}${renderPriceBreakdownText(
-    payload.breakdown
+    payload.breakdown,
+    payload.totalFare
   )}
 ========================================
   `.trim();
@@ -1580,6 +1635,14 @@ export function renderStatusUpdateEmail(
     formatVehicleTier(payload.vehicleTier, undefined, payload.vehicleDisplayName)
   );
   const theme: EmailAccentTheme = isCancelled ? 'rose' : isCompleted ? 'emerald' : 'blue';
+  const showStatusGuestSignupCta = shouldRenderGuestSignupCta(payload);
+  const statusRegisterUrl = buildGuestAccountSignupHref({
+    baseUrl: getAppBaseUrl(),
+    tripIds: [payload.tripId],
+    email: payload.passenger.email,
+    name: `${payload.passenger.firstName} ${payload.passenger.lastName}`.trim(),
+    phone: payload.passenger.phone,
+  });
 
   const html = renderEmailShell(
     `
@@ -1681,6 +1744,8 @@ export function renderStatusUpdateEmail(
       </div>
     </div>
 
+    ${showStatusGuestSignupCta ? renderGuestSignupCtaHtml(statusRegisterUrl) : ''}
+
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px;">
       <div style="font-size: 13px; color: #475569; line-height: 1.5;">
         Questions about this update? Call 24/7 Dispatch at
@@ -1714,7 +1779,7 @@ Route:
 - Vehicle: ${formatVehicleTier(payload.vehicleTier, undefined, payload.vehicleDisplayName)}
 - Pickup: ${payload.pickupAddress} at ${payload.pickupTime}
 - Dropoff: ${payload.dropoffAddress}
-
+${showStatusGuestSignupCta ? renderGuestSignupCtaText(statusRegisterUrl) : ''}
 Need help? Call 24/7 Dispatch at ${companyPhone}.
 ========================================
 (c) ${new Date().getFullYear()} ${companyName}
@@ -1968,6 +2033,15 @@ export function renderTripReceiptEmail(
     ? payload.paymentStatus.replace(/_/g, ' ').toUpperCase()
     : 'PAID';
 
+  const showReceiptGuestSignupCta = shouldRenderGuestSignupCta(payload);
+  const receiptRegisterUrl = buildGuestAccountSignupHref({
+    baseUrl: getAppBaseUrl(),
+    tripIds: [payload.tripId],
+    email: payload.passenger.email,
+    name: `${payload.passenger.firstName} ${payload.passenger.lastName}`.trim(),
+    phone: payload.passenger.phone,
+  });
+
   const subject = `Trip Receipt (#${payload.tripId}) — $${grandTotal.toFixed(2)} | ${companyName}`;
 
   const html = renderEmailShell(
@@ -2028,7 +2102,7 @@ export function renderTripReceiptEmail(
     </div>
 
     <div class="card-white" style="border-color: #cbd5e1;">
-      ${renderPriceBreakdownHtml(payload.breakdown, payload.tariffProfileName)}
+      ${renderPriceBreakdownHtml(payload.breakdown, payload.tariffProfileName, payload.subtotalFare)}
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 10px; border-top: 1px solid #e2e8f0; padding-top: 10px;">
         <tr>
           <td style="padding: 4px 0; font-size: 13px; color: #475569;">Ride Subtotal</td>
@@ -2059,6 +2133,8 @@ export function renderTripReceiptEmail(
         <strong>Payment Method:</strong> ${escapeHtml(paymentDisplay)} &nbsp;&middot;&nbsp; <strong>Status:</strong> ${escapeHtml(statusLabel)}
       </div>
     </div>
+
+    ${showReceiptGuestSignupCta ? renderGuestSignupCtaHtml(receiptRegisterUrl) : ''}
     `,
     `Official receipt for your ${companyName} ride #${payload.tripId}: $${grandTotal.toFixed(2)}.`,
     payload.companySettings,
@@ -2085,13 +2161,13 @@ Vehicle: ${vehicleLabel}
 ROUTE:
 - Pickup (${payload.pickupTime}): ${payload.pickupAddress}
 ${stopsText}- Dropoff: ${payload.dropoffAddress}
-${renderPriceBreakdownText(payload.breakdown)}
+${renderPriceBreakdownText(payload.breakdown, payload.subtotalFare)}
 
 TOTALS:
 - Ride Subtotal: $${payload.subtotalFare.toFixed(2)}
 ${tipAmount > 0 ? `- Driver Tip: $${tipAmount.toFixed(2)}\n` : ''}- Grand Total: $${grandTotal.toFixed(2)} ${currency}
 - Payment Method: ${paymentDisplay} (${statusLabel})
-
+${showReceiptGuestSignupCta ? renderGuestSignupCtaText(receiptRegisterUrl) : ''}
 Questions regarding this receipt? Call 24/7 Dispatch at ${companyPhone}.
 ========================================
 (c) ${new Date().getFullYear()} ${companyName}

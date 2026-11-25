@@ -73,6 +73,7 @@ export async function sendDispatchContextualTripEmail(params: {
 
       result = await emailService.sendTripReceipt({
         tripId: targetTrip.id,
+        customerId: targetTrip.customerId ?? null,
         completedAt: new Date(targetTrip.completedAt || Date.now()).toLocaleString(),
         passenger: {
           firstName: targetTrip.passenger?.firstName || 'Valued',
@@ -123,6 +124,7 @@ export async function sendDispatchContextualTripEmail(params: {
       );
       result = await emailService.sendBookingConfirmation({
         tripId: targetTrip.id,
+        customerId: targetTrip.customerId ?? null,
         trackingToken: targetTrip.trackingToken,
         status: targetTrip.status || 'CONFIRMED',
         passenger: {
@@ -159,6 +161,7 @@ export async function sendDispatchContextualTripEmail(params: {
     } else {
       result = await emailService.sendStatusUpdateNotification({
         tripId: targetTrip.id,
+        customerId: targetTrip.customerId ?? null,
         trackingToken: targetTrip.trackingToken,
         passenger: {
           firstName: targetTrip.passenger?.firstName || 'Valued',

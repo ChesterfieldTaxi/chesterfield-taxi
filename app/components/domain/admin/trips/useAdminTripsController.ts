@@ -51,9 +51,20 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
   const [includeArchivedInHistory, setIncludeArchivedInHistory] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [auditModalTrip, setAuditModalTrip] = useState<Trip | null>(null);
+  const [completeTripTarget, setCompleteTripTarget] = useState<Trip | null>(null);
+  const [completeModalOpenSeq, setCompleteModalOpenSeq] = useState<number>(0);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
   const [openActionTripId, setOpenActionTripId] = useState<string | null>(null);
+
+  const openCompleteTripModal = (trip: Trip) => {
+    setCompleteTripTarget(trip);
+    setCompleteModalOpenSeq((s) => s + 1);
+  };
+
+  const closeCompleteTripModal = () => {
+    setCompleteTripTarget(null);
+  };
 
   useEffect(() => {
     setActiveSub(normalizeTripsSubTab(initialSubTab));
@@ -414,13 +425,17 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
   return {
     activeSub,
     trips,
+    setTrips,
     drivers,
+    appSettings,
+    currentUser: getAdminAuthService().getCurrentUser(),
     vehicles: appSettings.vehicles,
     fleetCars: appSettings.fleet,
     assignMode,
     setAssignMode,
     isLoading,
     error,
+    setError,
     searchTerm,
     setSearchTerm,
     statusFilter,
@@ -431,6 +446,11 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
     setSelectedTrip,
     auditModalTrip,
     setAuditModalTrip,
+    completeTripTarget,
+    completeModalOpenSeq,
+    openCompleteTripModal,
+    closeCompleteTripModal,
+    showSuccess,
     actionLoadingId,
     actionSuccessMessage,
     openActionTripId,

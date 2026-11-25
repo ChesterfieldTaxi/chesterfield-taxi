@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getContactService, normalizePhone } from '../../../core/services/customer/contact.service';
-import { getWorkspaceBus, type UpcomingBookingPreview, type WorkspaceMessage } from '../../../core/services/workspace-bus.service';
+import { getLatestSoftphoneViewState, getWorkspaceBus, type UpcomingBookingPreview, type WorkspaceMessage } from '../../../core/services/workspace-bus.service';
 import type { Trip } from '../../../core/types/trip';
 import { formatDisplayPhone } from '../../../core/utils/phone';
 import { CalendarIcon, CarIcon, ExternalLinkIcon, KeypadGridIcon, MicIcon, MicOffIcon, PauseIcon, PhoneIcon, PhoneOffIcon, PlayIcon, PlusIcon, XIcon } from '../../ui/Icons';
@@ -64,14 +64,18 @@ export function DispatchHeaderCallHud({
   const [flydownOverride, setFlydownOverride] = useState<boolean | null>(
     typeof initialFlydownOpen === 'boolean' ? initialFlydownOpen : null
   );
-  const [liveCommsTab, setLiveCommsTab] = useState<string>(propCommsActiveTab || 'all');
-  const [liveCallsSubTab, setLiveCallsSubTab] = useState<string>(propCommsCallsSubTab || 'history');
+  const initialBusView = getLatestSoftphoneViewState();
+  const [hasLiveBusState, setHasLiveBusState] = useState<boolean>(Boolean(initialBusView));
+  const [liveCommsTab, setLiveCommsTab] = useState<string>(initialBusView?.activeTab || propCommsActiveTab || 'all');
+  const [liveCallsSubTab, setLiveCallsSubTab] = useState<string>(initialBusView?.callsSubTab || propCommsCallsSubTab || 'history');
 
-  useEffect(() => { if (propCommsActiveTab) setLiveCommsTab(propCommsActiveTab); }, [propCommsActiveTab]);
-  useEffect(() => { if (propCommsCallsSubTab) setLiveCallsSubTab(propCommsCallsSubTab); }, [propCommsCallsSubTab]);
+  useEffect(() => { if (!hasLiveBusState && propCommsActiveTab) setLiveCommsTab(propCommsActiveTab); }, [hasLiveBusState, propCommsActiveTab]);
+  useEffect(() => { if (!hasLiveBusState && propCommsCallsSubTab) setLiveCallsSubTab(propCommsCallsSubTab); }, [hasLiveBusState, propCommsCallsSubTab]);
 
-  const commsActiveTab = propCommsActiveTab || liveCommsTab;
-  const commsCallsSubTab = propCommsCallsSubTab || liveCallsSubTab;
+  const latestBusView = getLatestSoftphoneViewState();
+  const useLiveBus = hasLiveBusState || Boolean(latestBusView);
+  const commsActiveTab = useLiveBus ? (hasLiveBusState ? liveCommsTab : latestBusView!.activeTab) : (propCommsActiveTab || liveCommsTab);
+  const commsCallsSubTab = useLiveBus ? (hasLiveBusState ? liveCallsSubTab : latestBusView!.callsSubTab) : (propCommsCallsSubTab || liveCallsSubTab);
   const isKeypadTabVisible = Boolean(isPhoneDockActive && commsActiveTab === 'phone' && commsCallsSubTab === 'keypad');
 
   const prevContextKeyRef = useRef('');
@@ -85,6 +89,7 @@ export function DispatchHeaderCallHud({
 
   useEffect(() => workspaceBus.subscribe((msg: WorkspaceMessage) => {
     if (msg.type === 'SOFTPHONE_VIEW_STATE_CHANGED') {
+      setHasLiveBusState(true);
       setLiveCommsTab(msg.payload.activeTab);
       setLiveCallsSubTab(msg.payload.callsSubTab);
       setFlydownOverride(null);

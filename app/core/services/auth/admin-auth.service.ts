@@ -366,41 +366,92 @@ export class AdminAuthService {
     );
   }
 
-  public async registerWithEmail(email: string, password: string, _role: UserRole = 'customer', displayName?: string): Promise<AdminUser> {
+  public async registerWithEmail(
+    email: string,
+    password: string,
+    _role: UserRole = 'customer',
+    displayName?: string,
+    extraProfile?: { phone?: string; firstName?: string; lastName?: string }
+  ): Promise<AdminUser> {
     const trimmedEmail = email.trim().toLowerCase();
-    
+    const resolvedDisplayName = (
+      displayName ||
+      [extraProfile?.firstName, extraProfile?.lastName].filter(Boolean).join(' ') ||
+      trimmedEmail.split('@')[0]
+    ).trim();
+    const derivedFirstName =
+      extraProfile?.firstName?.trim() || resolvedDisplayName.split(/\s+/)[0] || '';
+    const derivedLastName =
+      extraProfile?.lastName?.trim() || resolvedDisplayName.split(/\s+/).slice(1).join(' ') || '';
+    const cleanedPhone = extraProfile?.phone?.trim() || '';
+
     if (this.isConfigured) {
       try {
         const auth = getFirebaseAuth();
         const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
-        
-        // Self-registration always provisions a 'customer' role (staff accounts are provisioned via Admin Onboarding)
+
+        // Self-registration always provisions a 'customer' role per firestore.rules lines 79-89
         const db = getFirestore(getFirebaseApp());
         const userRef = doc(db, 'users', cred.user.uid);
         const actualRole: UserRole = 'customer';
 
-        await setDoc(userRef, { 
-          role: actualRole,
-          roles: [actualRole],
-          email: trimmedEmail,
-          displayName: displayName || trimmedEmail.split('@')[0],
-          createdAt: new Date().toISOString()
-        }, { merge: true });
-        
-        return {
+        await setDoc(
+          userRef,
+          {
+            role: actualRole,
+            roles: [actualRole],
+            status: 'active',
+            email: trimmedEmail,
+            displayName: resolvedDisplayName,
+            ...(derivedFirstName ? { firstName: derivedFirstName } : {}),
+            ...(derivedLastName ? { lastName: derivedLastName } : {}),
+            ...(cleanedPhone ? { phone: cleanedPhone } : {}),
+            createdAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+
+        const createdUser: AdminUser = {
           uid: cred.user.uid,
           email: cred.user.email,
-          displayName: displayName || cred.user.displayName,
+          displayName: resolvedDisplayName || cred.user.displayName,
           role: actualRole,
           roles: [actualRole],
+          status: 'active',
+          ...(cleanedPhone ? { phone: cleanedPhone } : {}),
         };
+        this.cachedUser = createdUser;
+        return createdUser;
       } catch (err) {
         console.warn('[AdminAuthService] Firebase Auth registration error:', err);
         throw err;
       }
     }
-    
-    return this.signIn(email, password);
+
+    // Offline / local development fallback: support self-registration for any customer email
+    if (trimmedEmail.includes('blacklisted')) {
+      throw new Error('Access Denied: Account is blacklisted.');
+    }
+    if (!password || password.length < 6) {
+      throw new Error('auth/weak-password: Password should be at least 6 characters.');
+    }
+    const demoCustomer: AdminUser = {
+      uid: `demo_cust_${trimmedEmail.replace(/[^a-z0-9]/g, '_').slice(0, 24)}`,
+      email: trimmedEmail,
+      displayName: resolvedDisplayName,
+      isDemo: true,
+      role: 'customer',
+      roles: ['customer'],
+      status: 'active',
+      ...(cleanedPhone ? { phone: cleanedPhone } : {}),
+    };
+    if (typeof window !== 'undefined') {
+      try {
+        window.sessionStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(demoCustomer));
+      } catch {}
+    }
+    this.cachedUser = demoCustomer;
+    return demoCustomer;
   }
 
   public async sendPasswordReset(email: string): Promise<void> {

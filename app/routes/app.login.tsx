@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
-import { getBookingService } from '../core/services/booking';
 import { getPassengerService } from '../core/services/passenger.service';
 import { isFirebaseConfigured } from '../core/services/firebase';
 import { COMPANY_CONFIG } from '../config/companyConfig';
+import { claimGuestTripsForUser } from '../core/utils/guest-trip-claim.util';
 import { resolvePostAuthDestination } from '../core/utils/workspace-routing.util';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../components/ui/Card';
@@ -24,7 +24,7 @@ export function meta() {
 export default function UnifiedAppLoginRoute() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => searchParams.get('email') || '');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,17 +38,7 @@ export default function UnifiedAppLoginRoute() {
 
   const claimGuestTripIfPresent = async (uid: string) => {
     if (!claimTrip || !uid) return;
-    try {
-      const bookingService = getBookingService();
-      if (bookingService.updateTrip) {
-        await bookingService.updateTrip(claimTrip.toUpperCase(), {
-          customerId: uid,
-          userId: uid,
-        } as any);
-      }
-    } catch (err) {
-      console.warn('[UnifiedAppLoginRoute] Could not link guest trip on login:', err);
-    }
+    await claimGuestTripsForUser(uid, claimTrip);
   };
 
   useEffect(() => {
@@ -174,6 +164,7 @@ export default function UnifiedAppLoginRoute() {
   const registerParams = new URLSearchParams();
   if (rawRedirect) registerParams.set('redirect', rawRedirect);
   if (claimTrip) registerParams.set('claimTrip', claimTrip);
+  if (email.trim()) registerParams.set('email', email.trim());
   const registerHref = `/app/register${registerParams.toString() ? `?${registerParams.toString()}` : ''}`;
 
   return (

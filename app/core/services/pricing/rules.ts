@@ -1750,23 +1750,29 @@ export function createSurchargesAndDiscountsStep(
     }
 
     // 7. Per-Rate Final Fare Rounding Policy (exact_cents | nearest_half_dollar | nearest_dollar | ceil_dollar)
+    // Rounding delta is folded silently into the 'base' line item so sum(lineItems) === finalFare with 0 'rounding' lines.
     const fareRoundingMode = context.rateRounding?.fareMode ?? 'ceil_dollar';
     const roundedFare = applyFareRounding(currentTotal, fareRoundingMode);
     const roundingAdj = roundCurrency(roundedFare - currentTotal);
+    let combinedLineItems = [...context.lineItems, ...newLineItems];
     if (roundingAdj !== 0) {
-      newLineItems.push({
-        id: 'rounding-dollar',
-        category: 'rounding',
-        label: 'Rounding',
-        detail:
-          fareRoundingMode === 'ceil_dollar'
-            ? 'Round up to whole dollar'
-            : fareRoundingMode === 'nearest_dollar'
-            ? 'Nearest dollar'
-            : 'Nearest $0.50',
-        amount: roundingAdj,
-        sourceType: 'rounding',
-      });
+      const baseIdx = combinedLineItems.findIndex((li) => li.category === 'base');
+      if (baseIdx >= 0) {
+        combinedLineItems = combinedLineItems.map((li, idx) =>
+          idx === baseIdx ? { ...li, amount: roundCurrency(li.amount + roundingAdj) } : li
+        );
+      } else {
+        combinedLineItems = [
+          {
+            id: 'base-fare',
+            category: 'base',
+            label: 'Base Fare',
+            amount: roundingAdj,
+            sourceType: 'tariff',
+          },
+          ...combinedLineItems,
+        ];
+      }
       currentTotal = roundedFare;
     }
 
@@ -1779,7 +1785,7 @@ export function createSurchargesAndDiscountsStep(
       surgeDescription: resolvedSurgeDescription,
       surcharges: [...context.surcharges, ...newSurcharges],
       discounts: [...context.discounts, ...newDiscounts],
-      lineItems: [...context.lineItems, ...newLineItems],
+      lineItems: combinedLineItems,
       totalFare: finalFare,
       firewallTrace: updatedFirewallTrace,
       auditTrail: appendAudit(

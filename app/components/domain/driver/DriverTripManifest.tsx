@@ -18,6 +18,7 @@ import React, { useState } from 'react';
 import type { Trip } from '../../../core/types/trip';
 import type { VehicleTierConfig } from '../../../core/types/config';
 import { formatVehicleTierDisplay } from '../../../core/utils/vehicle-tier-format.util';
+import { reconcileBreakdownWithoutRounding } from '../../../core/utils/fare-breakdown.util';
 import { resolveStlTerminalInfo } from '../../../core/config/airports';
 import { resolveTripFlightBadge } from '../../../core/services/flight/flight-status.service';
 
@@ -195,7 +196,10 @@ export function DriverTripManifest({ trip, adminVehicles, compact = false }: Dri
     purple: 'bg-purple-500/15 text-purple-300 border-purple-500/35',
   };
 
-  const breakdown = Array.isArray(trip.pricing?.breakdown) ? trip.pricing.breakdown : [];
+  const breakdown =
+    Array.isArray(trip.pricing?.breakdown) && trip.pricing.breakdown.length > 0
+      ? reconcileBreakdownWithoutRounding(trip.pricing.breakdown, trip.pricing?.totalFare, trip.pricing)
+      : [];
 
   return (
     <div className="space-y-2.5">

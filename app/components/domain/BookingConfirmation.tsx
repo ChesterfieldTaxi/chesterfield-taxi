@@ -29,6 +29,7 @@ import { getAdminConfigService } from '../../core/services/config/admin-config.s
 import { getAdminAuthService } from '../../core/services/auth/admin-auth.service';
 import type { VehicleTierConfig } from '../../core/types/config';
 import { formatVehicleTierDisplay } from '../../core/utils/vehicle-tier-format.util';
+import { GuestAccountActivationCard } from './booking/GuestAccountActivationCard';
 import { PriceBreakdownPanel } from './booking/PriceBreakdownPanel';
 
 export interface EmailDeliveryFeedback {
@@ -118,6 +119,7 @@ export function BookingConfirmation({
   const [isSignedIn, setIsSignedIn] = React.useState(() =>
     Boolean(getAdminAuthService().getCurrentUser())
   );
+  const [activatedInline, setActivatedInline] = React.useState(false);
 
   React.useEffect(() => {
     const unsub = getAdminAuthService().onAuthStateChanged((u) => {
@@ -279,6 +281,14 @@ export function BookingConfirmation({
             </button>
           </div>
         </div>
+
+        {/* Inline 1-Step Guest Account Activation Card */}
+        {((!isSignedIn && !trip.customerId) || activatedInline) && Boolean(trip.id) && (
+          <GuestAccountActivationCard
+            trip={trip}
+            onActivated={() => setActivatedInline(true)}
+          />
+        )}
 
         {/* "What Happens Next?" 3-Step Lifecycle Timeline */}
         <div className="p-4 bg-gradient-to-br from-blue-50/70 via-slate-50 to-indigo-50/50 rounded-xl border border-blue-100 space-y-3">
@@ -780,27 +790,6 @@ export function BookingConfirmation({
                   <strong className="text-slate-900">Notes for Driver:</strong> {trip.driverNotes}
                 </p>
               )}
-            </div>
-          </div>
-        )}
-        {/* Guest Account Claiming CTA */}
-        {!isSignedIn && trip.id && (
-          <div className="pt-4 border-t border-slate-100 print:hidden">
-            <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h4 className="text-xs font-extrabold text-blue-950">
-                  Save This Trip &amp; Rebook in Seconds
-                </h4>
-                <p className="text-[11px] text-blue-800 mt-0.5">
-                  Create a free account to save Trip #{trip.id}, store favorite pickup spots, and view receipts anytime.
-                </p>
-              </div>
-              <Link
-                to={`/app/register?claimTrip=${encodeURIComponent(trip.id)}&email=${encodeURIComponent(trip.passenger.email || '')}`}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0 text-center"
-              >
-                Create Account &rarr;
-              </Link>
             </div>
           </div>
         )}

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { PriceLineItem, TripPricing } from '../../../core/types';
+import { reconcileBreakdownWithoutRounding } from '../../../core/utils/fare-breakdown.util';
 
 export interface PriceBreakdownPanelProps {
   outboundPricing?: TripPricing | null;
@@ -21,80 +22,7 @@ function buildCleanBreakdownLines(
   pricing: TripPricing,
   targetDisplayFare: number | null
 ): PriceLineItem[] {
-  const canonicalItems: PriceLineItem[] =
-    pricing.breakdown && pricing.breakdown.length > 0
-      ? pricing.breakdown
-      : [
-          {
-            id: 'base-fare',
-            category: 'base',
-            label: 'Base Fare',
-            amount: pricing.tariffBaseSubtotal ?? pricing.subtotal ?? pricing.baseFare,
-          },
-          ...(pricing.itemizedSurcharges || [])
-            .filter((s) => s.amount > 0 || /\(waived\)/i.test(s.name))
-            .map((s, i) => ({
-              id: `legacy-surcharge-${i}`,
-              category: 'surcharge' as const,
-              label: s.name,
-              amount: s.amount,
-              isWaived: s.amount === 0 && /\(waived\)/i.test(s.name),
-              originalAmount: s.originalAmount,
-            })),
-          ...(pricing.discountAmount > 0
-            ? [
-                {
-                  id: 'legacy-discount',
-                  category: 'discount' as const,
-                  label: 'Applied Discount',
-                  amount: -pricing.discountAmount,
-                },
-              ]
-            : []),
-        ];
-
-  const baseLine = canonicalItems.find((item) => item.category === 'base');
-  const extrasLines = canonicalItems.filter(
-    (item) => item.category === 'extra' && (item.amount !== 0 || item.isWaived)
-  );
-  const surchargeLines = canonicalItems.filter(
-    (item) => item.category === 'surcharge' && (item.amount !== 0 || item.isWaived)
-  );
-  const discountLines = canonicalItems.filter(
-    (item) => item.category === 'discount' && item.amount !== 0
-  );
-  const roundingTotal = canonicalItems
-    .filter((item) => item.category === 'rounding' && item.amount !== 0)
-    .reduce((sum, item) => sum + item.amount, 0);
-
-  const nonBaseTotal = [...extrasLines, ...surchargeLines, ...discountLines].reduce(
-    (sum, item) => sum + item.amount,
-    0
-  );
-
-  // Fold explicit rounding lines AND any ceiling/balancing delta silently into Base Fare
-  // so the visible lines always reconcile cleanly to the displayed total without revealing rounding.
-  const rawBaseWithRounding = (baseLine?.amount ?? 0) + roundingTotal;
-  const reconciledBaseAmount =
-    targetDisplayFare !== null
-      ? Math.max(0, Number((targetDisplayFare - nonBaseTotal).toFixed(2)))
-      : Math.max(0, Number(rawBaseWithRounding.toFixed(2)));
-
-  return [
-    ...(baseLine || targetDisplayFare !== null
-      ? [
-          {
-            id: baseLine?.id || 'base-fare',
-            category: 'base' as const,
-            label: 'Base Fare',
-            amount: reconciledBaseAmount,
-          },
-        ]
-      : []),
-    ...extrasLines,
-    ...surchargeLines,
-    ...discountLines,
-  ];
+  return reconcileBreakdownWithoutRounding(pricing.breakdown, targetDisplayFare, pricing);
 }
 
 /**

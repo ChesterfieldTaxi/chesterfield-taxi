@@ -1,6 +1,7 @@
 import type { GeoPoint, TripPricing, VehicleTier } from '../../types';
 import type { OversizedBagCategory, VehicleTierConfig } from '../../types/config';
 import type { DriverRosterItem } from '../../services/operator.service';
+import { reconcileBreakdownWithoutRounding } from '../../utils/fare-breakdown.util';
 import { formatVehicleTier } from '../../utils/trip-id.util';
 
 export const CUSTOMER_FBO_FACILITIES = [
@@ -766,20 +767,10 @@ export function buildPersistedPricing(
   }
 
   if (enginePricing) {
-    const diff = Number((targetFare - enginePricing.totalFare).toFixed(2));
     const adjustedBreakdown =
-      Math.abs(diff) > 0.005 && enginePricing.breakdown && enginePricing.breakdown.length > 0
-        ? [
-            ...enginePricing.breakdown,
-            {
-              id: 'round-trip-balance',
-              category: 'rounding' as const,
-              label: 'Round-Trip Balance Adjustment',
-              amount: diff,
-              sourceType: 'rounding' as const,
-            },
-          ]
-        : enginePricing.breakdown;
+      enginePricing.breakdown && enginePricing.breakdown.length > 0
+        ? reconcileBreakdownWithoutRounding(enginePricing.breakdown, targetFare, enginePricing)
+        : reconcileBreakdownWithoutRounding(undefined, targetFare, enginePricing);
     return {
       ...enginePricing,
       distanceMiles: distMiles || enginePricing.distanceMiles,

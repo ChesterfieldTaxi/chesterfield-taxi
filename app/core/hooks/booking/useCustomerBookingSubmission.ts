@@ -1866,6 +1866,7 @@ export function useCustomerBookingSubmission({
         // Single consolidated confirmation email to passenger (includes return trip details if round trip)
         const confirmResult = await emailService.sendBookingConfirmation({
           tripId: createdTrip.id,
+          customerId: createdTrip.customerId ?? signedInUid ?? null,
           trackingToken: createdTrip.trackingToken,
           passenger: {
             firstName: createdTrip.passenger.firstName,

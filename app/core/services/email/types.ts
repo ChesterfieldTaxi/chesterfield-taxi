@@ -21,6 +21,7 @@ export interface FlightOperationsEmailDetails {
 
 export interface BookingConfirmationEmailPayload {
   tripId: string;
+  customerId?: string | null;
   trackingToken?: string;
   trackingUrl?: string;
   passenger: {
@@ -141,6 +142,7 @@ export interface AdminDispatchAlertEmailPayload {
 
 export interface StatusUpdateEmailPayload {
   tripId: string;
+  customerId?: string | null;
   trackingToken?: string;
   trackingUrl?: string;
   passenger: {
@@ -222,6 +224,7 @@ export interface BookingClarificationRequestEmailPayload {
 
 export interface TripReceiptEmailPayload {
   tripId: string;
+  customerId?: string | null;
   completedAt: string;
   passenger: {
     firstName: string;

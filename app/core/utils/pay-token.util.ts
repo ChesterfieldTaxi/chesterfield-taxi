@@ -18,6 +18,7 @@ import {
   type InvoiceRecord,
 } from '../types/config';
 import type { Trip } from '../types/trip';
+import { reconcileBreakdownWithoutRounding } from './fare-breakdown.util';
 import { sanitizePublicAddressDisplay } from './tracking-token.util';
 
 export const PAY_TOKEN_PATTERN = /^pay_[a-zA-Z0-9_-]{24,80}$/;
@@ -287,13 +288,19 @@ export function buildTripPayLinkProjection(
       : trip.pricing?.totalFare ?? trip.payment?.amount ?? 0
   );
 
-  // Build sanitized itemized breakdown
+  // Build sanitized itemized breakdown (stripping all rounding items and reconciling into Base Fare)
   const rawLineItems: PayLinkLineItem[] = [];
   if (Array.isArray(trip.pricing?.breakdown) && trip.pricing.breakdown.length > 0) {
-    for (const b of trip.pricing.breakdown) {
+    const cleanBreakdown = reconcileBreakdownWithoutRounding(
+      trip.pricing.breakdown,
+      quotedOrMeteredTotal,
+      trip.pricing
+    );
+    for (const b of cleanBreakdown) {
+      if (b.isWaived && b.amount === 0) continue;
       rawLineItems.push(
         sanitizePayLinkLineItem({
-          label: b.label,
+          label: b.category === 'base' ? 'Base Fare' : b.label,
           detail: b.detail,
           amount: b.amount,
         })

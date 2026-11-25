@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
-import { getBookingService } from '../core/services/booking';
 import { isFirebaseConfigured } from '../core/services/firebase';
 import { COMPANY_CONFIG } from '../config/companyConfig';
+import { claimGuestTripsForUser, parseClaimTripIds } from '../core/utils/guest-trip-claim.util';
 import { resolvePostAuthDestination } from '../core/utils/workspace-routing.util';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent, CardFooter } from '../components/ui/Card';
@@ -29,21 +29,13 @@ export default function UnifiedAppRegisterRoute() {
   const isClaimingRef = React.useRef(false);
 
   const claimTripId = searchParams.get('claimTrip');
+  const phoneParam = searchParams.get('phone') || '';
   const rawRedirect = searchParams.get('redirect');
+  const parsedClaimTripIds = parseClaimTripIds(claimTripId);
 
   const claimGuestTripIfPresent = async (uid: string) => {
     if (!claimTripId || !uid) return;
-    try {
-      const bookingService = getBookingService();
-      if (bookingService.updateTrip) {
-        await bookingService.updateTrip(claimTripId.toUpperCase(), {
-          customerId: uid,
-          userId: uid,
-        } as any);
-      }
-    } catch (err) {
-      console.warn('[UnifiedAppRegisterRoute] Could not link guest trip to new user:', err);
-    }
+    await claimGuestTripsForUser(uid, claimTripId);
   };
 
   useEffect(() => {
@@ -70,7 +62,12 @@ export default function UnifiedAppRegisterRoute() {
       isClaimingRef.current = true;
       setError(null);
       const authService = getAdminAuthService();
-      const user = await authService.registerWithEmail(email, password, 'customer', displayName);
+      const nameParts = displayName.trim().split(/\s+/);
+      const user = await authService.registerWithEmail(email, password, 'customer', displayName, {
+        phone: phoneParam || undefined,
+        firstName: nameParts[0] || undefined,
+        lastName: nameParts.slice(1).join(' ') || undefined,
+      });
       await claimGuestTripIfPresent(user.uid);
       const dest = resolvePostAuthDestination(user, { rawRedirect });
       navigate(dest, { replace: true });
@@ -129,6 +126,7 @@ export default function UnifiedAppRegisterRoute() {
   const loginParams = new URLSearchParams();
   if (rawRedirect) loginParams.set('redirect', rawRedirect);
   if (claimTripId) loginParams.set('claimTrip', claimTripId);
+  if (email.trim()) loginParams.set('email', email.trim());
   const loginHref = `/app/login${loginParams.toString() ? `?${loginParams.toString()}` : ''}`;
 
   return (
@@ -150,9 +148,11 @@ export default function UnifiedAppRegisterRoute() {
         <Card className="shadow-xl border-slate-200/90 rounded-2xl overflow-hidden">
           <form onSubmit={handleSubmit}>
             <CardContent className="p-6 space-y-4 bg-white">
-              {claimTripId && (
+              {parsedClaimTripIds.length > 0 && (
                 <Alert variant="info" title="Link Your Trip">
-                  Create your account to attach Trip <strong>#{claimTripId}</strong> to your ride history.
+                  Create your account to attach{' '}
+                  {parsedClaimTripIds.length > 1 ? 'Trips ' : 'Trip '}
+                  <strong>{parsedClaimTripIds.map((id) => `#${id}`).join(' & ')}</strong> to your ride history.
                 </Alert>
               )}
               {error && (

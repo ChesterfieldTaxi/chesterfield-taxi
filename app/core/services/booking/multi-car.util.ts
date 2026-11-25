@@ -13,6 +13,7 @@ import type {
   TripPricing,
   TripStatus,
 } from '../../types/trip';
+import { reconcileBreakdownWithoutRounding } from '../../utils/fare-breakdown.util';
 
 export function generateMultiCarGroupId(): string {
   const ts = Date.now().toString(36).toUpperCase().slice(-5);
@@ -127,35 +128,7 @@ function stripOrderExtrasFromBreakdown(
     ];
   }
 
-  const sum = filtered.reduce((acc, item) => acc + item.amount, 0);
-  const diff = Number((targetFare - sum).toFixed(2));
-  if (Math.abs(diff) <= 0.01) {
-    return filtered;
-  }
-
-  // Adjust rounding or append a clean alignment line so breakdown ALWAYS sums to targetFare
-  const roundingIdx = filtered.findIndex((item) => item.category === 'rounding');
-  if (roundingIdx >= 0) {
-    const updated = [...filtered];
-    const nextRounding = Number((updated[roundingIdx].amount + diff).toFixed(2));
-    if (Math.abs(nextRounding) <= 0.005) {
-      updated.splice(roundingIdx, 1);
-    } else {
-      updated[roundingIdx] = { ...updated[roundingIdx], amount: nextRounding };
-    }
-    return updated;
-  }
-
-  return [
-    ...filtered,
-    {
-      id: 'vehicle-rate-adjustment',
-      category: 'rounding',
-      label: 'Fare Adjustment',
-      amount: diff,
-      sourceType: 'rounding',
-    },
-  ];
+  return reconcileBreakdownWithoutRounding(filtered, targetFare, basePricing);
 }
 
 /**
@@ -298,31 +271,8 @@ export function buildPerVehiclePricingSpecs(params: {
 
     if (idx === 0) {
       const car1Fare = Math.ceil(quoteForTier.totalFare);
-      const diff = Number((car1Fare - quoteForTier.totalFare).toFixed(2));
       const baseBreakdown = Array.isArray(quoteForTier.breakdown) ? quoteForTier.breakdown : [];
-      const breakdown =
-        Math.abs(diff) > 0.005 && baseBreakdown.length > 0
-          ? [
-              ...baseBreakdown,
-              {
-                id: 'fare-rounding',
-                category: 'rounding' as const,
-                label: 'Rounding',
-                amount: diff,
-                sourceType: 'rounding' as const,
-              },
-            ]
-          : baseBreakdown.length > 0
-          ? baseBreakdown
-          : [
-              {
-                id: 'base-fare',
-                category: 'base' as const,
-                label: 'Base Fare',
-                amount: car1Fare,
-                sourceType: 'tariff' as const,
-              },
-            ];
+      const breakdown = reconcileBreakdownWithoutRounding(baseBreakdown, car1Fare, quoteForTier);
 
       return {
         carIndex: 1,
@@ -377,18 +327,11 @@ export function buildPerVehiclePricingSpecs(params: {
       first.pricing = {
         ...first.pricing,
         totalFare: adjustedFare,
-        breakdown: first.pricing.breakdown
-          ? [
-              ...first.pricing.breakdown,
-              {
-                id: 'multi-car-balance',
-                category: 'rounding',
-                label: 'Order Balance Adjustment',
-                amount: residual,
-                sourceType: 'rounding',
-              },
-            ]
-          : first.pricing.breakdown,
+        breakdown: reconcileBreakdownWithoutRounding(
+          first.pricing.breakdown,
+          adjustedFare,
+          first.pricing
+        ),
       };
     }
   }

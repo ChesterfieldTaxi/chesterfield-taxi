@@ -411,6 +411,10 @@ export function useTwilioSoftphoneDevice({
     if (isVisibleRef.current) {
       setActiveTab('phone');
       setCallsSubTab('keypad');
+      workspaceBus.publish('SOFTPHONE_VIEW_STATE_CHANGED', {
+        activeTab: 'phone',
+        callsSubTab: 'keypad',
+      });
     }
     workspaceBus.publish('CALL_ANSWERED', {
       callerNumber: callerFrom,
@@ -510,6 +514,10 @@ export function useTwilioSoftphoneDevice({
       if (isVisibleRef.current) {
         setActiveTab('phone');
         setCallsSubTab('keypad');
+        workspaceBus.publish('SOFTPHONE_VIEW_STATE_CHANGED', {
+          activeTab: 'phone',
+          callsSubTab: 'keypad',
+        });
       }
 
       const newCallRecord: InteractionEvent = {
@@ -618,8 +626,14 @@ export function useTwilioSoftphoneDevice({
     setShowInCallTrips(false);
     setShowInCallNotes(false);
 
-    setActiveTab('phone');
-    setCallsSubTab('keypad');
+    if (isVisibleRef.current) {
+      setActiveTab('phone');
+      setCallsSubTab('keypad');
+      workspaceBus.publish('SOFTPHONE_VIEW_STATE_CHANGED', {
+        activeTab: 'phone',
+        callsSubTab: 'keypad',
+      });
+    }
 
     const newCallRecord: InteractionEvent = {
       id: callId,

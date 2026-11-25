@@ -221,6 +221,7 @@ class WorkspaceBusService {
   private listeners: Set<(event: WorkspaceMessage<any>) => void> = new Set();
   private clientId: string;
   private poppedOutModules: Set<WorkspaceModuleKey> = new Set();
+  private latestSoftphoneViewState: WorkspaceEventMap['SOFTPHONE_VIEW_STATE_CHANGED'] | null = null;
 
   constructor() {
     this.clientId = `window_${Math.random().toString(36).substring(2, 9)}`;
@@ -243,6 +244,11 @@ class WorkspaceBusService {
       this.poppedOutModules.add((msg.payload as any).moduleKey);
     } else if (msg.type === 'WINDOW_UNLOAD') {
       this.poppedOutModules.delete((msg.payload as any).moduleKey);
+    } else if (msg.type === 'SOFTPHONE_VIEW_STATE_CHANGED' && msg.payload) {
+      this.latestSoftphoneViewState = {
+        activeTab: String((msg.payload as any).activeTab || ''),
+        callsSubTab: String((msg.payload as any).callsSubTab || ''),
+      };
     }
 
     this.listeners.forEach((callback) => {
@@ -255,6 +261,14 @@ class WorkspaceBusService {
   }
 
   public publish<T extends WorkspaceEventType>(type: T, payload: WorkspaceEventMap[T]): void {
+    if (type === 'SOFTPHONE_VIEW_STATE_CHANGED' && payload) {
+      const p = payload as WorkspaceEventMap['SOFTPHONE_VIEW_STATE_CHANGED'];
+      this.latestSoftphoneViewState = {
+        activeTab: String(p.activeTab || ''),
+        callsSubTab: String(p.callsSubTab || ''),
+      };
+    }
+
     const message: WorkspaceMessage<T> = {
       type,
       payload,
@@ -268,6 +282,14 @@ class WorkspaceBusService {
 
     // Also notify local listeners in the current window
     this.listeners.forEach((cb) => cb(message));
+  }
+
+  public getLatestSoftphoneViewState(): WorkspaceEventMap['SOFTPHONE_VIEW_STATE_CHANGED'] | null {
+    return this.latestSoftphoneViewState ? { ...this.latestSoftphoneViewState } : null;
+  }
+
+  public resetSoftphoneViewStateForTests(): void {
+    this.latestSoftphoneViewState = null;
   }
 
   public subscribe(callback: (msg: WorkspaceMessage) => void): () => void {
@@ -304,4 +326,12 @@ export function getWorkspaceBus(): WorkspaceBusService {
     workspaceBusInstance = new WorkspaceBusService();
   }
   return workspaceBusInstance;
+}
+
+export function getLatestSoftphoneViewState(): WorkspaceEventMap['SOFTPHONE_VIEW_STATE_CHANGED'] | null {
+  return getWorkspaceBus().getLatestSoftphoneViewState();
+}
+
+export function resetSoftphoneViewStateForTests(): void {
+  getWorkspaceBus().resetSoftphoneViewStateForTests();
 }
