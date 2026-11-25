@@ -7,7 +7,7 @@
  * - Security audit trail logging for blocked actions.
  */
 
-import { doc, getDoc, setDoc, getFirestore } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, getFirestore } from 'firebase/firestore';
 import { getFirebaseApp, isFirebaseConfigured } from '../firebase';
 
 export type GovernanceEntityType =
@@ -372,17 +372,24 @@ export class UniversalGovernanceService {
       try {
         const db = getFirestore(getFirebaseApp());
         if (entityType === 'passenger') {
-          await setDoc(doc(db, 'customerGovernance', entityId.toLowerCase().trim()), updated, { merge: true });
+          await setDoc(
+            doc(db, 'customerGovernance', entityId.toLowerCase().trim()),
+            {
+              ...updated,
+              blacklistReason: updated.blacklistReason ?? null,
+            },
+            { merge: true }
+          );
         } else if (entityType === 'driver') {
           await setDoc(doc(db, 'drivers', entityId), {
             isBlacklisted,
-            blacklistReason: updated.blacklistReason,
+            blacklistReason: updated.blacklistReason ?? null,
             updatedAt: updated.updatedAt,
           }, { merge: true });
         } else if (entityType === 'staff') {
           await setDoc(doc(db, 'users', entityId), {
             isBlacklisted,
-            blacklistReason: updated.blacklistReason,
+            blacklistReason: updated.blacklistReason ?? null,
             status: isBlacklisted ? 'suspended' : 'active',
             updatedAt: updated.updatedAt,
           }, { merge: true });
@@ -390,6 +397,61 @@ export class UniversalGovernanceService {
       } catch (e) {
         console.warn('[UniversalGovernanceService] Error persisting blacklist to Firestore:', e);
       }
+    }
+  }
+
+  /**
+   * Hydrate passenger governance records (`isBlacklisted`, `isArchived`, `isPurged`) from Firestore
+   * so cross-origin sessions (e.g., localhost -> Vercel) share the same governance state.
+   */
+  public async syncPassengerGovernanceFromFirestore(): Promise<number> {
+    if (!isFirebaseConfigured()) return 0;
+    try {
+      const db = getFirestore(getFirebaseApp());
+      const snap = await getDocs(collection(db, 'customerGovernance'));
+      let count = 0;
+      snap.forEach((docSnap) => {
+        const data = docSnap.data() as Partial<EntityGovernanceRecord> | undefined;
+        if (!data) return;
+        const entityId = (data.entityId || docSnap.id).trim();
+        if (!entityId) return;
+        const record: EntityGovernanceRecord = {
+          entityId,
+          entityType: 'passenger',
+          isBlacklisted: Boolean(data.isBlacklisted),
+          ...(data.blacklistReason ? { blacklistReason: data.blacklistReason } : {}),
+          isArchived: Boolean(data.isArchived),
+          ...(data.archivedAt ? { archivedAt: data.archivedAt } : {}),
+          ...(data.archiveReason ? { archiveReason: data.archiveReason } : {}),
+          ...(data.isPurged !== undefined ? { isPurged: Boolean(data.isPurged) } : {}),
+          ...(data.purgedAt ? { purgedAt: data.purgedAt } : {}),
+          ...(data.displayName ? { displayName: data.displayName } : {}),
+          updatedAt: data.updatedAt || new Date().toISOString(),
+          ...(data.updatedBy ? { updatedBy: data.updatedBy } : {}),
+        };
+
+        const key = this.getKey('passenger', entityId);
+        const existing = this.cache.get(key);
+        const existingTs = existing?.updatedAt ? Date.parse(existing.updatedAt) : 0;
+        const remoteTs = record.updatedAt ? Date.parse(record.updatedAt) : 0;
+        if (!existing || remoteTs >= existingTs) {
+          this.cache.set(key, record);
+          if (!entityId.includes('@')) {
+            const digits = entityId.replace(/\D/g, '');
+            if (digits && digits !== entityId) {
+              this.cache.set(this.getKey('passenger', digits), record);
+            }
+          }
+          count += 1;
+        }
+      });
+      if (count > 0) {
+        this.persistToStorage();
+      }
+      return count;
+    } catch (e) {
+      console.warn('[UniversalGovernanceService] Failed to sync passenger governance from Firestore:', e);
+      return 0;
     }
   }
 

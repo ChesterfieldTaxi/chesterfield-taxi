@@ -95,17 +95,40 @@ export function AdminCustomersSubpage({
   useEffect(() => {
     setIsLoading(true);
     const service = getBookingService();
-    if (service.getAllTrips) {
-      service
-        .getAllTrips()
-        .then((data) => {
-          setTrips(data);
-          setIsLoading(false);
-        })
-        .catch(() => setIsLoading(false));
-    } else {
+    const govService = getUniversalGovernanceService();
+    const contactService = getContactService();
+
+    const tripsPromise = service.getAllTrips
+      ? service
+          .getAllTrips()
+          .then((data) => {
+            setTrips(data);
+          })
+          .catch(() => {})
+      : Promise.resolve();
+
+    const syncPromise = Promise.all([
+      govService.syncPassengerGovernanceFromFirestore().catch(() => 0),
+      contactService.syncContactsFromFirestore().catch(() => 0),
+    ]).then(() => {
+      setGovernanceRefreshKey((k) => k + 1);
+    });
+
+    Promise.all([tripsPromise, syncPromise]).finally(() => {
       setIsLoading(false);
-    }
+    });
+
+    const unsubGov = govService.subscribe(() => {
+      setGovernanceRefreshKey((k) => k + 1);
+    });
+    const unsubContacts = contactService.subscribe(() => {
+      setGovernanceRefreshKey((k) => k + 1);
+    });
+
+    return () => {
+      unsubGov();
+      unsubContacts();
+    };
   }, []);
 
   const allCustomers = useMemo<CustomerProfile[]>(() => {
