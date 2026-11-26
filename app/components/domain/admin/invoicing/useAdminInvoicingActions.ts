@@ -27,7 +27,14 @@ import {
 } from './invoicing-helpers.util';
 import { useAdminPayoutsController } from './useAdminPayoutsController';
 
-export type InvoicingSubTab = 'ledger' | 'accounts' | 'payouts' | 'accounting-sync';
+export type InvoicingSubTab =
+  | 'ledger'
+  | 'accounts'
+  | 'driver-payouts'
+  | 'staff-payouts'
+  | 'other-payees'
+  | 'payouts'
+  | 'accounting-sync';
 export type CorporateBillingCycleOption = 'net15' | 'net30' | 'net60' | 'immediate';
 export type CorporateAccountFilterMode = 'all' | 'po_enforced' | 'po_disabled';
 export type LedgerPeriodFilter = 'all' | '30d' | '7d' | 'today';
@@ -168,7 +175,12 @@ export function useAdminInvoicingActions({
   const payouts = useAdminPayoutsController({
     settings,
     billingDraft,
-    isActivePayoutsSub: activeSub === 'payouts',
+    activeSub,
+    isActivePayoutsSub:
+      activeSub === 'driver-payouts' ||
+      activeSub === 'staff-payouts' ||
+      activeSub === 'other-payees' ||
+      activeSub === 'payouts',
     onSave,
     setIsSaving,
     showSuccess,

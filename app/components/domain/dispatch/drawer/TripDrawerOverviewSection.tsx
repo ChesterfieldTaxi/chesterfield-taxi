@@ -663,7 +663,8 @@ export function TripDrawerOverviewSection({
                 const snap = reviewTrip.flightTelemetry;
                 const termInfo = resolveStlTerminalInfo(
                   snap?.airlineCode || airline || creds.airline,
-                  snap?.destinationIata || creds.airportCode || 'STL'
+                  snap?.destinationIata || creds.airportCode || 'STL',
+                  getAdminConfigService().getCachedSettings().customerBookingConfig
                 );
                 const isTerminalStatus = [
                   'completed',
@@ -871,7 +872,7 @@ export function TripDrawerOverviewSection({
                         )}
 
                         <div className="text-status-info-fg font-semibold bg-surface-card/80 px-2 py-1 rounded border border-status-info-border/80">
-                          Curbside Pickup: {snap?.pickupDoorGuidance || termInfo.pickupDoorGuidance}
+                          Curbside Pickup: {termInfo.pickupDoorGuidance || snap?.pickupDoorGuidance}
                         </div>
 
                         {alignment?.conflict === 'flight_cancelled' && (

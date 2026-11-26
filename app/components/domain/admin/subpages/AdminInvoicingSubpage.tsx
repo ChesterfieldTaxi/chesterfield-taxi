@@ -12,6 +12,7 @@ import {
   InvoiceBuilderModal,
   CorporateAccountsPanel,
   DriverPayoutsPanel,
+  StaffAndOtherPayeesTables,
   BillingPolicyAndQuickBooksPanel,
   type InvoicingSubTab,
   type AdminInvoicingSubpageProps,
@@ -136,20 +137,62 @@ export function AdminInvoicingSubpage({
         onCsvImportSuccess={actions.handleCsvImportSuccess}
       />
 
-      {/* ─── 3. Driver, Staff & Other Payouts ─── */}
-      {activeSub === 'payouts' && (
+      {/* ─── 3a. Driver Payouts ─── */}
+      {(activeSub === 'driver-payouts' || activeSub === 'payouts') && (
         <DriverPayoutsPanel
           isSaving={actions.isSaving}
           billingDraft={actions.billingDraft}
           setBillingDraft={actions.setBillingDraft}
           onSaveBillingPolicies={actions.handleSaveBillingPolicies}
-          activePayeeTab={actions.activePayeeTab}
-          setActivePayeeTab={actions.setActivePayeeTab}
           payoutPeriod={actions.payoutPeriod}
           setPayoutPeriod={actions.setPayoutPeriod}
           driverRollups={actions.driverRollups}
-          driverCommissionOverrides={actions.driverCommissionOverrides}
-          setDriverCommissionOverrides={actions.setDriverCommissionOverrides}
+          driverPayoutOverrides={actions.driverPayoutOverrides}
+          onUpdateDriverPayoutOverride={actions.updateDriverPayoutOverride}
+          onSaveDriverPayoutSettings={actions.handleSaveDriverPayoutSettings}
+          payoutSettlements={actions.payoutSettlements}
+          onSaveCustomPayee={actions.handleSaveCustomPayee}
+          onRecordSettlement={actions.handleRecordSettlement}
+          onUpdateSettlementStatus={actions.handleUpdateSettlementStatus}
+          onExportPayoutsCsv={actions.handleExportPayoutsCsv}
+        />
+      )}
+
+      {/* ─── 3b. Staff Payroll ─── */}
+      {activeSub === 'staff-payouts' && (
+        <StaffAndOtherPayeesTables
+          mode="staff"
+          isSaving={actions.isSaving}
+          billingDraft={actions.billingDraft}
+          setBillingDraft={actions.setBillingDraft}
+          onSaveBillingPolicies={actions.handleSaveBillingPolicies}
+          payoutPeriod={actions.payoutPeriod}
+          setPayoutPeriod={actions.setPayoutPeriod}
+          staffPreviews={actions.staffPreviews}
+          staffHoursMap={actions.staffHoursMap}
+          setStaffHoursMap={actions.setStaffHoursMap}
+          customPayees={actions.customPayees}
+          otherPayeeInputs={actions.otherPayeeInputs}
+          setOtherPayeeInputs={actions.setOtherPayeeInputs}
+          payoutSettlements={actions.payoutSettlements}
+          onSaveCustomPayee={actions.handleSaveCustomPayee}
+          onDeleteCustomPayee={actions.handleDeleteCustomPayee}
+          onRecordSettlement={actions.handleRecordSettlement}
+          onUpdateSettlementStatus={actions.handleUpdateSettlementStatus}
+          onExportPayoutsCsv={actions.handleExportPayoutsCsv}
+        />
+      )}
+
+      {/* ─── 3c. Other Payees ─── */}
+      {activeSub === 'other-payees' && (
+        <StaffAndOtherPayeesTables
+          mode="other"
+          isSaving={actions.isSaving}
+          billingDraft={actions.billingDraft}
+          setBillingDraft={actions.setBillingDraft}
+          onSaveBillingPolicies={actions.handleSaveBillingPolicies}
+          payoutPeriod={actions.payoutPeriod}
+          setPayoutPeriod={actions.setPayoutPeriod}
           staffPreviews={actions.staffPreviews}
           staffHoursMap={actions.staffHoursMap}
           setStaffHoursMap={actions.setStaffHoursMap}

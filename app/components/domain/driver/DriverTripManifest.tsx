@@ -20,6 +20,7 @@ import type { VehicleTierConfig } from '../../../core/types/config';
 import { formatVehicleTierDisplay } from '../../../core/utils/vehicle-tier-format.util';
 import { reconcileBreakdownWithoutRounding } from '../../../core/utils/fare-breakdown.util';
 import { resolveStlTerminalInfo } from '../../../core/config/airports';
+import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
 import { resolveTripFlightBadge } from '../../../core/services/flight/flight-status.service';
 
 export interface DriverTripManifestProps {
@@ -361,7 +362,8 @@ export function DriverTripManifest({ trip, adminVehicles, compact = false }: Dri
         const snap = trip.flightTelemetry;
         const termInfo = resolveStlTerminalInfo(
           snap?.airlineCode || airline || fboFacility,
-          snap?.destinationIata || (typeof meta.airportIataCode === 'string' ? meta.airportIataCode : undefined)
+          snap?.destinationIata || (typeof meta.airportIataCode === 'string' ? meta.airportIataCode : undefined),
+          getAdminConfigService().getCachedSettings().customerBookingConfig
         );
         const pillToneMap: Record<typeof flightBadge.tone, string> = {
           emerald: 'bg-emerald-500/20 text-emerald-200 border-emerald-400/40',
@@ -371,7 +373,7 @@ export function DriverTripManifest({ trip, adminVehicles, compact = false }: Dri
           slate: 'bg-slate-800 text-slate-200 border-slate-600',
         };
         const doorGuidance =
-          snap?.pickupDoorGuidance || flightBadge.pickupDoorGuidance || termInfo.pickupDoorGuidance;
+          termInfo.pickupDoorGuidance || flightBadge.pickupDoorGuidance || snap?.pickupDoorGuidance;
 
         return (
           <div className="bg-sky-950/35 border border-sky-700/40 rounded-2xl p-3 space-y-1.5 text-xs">

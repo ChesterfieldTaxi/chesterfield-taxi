@@ -20,6 +20,7 @@ import {
   computeDriverEarningsRollup,
   computeStaffPayoutPreview,
   exportPayoutsCsv,
+  type DriverPayoutOverrideInput,
   type PayoutPeriodPreset,
   type StaffHoursInputValue,
 } from '../../../../core/services/payouts.service';
@@ -28,6 +29,7 @@ import { triggerInvoicingBrowserDownload } from './invoicing-helpers.util';
 export interface UseAdminPayoutsControllerParams {
   settings: AppSettings;
   billingDraft: NormalizedBillingSettingsConfig;
+  activeSub?: string;
   isActivePayoutsSub: boolean;
   onSave: (updates: Partial<AppSettings>) => Promise<void>;
   setIsSaving: (v: boolean) => void;
@@ -35,16 +37,25 @@ export interface UseAdminPayoutsControllerParams {
   onLedgerRefresh: () => Promise<void>;
 }
 
+function resolvePayeeTabFromSub(sub?: string): PayoutPayeeType {
+  if (sub === 'staff-payouts') return 'staff';
+  if (sub === 'other-payees') return 'other';
+  return 'driver';
+}
+
 export function useAdminPayoutsController({
   settings,
   billingDraft,
+  activeSub,
   isActivePayoutsSub,
   onSave,
   setIsSaving,
   showSuccess,
   onLedgerRefresh,
 }: UseAdminPayoutsControllerParams) {
-  const [activePayeeTab, setActivePayeeTab] = useState<PayoutPayeeType>('driver');
+  const [activePayeeTab, setActivePayeeTab] = useState<PayoutPayeeType>(() =>
+    resolvePayeeTabFromSub(activeSub)
+  );
   const [payoutPeriod, setPayoutPeriod] = useState<PayoutPeriodPreset>('30d');
   const [trips, setTrips] = useState<Trip[]>([]);
   const [drivers, setDrivers] = useState<DriverRosterItem[]>([]);
@@ -52,10 +63,24 @@ export function useAdminPayoutsController({
   const [driverCommissionOverrides, setDriverCommissionOverrides] = useState<Record<string, number>>(
     {}
   );
+  const [driverPayoutOverrides, setDriverPayoutOverrides] = useState<
+    Record<string, DriverPayoutOverrideInput>
+  >({});
   const [staffHoursMap, setStaffHoursMap] = useState<Record<string, StaffHoursInputValue>>({});
   const [otherPayeeInputs, setOtherPayeeInputs] = useState<
     Record<string, { volume: number; adjustments: number }>
   >({});
+
+  useEffect(() => {
+    if (
+      activeSub === 'driver-payouts' ||
+      activeSub === 'staff-payouts' ||
+      activeSub === 'other-payees' ||
+      activeSub === 'payouts'
+    ) {
+      setActivePayeeTab(resolvePayeeTabFromSub(activeSub));
+    }
+  }, [activeSub]);
 
   const customPayees = settings.customPayees || [];
   const payoutSettlements = useMemo(
@@ -130,17 +155,123 @@ export function useAdminPayoutsController({
         billingDraft.driverDefaultCommissionPercent,
         payoutPeriod,
         payoutSettlements,
-        driverCommissionOverrides
+        driverCommissionOverrides,
+        billingDraft,
+        driverPayoutOverrides
       ),
     [
       trips,
       drivers,
-      billingDraft.driverDefaultCommissionPercent,
+      billingDraft,
       payoutPeriod,
       payoutSettlements,
       driverCommissionOverrides,
+      driverPayoutOverrides,
     ]
   );
+
+  const updateDriverPayoutOverride = (
+    driverId: string,
+    patch: Partial<DriverPayoutOverrideInput>
+  ) => {
+    setDriverPayoutOverrides((prev) => {
+      const existing = prev[driverId] || {};
+      return {
+        ...prev,
+        [driverId]: {
+          ...existing,
+          ...patch,
+          ...(patch.paymentTypeCommissionRates !== undefined
+            ? {
+                paymentTypeCommissionRates: {
+                  ...(existing.paymentTypeCommissionRates || {}),
+                  ...patch.paymentTypeCommissionRates,
+                },
+              }
+            : {}),
+        },
+      };
+    });
+  };
+
+  const handleSaveDriverPayoutSettings = async (
+    driverId: string,
+    patch?: Partial<DriverPayoutOverrideInput>
+  ) => {
+    const opSvc = getOperatorService();
+    const existingOp = operators.find((o) => o.uid === driverId) || opSvc.getOperatorById(driverId);
+    const rosterDriver = drivers.find((d) => d.id === driverId);
+    if (!existingOp && !rosterDriver) return;
+
+    const mergedOverride: DriverPayoutOverrideInput = {
+      ...(driverPayoutOverrides[driverId] || {}),
+      ...(patch || {}),
+    };
+
+    setIsSaving(true);
+    try {
+      const baseOp: OperatorUser = existingOp || {
+        uid: driverId,
+        email: rosterDriver?.email || `${driverId}@chesterfieldtaxi.com`,
+        displayName: rosterDriver?.name || driverId,
+        firstName: rosterDriver?.firstName,
+        lastName: rosterDriver?.lastName,
+        cabNumber: rosterDriver?.cabNumber,
+        username: rosterDriver?.username,
+        role: 'driver',
+        roles: ['driver'],
+        phone: rosterDriver?.phone || '',
+        carOwnership: rosterDriver?.carOwnership || 'owner_operator',
+      };
+
+      const nextCommissionRate =
+        mergedOverride.commissionPercent !== undefined
+          ? mergedOverride.commissionPercent === null
+            ? undefined
+            : Number(
+                Math.min(1, Math.max(0, Number(mergedOverride.commissionPercent) / 100)).toFixed(4)
+              )
+          : driverCommissionOverrides[driverId] !== undefined
+          ? Number(
+              Math.min(1, Math.max(0, driverCommissionOverrides[driverId] / 100)).toFixed(4)
+            )
+          : baseOp.commissionRate;
+
+      const updatedOp: OperatorUser = {
+        ...baseOp,
+        carOwnership: mergedOverride.carOwnership ?? baseOp.carOwnership ?? 'owner_operator',
+        payoutType: mergedOverride.payoutType ?? baseOp.payoutType ?? 'percent',
+        flatPayoutPeriod: mergedOverride.flatPayoutPeriod ?? baseOp.flatPayoutPeriod ?? 'week',
+        flatPayoutAmount:
+          mergedOverride.flatPayoutAmount !== undefined
+            ? Math.max(0, Number(mergedOverride.flatPayoutAmount) || 0)
+            : baseOp.flatPayoutAmount,
+        commissionRate: nextCommissionRate,
+        paymentTypeCommissionRates:
+          mergedOverride.paymentTypeCommissionRates !== undefined
+            ? {
+                ...(baseOp.paymentTypeCommissionRates || {}),
+                ...mergedOverride.paymentTypeCommissionRates,
+              }
+            : baseOp.paymentTypeCommissionRates,
+      };
+
+      await opSvc.saveOperator(updatedOp);
+      setDriverPayoutOverrides((prev) => {
+        const next = { ...prev };
+        delete next[driverId];
+        return next;
+      });
+      setDriverCommissionOverrides((prev) => {
+        const next = { ...prev };
+        delete next[driverId];
+        return next;
+      });
+      showSuccess(`Saved payout rule for ${updatedOp.displayName || driverId}.`, 3000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const staffPreviews = useMemo(
     () =>
@@ -241,7 +372,13 @@ export function useAdminPayoutsController({
   };
 
   const handleExportPayoutsCsv = () => {
-    const source = payoutSettlements.length > 0 ? payoutSettlements : driverRollups;
+    const filteredSettlements = payoutSettlements.filter((s) => s.payeeType === activePayeeTab);
+    const source =
+      filteredSettlements.length > 0
+        ? filteredSettlements
+        : activePayeeTab === 'driver'
+        ? driverRollups
+        : payoutSettlements;
     const exported = exportPayoutsCsv(source);
     triggerInvoicingBrowserDownload(exported.csvContent, exported.mimeType, exported.fileName);
     showSuccess(`Exported ${exported.rowCount} payout record(s) (${exported.fileName}).`, 3500);
@@ -255,6 +392,9 @@ export function useAdminPayoutsController({
     driverRollups,
     driverCommissionOverrides,
     setDriverCommissionOverrides,
+    driverPayoutOverrides,
+    updateDriverPayoutOverride,
+    handleSaveDriverPayoutSettings,
     staffPreviews,
     staffHoursMap,
     setStaffHoursMap,

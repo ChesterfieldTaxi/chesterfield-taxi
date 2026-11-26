@@ -235,7 +235,7 @@ export const ADMIN_GUIDES: HelpGuide[] = [
       {
         question: 'Can dispatchers pause Auto-Pilot or adjust lead windows during a rush?',
         answer:
-          'Yes, if permitted under Drivers & Staff → Role & Lead-Window Access, operators can pause/resume Auto-Pilot directly from the Dispatch Console header.',
+          'Yes, if permitted under Drivers & Staff → Roles & Permissions, operators can pause/resume Auto-Pilot directly from the Dispatch Console header.',
       },
       {
         question: 'When do changes on Dispatch & Automation take effect?',
@@ -557,9 +557,9 @@ export const ADMIN_GUIDES: HelpGuide[] = [
           'Navigate to Drivers & Staff → Roster to create or edit driver and dispatcher profiles, contact numbers, callsigns, assigned vehicles, and active status.',
       },
       {
-        title: 'Configure Role & Lead-Window Access',
+        title: 'Configure Roles & Permissions',
         description:
-          'Open Role & Lead-Window Access to control which staff roles can edit pre-pickup lead windows, override staged drivers, or access administrative modules.',
+          'Open Roles & Permissions to control which staff roles can edit pre-pickup lead windows, override staged drivers, or access administrative modules.',
       },
       {
         title: 'Set Driver App Policies',
@@ -578,7 +578,7 @@ export const ADMIN_GUIDES: HelpGuide[] = [
         rows: [
           { label: 'Roster', description: 'Active and inactive drivers, dispatchers, and staff accounts.' },
           {
-            label: 'Role & Lead-Window Access',
+            label: 'Roles & Permissions',
             description: 'Granular operational permissions for dispatchers and supervisors.',
           },
           {

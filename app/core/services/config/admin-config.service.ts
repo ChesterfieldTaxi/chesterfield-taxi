@@ -14,6 +14,10 @@
  */
 
 import { doc, getDoc, setDoc, onSnapshot, type Firestore } from 'firebase/firestore';
+import {
+  DEFAULT_TERMINAL_PICKUP_LOCATIONS,
+  buildCombinedLambertPickupInstructions,
+} from '../../config/airports';
 import type {
   AppSettings,
   CustomerBookingConfig,
@@ -127,7 +131,10 @@ export const DEFAULT_CUSTOMER_BOOKING_CONFIG: CustomerBookingConfig = {
   requireFlightNumberForAirport: false,
   airportMeetAndGreetOptions: 'curbside',
   flightDelayGraceMinutes: 45,
-  lambertPickupInstructions: 'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time.',
+  lambertPickupInstructions: buildCombinedLambertPickupInstructions(DEFAULT_TERMINAL_PICKUP_LOCATIONS),
+  terminal1PickupLocation: DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal1PickupLocation,
+  terminal2PickupLocation: DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal2PickupLocation,
+  privateFboPickupLocation: DEFAULT_TERMINAL_PICKUP_LOCATIONS.privateFboPickupLocation,
   allowRoundTrip: true,
   roundTripDiscountPercent: 5,
   allowChildSafetySeats: true,
@@ -370,8 +377,34 @@ function normalizeCustomerBookingConfig(
     ...fallback,
     ...(incoming || {}),
   };
+  const terminal1PickupLocation =
+    (merged.terminal1PickupLocation || '').trim() ||
+    DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal1PickupLocation;
+  const terminal2PickupLocation =
+    (merged.terminal2PickupLocation || '').trim() ||
+    DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal2PickupLocation;
+  const privateFboPickupLocation =
+    (merged.privateFboPickupLocation || '').trim() ||
+    DEFAULT_TERMINAL_PICKUP_LOCATIONS.privateFboPickupLocation;
+  const hasStructuredUpdate =
+    incoming?.terminal1PickupLocation !== undefined ||
+    incoming?.terminal2PickupLocation !== undefined ||
+    incoming?.privateFboPickupLocation !== undefined;
+  const lambertPickupInstructions =
+    hasStructuredUpdate || !(merged.lambertPickupInstructions || '').trim()
+      ? buildCombinedLambertPickupInstructions({
+          terminal1PickupLocation,
+          terminal2PickupLocation,
+          privateFboPickupLocation,
+        })
+      : (merged.lambertPickupInstructions || '').trim();
+
   return {
     ...merged,
+    terminal1PickupLocation,
+    terminal2PickupLocation,
+    privateFboPickupLocation,
+    lambertPickupInstructions,
     allowPublicCorporateCheckout: Boolean(merged.allowPublicCorporateCheckout),
     guestSelfServicePolicy: normalizeGuestSelfServicePolicy(
       incoming?.guestSelfServicePolicy ?? fallback?.guestSelfServicePolicy

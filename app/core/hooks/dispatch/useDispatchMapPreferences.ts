@@ -1,4 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type {
+  DispatchFlightBadgeFormat,
+  DispatchFlightBadgePlacement,
+} from '../../types/config';
 
 export const DISPATCH_MAP_PREFS_STORAGE_KEY = 'ct_dispatch_map_prefs_v1';
 
@@ -19,6 +23,12 @@ export interface DispatchMapPreferences {
   showExclusionsOverlay: boolean;
   /** Render active non-archived Driver Home base pins on the Dispatch map (default: false). */
   showDriverHomesOverlay: boolean;
+  /** Show flight telemetry badge on Trips Queue rows (default: true). */
+  showQueueFlightBadge: boolean;
+  /** Format for Trips Queue flight badge (default: 'ident_from_origin'). */
+  flightBadgeFormat: DispatchFlightBadgeFormat;
+  /** Placement of Trips Queue flight badge relative to pickup time (default: 'stacked'). */
+  flightBadgePlacement: DispatchFlightBadgePlacement;
   /** Multi-select vehicle type filter keys; empty array `[]` means all vehicle types shown (default: []). */
   selectedVehicleTypes: string[];
 }
@@ -29,6 +39,9 @@ export interface DispatchMapAdminOverlayDefaults {
   defaultShowPlacesOverlay?: boolean;
   defaultShowExclusionsOverlay?: boolean;
   defaultShowDriverHomesOverlay?: boolean;
+  showQueueFlightBadge?: boolean;
+  flightBadgeFormat?: DispatchFlightBadgeFormat;
+  flightBadgePlacement?: DispatchFlightBadgePlacement;
 }
 
 export const DEFAULT_DISPATCH_MAP_PREFERENCES: DispatchMapPreferences = Object.freeze({
@@ -40,6 +53,9 @@ export const DEFAULT_DISPATCH_MAP_PREFERENCES: DispatchMapPreferences = Object.f
   showPlacesOverlay: false,
   showExclusionsOverlay: false,
   showDriverHomesOverlay: false,
+  showQueueFlightBadge: true,
+  flightBadgeFormat: 'ident_from_origin',
+  flightBadgePlacement: 'stacked',
   selectedVehicleTypes: [],
 });
 
@@ -82,6 +98,19 @@ function buildFallbackPreferences(
       adminDefaults?.defaultShowDriverHomesOverlay ??
         DEFAULT_DISPATCH_MAP_PREFERENCES.showDriverHomesOverlay
     ),
+    showQueueFlightBadge: Boolean(
+      adminDefaults?.showQueueFlightBadge ??
+        DEFAULT_DISPATCH_MAP_PREFERENCES.showQueueFlightBadge
+    ),
+    flightBadgeFormat:
+      adminDefaults?.flightBadgeFormat === 'ident_terminal' ||
+      adminDefaults?.flightBadgeFormat === 'origin_only'
+        ? adminDefaults.flightBadgeFormat
+        : DEFAULT_DISPATCH_MAP_PREFERENCES.flightBadgeFormat,
+    flightBadgePlacement:
+      adminDefaults?.flightBadgePlacement === 'inline'
+        ? 'inline'
+        : DEFAULT_DISPATCH_MAP_PREFERENCES.flightBadgePlacement,
     selectedVehicleTypes: [],
   };
 }
@@ -138,6 +167,20 @@ export function parseDispatchMapPreferences(
         typeof obj.showDriverHomesOverlay === 'boolean'
           ? obj.showDriverHomesOverlay
           : fallback.showDriverHomesOverlay,
+      showQueueFlightBadge:
+        typeof obj.showQueueFlightBadge === 'boolean'
+          ? obj.showQueueFlightBadge
+          : fallback.showQueueFlightBadge,
+      flightBadgeFormat:
+        obj.flightBadgeFormat === 'ident_from_origin' ||
+        obj.flightBadgeFormat === 'ident_terminal' ||
+        obj.flightBadgeFormat === 'origin_only'
+          ? obj.flightBadgeFormat
+          : fallback.flightBadgeFormat,
+      flightBadgePlacement:
+        obj.flightBadgePlacement === 'stacked' || obj.flightBadgePlacement === 'inline'
+          ? obj.flightBadgePlacement
+          : fallback.flightBadgePlacement,
       selectedVehicleTypes: normalizeVehicleTypeArray(obj.selectedVehicleTypes),
     };
   } catch {
@@ -172,6 +215,13 @@ export function serializeDispatchMapPreferences(prefs: Partial<DispatchMapPrefer
     showDriverHomesOverlay: Boolean(
       prefs.showDriverHomesOverlay ?? DEFAULT_DISPATCH_MAP_PREFERENCES.showDriverHomesOverlay
     ),
+    showQueueFlightBadge: Boolean(
+      prefs.showQueueFlightBadge ?? DEFAULT_DISPATCH_MAP_PREFERENCES.showQueueFlightBadge
+    ),
+    flightBadgeFormat:
+      prefs.flightBadgeFormat ?? DEFAULT_DISPATCH_MAP_PREFERENCES.flightBadgeFormat,
+    flightBadgePlacement:
+      prefs.flightBadgePlacement ?? DEFAULT_DISPATCH_MAP_PREFERENCES.flightBadgePlacement,
     selectedVehicleTypes: normalizeVehicleTypeArray(prefs.selectedVehicleTypes),
   });
 }
@@ -186,6 +236,9 @@ function arePreferencesEqual(a: DispatchMapPreferences, b: DispatchMapPreference
     a.showPlacesOverlay !== b.showPlacesOverlay ||
     a.showExclusionsOverlay !== b.showExclusionsOverlay ||
     a.showDriverHomesOverlay !== b.showDriverHomesOverlay ||
+    a.showQueueFlightBadge !== b.showQueueFlightBadge ||
+    a.flightBadgeFormat !== b.flightBadgeFormat ||
+    a.flightBadgePlacement !== b.flightBadgePlacement ||
     a.selectedVehicleTypes.length !== b.selectedVehicleTypes.length
   ) {
     return false;
@@ -234,7 +287,7 @@ function writeClientStoredPreferences(next: DispatchMapPreferences): void {
 
 export type DispatchMapBooleanPreferenceKey = Exclude<
   keyof DispatchMapPreferences,
-  'selectedVehicleTypes'
+  'selectedVehicleTypes' | 'flightBadgeFormat' | 'flightBadgePlacement'
 >;
 
 export interface UseDispatchMapPreferencesResult {

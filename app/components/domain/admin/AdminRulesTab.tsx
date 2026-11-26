@@ -23,6 +23,11 @@ import type {
 } from '../../../core/types/config';
 import { getZoneService } from '../../../core/services/zones/zone.service';
 import type { ZoneGeofence } from '../../../core/types/zone';
+import {
+  DEFAULT_TERMINAL_PICKUP_LOCATIONS,
+  buildCombinedLambertPickupInstructions,
+  type TerminalPickupLocations,
+} from '../../../core/config/airports';
 import { AdminAutoDispatchControlPanel } from './rules/AdminAutoDispatchControlPanel';
 import { BookingIntakeRulesPanel } from './rules/BookingIntakeRulesPanel';
 import { DispatchConsoleSettingsPanel } from './rules/DispatchConsoleSettingsPanel';
@@ -61,12 +66,16 @@ export function AdminRulesTab({ initialSection = 'auto-dispatch' }: AdminRulesTa
   const [zones, setZones] = useState<ZoneGeofence[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
-  const [lambertInstructions, setLambertInstructions] = useState<string>(() => {
-    const cached = getAdminConfigService().getCachedSettings();
-    return (
-      cached.customerBookingConfig?.lambertPickupInstructions ||
-      'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time.'
-    );
+  const [terminalLocations, setTerminalLocations] = useState<Required<TerminalPickupLocations>>(() => {
+    const cached = getAdminConfigService().getCachedSettings().customerBookingConfig;
+    return {
+      terminal1PickupLocation:
+        cached?.terminal1PickupLocation || DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal1PickupLocation,
+      terminal2PickupLocation:
+        cached?.terminal2PickupLocation || DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal2PickupLocation,
+      privateFboPickupLocation:
+        cached?.privateFboPickupLocation || DEFAULT_TERMINAL_PICKUP_LOCATIONS.privateFboPickupLocation,
+    };
   });
   const [dispatchAutomation, setDispatchAutomation] = useState<DispatchAutomationConfig>(() =>
     normalizeDispatchAutomationConfig(
@@ -88,7 +97,19 @@ export function AdminRulesTab({ initialSection = 'auto-dispatch' }: AdminRulesTa
     getZoneService().getZones().then((res) => setZones(res.filter((z) => z.isActive && !z.isArchived))).catch(() => {});
     const unsub = getAdminConfigService().subscribeToSettings((s) => {
       if (s.bookingRulesConfig) setConfig(hydrateBookingRules(s.bookingRulesConfig));
-      if (s.customerBookingConfig?.lambertPickupInstructions !== undefined) setLambertInstructions(s.customerBookingConfig.lambertPickupInstructions);
+      if (s.customerBookingConfig) {
+        setTerminalLocations({
+          terminal1PickupLocation:
+            s.customerBookingConfig.terminal1PickupLocation ||
+            DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal1PickupLocation,
+          terminal2PickupLocation:
+            s.customerBookingConfig.terminal2PickupLocation ||
+            DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal2PickupLocation,
+          privateFboPickupLocation:
+            s.customerBookingConfig.privateFboPickupLocation ||
+            DEFAULT_TERMINAL_PICKUP_LOCATIONS.privateFboPickupLocation,
+        });
+      }
       if (s.dispatchAutomation) setDispatchAutomation(normalizeDispatchAutomationConfig(s.dispatchAutomation));
       setConsoleConfig(normalizeDispatchConsoleConfig(s.dispatchConsoleConfig, s.enableRealtimeRouting));
       setStandingConfig(normalizeStandingOrdersConfig(s.standingOrdersConfig));
@@ -148,7 +169,8 @@ export function AdminRulesTab({ initialSection = 'auto-dispatch' }: AdminRulesTa
         customerBookingConfig: {
           ...DEFAULT_CUSTOMER_BOOKING_CONFIG,
           ...(cachedSettings.customerBookingConfig || {}),
-          lambertPickupInstructions: lambertInstructions,
+          ...terminalLocations,
+          lambertPickupInstructions: buildCombinedLambertPickupInstructions(terminalLocations),
         },
       });
       setSaveStatus('Dispatch & Automation policies saved and synced live.');
@@ -203,8 +225,8 @@ export function AdminRulesTab({ initialSection = 'auto-dispatch' }: AdminRulesTa
 
       {activeSection === 'intake-rules' && (
         <BookingIntakeRulesPanel
-          config={config} zones={zones} lambertInstructions={lambertInstructions} isSaving={isSaving}
-          onChangeConfig={setConfig} onChangeLambertInstructions={setLambertInstructions} onSave={handleSave}
+          config={config} zones={zones} terminalLocations={terminalLocations} isSaving={isSaving}
+          onChangeConfig={setConfig} onChangeTerminalLocations={setTerminalLocations} onSave={handleSave}
         />
       )}
 

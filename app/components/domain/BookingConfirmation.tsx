@@ -27,6 +27,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { getAdminConfigService } from '../../core/services/config/admin-config.service';
+import { buildCombinedLambertPickupInstructions } from '../../core/config/airports';
 import { getAdminAuthService } from '../../core/services/auth/admin-auth.service';
 import type { VehicleTierConfig } from '../../core/types/config';
 import { formatVehicleTierDisplay } from '../../core/utils/vehicle-tier-format.util';
@@ -114,7 +115,7 @@ export function BookingConfirmation({
 
   const lambertInstructions =
     bookingConfig?.lambertPickupInstructions ||
-    'Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time.';
+    buildCombinedLambertPickupInstructions(bookingConfig);
 
   const [copiedId, setCopiedId] = React.useState(false);
   const [isSignedIn, setIsSignedIn] = React.useState(() =>

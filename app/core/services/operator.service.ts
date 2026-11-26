@@ -21,7 +21,13 @@ import type { UserRole } from './auth/admin-auth.service';
 
 const STAFF_AND_DRIVER_ROLES = ['admin', 'dispatcher', 'driver', 'operator'] as const;
 import type { GeoPoint } from '../types/trip';
-import type { DriverScheduleConfig } from '../types/driver';
+import type {
+  DriverCarOwnership,
+  DriverPayoutType,
+  DriverScheduleConfig,
+  FlatPayoutPeriod,
+  PaymentTypeCommissionRates,
+} from '../types/driver';
 import type { ThemePreference } from '../../config/theme-tokens';
 
 /**
@@ -113,6 +119,12 @@ export interface OperatorUser {
   homeAddress?: string;
   homeCoordinates?: GeoPoint;
   schedule?: DriverScheduleConfig;
+  carOwnership?: DriverCarOwnership;
+  payoutType?: DriverPayoutType;
+  flatPayoutPeriod?: FlatPayoutPeriod;
+  flatPayoutAmount?: number;
+  commissionRate?: number;
+  paymentTypeCommissionRates?: PaymentTypeCommissionRates;
   themePreference?: ThemePreference;
 }
 
@@ -139,6 +151,12 @@ export interface DriverRosterItem {
   homeAddress?: string;
   homeCoordinates?: GeoPoint;
   schedule?: DriverScheduleConfig;
+  carOwnership?: DriverCarOwnership;
+  payoutType?: DriverPayoutType;
+  flatPayoutPeriod?: FlatPayoutPeriod;
+  flatPayoutAmount?: number;
+  commissionRate?: number;
+  paymentTypeCommissionRates?: PaymentTypeCommissionRates;
   themePreference?: ThemePreference;
 }
 
@@ -411,6 +429,20 @@ export class OperatorService {
             homeAddress: data.homeAddress || undefined,
             homeCoordinates: data.homeCoordinates || undefined,
             schedule: data.schedule || undefined,
+            carOwnership: data.carOwnership === 'company_owned' ? 'company_owned' : 'owner_operator',
+            payoutType:
+              data.payoutType === 'flat' ? 'flat' : data.payoutType === 'percent' ? 'percent' : undefined,
+            flatPayoutPeriod:
+              data.flatPayoutPeriod === 'day' ||
+              data.flatPayoutPeriod === 'week' ||
+              data.flatPayoutPeriod === 'month'
+                ? data.flatPayoutPeriod
+                : undefined,
+            flatPayoutAmount:
+              typeof data.flatPayoutAmount === 'number' ? data.flatPayoutAmount : undefined,
+            commissionRate:
+              typeof data.commissionRate === 'number' ? data.commissionRate : undefined,
+            paymentTypeCommissionRates: data.paymentTypeCommissionRates || undefined,
           });
         }
       });
@@ -497,6 +529,12 @@ export class OperatorService {
         homeAddress: op.homeAddress,
         homeCoordinates: op.homeCoordinates,
         schedule: op.schedule,
+        carOwnership: op.carOwnership === 'company_owned' ? 'company_owned' : 'owner_operator',
+        payoutType: op.payoutType,
+        flatPayoutPeriod: op.flatPayoutPeriod,
+        flatPayoutAmount: op.flatPayoutAmount,
+        commissionRate: op.commissionRate,
+        paymentTypeCommissionRates: op.paymentTypeCommissionRates,
       };
     });
 
@@ -637,6 +675,12 @@ export class OperatorService {
       assignedUnit,
       homeAddress: normalizedHomeAddress,
       homeCoordinates: normalizedHomeAddress ? operator.homeCoordinates || undefined : undefined,
+      ...(normalizedRoles.includes('driver')
+        ? {
+            carOwnership:
+              operator.carOwnership === 'company_owned' ? 'company_owned' : 'owner_operator',
+          }
+        : {}),
     };
 
     if (isFirebaseConfigured()) {
@@ -645,7 +689,7 @@ export class OperatorService {
         const sanitized = Object.fromEntries(
           Object.entries(completeOperator).filter(([, v]) => v !== undefined)
         );
-        // Explicit null clears a removed Driver Home Address on `{ merge: true }` writes
+        // Explicit null clears removed optional fields on `{ merge: true }` writes
         // (only when the caller supplied the field, so partial saves never wipe it).
         const homePatch =
           'homeAddress' in operator
@@ -654,7 +698,21 @@ export class OperatorService {
                 homeCoordinates: completeOperator.homeCoordinates ?? null,
               }
             : {};
-        await setDoc(doc(db, 'users', completeOperator.uid), { ...sanitized, ...homePatch }, { merge: true });
+        const payoutPatch: Record<string, unknown> = {};
+        if ('commissionRate' in operator && completeOperator.commissionRate === undefined) {
+          payoutPatch.commissionRate = null;
+        }
+        if (
+          'paymentTypeCommissionRates' in operator &&
+          completeOperator.paymentTypeCommissionRates === undefined
+        ) {
+          payoutPatch.paymentTypeCommissionRates = null;
+        }
+        await setDoc(
+          doc(db, 'users', completeOperator.uid),
+          { ...sanitized, ...homePatch, ...payoutPatch },
+          { merge: true }
+        );
       } catch (err) {
         console.warn('[OperatorService] Firestore save error:', err);
       }

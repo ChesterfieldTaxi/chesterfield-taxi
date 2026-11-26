@@ -28,6 +28,7 @@ import {
 } from './trip-queue-columns.util';
 import { useQueueTableColumns } from './TripQueueColumnsDropdown';
 import { DriverAssignDropdown } from './DriverAssignDropdown';
+import { useDispatchMapPreferences } from '../../../../core/hooks/dispatch/useDispatchMapPreferences';
 import { getDispatchStatusBadge } from './DispatchStatusBadge';
 
 export interface TripQueueTableViewProps {
@@ -83,6 +84,7 @@ export function TripQueueTableView({
   const tableRef = useRef<HTMLTableElement | null>(null);
   const [columnSort, setColumnSort] = useState<QueueColumnSortState>(DEFAULT_QUEUE_COLUMN_SORT);
   const nowMs = useLiveClockNowMs(30_000);
+  const { preferences: dispatchPrefs } = useDispatchMapPreferences(settings.dispatchConsoleConfig);
   const internalCols = useQueueTableColumns();
   const activeColumns = externalColumns ?? internalCols.visibleColumns;
   const activeMinWidthPx = externalMinWidthPx ?? computeQueueTableMinWidthPx(activeColumns);
@@ -307,13 +309,35 @@ export function TripQueueTableView({
                 {visibleColSet.has('date_time') && (
                   <td className="py-2 px-2 font-semibold text-fg-secondary whitespace-nowrap">
                     <div className="flex flex-col items-start gap-0.5">
-                      <span className={`whitespace-nowrap ${isAsapRow ? 'font-extrabold text-fg-primary' : ''}`}>
-                        {pickupTimeStr}
-                      </span>
-                      {(hasSlaBadge || hasFlightBadge) && (
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
+                        <span className={`whitespace-nowrap ${isAsapRow ? 'font-extrabold text-fg-primary' : ''}`}>
+                          {pickupTimeStr}
+                        </span>
+                        {dispatchPrefs.showQueueFlightBadge &&
+                          dispatchPrefs.flightBadgePlacement === 'inline' &&
+                          hasFlightBadge && (
+                            <DispatchFlightTelemetryPill
+                              trip={trip}
+                              compact
+                              format={dispatchPrefs.flightBadgeFormat}
+                            />
+                          )}
+                      </div>
+                      {(hasSlaBadge ||
+                        (dispatchPrefs.showQueueFlightBadge &&
+                          dispatchPrefs.flightBadgePlacement !== 'inline' &&
+                          hasFlightBadge)) && (
                         <div className="flex items-center gap-1 whitespace-nowrap">
                           <DispatchSlaBadge sla={tripSla} />
-                          <DispatchFlightTelemetryPill trip={trip} compact />
+                          {dispatchPrefs.showQueueFlightBadge &&
+                            dispatchPrefs.flightBadgePlacement !== 'inline' &&
+                            hasFlightBadge && (
+                              <DispatchFlightTelemetryPill
+                                trip={trip}
+                                compact
+                                format={dispatchPrefs.flightBadgeFormat}
+                              />
+                            )}
                         </div>
                       )}
                     </div>

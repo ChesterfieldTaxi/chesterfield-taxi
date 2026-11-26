@@ -1,5 +1,6 @@
 import React from 'react';
 import type {
+  PayoutPayeeType,
   PayoutSettlementRecord,
   PayoutSettlementStatus,
 } from '../../../../core/types/config';
@@ -10,6 +11,7 @@ import { Button } from '../../../ui/Button';
 
 export interface PayoutSettlementHistoryTableProps {
   payoutSettlements: PayoutSettlementRecord[];
+  payeeTypeFilter?: PayoutPayeeType;
   isSaving: boolean;
   onUpdateSettlementStatus: (
     settlementId: string,
@@ -18,16 +20,28 @@ export interface PayoutSettlementHistoryTableProps {
   ) => Promise<void>;
 }
 
+const HISTORY_TITLES: Record<PayoutPayeeType, string> = {
+  driver: 'Driver Payout Settlement History',
+  staff: 'Staff Payroll Settlement History',
+  other: 'Other Payees Settlement History',
+};
+
 export function PayoutSettlementHistoryTable({
   payoutSettlements,
+  payeeTypeFilter,
   isSaving,
   onUpdateSettlementStatus,
 }: PayoutSettlementHistoryTableProps) {
+  const visibleSettlements = payeeTypeFilter
+    ? payoutSettlements.filter((s) => s.payeeType === payeeTypeFilter)
+    : payoutSettlements;
+  const title = payeeTypeFilter ? HISTORY_TITLES[payeeTypeFilter] : 'Payout Settlement History';
+
   return (
     <Card className="border border-border-subtle/90 shadow-xs overflow-hidden">
       <CardHeader className="pb-2.5 border-b border-border-faint">
         <CardTitle className="text-sm font-black text-fg-primary">
-          Payout Settlement History ({payoutSettlements.length})
+          {title} ({visibleSettlements.length})
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0 overflow-x-auto">
@@ -44,7 +58,7 @@ export function PayoutSettlementHistoryTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-border-faint">
-            {payoutSettlements.map((s) => (
+            {visibleSettlements.map((s) => (
               <tr key={s.id} className="hover:bg-surface-subtle/70">
                 <td className="px-4 py-2.5 font-mono text-[11px] text-fg-secondary">
                   {s.periodStart} &rarr; {s.periodEnd}
@@ -106,7 +120,7 @@ export function PayoutSettlementHistoryTable({
                 </td>
               </tr>
             ))}
-            {payoutSettlements.length === 0 && (
+            {visibleSettlements.length === 0 && (
               <tr>
                 <td colSpan={7} className="py-8 text-center text-fg-subtle">
                   No payout settlements recorded yet.

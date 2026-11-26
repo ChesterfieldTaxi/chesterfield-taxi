@@ -3,26 +3,31 @@ import { Button } from '../../../ui/Button';
 import { CheckIcon, PlaneIcon, SlidersIcon, SpinnerIcon } from '../../../ui/Icons';
 import type { BookingRulesConfig } from '../../../../core/services/bookingRulesEngine';
 import type { ZoneGeofence } from '../../../../core/types/zone';
+import {
+  DEFAULT_TERMINAL_PICKUP_LOCATIONS,
+  buildCombinedLambertPickupInstructions,
+  type TerminalPickupLocations,
+} from '../../../../core/config/airports';
 import { ModularTierCard } from './ModularTierCard';
 import { BookingRulesSimulatorCard } from './BookingRulesSimulatorCard';
 
 export interface BookingIntakeRulesPanelProps {
   config: BookingRulesConfig;
   zones: ZoneGeofence[];
-  lambertInstructions: string;
+  terminalLocations: Required<TerminalPickupLocations>;
   isSaving: boolean;
   onChangeConfig: (next: BookingRulesConfig) => void;
-  onChangeLambertInstructions: (next: string) => void;
+  onChangeTerminalLocations: (next: Required<TerminalPickupLocations>) => void;
   onSave: () => void | Promise<void>;
 }
 
 export function BookingIntakeRulesPanel({
   config,
   zones,
-  lambertInstructions,
+  terminalLocations,
   isSaving,
   onChangeConfig,
-  onChangeLambertInstructions,
+  onChangeTerminalLocations,
   onSave,
 }: BookingIntakeRulesPanelProps) {
   return (
@@ -111,15 +116,65 @@ export function BookingIntakeRulesPanel({
             </span>
           </div>
 
-          <textarea
-            rows={3}
-            value={lambertInstructions}
-            onChange={(e) => onChangeLambertInstructions(e.target.value)}
-            placeholder="e.g. Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time."
-            className="w-full px-3.5 py-2.5 border border-border-subtle rounded-xl text-xs font-medium text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface-subtle/50"
-          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-fg-strong mb-1">
+                STL Terminal 1 Pickup Location
+              </label>
+              <input
+                type="text"
+                value={terminalLocations.terminal1PickupLocation}
+                onChange={(e) =>
+                  onChangeTerminalLocations({
+                    ...terminalLocations,
+                    terminal1PickupLocation: e.target.value,
+                  })
+                }
+                placeholder={DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal1PickupLocation}
+                className="w-full px-3 py-2 border border-border-subtle rounded-xl text-xs font-medium text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface-subtle/50"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-fg-strong mb-1">
+                STL Terminal 2 (Southwest / Lufthansa)
+              </label>
+              <input
+                type="text"
+                value={terminalLocations.terminal2PickupLocation}
+                onChange={(e) =>
+                  onChangeTerminalLocations({
+                    ...terminalLocations,
+                    terminal2PickupLocation: e.target.value,
+                  })
+                }
+                placeholder={DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal2PickupLocation}
+                className="w-full px-3 py-2 border border-border-subtle rounded-xl text-xs font-medium text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface-subtle/50"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-fg-strong mb-1">
+                Private FBO (SUS / CPS) Pickup
+              </label>
+              <input
+                type="text"
+                value={terminalLocations.privateFboPickupLocation}
+                onChange={(e) =>
+                  onChangeTerminalLocations({
+                    ...terminalLocations,
+                    privateFboPickupLocation: e.target.value,
+                  })
+                }
+                placeholder={DEFAULT_TERMINAL_PICKUP_LOCATIONS.privateFboPickupLocation}
+                className="w-full px-3 py-2 border border-border-subtle rounded-xl text-xs font-medium text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface-subtle/50"
+              />
+            </div>
+          </div>
+          <p className="text-[11px] text-fg-secondary bg-surface-subtle/70 px-3 py-2 rounded-xl border border-border-faint">
+            <span className="font-bold text-fg-primary">Combined Summary: </span>
+            {buildCombinedLambertPickupInstructions(terminalLocations)}
+          </p>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-fg-muted">
-            <span>Synced automatically with Website → Booking &amp; /track → Airport Rules.</span>
+            <span>Synced automatically with Website → Booking &amp; Tracking → Airport Rules.</span>
             <Button
               size="sm"
               variant="outline"

@@ -168,16 +168,20 @@ export const DispatchCascadePill = React.memo(function DispatchCascadePill({
   return null;
 });
 
+import type { DispatchFlightBadgeFormat } from '../../../core/types/config';
+
 export interface DispatchFlightTelemetryPillProps {
   trip: Trip;
   compact?: boolean;
+  format?: DispatchFlightBadgeFormat;
 }
 
 export const DispatchFlightTelemetryPill = React.memo(function DispatchFlightTelemetryPill({
   trip,
   compact = false,
+  format,
 }: DispatchFlightTelemetryPillProps) {
-  const badge = resolveTripFlightBadge(trip);
+  const badge = resolveTripFlightBadge(trip, { format });
   if (!badge.hasFlight || !badge.label) {
     return null;
   }
@@ -201,11 +205,11 @@ export const DispatchFlightTelemetryPill = React.memo(function DispatchFlightTel
   return (
     <span
       title={tooltipParts.join(' · ')}
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10.5px] font-extrabold tracking-tight shrink-0 ${
+      className={`inline-flex items-center gap-1 px-1.5 py-0 rounded-full border text-[10px] font-medium leading-tight tracking-tight shrink-0 ${
         toneClasses[badge.tone]
       }`}
     >
-      <PlaneIcon className="w-3 h-3 shrink-0" />
+      <PlaneIcon className="w-2.5 h-2.5 shrink-0" />
       <span className={compact ? 'truncate max-w-[140px]' : ''}>
         {compact ? badge.shortLabel : badge.label}
       </span>

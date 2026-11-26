@@ -9,14 +9,22 @@
  */
 
 import {
+  DEFAULT_COMMISSIONABLE_FARE_COMPONENTS,
   normalizeBillingSettingsConfig,
   type BillingSettingsConfig,
+  type CommissionableFareComponent,
   type CustomPayeeCategory,
   type CustomPayeeRateType,
   type PayoutPayeeRecord,
   type PayoutPayeeType,
   type PayoutSettlementRecord,
 } from '../types/config';
+import type {
+  DriverCarOwnership,
+  DriverPayoutType,
+  FlatPayoutPeriod,
+  PaymentTypeCommissionRates,
+} from '../types/driver';
 import type { FinancialLedgerEntry, LedgerEntryType } from '../types/invoicing';
 import type { Trip } from '../types/trip';
 import { escapeCsvCell } from './analytics/operational-intelligence.service';
@@ -42,21 +50,53 @@ export type PayoutPeriodInput =
   | null
   | undefined;
 
+export interface ExtractedTripFareComponents {
+  baseFare: number;
+  extras: number;
+  waitDelay: number;
+  surcharges: number;
+  tolls: number;
+  tips: number;
+  grossFareExTipAndTolls: number;
+}
+
+export interface DriverPayoutOverrideInput {
+  carOwnership?: DriverCarOwnership;
+  payoutType?: DriverPayoutType;
+  flatPayoutPeriod?: FlatPayoutPeriod;
+  flatPayoutAmount?: number;
+  commissionPercent?: number | null;
+  paymentTypeCommissionRates?: PaymentTypeCommissionRates;
+}
+
 export interface DriverEarningsRollupRow {
   driverId: string;
   driverName: string;
   cabNumber?: string;
+  carOwnership: DriverCarOwnership;
+  payoutType: DriverPayoutType;
+  flatPayoutPeriod: FlatPayoutPeriod;
+  flatPayoutAmount: number;
+  flatPeriodMultiplier: number;
+  calendarDays: number;
   tripCount: number;
   grossFares: number;
+  commissionableBaseAmount: number;
   tips: number;
   tollsReimbursed: number;
   commissionPercent: number;
+  effectivePaymentTypePercents: {
+    cash: number;
+    card: number;
+    account: number;
+  };
   driverFareShare: number;
   platformFee: number;
   totalEarned: number;
   alreadySettledAmount: number;
   pendingSettlementAmount: number;
   netPayout: number;
+  owesCompanyAmount: number;
   periodStart: string;
   periodEnd: string;
 }
@@ -262,19 +302,22 @@ function doesSettlementOverlapWindow(
   return true;
 }
 
-function extractTripTollsAndTips(trip: Trip): {
-  grossFareExTipAndTolls: number;
-  tips: number;
-  tolls: number;
-} {
-  const driverTollSum = (trip.pricing?.driverExtras || [])
+/**
+ * Extracts itemized fare components from a completed `Trip`:
+ * `baseFare`, `extras`, `waitDelay`, `surcharges`, `tolls`, `tips`, and `grossFareExTipAndTolls`.
+ */
+export function extractTripFareComponents(trip: Trip): ExtractedTripFareComponents {
+  const p = trip.pricing;
+  const driverExtras = p?.driverExtras || [];
+
+  const driverTollSum = driverExtras
     .filter((ex) => ex.category === 'toll')
     .reduce((sum, ex) => sum + Math.max(0, Number(ex.amount || 0)), 0);
 
   const tolls = roundMoney(
     Math.max(
       driverTollSum,
-      Math.max(0, Number(trip.pricing?.tollsFee || 0)),
+      Math.max(0, Number(p?.tollsFee || 0)),
       Math.max(0, Number(trip.payment?.tollsAmount || 0))
     )
   );
@@ -282,60 +325,297 @@ function extractTripTollsAndTips(trip: Trip): {
   const tips = roundMoney(Math.max(0, Number(trip.payment?.tipAmount || 0)));
 
   const rawTotalBeforeTip =
-    trip.pricing?.totalFare !== undefined && Number(trip.pricing.totalFare) > 0
-      ? Number(trip.pricing.totalFare)
-      : trip.pricing?.meterCalculatedFare && Number(trip.pricing.meterCalculatedFare) > 0
-      ? Number(trip.pricing.meterCalculatedFare)
+    p?.totalFare !== undefined && Number(p.totalFare) > 0
+      ? Number(p.totalFare)
+      : p?.meterCalculatedFare && Number(p.meterCalculatedFare) > 0
+      ? Number(p.meterCalculatedFare)
       : Math.max(0, Number(trip.payment?.amount || 0) - tips);
 
   const grossFareExTipAndTolls = roundMoney(Math.max(0, rawTotalBeforeTip - tolls));
 
+  const driverNonTollExtrasSum = driverExtras
+    .filter((ex) => ex.category !== 'toll')
+    .reduce((sum, ex) => sum + Math.max(0, Number(ex.amount || 0)), 0);
+
+  const explicitWait = Math.max(
+    Math.max(0, Number(p?.delayFee || 0)),
+    Math.max(0, Number(trip.payment?.waitTimeAmount || 0))
+  );
+
+  let rawWaitDelay = explicitWait;
+  let rawExtras = 0;
+  let rawSurcharges = 0;
+
+  if (Array.isArray(p?.breakdown) && p.breakdown.length > 0) {
+    let breakdownWait = 0;
+    let breakdownExtras = 0;
+    let breakdownSurcharges = 0;
+
+    for (const item of p.breakdown) {
+      if (!item || item.isWaived || Number(item.amount || 0) <= 0) continue;
+      const amt = Math.max(0, Number(item.amount || 0));
+      const keyText = `${item.id || ''} ${item.label || ''}`.toLowerCase();
+      if (keyText.includes('toll')) continue;
+      if (keyText.includes('wait') || keyText.includes('delay')) {
+        breakdownWait += amt;
+      } else if (item.category === 'extra') {
+        breakdownExtras += amt;
+      } else if (item.category === 'surcharge') {
+        breakdownSurcharges += amt;
+      }
+    }
+
+    rawWaitDelay = Math.max(explicitWait, breakdownWait);
+    rawExtras = breakdownExtras + driverNonTollExtrasSum;
+    rawSurcharges = breakdownSurcharges;
+  } else {
+    rawExtras =
+      Math.max(0, Number(p?.carSeatFee || 0)) +
+      Math.max(0, Number(p?.oversizedLuggageFee || 0)) +
+      Math.max(0, Number(p?.customExtrasFee || 0)) +
+      Math.max(0, Number(p?.multiStopSurcharge || 0)) +
+      Math.max(0, Number(p?.passengerSurcharge || 0)) +
+      driverNonTollExtrasSum;
+
+    const itemizedSurchargesSum = (p?.itemizedSurcharges || []).reduce(
+      (sum, s) => sum + Math.max(0, Number(s.amount || 0)),
+      0
+    );
+    rawSurcharges =
+      itemizedSurchargesSum > 0
+        ? itemizedSurchargesSum
+        : Math.max(0, Number(p?.airportSurcharge || 0));
+  }
+
+  let remaining = grossFareExTipAndTolls;
+  const waitDelay = roundMoney(Math.min(remaining, Math.max(0, rawWaitDelay)));
+  remaining = roundMoney(Math.max(0, remaining - waitDelay));
+  const extras = roundMoney(Math.min(remaining, Math.max(0, rawExtras)));
+  remaining = roundMoney(Math.max(0, remaining - extras));
+  const surcharges = roundMoney(Math.min(remaining, Math.max(0, rawSurcharges)));
+  const baseFare = roundMoney(Math.max(0, remaining - surcharges));
+
   return {
-    grossFareExTipAndTolls,
-    tips,
+    baseFare,
+    extras,
+    waitDelay,
+    surcharges,
     tolls,
+    tips,
+    grossFareExTipAndTolls,
   };
 }
 
+export function normalizeDriverCommissionRateToPercent(rate?: number | null): number | null {
+  if (rate === null || rate === undefined) return null;
+  const num = Number(rate);
+  if (!Number.isFinite(num) || num < 0) return null;
+  const asPercent = num <= 1 && num > 0 ? num * 100 : num;
+  return clampCommissionPercent(asPercent, 75);
+}
+
+export function resolveTripPaymentCommissionBucket(
+  method?: string | null
+): 'cash' | 'card' | 'account' {
+  const clean = String(method || '').trim().toLowerCase();
+  if (clean === 'cash') return 'cash';
+  if (clean === 'corporate' || clean === 'account') return 'account';
+  return 'card';
+}
+
+export function resolvePayoutWindowCalendarDays(
+  periodWin: PayoutPeriodWindow,
+  earliestTripMs?: number | null
+): number {
+  if (periodWin.startMs !== null && periodWin.endMs !== null) {
+    const spanDays = (periodWin.endMs - periodWin.startMs) / 86_400_000;
+    return Math.max(1, Math.ceil(spanDays));
+  }
+  if (earliestTripMs !== null && earliestTripMs !== undefined && Number.isFinite(earliestTripMs)) {
+    const endMs = periodWin.endMs ?? periodWin.nowMs ?? Date.now();
+    return Math.max(1, Math.ceil(Math.max(0, endMs - earliestTripMs) / 86_400_000));
+  }
+  return 30;
+}
+
+export function resolveFlatPayoutPeriodMultiplier(
+  calendarDays: number,
+  flatPeriod: FlatPayoutPeriod
+): number {
+  const safeDays = Math.max(1, calendarDays);
+  if (flatPeriod === 'day') return safeDays;
+  if (flatPeriod === 'week') return safeDays / 7;
+  return safeDays / 30;
+}
+
+function resolveDriverCommissionPercentForBucket(params: {
+  bucket: 'cash' | 'card' | 'account';
+  carOwnership: DriverCarOwnership;
+  individualCommissionPercent: number | null;
+  driverPaymentTypeRates?: PaymentTypeCommissionRates;
+  usePaymentTypeSplit: boolean;
+  globalPaymentTypePercents: { cash: number | null; card: number | null; account: number | null };
+  ownerOperatorPercent: number | null;
+  companyOwnedPercent: number | null;
+  universalPercent: number;
+}): number {
+  const {
+    bucket,
+    carOwnership,
+    individualCommissionPercent,
+    driverPaymentTypeRates,
+    usePaymentTypeSplit,
+    globalPaymentTypePercents,
+    ownerOperatorPercent,
+    companyOwnedPercent,
+    universalPercent,
+  } = params;
+
+  // 1. Per-driver payment-type override (if enabled) -> Per-driver commissionRate
+  if (usePaymentTypeSplit && driverPaymentTypeRates) {
+    const perDriverBucketVal = driverPaymentTypeRates[bucket];
+    if (perDriverBucketVal !== null && perDriverBucketVal !== undefined && Number.isFinite(Number(perDriverBucketVal))) {
+      return clampCommissionPercent(perDriverBucketVal, universalPercent);
+    }
+  }
+  if (individualCommissionPercent !== null && Number.isFinite(individualCommissionPercent)) {
+    return clampCommissionPercent(individualCommissionPercent, universalPercent);
+  }
+
+  // 2. Global payment-type % (if enabled)
+  if (usePaymentTypeSplit) {
+    const globalBucketVal = globalPaymentTypePercents[bucket];
+    if (globalBucketVal !== null && globalBucketVal !== undefined && Number.isFinite(Number(globalBucketVal))) {
+      return clampCommissionPercent(globalBucketVal, universalPercent);
+    }
+  }
+
+  // 3. Car Ownership %
+  const ownershipOverride =
+    carOwnership === 'company_owned' ? companyOwnedPercent : ownerOperatorPercent;
+  if (ownershipOverride !== null && ownershipOverride !== undefined && Number.isFinite(Number(ownershipOverride))) {
+    return clampCommissionPercent(ownershipOverride, universalPercent);
+  }
+
+  // 4. Universal %
+  return universalPercent;
+}
+
+export type DriverRollupRosterInput = Pick<DriverRosterItem, 'id' | 'name' | 'cabNumber'> & {
+  isArchived?: boolean;
+  carOwnership?: DriverCarOwnership;
+  payoutType?: DriverPayoutType;
+  flatPayoutPeriod?: FlatPayoutPeriod;
+  flatPayoutAmount?: number;
+  commissionRate?: number;
+  paymentTypeCommissionRates?: PaymentTypeCommissionRates;
+};
+
 /**
- * Aggregates completed trips per driver within `periodWindow`:
- * - `grossFares`: commissionable base+distance+wait+extras fare (excluding tips & pass-through tolls)
- * - `tips` & `tollsReimbursed`: 100% pass-through to driver
- * - `driverFareShare`: `grossFares * (commissionPercent / 100)`
- * - `platformFee`: `grossFares - driverFareShare`
- * - `netPayout`: `Math.max(0, driverFareShare + tips + tollsReimbursed - alreadySettledAmount)`
+ * Aggregates completed trips per driver within `periodWindow`, supporting:
+ * - `percent` mode: `commissionableComponents` filtering + 4-tier rate precedence
+ *   (individual -> payment type -> car ownership -> universal)
+ * - `flat` mode: calendar-day lease/fee multiplier (`day`, `week`, `month`) where
+ *   `netPayout = (grossFares + tips + tolls) - platformFee - alreadySettledAmount` (allows negative balance)
  */
 export function computeDriverEarningsRollup(
   trips: ReadonlyArray<Trip>,
-  drivers: ReadonlyArray<Pick<DriverRosterItem, 'id' | 'name' | 'cabNumber'> & { isArchived?: boolean }>,
-  defaultCommissionPercent: number = 75,
+  drivers: ReadonlyArray<DriverRollupRosterInput>,
+  defaultCommissionPercentOrPolicy: number | Partial<BillingSettingsConfig> = 75,
   periodWindow?: PayoutPeriodInput,
   existingSettlements?: ReadonlyArray<PayoutSettlementRecord>,
-  driverCommissionOverrides?: Record<string, number>
+  driverCommissionOverrides?: Record<string, number>,
+  billingPolicy?: Partial<BillingSettingsConfig> | null,
+  driverPayoutOverrides?: Record<string, DriverPayoutOverrideInput>
 ): DriverEarningsRollupRow[] {
   const periodWin = resolvePayoutPeriodWindow(periodWindow);
-  const clampedDefaultComm = clampCommissionPercent(defaultCommissionPercent, 75);
-  const settlements = existingSettlements ?? periodWin.settlements ?? [];
-  const overrides = driverCommissionOverrides ?? periodWin.commissionOverrides ?? {};
+  const inlinePolicy =
+    typeof defaultCommissionPercentOrPolicy === 'object' && defaultCommissionPercentOrPolicy !== null
+      ? defaultCommissionPercentOrPolicy
+      : undefined;
+  const mergedPolicyRaw: Partial<BillingSettingsConfig> = {
+    ...(inlinePolicy || {}),
+    ...(billingPolicy || {}),
+  };
+  if (typeof defaultCommissionPercentOrPolicy === 'number' && mergedPolicyRaw.driverDefaultCommissionPercent === undefined) {
+    mergedPolicyRaw.driverDefaultCommissionPercent = defaultCommissionPercentOrPolicy;
+  }
 
-  const driverMeta = new Map<
-    string,
-    { id: string; name: string; cabNumber?: string }
-  >();
+  const normalizedPolicy = normalizeBillingSettingsConfig(mergedPolicyRaw);
+  const universalPercent = clampCommissionPercent(normalizedPolicy.driverDefaultCommissionPercent, 75);
+  const commissionableSet = new Set<CommissionableFareComponent>(
+    normalizedPolicy.commissionableComponents || DEFAULT_COMMISSIONABLE_FARE_COMPONENTS
+  );
+  const settlements = existingSettlements ?? periodWin.settlements ?? [];
+  const legacyCommOverrides = driverCommissionOverrides ?? periodWin.commissionOverrides ?? {};
+  const payoutOverrides = driverPayoutOverrides || {};
+
+  interface ResolvedDriverMeta {
+    id: string;
+    name: string;
+    cabNumber?: string;
+    carOwnership: DriverCarOwnership;
+    payoutType: DriverPayoutType;
+    flatPayoutPeriod: FlatPayoutPeriod;
+    flatPayoutAmount: number;
+    individualCommissionPercent: number | null;
+    paymentTypeCommissionRates?: PaymentTypeCommissionRates;
+  }
+
+  const driverMeta = new Map<string, ResolvedDriverMeta>();
+
+  const buildDriverMeta = (
+    id: string,
+    base: Partial<DriverRollupRosterInput> & { name: string }
+  ): ResolvedDriverMeta => {
+    const rowOverride = payoutOverrides[id];
+    const carOwnership: DriverCarOwnership =
+      (rowOverride?.carOwnership ?? base.carOwnership) === 'company_owned'
+        ? 'company_owned'
+        : 'owner_operator';
+    const payoutType: DriverPayoutType =
+      (rowOverride?.payoutType ?? base.payoutType) === 'flat' ? 'flat' : 'percent';
+    const rawPeriod = rowOverride?.flatPayoutPeriod ?? base.flatPayoutPeriod;
+    const flatPayoutPeriod: FlatPayoutPeriod =
+      rawPeriod === 'day' || rawPeriod === 'month' ? rawPeriod : 'week';
+    const rawFlatAmt = rowOverride?.flatPayoutAmount ?? base.flatPayoutAmount ?? 0;
+    const flatPayoutAmount = roundMoney(Math.max(0, Number(rawFlatAmt) || 0));
+
+    let individualCommissionPercent: number | null = null;
+    if (legacyCommOverrides[id] !== undefined) {
+      individualCommissionPercent = clampCommissionPercent(legacyCommOverrides[id], universalPercent);
+    } else if (rowOverride?.commissionPercent !== undefined) {
+      individualCommissionPercent =
+        rowOverride.commissionPercent === null
+          ? null
+          : clampCommissionPercent(rowOverride.commissionPercent, universalPercent);
+    } else if (base.commissionRate !== undefined) {
+      individualCommissionPercent = normalizeDriverCommissionRateToPercent(base.commissionRate);
+    }
+
+    const paymentTypeCommissionRates =
+      rowOverride?.paymentTypeCommissionRates ?? base.paymentTypeCommissionRates;
+
+    return {
+      id,
+      name: base.name || id,
+      cabNumber: base.cabNumber,
+      carOwnership,
+      payoutType,
+      flatPayoutPeriod,
+      flatPayoutAmount,
+      individualCommissionPercent,
+      paymentTypeCommissionRates,
+    };
+  };
 
   for (const d of drivers || []) {
     if (!d?.id || d.isArchived) continue;
-    driverMeta.set(d.id, {
-      id: d.id,
-      name: d.name || d.id,
-      cabNumber: d.cabNumber,
-    });
+    driverMeta.set(d.id, buildDriverMeta(d.id, d));
   }
 
-  const tripStatsByDriver = new Map<
-    string,
-    { tripCount: number; grossFares: number; tips: number; tollsReimbursed: number }
-  >();
+  const tripsByDriver = new Map<string, Trip[]>();
+  let earliestMatchedTripMs: number | null = null;
 
   for (const trip of trips || []) {
     if (!trip || String(trip.status || '').toLowerCase() !== 'completed') continue;
@@ -345,48 +625,115 @@ export function computeDriverEarningsRollup(
     const tsMs = resolveTripTimestampMs(trip);
     if (!isTimestampWithinWindow(tsMs, periodWin)) continue;
 
-    if (!driverMeta.has(driverId)) {
-      const meta = (trip.metadata || {}) as Record<string, unknown>;
-      driverMeta.set(driverId, {
-        id: driverId,
-        name:
-          (typeof meta.assignedDriverName === 'string' && meta.assignedDriverName.trim()) ||
-          `Driver ${driverId}`,
-      });
+    if (tsMs !== null && (earliestMatchedTripMs === null || tsMs < earliestMatchedTripMs)) {
+      earliestMatchedTripMs = tsMs;
     }
 
-    const amounts = extractTripTollsAndTips(trip);
-    const current = tripStatsByDriver.get(driverId) || {
-      tripCount: 0,
-      grossFares: 0,
-      tips: 0,
-      tollsReimbursed: 0,
-    };
-    current.tripCount += 1;
-    current.grossFares = roundMoney(current.grossFares + amounts.grossFareExTipAndTolls);
-    current.tips = roundMoney(current.tips + amounts.tips);
-    current.tollsReimbursed = roundMoney(current.tollsReimbursed + amounts.tolls);
-    tripStatsByDriver.set(driverId, current);
+    if (!driverMeta.has(driverId)) {
+      const meta = (trip.metadata || {}) as Record<string, unknown>;
+      const fallbackName =
+        (typeof meta.assignedDriverName === 'string' && meta.assignedDriverName.trim()) ||
+        `Driver ${driverId}`;
+      driverMeta.set(driverId, buildDriverMeta(driverId, { name: fallbackName }));
+    }
+
+    const list = tripsByDriver.get(driverId) || [];
+    list.push(trip);
+    tripsByDriver.set(driverId, list);
   }
 
+  const calendarDays = resolvePayoutWindowCalendarDays(periodWin, earliestMatchedTripMs);
   const rows: DriverEarningsRollupRow[] = [];
 
   for (const [driverId, info] of driverMeta.entries()) {
-    const stats = tripStatsByDriver.get(driverId) || {
-      tripCount: 0,
-      grossFares: 0,
-      tips: 0,
-      tollsReimbursed: 0,
+    const driverTrips = tripsByDriver.get(driverId) || [];
+
+    const effectivePaymentTypePercents = {
+      cash: resolveDriverCommissionPercentForBucket({
+        bucket: 'cash',
+        carOwnership: info.carOwnership,
+        individualCommissionPercent: info.individualCommissionPercent,
+        driverPaymentTypeRates: info.paymentTypeCommissionRates,
+        usePaymentTypeSplit: normalizedPolicy.usePaymentTypeCommissionSplit,
+        globalPaymentTypePercents: normalizedPolicy.paymentTypeCommissionPercents,
+        ownerOperatorPercent: normalizedPolicy.ownerOperatorCommissionPercent,
+        companyOwnedPercent: normalizedPolicy.companyOwnedCommissionPercent,
+        universalPercent,
+      }),
+      card: resolveDriverCommissionPercentForBucket({
+        bucket: 'card',
+        carOwnership: info.carOwnership,
+        individualCommissionPercent: info.individualCommissionPercent,
+        driverPaymentTypeRates: info.paymentTypeCommissionRates,
+        usePaymentTypeSplit: normalizedPolicy.usePaymentTypeCommissionSplit,
+        globalPaymentTypePercents: normalizedPolicy.paymentTypeCommissionPercents,
+        ownerOperatorPercent: normalizedPolicy.ownerOperatorCommissionPercent,
+        companyOwnedPercent: normalizedPolicy.companyOwnedCommissionPercent,
+        universalPercent,
+      }),
+      account: resolveDriverCommissionPercentForBucket({
+        bucket: 'account',
+        carOwnership: info.carOwnership,
+        individualCommissionPercent: info.individualCommissionPercent,
+        driverPaymentTypeRates: info.paymentTypeCommissionRates,
+        usePaymentTypeSplit: normalizedPolicy.usePaymentTypeCommissionSplit,
+        globalPaymentTypePercents: normalizedPolicy.paymentTypeCommissionPercents,
+        ownerOperatorPercent: normalizedPolicy.ownerOperatorCommissionPercent,
+        companyOwnedPercent: normalizedPolicy.companyOwnedCommissionPercent,
+        universalPercent,
+      }),
     };
 
-    const commissionPercent =
-      overrides[driverId] !== undefined
-        ? clampCommissionPercent(overrides[driverId], clampedDefaultComm)
-        : clampedDefaultComm;
+    const baseDefaultPercent = resolveDriverCommissionPercentForBucket({
+      bucket: 'card',
+      carOwnership: info.carOwnership,
+      individualCommissionPercent: info.individualCommissionPercent,
+      driverPaymentTypeRates: undefined,
+      usePaymentTypeSplit: false,
+      globalPaymentTypePercents: normalizedPolicy.paymentTypeCommissionPercents,
+      ownerOperatorPercent: normalizedPolicy.ownerOperatorCommissionPercent,
+      companyOwnedPercent: normalizedPolicy.companyOwnedCommissionPercent,
+      universalPercent,
+    });
 
-    const driverFareShare = roundMoney((stats.grossFares * commissionPercent) / 100);
-    const platformFee = roundMoney(Math.max(0, stats.grossFares - driverFareShare));
-    const totalEarned = roundMoney(driverFareShare + stats.tips + stats.tollsReimbursed);
+    let grossFares = 0;
+    let tips = 0;
+    let tollsReimbursed = 0;
+    let commissionableBaseAmount = 0;
+    let percentDriverShareSum = 0;
+    let percentPassThroughSum = 0;
+    let percentTotalCollectedSum = 0;
+
+    for (const trip of driverTrips) {
+      const comp = extractTripFareComponents(trip);
+      grossFares = roundMoney(grossFares + comp.grossFareExTipAndTolls);
+      tips = roundMoney(tips + comp.tips);
+      tollsReimbursed = roundMoney(tollsReimbursed + comp.tolls);
+
+      const tripCommBase = roundMoney(
+        (commissionableSet.has('base_fare') ? comp.baseFare : 0) +
+          (commissionableSet.has('extras') ? comp.extras : 0) +
+          (commissionableSet.has('wait_delay') ? comp.waitDelay : 0) +
+          (commissionableSet.has('surcharges') ? comp.surcharges : 0) +
+          (commissionableSet.has('tolls') ? comp.tolls : 0) +
+          (commissionableSet.has('tips') ? comp.tips : 0)
+      );
+      commissionableBaseAmount = roundMoney(commissionableBaseAmount + tripCommBase);
+
+      const bucket = resolveTripPaymentCommissionBucket(trip.payment?.method);
+      const tripRatePercent = effectivePaymentTypePercents[bucket];
+      const tripCommShare = roundMoney((tripCommBase * tripRatePercent) / 100);
+      const tripPassThrough = roundMoney(
+        (commissionableSet.has('tips') ? 0 : comp.tips) +
+          (commissionableSet.has('tolls') ? 0 : comp.tolls)
+      );
+
+      percentDriverShareSum = roundMoney(percentDriverShareSum + tripCommShare);
+      percentPassThroughSum = roundMoney(percentPassThroughSum + tripPassThrough);
+      percentTotalCollectedSum = roundMoney(
+        percentTotalCollectedSum + comp.grossFareExTipAndTolls + comp.tips + comp.tolls
+      );
+    }
 
     let alreadySettledAmount = 0;
     let pendingSettlementAmount = 0;
@@ -395,7 +742,9 @@ export function computeDriverEarningsRollup(
       if (s.payeeType !== 'driver' || s.payeeId !== driverId) continue;
       if (!doesSettlementOverlapWindow(s, periodWin)) continue;
       if (s.status === 'paid') {
-        alreadySettledAmount = roundMoney(alreadySettledAmount + Math.max(0, Number(s.netPayoutAmount || 0)));
+        alreadySettledAmount = roundMoney(
+          alreadySettledAmount + Math.max(0, Number(s.netPayoutAmount || 0))
+        );
       } else {
         pendingSettlementAmount = roundMoney(
           pendingSettlementAmount + Math.max(0, Number(s.netPayoutAmount || 0))
@@ -403,29 +752,72 @@ export function computeDriverEarningsRollup(
       }
     }
 
-    const netPayout = roundMoney(Math.max(0, totalEarned - alreadySettledAmount));
+    const flatPeriodMultiplier = Number(
+      resolveFlatPayoutPeriodMultiplier(calendarDays, info.flatPayoutPeriod).toFixed(4)
+    );
+
+    let commissionPercent = baseDefaultPercent;
+    let driverFareShare = 0;
+    let platformFee = 0;
+    let totalEarned = 0;
+    let netPayout = 0;
+
+    if (info.payoutType === 'flat') {
+      commissionPercent = 100;
+      platformFee = roundMoney(info.flatPayoutAmount * flatPeriodMultiplier);
+      driverFareShare = grossFares;
+      totalEarned = roundMoney(grossFares + tips + tollsReimbursed - platformFee);
+      netPayout = roundMoney(totalEarned - alreadySettledAmount);
+    } else {
+      if (driverTrips.length > 0 && commissionableBaseAmount > 0 && normalizedPolicy.usePaymentTypeCommissionSplit) {
+        commissionPercent = clampCommissionPercent(
+          (percentDriverShareSum / commissionableBaseAmount) * 100,
+          baseDefaultPercent
+        );
+      }
+      driverFareShare = percentDriverShareSum;
+      totalEarned = roundMoney(percentDriverShareSum + percentPassThroughSum);
+      platformFee = roundMoney(Math.max(0, percentTotalCollectedSum - totalEarned));
+      netPayout = roundMoney(Math.max(0, totalEarned - alreadySettledAmount));
+    }
+
+    const owesCompanyAmount = netPayout < 0 ? roundMoney(Math.abs(netPayout)) : 0;
 
     rows.push({
       driverId,
       driverName: info.name,
       ...(info.cabNumber ? { cabNumber: info.cabNumber } : {}),
-      tripCount: stats.tripCount,
-      grossFares: stats.grossFares,
-      tips: stats.tips,
-      tollsReimbursed: stats.tollsReimbursed,
+      carOwnership: info.carOwnership,
+      payoutType: info.payoutType,
+      flatPayoutPeriod: info.flatPayoutPeriod,
+      flatPayoutAmount: info.flatPayoutAmount,
+      flatPeriodMultiplier,
+      calendarDays,
+      tripCount: driverTrips.length,
+      grossFares,
+      commissionableBaseAmount,
+      tips,
+      tollsReimbursed,
       commissionPercent,
+      effectivePaymentTypePercents,
       driverFareShare,
       platformFee,
       totalEarned,
       alreadySettledAmount,
       pendingSettlementAmount,
       netPayout,
+      owesCompanyAmount,
       periodStart: periodWin.periodStart,
       periodEnd: periodWin.periodEnd,
     });
   }
 
-  return rows.sort((a, b) => b.netPayout - a.netPayout || b.tripCount - a.tripCount || a.driverName.localeCompare(b.driverName));
+  return rows.sort(
+    (a, b) =>
+      b.netPayout - a.netPayout ||
+      b.tripCount - a.tripCount ||
+      a.driverName.localeCompare(b.driverName)
+  );
 }
 
 function isStaffOperator(op: OperatorUser): boolean {
@@ -716,11 +1108,15 @@ export function exportPayoutsCsv(
     // DriverEarningsRollupRow preview export
     const net = roundMoney(Number(item.netPayout || 0));
     totalNetPayout = roundMoney(totalNetPayout + net);
+    const modeDetail =
+      item.payoutType === 'flat'
+        ? `Flat $${item.flatPayoutAmount.toFixed(2)}/${item.flatPayoutPeriod}`
+        : `${item.commissionPercent}% Share`;
     return [
       item.driverId,
       'DRIVER',
       item.driverName,
-      item.cabNumber ? `Cab #${item.cabNumber} (${item.commissionPercent}%)` : `${item.commissionPercent}% Share`,
+      item.cabNumber ? `Cab #${item.cabNumber} (${modeDetail})` : modeDetail,
       item.periodStart,
       item.periodEnd,
       `${item.tripCount} trips`,

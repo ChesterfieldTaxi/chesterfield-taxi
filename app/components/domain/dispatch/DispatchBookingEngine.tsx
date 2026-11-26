@@ -1335,7 +1335,10 @@ function DispatchBookingEngineComponent({
           fboFacility={fboFacility}
           setFboFacility={setFboFacility}
           hasCheckedLuggage={hasCheckedLuggage}
-          setHasCheckedLuggage={setHasCheckedLuggage}
+          setHasCheckedLuggage={(checked) => {
+            setHasCheckedLuggage(checked);
+            setCheckedBags((prev) => (checked ? Math.max(1, prev) : 0));
+          }}
           outboundFlightTelemetry={outboundFlightTelemetry}
           setOutboundFlightTelemetry={setOutboundFlightTelemetry}
           onSwapRoute={handleSwapRoute}

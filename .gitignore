@@ -1,8 +1,30 @@
+# Dependencies & Build Outputs
 node_modules/
 .react-router/
 .vercel/
+.firebase/
 build/
+dist/
+
+# Environment Variables & Secrets
 .env
 .env.*
 .env.example
+*firebase-adminsdk*.json
+*service-account*.json
+*credentials*.json
+*.pem
+*.key
+*.p12
+
+# Local Data Exports, Customer PII & Migration Checkpoints
 *.csv
+clients_history/
+corporate_accounts.json
+reports/
+
+# Logs & OS Metadata
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

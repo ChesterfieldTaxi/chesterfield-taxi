@@ -3,6 +3,7 @@ import type { UserRole } from '../../../../core/services/auth/admin-auth.service
 import { generateDriverUsername, type OperatorUser } from '../../../../core/services/operator.service';
 import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
+import { Select } from '../../../ui/Select';
 import {
   ArchiveBoxIcon,
   BanIcon,
@@ -18,7 +19,11 @@ import {
 } from '../../../ui/Icons';
 import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
 import { LocationAutocomplete } from '../../LocationAutocomplete';
-import { ROLE_META, type EditFormState } from './operator-provisioning.util';
+import {
+  CAR_OWNERSHIP_OPTIONS,
+  ROLE_META,
+  type EditFormState,
+} from './operator-provisioning.util';
 import { RoleIcon } from './OperatorRosterPanel';
 
 export interface OperatorEditorDrawerProps {
@@ -178,13 +183,24 @@ export function OperatorEditorDrawer({
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <Input label="Driver's License / Permit #" placeholder="MO-DL-1234567" value={editForm.driverLicense} onChange={(e) => onChangeForm({ ...editForm, driverLicense: e.target.value })} />
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-fg-secondary">Driver Score</label>
-                    <span className="text-xs font-extrabold text-status-warning-fg bg-status-warning-bg px-2 py-0.5 rounded-md tabular-nums">{editForm.driverScore} / 100</span>
-                  </div>
-                  <input type="range" min={0} max={100} value={editForm.driverScore} onChange={(e) => onChangeForm({ ...editForm, driverScore: Number(e.target.value) })} className="w-full accent-blue-600 mt-2 cursor-pointer" />
+                <Select
+                  label="Car Ownership"
+                  options={CAR_OWNERSHIP_OPTIONS}
+                  value={editForm.carOwnership}
+                  onValueChange={(val) =>
+                    onChangeForm({
+                      ...editForm,
+                      carOwnership: val === 'company_owned' ? 'company_owned' : 'owner_operator',
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-fg-secondary">Driver Score</label>
+                  <span className="text-xs font-extrabold text-status-warning-fg bg-status-warning-bg px-2 py-0.5 rounded-md tabular-nums">{editForm.driverScore} / 100</span>
                 </div>
+                <input type="range" min={0} max={100} value={editForm.driverScore} onChange={(e) => onChangeForm({ ...editForm, driverScore: Number(e.target.value) })} className="w-full accent-blue-600 mt-2 cursor-pointer" />
               </div>
               <LocationAutocomplete
                 label="Driver Home Address"

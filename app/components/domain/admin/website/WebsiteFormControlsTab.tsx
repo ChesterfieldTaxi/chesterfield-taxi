@@ -6,6 +6,10 @@ import {
   type CustomerBookingConfig,
 } from '../../../../core/types/config';
 import { DEFAULT_CUSTOMER_BOOKING_CONFIG } from '../../../../core/services/config/admin-config.service';
+import {
+  DEFAULT_TERMINAL_PICKUP_LOCATIONS,
+  buildCombinedLambertPickupInstructions,
+} from '../../../../core/config/airports';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../ui/Card';
 import { Button } from '../../../ui/Button';
@@ -264,16 +268,87 @@ export function WebsiteFormControlsTab({ settings, onSave, isLoading }: WebsiteF
             </div>
           </div>
 
-          <div className="p-3.5 bg-status-info-bg/60 border border-status-info-border rounded-xl space-y-1.5">
-            <label className="text-xs font-bold text-status-info-fg block">
-              STL Lambert Airport Pickup Instructions (Confirmation Screen &amp; Emails)
-            </label>
-            <textarea
-              rows={2}
-              value={formConfig.lambertPickupInstructions ?? ''}
-              onChange={(e) => setFormConfig((prev) => ({ ...prev, lambertPickupInstructions: e.target.value }))}
-              className="w-full px-3 py-2 border border-status-info-border rounded-lg text-xs text-fg-primary bg-surface-card focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          <div className="p-3.5 bg-status-info-bg/60 border border-status-info-border rounded-xl space-y-3">
+            <div>
+              <span className="text-xs font-bold text-status-info-fg block">
+                Airport Terminal &amp; FBO Pickup Locations (Confirmation Screen, Emails &amp; SMS)
+              </span>
+              <span className="text-[11px] text-fg-muted">
+                Configure exact curbside door or FBO instructions per terminal. Changes propagate across booking, emails, and dispatch templates.
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="text-[11px] font-bold text-fg-strong block mb-1">
+                  STL Terminal 1 Pickup Location
+                </label>
+                <input
+                  type="text"
+                  value={formConfig.terminal1PickupLocation ?? DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal1PickupLocation}
+                  onChange={(e) => {
+                    const terminal1PickupLocation = e.target.value;
+                    setFormConfig((prev) => ({
+                      ...prev,
+                      terminal1PickupLocation,
+                      lambertPickupInstructions: buildCombinedLambertPickupInstructions({
+                        ...prev,
+                        terminal1PickupLocation,
+                      }),
+                    }));
+                  }}
+                  placeholder={DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal1PickupLocation}
+                  className="w-full px-2.5 py-1.5 border border-status-info-border rounded-lg text-xs text-fg-primary bg-surface-card focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-fg-strong block mb-1">
+                  STL Terminal 2 (Southwest / Lufthansa)
+                </label>
+                <input
+                  type="text"
+                  value={formConfig.terminal2PickupLocation ?? DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal2PickupLocation}
+                  onChange={(e) => {
+                    const terminal2PickupLocation = e.target.value;
+                    setFormConfig((prev) => ({
+                      ...prev,
+                      terminal2PickupLocation,
+                      lambertPickupInstructions: buildCombinedLambertPickupInstructions({
+                        ...prev,
+                        terminal2PickupLocation,
+                      }),
+                    }));
+                  }}
+                  placeholder={DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal2PickupLocation}
+                  className="w-full px-2.5 py-1.5 border border-status-info-border rounded-lg text-xs text-fg-primary bg-surface-card focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-fg-strong block mb-1">
+                  Private FBO (SUS / CPS) Pickup
+                </label>
+                <input
+                  type="text"
+                  value={formConfig.privateFboPickupLocation ?? DEFAULT_TERMINAL_PICKUP_LOCATIONS.privateFboPickupLocation}
+                  onChange={(e) => {
+                    const privateFboPickupLocation = e.target.value;
+                    setFormConfig((prev) => ({
+                      ...prev,
+                      privateFboPickupLocation,
+                      lambertPickupInstructions: buildCombinedLambertPickupInstructions({
+                        ...prev,
+                        privateFboPickupLocation,
+                      }),
+                    }));
+                  }}
+                  placeholder={DEFAULT_TERMINAL_PICKUP_LOCATIONS.privateFboPickupLocation}
+                  className="w-full px-2.5 py-1.5 border border-status-info-border rounded-lg text-xs text-fg-primary bg-surface-card focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-status-info-fg/90 bg-surface-card/70 px-2.5 py-1.5 rounded-lg border border-status-info-border/60">
+              <span className="font-bold">Combined Summary: </span>
+              {buildCombinedLambertPickupInstructions(formConfig)}
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -38,13 +38,13 @@ Clean up the customer and dispatch flight info cards (removing redundant trackin
 - `app/components/domain/dispatch/queue/TripQueueTableView.tsx` — Place `DispatchFlightTelemetryPill` inline with pickup time (or fixed-height cell) so row height stays consistent across all rows.
 
 ## Tasks
-- [ ] Add `terminal1PickupLocation`, `terminal2PickupLocation`, and `privateFboPickupLocation` to `CustomerBookingConfig` and `AdminConfigService` defaults, with helper to derive combined `lambertPickupInstructions`.
-- [ ] Update `resolveStlTerminalInfo` in `airports.ts`, `flight-status.server.ts`, `comms-templates.service.ts`, `dispatch-email-catalog.ts`, `email-templates.ts`, and `BookingConfirmation.tsx` to consume configured terminal pickup locations.
-- [ ] Add structured Terminal 1, Terminal 2, and Private FBO pickup location inputs in `WebsiteFormControlsTab.tsx` and `AdminRulesTab.tsx`.
-- [ ] Update `resolveTripFlightBadge` in `flight-status.service.ts` to show flight `originIata` instead of `STL T1/T2`, and update `DispatchFlightTelemetryPill` + `TripQueueTableView.tsx` for non-bold compact styling and uniform row height.
-- [ ] Clean up `FlightAssistanceCard.tsx`, `DispatchRoutingTimingSection.tsx`, and `DispatchReturnRepeatSection.tsx`: remove `"Live Flight Tracking"`/`"Arrival Tracking"`/`"Terminal Routing"` labels, narrow Flight # input (`sm:grid-cols-12`), and render a compact optional Airline-only container for commercial airport dropoffs.
-- [ ] Sync `hasCheckedLuggage` / `returnHasCheckedLuggage` toggles in customer and dispatch booking sections so `checkedBags` / `returnCheckedBags` is at least `1` when checked luggage is selected.
-- [ ] Run `npm run typecheck` and `npm run build` to verify zero TypeScript or build errors.
+- [x] Add `terminal1PickupLocation`, `terminal2PickupLocation`, and `privateFboPickupLocation` to `CustomerBookingConfig` and `AdminConfigService` defaults, with helper to derive combined `lambertPickupInstructions`.
+- [x] Update `resolveStlTerminalInfo` in `airports.ts`, `flight-status.server.ts`, `comms-templates.service.ts`, `dispatch-email-catalog.ts`, `email-templates.ts`, and `BookingConfirmation.tsx` to consume configured terminal pickup locations.
+- [x] Add structured Terminal 1, Terminal 2, and Private FBO pickup location inputs in `WebsiteFormControlsTab.tsx` and `AdminRulesTab.tsx`.
+- [x] Update `resolveTripFlightBadge` in `flight-status.service.ts` to show flight `originIata` instead of `STL T1/T2`, and update `DispatchFlightTelemetryPill` + `TripQueueTableView.tsx` for non-bold compact styling and uniform row height.
+- [x] Clean up `FlightAssistanceCard.tsx`, `DispatchRoutingTimingSection.tsx`, and `DispatchReturnRepeatSection.tsx`: remove `"Live Flight Tracking"`/`"Arrival Tracking"`/`"Terminal Routing"` labels, narrow Flight # input (`sm:grid-cols-12`), and render a compact optional Airline-only container for commercial airport dropoffs.
+- [x] Sync `hasCheckedLuggage` / `returnHasCheckedLuggage` toggles in customer and dispatch booking sections so `checkedBags` / `returnCheckedBags` is at least `1` when checked luggage is selected.
+- [x] Run `npm run typecheck` and `npm run build` to verify zero TypeScript or build errors.
 
 ## Verification
 - `npm run typecheck`

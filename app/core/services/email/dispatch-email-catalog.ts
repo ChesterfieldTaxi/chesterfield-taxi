@@ -12,6 +12,7 @@
  */
 
 import { resolveStlTerminalInfo } from '../../config/airports';
+import { getAdminConfigService } from '../config/admin-config.service';
 import {
   DISPATCH_MAILBOX_ADDRESS,
   DISPATCH_MAILBOX_DOMAIN,
@@ -347,7 +348,11 @@ function resolveTemplateVariableMap(
 
   let effectivePickup = (context.pickupAddress || '').trim() || 'your requested pickup location';
   if (context.airlineOrAirportHint) {
-    const termInfo = resolveStlTerminalInfo(context.airlineOrAirportHint);
+    const termInfo = resolveStlTerminalInfo(
+      context.airlineOrAirportHint,
+      undefined,
+      getAdminConfigService().getCachedSettings().customerBookingConfig
+    );
     if (
       termInfo.terminal &&
       effectivePickup.toLowerCase().includes('lambert') &&

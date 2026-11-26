@@ -317,6 +317,33 @@ export interface ParsedFlightIdent {
   isValid: boolean;
 }
 
+export interface TerminalPickupLocations {
+  terminal1PickupLocation?: string;
+  terminal2PickupLocation?: string;
+  privateFboPickupLocation?: string;
+}
+
+export const DEFAULT_TERMINAL_PICKUP_LOCATIONS: Required<TerminalPickupLocations> = {
+  terminal1PickupLocation: 'Lower Level Exit Door 6 / Door 12',
+  terminal2PickupLocation: 'Baggage Claim Exit Door 12',
+  privateFboPickupLocation: 'Private FBO Ramp / Lobby Coordination',
+};
+
+export function buildCombinedLambertPickupInstructions(
+  locations?: TerminalPickupLocations | null
+): string {
+  const t1 =
+    (locations?.terminal1PickupLocation || '').trim() ||
+    DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal1PickupLocation;
+  const t2 =
+    (locations?.terminal2PickupLocation || '').trim() ||
+    DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal2PickupLocation;
+  const fbo =
+    (locations?.privateFboPickupLocation || '').trim() ||
+    DEFAULT_TERMINAL_PICKUP_LOCATIONS.privateFboPickupLocation;
+  return `Terminal 1: ${t1} • Terminal 2: ${t2} • Private FBO: ${fbo}`;
+}
+
 export interface StlTerminalInfo {
   airportCode: 'STL' | 'SUS' | 'CPS';
   airlineCode?: string;
@@ -467,11 +494,21 @@ export function parseFlightIdent(
  */
 export function resolveStlTerminalInfo(
   airlineCodeOrName?: string,
-  airportCode?: string
+  airportCode?: string,
+  pickupConfig?: TerminalPickupLocations | null
 ): StlTerminalInfo {
   const raw = (airlineCodeOrName || '').trim();
   const rawLower = raw.toLowerCase();
   const explicitAirport = (airportCode || '').trim().toUpperCase();
+  const t1Loc =
+    (pickupConfig?.terminal1PickupLocation || '').trim() ||
+    DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal1PickupLocation;
+  const t2Loc =
+    (pickupConfig?.terminal2PickupLocation || '').trim() ||
+    DEFAULT_TERMINAL_PICKUP_LOCATIONS.terminal2PickupLocation;
+  const fboLoc =
+    (pickupConfig?.privateFboPickupLocation || '').trim() ||
+    DEFAULT_TERMINAL_PICKUP_LOCATIONS.privateFboPickupLocation;
 
   if (
     explicitAirport === 'SUS' ||
@@ -486,7 +523,7 @@ export function resolveStlTerminalInfo(
       airportCode: 'SUS',
       terminal: 'Private FBO',
       shortTerminal: 'SUS FBO',
-      pickupDoorGuidance: 'Spirit of St. Louis (SUS) · Private FBO Ramp / Lobby Coordination',
+      pickupDoorGuidance: `Spirit of St. Louis (SUS) · ${fboLoc}`,
       isPrivateFbo: true,
     };
   }
@@ -502,7 +539,7 @@ export function resolveStlTerminalInfo(
       airportCode: 'CPS',
       terminal: 'Private FBO',
       shortTerminal: 'CPS FBO',
-      pickupDoorGuidance: 'St. Louis Downtown (CPS) · Private FBO Ramp / Lobby Coordination',
+      pickupDoorGuidance: `St. Louis Downtown (CPS) · ${fboLoc}`,
       isPrivateFbo: true,
     };
   }
@@ -522,7 +559,9 @@ export function resolveStlTerminalInfo(
       airlineName,
       terminal: 'Terminal 2',
       shortTerminal: 'STL T2',
-      pickupDoorGuidance: 'Terminal 2 · Baggage Claim Exit Door 12',
+      pickupDoorGuidance: t2Loc.toLowerCase().startsWith('terminal 2')
+        ? t2Loc
+        : `Terminal 2 · ${t2Loc}`,
       isPrivateFbo: false,
     };
   }
@@ -539,7 +578,9 @@ export function resolveStlTerminalInfo(
       airlineName,
       terminal: 'Terminal 1',
       shortTerminal: 'STL T1',
-      pickupDoorGuidance: 'Terminal 1 · Lower Level Exit Door 6 / Door 12',
+      pickupDoorGuidance: t1Loc.toLowerCase().startsWith('terminal 1')
+        ? t1Loc
+        : `Terminal 1 · ${t1Loc}`,
       isPrivateFbo: false,
     };
   }
@@ -548,8 +589,7 @@ export function resolveStlTerminalInfo(
     airportCode: 'STL',
     terminal: undefined,
     shortTerminal: 'STL',
-    pickupDoorGuidance:
-      'Terminal 1: Lower Level Exit Door 6 / Door 12 • Terminal 2 (Southwest / Lufthansa): Baggage Claim Exit Door 12',
+    pickupDoorGuidance: `Terminal 1: ${t1Loc} • Terminal 2 (Southwest / Lufthansa): ${t2Loc}`,
     isPrivateFbo: false,
   };
 }

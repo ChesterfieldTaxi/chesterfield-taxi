@@ -84,7 +84,11 @@ export function FlightTelemetryCheckPanel({
 
   const parsedIdent = parseFlightIdent(airline, flightNumber);
   const terminalResolution = airline.trim()
-    ? resolveStlTerminalInfo(airline, airportIataCode || 'STL')
+    ? resolveStlTerminalInfo(
+        airline,
+        airportIataCode || 'STL',
+        getAdminConfigService().getCachedSettings().customerBookingConfig
+      )
     : null;
 
   const effectiveBookingType: 'asap' | 'scheduled' =
@@ -343,9 +347,9 @@ export function FlightTelemetryCheckPanel({
                 {activeTelemetry.baggageClaim}
               </span>
             )}
-            {activeTelemetry.pickupDoorGuidance && isPickupAirport && (
+            {(terminalResolution?.pickupDoorGuidance || activeTelemetry.pickupDoorGuidance) && isPickupAirport && (
               <span className="text-status-info-fg font-semibold">
-                Meet Driver: {activeTelemetry.pickupDoorGuidance}
+                Meet Driver: {terminalResolution?.pickupDoorGuidance || activeTelemetry.pickupDoorGuidance}
               </span>
             )}
           </div>
@@ -486,6 +490,75 @@ export function FlightAssistanceCard({
     }
   };
 
+  const isCommercialDropoff =
+    detection.isDropoffAirport && !detection.isPickupAirport && !detection.isPrivateAviation;
+
+  if (isCommercialDropoff) {
+    const dropoffTermInfo = airline
+      ? resolveStlTerminalInfo(
+          airline,
+          detection.airport?.iataCode || 'STL',
+          getAdminConfigService().getCachedSettings().customerBookingConfig
+        )
+      : null;
+
+    return (
+      <div className={`p-3 border rounded-xl space-y-2 animate-in fade-in duration-200 ${containerColors}`}>
+        <div className="flex items-center justify-between gap-2">
+          <div className={`flex items-center gap-1.5 font-bold text-xs ${accentText}`}>
+            <PlaneLandingIcon
+              className={`w-3.5 h-3.5 ${isReturn ? 'text-indigo-600' : 'text-blue-600'} rotate-45`}
+            />
+            <span>
+              {detection.airport?.iataCode || detection.airport?.name || 'Airport'} {isReturn ? 'Return ' : ''}Dropoff
+            </span>
+          </div>
+          <span className="text-[10px] font-semibold text-fg-muted bg-surface-card px-2 py-0.5 rounded border border-border-subtle">
+            Optional
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
+          <div className="sm:col-span-5">
+            <Select
+              searchable
+              searchPlaceholder="Search airline or IATA code..."
+              value={airline}
+              options={[
+                { value: '', label: 'Select Airline (Optional)' },
+                ...MAJOR_AIRLINES.map((al) => ({
+                  value: al.name,
+                  label: `${al.name} (${al.code})`,
+                  selectedLabel: al.code,
+                })),
+              ]}
+              onValueChange={(val) => {
+                if (val && !provideFlightInfo) {
+                  onToggleProvideFlightInfo(true);
+                }
+                handleAirlineSelect(val);
+              }}
+              size="sm"
+              triggerClassName={`border ${inputBorder} rounded-lg`}
+            />
+          </div>
+          <div className="sm:col-span-7 text-[11px] text-fg-secondary leading-snug">
+            {dropoffTermInfo ? (
+              <span>
+                <span className="font-bold text-fg-strong">{dropoffTermInfo.terminal || 'Terminal'}: </span>
+                {dropoffTermInfo.pickupDoorGuidance}
+              </span>
+            ) : (
+              <span>
+                Select your airline for terminal dropoff door guidance (T1: AA, DL, UA · T2: WN, LH).
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`p-3.5 border rounded-xl space-y-3 animate-in fade-in duration-200 ${containerColors}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -517,18 +590,14 @@ export function FlightAssistanceCard({
             <span>
               {detection.isPickupAirport
                 ? 'Track Inbound Flight'
-                : detection.isPrivateAviation
-                ? 'Aviation Details'
-                : 'Provide Airline'}
+                : 'Aviation Details'}
             </span>
           </label>
-          <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${badgeStyle}`}>
-            {detection.isPrivateAviation
-              ? 'Private FBO'
-              : detection.isPickupAirport
-              ? 'Live Flight Tracking'
-              : 'Terminal Routing'}
-          </span>
+          {detection.isPrivateAviation && (
+            <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${badgeStyle}`}>
+              Private FBO
+            </span>
+          )}
         </div>
       </div>
 
@@ -598,10 +667,10 @@ export function FlightAssistanceCard({
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <div className="sm:col-span-5">
                   <label className="block text-[11px] text-fg-secondary font-semibold mb-1">
-                    Airline {detection.isDropoffAirport ? '(Terminal Door)' : ''}
+                    Airline
                   </label>
                   <Select
                     searchable
@@ -621,9 +690,9 @@ export function FlightAssistanceCard({
                   />
                 </div>
 
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-[11px] text-fg-secondary font-semibold mb-1">
-                    {detection.isPickupAirport ? 'Flight # (1–4 digits)' : 'Flight # (Optional)'}
+                    {detection.isPickupAirport ? 'Flight #' : 'Flight # (Opt)'}
                   </label>
                   <input
                     type="text"
@@ -631,10 +700,10 @@ export function FlightAssistanceCard({
                     inputMode="numeric"
                     pattern="[0-9]{1,4}"
                     maxLength={4}
-                    placeholder="e.g. 1234"
+                    placeholder="1234"
                     value={flightNumber}
                     onChange={(e) => handleFlightNumInput(e.target.value)}
-                    className={`w-full px-3 py-2 bg-surface-card border ${
+                    className={`w-full px-2.5 py-2 bg-surface-card border ${
                       flightNumberError ? 'border-red-400 bg-status-danger-bg/40' : inputBorder
                     } rounded-lg text-base sm:text-sm font-mono font-bold text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500/25`}
                   />
@@ -643,7 +712,7 @@ export function FlightAssistanceCard({
                   )}
                 </div>
 
-                <div>
+                <div className="sm:col-span-5">
                   <label className="block text-[11px] text-fg-secondary font-semibold mb-1">
                     {detection.isPickupAirport ? 'Departing From (Origin)' : 'Destination (Optional)'}
                   </label>

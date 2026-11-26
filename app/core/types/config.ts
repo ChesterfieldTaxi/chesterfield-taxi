@@ -623,7 +623,10 @@ export interface CustomerBookingConfig {
   requireFlightNumberForAirport: boolean;
   airportMeetAndGreetOptions?: 'curbside' | 'baggage_claim' | 'both';
   flightDelayGraceMinutes?: number; // e.g. 45 min
-  lambertPickupInstructions?: string; // Curbside door / baggage claim pickup instructions for STL Lambert Airport
+  lambertPickupInstructions?: string; // Derived combined curbside pickup instructions for STL Lambert Airport
+  terminal1PickupLocation?: string; // STL Terminal 1 pickup door/location
+  terminal2PickupLocation?: string; // STL Terminal 2 pickup door/location
+  privateFboPickupLocation?: string; // Private FBO (SUS/CPS) pickup location
   allowRoundTrip: boolean;
   roundTripDiscountPercent?: number; // e.g. 5%
   allowChildSafetySeats: boolean;
@@ -895,6 +898,44 @@ export function normalizeCorporatePortalPolicy(
   };
 }
 
+export type CommissionableFareComponent =
+  | 'base_fare'
+  | 'extras'
+  | 'wait_delay'
+  | 'surcharges'
+  | 'tolls'
+  | 'tips';
+
+export const ALL_COMMISSIONABLE_FARE_COMPONENTS: readonly CommissionableFareComponent[] = [
+  'base_fare',
+  'extras',
+  'wait_delay',
+  'surcharges',
+  'tolls',
+  'tips',
+] as const;
+
+export const DEFAULT_COMMISSIONABLE_FARE_COMPONENTS: CommissionableFareComponent[] = [
+  'base_fare',
+  'extras',
+  'wait_delay',
+];
+
+export const COMMISSIONABLE_COMPONENT_LABELS: Record<CommissionableFareComponent, string> = {
+  base_fare: 'Base & Distance',
+  extras: 'Extras',
+  wait_delay: 'Wait / Delay',
+  surcharges: 'Surcharges',
+  tolls: 'Tolls',
+  tips: 'Tips',
+};
+
+export interface PaymentTypeCommissionPercentsConfig {
+  cash: number | null;
+  card: number | null;
+  account: number | null;
+}
+
 export interface BillingSettingsConfig {
   autoEmailReceipts?: boolean;
   stripeTerminalEnabled?: boolean;
@@ -912,6 +953,12 @@ export interface BillingSettingsConfig {
   payLinkAllowTipOnInvoices?: boolean; // default false
   autoSendPayLinkReceiptSms?: boolean; // default true
   driverDefaultCommissionPercent?: number; // default 75, clamped 0..100
+  // Phase 105: Ownership, Commissionable Base & Payment-Type Commission Rules
+  ownerOperatorCommissionPercent?: number | null; // optional override 0..100
+  companyOwnedCommissionPercent?: number | null; // optional override 0..100
+  commissionableComponents?: CommissionableFareComponent[];
+  usePaymentTypeCommissionSplit?: boolean;
+  paymentTypeCommissionPercents?: Partial<PaymentTypeCommissionPercentsConfig>;
   staffDispatcherHourlyRate?: number; // default 24
   staffPerBookingBonusAmount?: number; // default 0
 }
@@ -928,11 +975,18 @@ export type NormalizedBillingSettingsConfig = Required<
     | 'payLinkAllowTipOnInvoices'
     | 'autoSendPayLinkReceiptSms'
     | 'driverDefaultCommissionPercent'
+    | 'ownerOperatorCommissionPercent'
+    | 'companyOwnedCommissionPercent'
+    | 'commissionableComponents'
+    | 'usePaymentTypeCommissionSplit'
+    | 'paymentTypeCommissionPercents'
     | 'staffDispatcherHourlyRate'
     | 'staffPerBookingBonusAmount'
   >
 > &
-  BillingSettingsConfig;
+  Omit<BillingSettingsConfig, 'paymentTypeCommissionPercents'> & {
+    paymentTypeCommissionPercents: PaymentTypeCommissionPercentsConfig;
+  };
 
 export const DEFAULT_BILLING_SETTINGS_CONFIG: NormalizedBillingSettingsConfig = {
   autoEmailReceipts: true,
@@ -944,6 +998,15 @@ export const DEFAULT_BILLING_SETTINGS_CONFIG: NormalizedBillingSettingsConfig = 
   payLinkAllowTipOnInvoices: false,
   autoSendPayLinkReceiptSms: true,
   driverDefaultCommissionPercent: 75,
+  ownerOperatorCommissionPercent: null,
+  companyOwnedCommissionPercent: null,
+  commissionableComponents: [...DEFAULT_COMMISSIONABLE_FARE_COMPONENTS],
+  usePaymentTypeCommissionSplit: false,
+  paymentTypeCommissionPercents: {
+    cash: null,
+    card: null,
+    account: null,
+  },
   staffDispatcherHourlyRate: 24,
   staffPerBookingBonusAmount: 0,
 };
@@ -963,6 +1026,26 @@ export function normalizeBillingSettingsConfig(
     const clamped = Math.min(max, Math.max(min, num));
     return roundInt ? Math.round(clamped) : Number(clamped.toFixed(2));
   };
+
+  const clampOptionalPercent = (val: unknown): number | null => {
+    if (val === null || val === undefined || val === '') return null;
+    const num = typeof val === 'number' ? val : Number(val);
+    if (!Number.isFinite(num)) return null;
+    return Number(Math.min(100, Math.max(0, num)).toFixed(2));
+  };
+
+  const validCompSet = new Set<string>(ALL_COMMISSIONABLE_FARE_COMPONENTS);
+  const commissionableComponents: CommissionableFareComponent[] = Array.isArray(
+    raw?.commissionableComponents
+  )
+    ? Array.from(
+        new Set(
+          raw.commissionableComponents.filter((c): c is CommissionableFareComponent =>
+            validCompSet.has(String(c))
+          )
+        )
+      )
+    : [...DEFAULT_COMMISSIONABLE_FARE_COMPONENTS];
 
   const optStr = (val: unknown): string | undefined => {
     if (typeof val !== 'string') return undefined;
@@ -1014,6 +1097,18 @@ export function normalizeBillingSettingsConfig(
       0,
       100
     ),
+    ownerOperatorCommissionPercent: clampOptionalPercent(raw?.ownerOperatorCommissionPercent),
+    companyOwnedCommissionPercent: clampOptionalPercent(raw?.companyOwnedCommissionPercent),
+    commissionableComponents,
+    usePaymentTypeCommissionSplit:
+      raw?.usePaymentTypeCommissionSplit !== undefined
+        ? Boolean(raw.usePaymentTypeCommissionSplit)
+        : DEFAULT_BILLING_SETTINGS_CONFIG.usePaymentTypeCommissionSplit,
+    paymentTypeCommissionPercents: {
+      cash: clampOptionalPercent(raw?.paymentTypeCommissionPercents?.cash),
+      card: clampOptionalPercent(raw?.paymentTypeCommissionPercents?.card),
+      account: clampOptionalPercent(raw?.paymentTypeCommissionPercents?.account),
+    },
     staffDispatcherHourlyRate: clampNumber(
       raw?.staffDispatcherHourlyRate,
       DEFAULT_BILLING_SETTINGS_CONFIG.staffDispatcherHourlyRate,
@@ -1470,6 +1565,8 @@ export function canOperatorConfigureLeadWindows(
 
 export type DispatchQueueLayoutMode = 'auto' | 'table' | 'cards' | 'compact';
 export type DispatchDefaultQueueStatusFilter = 'active_only' | 'all';
+export type DispatchFlightBadgeFormat = 'ident_from_origin' | 'ident_terminal' | 'origin_only';
+export type DispatchFlightBadgePlacement = 'stacked' | 'inline';
 
 export interface DispatchConsoleSettingsConfig {
   conflictGuardEnabled: boolean; // default true
@@ -1484,6 +1581,9 @@ export interface DispatchConsoleSettingsConfig {
   defaultShowTrafficOverlay?: boolean; // default false
   defaultShowPlacesOverlay?: boolean; // default false
   defaultShowExclusionsOverlay?: boolean; // default false
+  showQueueFlightBadge?: boolean; // default true
+  flightBadgeFormat?: DispatchFlightBadgeFormat; // default 'ident_from_origin'
+  flightBadgePlacement?: DispatchFlightBadgePlacement; // default 'stacked'
 }
 
 export const DEFAULT_DISPATCH_CONSOLE_CONFIG: DispatchConsoleSettingsConfig = {
@@ -1499,6 +1599,9 @@ export const DEFAULT_DISPATCH_CONSOLE_CONFIG: DispatchConsoleSettingsConfig = {
   defaultShowTrafficOverlay: false,
   defaultShowPlacesOverlay: false,
   defaultShowExclusionsOverlay: false,
+  showQueueFlightBadge: true,
+  flightBadgeFormat: 'ident_from_origin',
+  flightBadgePlacement: 'stacked',
 };
 
 export function normalizeDispatchConsoleConfig(
@@ -1567,6 +1670,16 @@ export function normalizeDispatchConsoleConfig(
       raw?.defaultShowExclusionsOverlay !== undefined
         ? Boolean(raw.defaultShowExclusionsOverlay)
         : false,
+    showQueueFlightBadge:
+      raw?.showQueueFlightBadge !== undefined
+        ? Boolean(raw.showQueueFlightBadge)
+        : DEFAULT_DISPATCH_CONSOLE_CONFIG.showQueueFlightBadge,
+    flightBadgeFormat:
+      raw?.flightBadgeFormat === 'ident_terminal' || raw?.flightBadgeFormat === 'origin_only'
+        ? raw.flightBadgeFormat
+        : 'ident_from_origin',
+    flightBadgePlacement:
+      raw?.flightBadgePlacement === 'inline' ? 'inline' : 'stacked',
   };
 }
 

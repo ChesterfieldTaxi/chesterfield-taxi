@@ -11,6 +11,7 @@
  */
 
 import { COMPANY_CONFIG } from '../../../config/companyConfig';
+import { buildCombinedLambertPickupInstructions } from '../../config/airports';
 import type { PriceLineItem } from '../../types';
 import { reconcileBreakdownWithoutRounding } from '../../utils/fare-breakdown.util';
 import { buildGuestAccountSignupHref } from '../../utils/guest-trip-claim.util';
@@ -735,7 +736,7 @@ export function renderBookingRequestReceivedEmail(
   const isLambert = isLambertAddress(payload.pickupAddress);
   const lambertInstructions =
     payload.lambertPickupInstructions ||
-    'Terminal 1: Exit Door 12 (Baggage Claim level) · Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time.';
+    buildCombinedLambertPickupInstructions();
 
   const hasReturn = Boolean(payload.returnTripDetails);
   const totalCombinedFare = hasReturn
@@ -1080,7 +1081,7 @@ export function renderBookingConfirmedEmail(
   const isLambert = isLambertAddress(payload.pickupAddress);
   const lambertInstructions =
     payload.lambertPickupInstructions ||
-    'Terminal 1: Exit Door 12 (Baggage Claim level) · Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time.';
+    buildCombinedLambertPickupInstructions();
 
   const hasReturn = Boolean(payload.returnTripDetails);
   const totalCombinedFare = hasReturn

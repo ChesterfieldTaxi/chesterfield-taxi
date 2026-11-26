@@ -270,6 +270,68 @@ export function DispatchConsoleSettingsPanel({
             </div>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <label className="flex items-start justify-between gap-3 p-4 bg-surface-subtle border border-border-subtle rounded-xl cursor-pointer">
+              <div>
+                <span className="font-bold text-fg-primary block">
+                  Show Queue Flight Badge
+                </span>
+                <span className="text-[11px] text-fg-muted mt-0.5 block">
+                  Display flight number &amp; origin/terminal badge on Trips Queue rows.
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={consoleConfig.showQueueFlightBadge !== false}
+                onChange={(e) => updateConsole({ showQueueFlightBadge: e.target.checked })}
+                className="w-4 h-4 mt-0.5 rounded text-blue-600 cursor-pointer"
+              />
+            </label>
+
+            <div className="p-4 bg-surface-subtle border border-border-subtle rounded-xl">
+              <label className="font-bold text-fg-primary block mb-1">
+                Flight Badge Format
+              </label>
+              <Select
+                size="sm"
+                value={consoleConfig.flightBadgeFormat || 'ident_from_origin'}
+                onValueChange={(val) =>
+                  updateConsole({
+                    flightBadgeFormat: val as DispatchConsoleSettingsConfig['flightBadgeFormat'],
+                  })
+                }
+              >
+                <option value="ident_from_origin">WN#1234 from SLC</option>
+                <option value="ident_terminal">WN#1234 · STL T2</option>
+                <option value="origin_only">SLC (Origin Only)</option>
+              </Select>
+              <span className="text-[10px] text-fg-muted mt-1 block">
+                Default label format in Trips Queue (dispatchers can override locally).
+              </span>
+            </div>
+
+            <div className="p-4 bg-surface-subtle border border-border-subtle rounded-xl">
+              <label className="font-bold text-fg-primary block mb-1">
+                Flight Badge Placement
+              </label>
+              <Select
+                size="sm"
+                value={consoleConfig.flightBadgePlacement || 'stacked'}
+                onValueChange={(val) =>
+                  updateConsole({
+                    flightBadgePlacement: val as DispatchConsoleSettingsConfig['flightBadgePlacement'],
+                  })
+                }
+              >
+                <option value="stacked">Stacked Under Pickup Time</option>
+                <option value="inline">Inline Next to Pickup Time</option>
+              </Select>
+              <span className="text-[10px] text-fg-muted mt-1 block">
+                Stacked keeps flight info under the timestamp; inline keeps rows compact.
+              </span>
+            </div>
+          </div>
+
           {/* Relocated Live Map Route Polylines (`enableRealtimeRouting`) */}
           <label className="flex items-start justify-between gap-4 p-4 rounded-xl border border-status-staged-border bg-status-staged-bg/40 cursor-pointer">
             <div className="space-y-1">

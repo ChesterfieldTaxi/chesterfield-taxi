@@ -10,6 +10,8 @@
 
 export type FlightProviderId = 'aerodatabox' | 'flightaware' | 'fallback';
 
+import type { TerminalPickupLocations } from '../config/airports';
+
 export type FlightOperationalStatus =
   | 'scheduled'
   | 'en_route'
@@ -55,6 +57,7 @@ export interface FlightLookupQuery {
   destinationIata?: string;
   originIata?: string;
   scheduledPickupIso?: string;
+  pickupConfig?: TerminalPickupLocations | null;
 }
 
 export interface IFlightStatusProvider {

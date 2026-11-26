@@ -3,6 +3,7 @@ import type { UserRole } from '../../../../core/services/auth/admin-auth.service
 import { generateDriverUsername } from '../../../../core/services/operator.service';
 import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
+import { Select } from '../../../ui/Select';
 import {
   CarIcon,
   CheckIcon,
@@ -12,7 +13,11 @@ import {
   UserIcon,
 } from '../../../ui/Icons';
 import { AdminSlideOverDrawer } from '../AdminSlideOverDrawer';
-import { ROLE_META, type CreateOperatorFormState } from './operator-provisioning.util';
+import {
+  CAR_OWNERSHIP_OPTIONS,
+  ROLE_META,
+  type CreateOperatorFormState,
+} from './operator-provisioning.util';
 import { RoleIcon } from './OperatorRosterPanel';
 
 export interface OperatorCreateDrawerProps {
@@ -225,12 +230,25 @@ export function OperatorCreateDrawer({
               />
             </div>
 
-            <Input
-              label="Assigned Car"
-              placeholder="e.g. Car #400 (Standard Sedan)"
-              value={createForm.assignedUnit}
-              onChange={(e) => onChangeForm({ ...createForm, assignedUnit: e.target.value })}
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <Input
+                label="Assigned Car"
+                placeholder="e.g. Car #400 (Standard Sedan)"
+                value={createForm.assignedUnit}
+                onChange={(e) => onChangeForm({ ...createForm, assignedUnit: e.target.value })}
+              />
+              <Select
+                label="Car Ownership"
+                options={CAR_OWNERSHIP_OPTIONS}
+                value={createForm.carOwnership}
+                onValueChange={(val) =>
+                  onChangeForm({
+                    ...createForm,
+                    carOwnership: val === 'company_owned' ? 'company_owned' : 'owner_operator',
+                  })
+                }
+              />
+            </div>
 
             <div className="bg-surface-subtle border border-border-subtle rounded-xl p-3 flex items-center justify-between gap-2">
               <div>

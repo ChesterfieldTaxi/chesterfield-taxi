@@ -99,7 +99,11 @@ export function DispatchNavigationShell({
   dispatchPush,
   onSignOut,
 }: DispatchNavigationShellProps) {
-  const { preferences: mapPrefs, togglePreference: toggleMapPref } = useDispatchMapPreferences();
+  const {
+    preferences: mapPrefs,
+    togglePreference: toggleMapPref,
+    updatePreference: updateMapPref,
+  } = useDispatchMapPreferences();
 
   return (
     <>
@@ -575,6 +579,97 @@ export function DispatchNavigationShell({
                   </div>
                 );
               })}
+            </div>
+
+            {/* Queue Flight Badge Preferences */}
+            <div className="py-3 border-b border-border-header/80 space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-fg-subtle block px-1">
+                Queue Flight Badge
+              </span>
+
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-overlay/70 border border-border-header text-xs gap-2">
+                <div className="min-w-0">
+                  <span className="font-semibold text-fg-on-header block leading-tight">
+                    Show Flight Badge
+                  </span>
+                  <span className="text-[10px] text-fg-subtle block leading-snug">
+                    Display flight pill on airport trips in Trips Queue
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={mapPrefs.showQueueFlightBadge}
+                  onClick={() => toggleMapPref('showQueueFlightBadge')}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shrink-0 transition-colors cursor-pointer ${
+                    mapPrefs.showQueueFlightBadge
+                      ? 'bg-blue-600 text-white hover:bg-blue-500'
+                      : 'bg-surface-header-elevated text-slate-300 hover:bg-surface-header-muted'
+                  }`}
+                >
+                  {mapPrefs.showQueueFlightBadge ? 'On' : 'Off'}
+                </button>
+              </div>
+
+              {mapPrefs.showQueueFlightBadge && (
+                <>
+                  <div className="p-2.5 rounded-xl bg-surface-overlay/70 border border-border-header space-y-1.5">
+                    <span className="text-[10px] font-semibold text-fg-subtle block">
+                      Badge Format
+                    </span>
+                    <div className="grid grid-cols-3 gap-1 text-[10px] font-bold">
+                      {(
+                        [
+                          { value: 'ident_from_origin', label: 'WN#1234 from SLC' },
+                          { value: 'ident_terminal', label: 'WN#1234 · T2' },
+                          { value: 'origin_only', label: 'SLC Only' },
+                        ] as const
+                      ).map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => updateMapPref('flightBadgeFormat', opt.value)}
+                          className={`py-1 px-1.5 rounded-lg truncate transition-colors cursor-pointer ${
+                            mapPrefs.flightBadgeFormat === opt.value
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-surface-header-elevated text-slate-300 hover:bg-surface-header-muted'
+                          }`}
+                          title={opt.label}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-surface-overlay/70 border border-border-header space-y-1.5">
+                    <span className="text-[10px] font-semibold text-fg-subtle block">
+                      Badge Placement
+                    </span>
+                    <div className="grid grid-cols-2 gap-1 text-[10px] font-bold">
+                      {(
+                        [
+                          { value: 'stacked', label: 'Under Time' },
+                          { value: 'inline', label: 'Inline' },
+                        ] as const
+                      ).map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => updateMapPref('flightBadgePlacement', opt.value)}
+                          className={`py-1 px-2 rounded-lg transition-colors cursor-pointer ${
+                            mapPrefs.flightBadgePlacement === opt.value
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-surface-header-elevated text-slate-300 hover:bg-surface-header-muted'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Quick Links */}

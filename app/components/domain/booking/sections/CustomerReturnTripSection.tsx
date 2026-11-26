@@ -402,7 +402,11 @@ export function CustomerReturnTripSection({
                 }
                 hasCheckedLuggage={form.returnHasCheckedLuggage}
                 onHasCheckedLuggageChange={(checked) =>
-                  setForm((prev) => ({ ...prev, returnHasCheckedLuggage: checked }))
+                  setForm((prev) => ({
+                    ...prev,
+                    returnHasCheckedLuggage: checked,
+                    returnCheckedBags: checked ? Math.max(1, prev.returnCheckedBags) : 0,
+                  }))
                 }
                 fboFacilities={COMMON_FBO_FACILITIES}
                 lambertPickupInstructions={bookingConfig.lambertPickupInstructions}

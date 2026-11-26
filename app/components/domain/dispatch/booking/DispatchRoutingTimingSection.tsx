@@ -4,8 +4,10 @@ import type { FlightTelemetrySnapshot } from '../../../../core/types/flight';
 import {
   MAJOR_AIRLINES,
   parseFlightIdent,
+  resolveStlTerminalInfo,
   type AirportDetectionResult,
 } from '../../../../core/config/airports';
+import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
 import {
   DISPATCH_FBO_FACILITIES as COMMON_FBO_FACILITIES,
   type UseBookingWaypointsResult,
@@ -287,6 +289,71 @@ export function DispatchRoutingTimingSection({
 
           {/* Outbound Flight / Aviation Details Box */}
           <CollapsibleSection isOpen={airportDetection.isAirportTrip || provideFlightInfo}>
+            {airportDetection.isDropoffAirport &&
+            !airportDetection.isPickupAirport &&
+            !airportDetection.isPrivateAviation ? (
+              <div className="p-2.5 bg-status-info-bg/60 border border-status-info-border rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-status-info-fg font-bold text-xs">
+                    <PlaneLandingIcon className="w-3.5 h-3.5 text-blue-600 rotate-45" />
+                    <span>{airportDetection.airport?.shortName || 'Airport'} Dropoff</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-fg-muted bg-surface-card px-1.5 py-0.5 rounded border border-border-subtle">
+                    Optional
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                  <div className="sm:col-span-5">
+                    <Select
+                      size="xs"
+                      searchable
+                      searchPlaceholder="Search airline or IATA code..."
+                      value={airline}
+                      options={[
+                        { value: '', label: 'Select Airline (Optional)' },
+                        ...MAJOR_AIRLINES.map((al) => ({
+                          value: al.name,
+                          label: `${al.name} (${al.code})`,
+                          selectedLabel: al.code,
+                        })),
+                      ]}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v && !provideFlightInfo) setProvideFlightInfo(true);
+                        setAirline(v);
+                        if (outboundFlightTelemetry) setOutboundFlightTelemetry(null);
+                      }}
+                      triggerClassName="border-status-info-border"
+                    />
+                  </div>
+                  <div className="sm:col-span-7 text-[11px] text-fg-secondary leading-snug">
+                    {airline ? (
+                      <span>
+                        <span className="font-bold text-fg-strong">
+                          {resolveStlTerminalInfo(
+                            airline,
+                            airportDetection.airport?.iataCode || 'STL',
+                            getAdminConfigService().getCachedSettings().customerBookingConfig
+                          ).terminal || 'Terminal'}
+                          :{' '}
+                        </span>
+                        {
+                          resolveStlTerminalInfo(
+                            airline,
+                            airportDetection.airport?.iataCode || 'STL',
+                            getAdminConfigService().getCachedSettings().customerBookingConfig
+                          ).pickupDoorGuidance
+                        }
+                      </span>
+                    ) : (
+                      <span>
+                        Select airline for terminal dropoff door hint (T1: AA, DL, UA · T2: WN, LH).
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
             <div className="p-3 bg-status-info-bg/70 border border-status-info-border rounded-lg space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-status-info-fg font-bold text-xs">
@@ -320,23 +387,15 @@ export function DispatchRoutingTimingSection({
                     <span>
                       {airportDetection.isPickupAirport
                         ? 'Track Inbound Flight'
-                        : airportDetection.isPrivateAviation
-                        ? 'Provide Aviation Details'
-                        : 'Provide Airline'}
+                        : 'Provide Aviation Details'}
                     </span>
                   </label>
-                  <span className="text-[10px] bg-blue-200/80 text-status-info-fg px-2 py-0.5 rounded font-bold inline-flex items-center gap-1">
-                    {airportDetection.isPrivateAviation ? (
-                      <>
-                        <PlaneIcon className="w-3 h-3 shrink-0" />
-                        <span>Private Aviation (FBO)</span>
-                      </>
-                    ) : airportDetection.isPickupAirport ? (
-                      'Arrival Tracking'
-                    ) : (
-                      'Terminal Routing'
-                    )}
-                  </span>
+                  {airportDetection.isPrivateAviation && (
+                    <span className="text-[10px] bg-blue-200/80 text-status-info-fg px-2 py-0.5 rounded font-bold inline-flex items-center gap-1">
+                      <PlaneIcon className="w-3 h-3 shrink-0" />
+                      <span>Private Aviation (FBO)</span>
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -390,8 +449,8 @@ export function DispatchRoutingTimingSection({
                     </div>
                   ) : (
                     <>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <div>
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                        <div className="sm:col-span-5">
                           <span className="block text-[10px] text-fg-secondary font-semibold mb-0.5">
                             Airline
                           </span>
@@ -422,7 +481,7 @@ export function DispatchRoutingTimingSection({
                             triggerClassName="border-status-info-border"
                           />
                         </div>
-                        <div>
+                        <div className="sm:col-span-2">
                           <span className="block text-[10px] text-fg-secondary font-semibold mb-0.5">
                             Flight #
                           </span>
@@ -431,7 +490,7 @@ export function DispatchRoutingTimingSection({
                             inputMode="numeric"
                             pattern="[0-9]{1,4}"
                             maxLength={4}
-                            placeholder="e.g. 1234"
+                            placeholder="1234"
                             value={flightNumber}
                             onChange={(e) => {
                               const val = e.target.value.replace(/\D/g, '').slice(0, 4);
@@ -447,7 +506,7 @@ export function DispatchRoutingTimingSection({
                             className="w-full px-2 py-1 bg-surface-card border border-status-info-border rounded text-xs font-mono font-bold"
                           />
                         </div>
-                        <div>
+                        <div className="sm:col-span-5">
                           <span className="block text-[10px] text-fg-secondary font-semibold mb-0.5">
                             {airportDetection.isPickupAirport ? 'Origin' : 'Destination'}
                           </span>
@@ -516,6 +575,7 @@ export function DispatchRoutingTimingSection({
                 </div>
               </CollapsibleSection>
             </div>
+            )}
           </CollapsibleSection>
         </div>
       </div>

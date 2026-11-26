@@ -8,6 +8,7 @@ import {
   isFirebaseConfigured,
 } from '../../../../core/services/firebase';
 import type { UserRole } from '../../../../core/services/auth/admin-auth.service';
+import type { DriverCarOwnership } from '../../../../core/types/driver';
 import type { GeoPoint } from '../../../../core/types/trip';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
 import {
@@ -62,6 +63,14 @@ export const ROLE_META: Record<UserRole, RoleMetaItem> = {
   },
 };
 
+export const CAR_OWNERSHIP_OPTIONS: ReadonlyArray<{
+  value: DriverCarOwnership;
+  label: string;
+}> = [
+  { value: 'owner_operator', label: 'Owner-Operator' },
+  { value: 'company_owned', label: 'Company-Owned' },
+];
+
 export interface EditFormState {
   firstName: string;
   lastName: string;
@@ -71,6 +80,7 @@ export interface EditFormState {
   roles: UserRole[];
   cabNumber: string;
   assignedUnit: string;
+  carOwnership: DriverCarOwnership;
   driverLicense: string;
   driverScore: number;
   homeAddress: string;
@@ -95,6 +105,7 @@ export interface CreateOperatorFormState {
   roles: UserRole[];
   cabNumber: string;
   assignedUnit: string;
+  carOwnership: DriverCarOwnership;
   driverLicense: string;
   deskExtension: string;
   emergencyContact: string;
@@ -111,6 +122,7 @@ export const EMPTY_CREATE_STATE: CreateOperatorFormState = {
   roles: ['driver'],
   cabNumber: '',
   assignedUnit: '',
+  carOwnership: 'owner_operator',
   driverLicense: '',
   deskExtension: '',
   emergencyContact: '',
@@ -133,6 +145,7 @@ export function buildInitialEditFormState(op: OperatorUser): EditFormState {
     roles: activeRoles,
     cabNumber: cab,
     assignedUnit: op.assignedUnit ? op.assignedUnit.replace(/^Cab\s*#?/i, 'Car #') : cab ? `Car #${cab}` : '',
+    carOwnership: op.carOwnership === 'company_owned' ? 'company_owned' : 'owner_operator',
     driverLicense: op.driverLicense || '',
     driverScore: typeof op.driverScore === 'number' ? op.driverScore : 98,
     homeAddress: op.homeAddress || '',
@@ -185,6 +198,11 @@ export async function provisionNewOperatorAccount(createForm: CreateOperatorForm
     phone: createForm.phone.trim(),
     driverLicense: createForm.driverLicense.trim(),
     assignedUnit,
+    carOwnership: selectedRoles.includes('driver')
+      ? createForm.carOwnership === 'company_owned'
+        ? 'company_owned'
+        : 'owner_operator'
+      : undefined,
     deskExtension: createForm.deskExtension.trim(),
     emergencyContact: createForm.emergencyContact.trim(),
     adminNotes: createForm.adminNotes.trim(),
@@ -236,6 +254,11 @@ export async function saveEditedOperatorProfile(
     role: nextRoles[0] || 'customer',
     cabNumber: cleanCab,
     assignedUnit,
+    carOwnership: nextRoles.includes('driver')
+      ? editForm.carOwnership === 'company_owned'
+        ? 'company_owned'
+        : 'owner_operator'
+      : editingOperator.carOwnership,
     driverLicense: editForm.driverLicense.trim(),
     driverScore: clampedScore,
     homeAddress: cleanHomeAddr,

@@ -413,7 +413,11 @@ export function CustomerRouteTimingSection({
           onFboFacilityChange={(val) => setForm((prev) => ({ ...prev, fboFacility: val }))}
           hasCheckedLuggage={form.hasCheckedLuggage}
           onHasCheckedLuggageChange={(checked) =>
-            setForm((prev) => ({ ...prev, hasCheckedLuggage: checked }))
+            setForm((prev) => ({
+              ...prev,
+              hasCheckedLuggage: checked,
+              checkedBags: checked ? Math.max(1, prev.checkedBags) : 0,
+            }))
           }
           fboFacilities={COMMON_FBO_FACILITIES}
           lambertPickupInstructions={bookingConfig.lambertPickupInstructions}

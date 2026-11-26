@@ -5,8 +5,10 @@ import type { FlightTelemetrySnapshot } from '../../../../core/types/flight';
 import {
   MAJOR_AIRLINES,
   parseFlightIdent,
+  resolveStlTerminalInfo,
   type AirportDetectionResult,
 } from '../../../../core/config/airports';
+import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
 import {
   DAYS_OF_WEEK,
   DISPATCH_FBO_FACILITIES as COMMON_FBO_FACILITIES,
@@ -439,6 +441,73 @@ export function DispatchReturnRepeatSection({
                   <CollapsibleSection
                     isOpen={returnAirportDetection.isAirportTrip || returnProvideFlightInfo}
                   >
+                    {returnAirportDetection.isDropoffAirport &&
+                    !returnAirportDetection.isPickupAirport &&
+                    !returnAirportDetection.isPrivateAviation ? (
+                      <div className="p-2.5 bg-surface-card/90 border border-status-staged-border rounded-lg space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-status-staged-fg font-bold text-xs">
+                            <PlaneLandingIcon className="w-3.5 h-3.5 text-indigo-600 rotate-45" />
+                            <span>
+                              {returnAirportDetection.airport?.shortName || 'Airport'} Return Dropoff
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-semibold text-fg-muted bg-surface-subtle px-1.5 py-0.5 rounded border border-border-subtle">
+                            Optional
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                          <div className="sm:col-span-5">
+                            <Select
+                              size="xs"
+                              searchable
+                              searchPlaceholder="Search airline or IATA code..."
+                              value={returnAirline}
+                              options={[
+                                { value: '', label: 'Select Airline (Optional)' },
+                                ...MAJOR_AIRLINES.map((al) => ({
+                                  value: al.name,
+                                  label: `${al.name} (${al.code})`,
+                                  selectedLabel: al.code,
+                                })),
+                              ]}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (v && !returnProvideFlightInfo) setReturnProvideFlightInfo(true);
+                                setReturnAirline(v);
+                                if (returnFlightTelemetry) setReturnFlightTelemetry(null);
+                              }}
+                              triggerClassName="border-status-staged-border"
+                            />
+                          </div>
+                          <div className="sm:col-span-7 text-[11px] text-fg-secondary leading-snug">
+                            {returnAirline ? (
+                              <span>
+                                <span className="font-bold text-fg-strong">
+                                  {resolveStlTerminalInfo(
+                                    returnAirline,
+                                    returnAirportDetection.airport?.iataCode || 'STL',
+                                    getAdminConfigService().getCachedSettings().customerBookingConfig
+                                  ).terminal || 'Terminal'}
+                                  :{' '}
+                                </span>
+                                {
+                                  resolveStlTerminalInfo(
+                                    returnAirline,
+                                    returnAirportDetection.airport?.iataCode || 'STL',
+                                    getAdminConfigService().getCachedSettings().customerBookingConfig
+                                  ).pickupDoorGuidance
+                                }
+                              </span>
+                            ) : (
+                              <span>
+                                Select airline for terminal dropoff door hint (T1: AA, DL, UA · T2: WN, LH).
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
                     <div className="p-3 bg-surface-card/90 border border-status-staged-border rounded-lg space-y-2.5">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-status-staged-fg font-bold text-xs">
@@ -476,23 +545,15 @@ export function DispatchReturnRepeatSection({
                             <span>
                               {returnAirportDetection.isPickupAirport
                                 ? 'Track Inbound Flight'
-                                : returnAirportDetection.isPrivateAviation
-                                ? 'Provide Aviation Details'
-                                : 'Provide Airline'}
+                                : 'Provide Aviation Details'}
                             </span>
                           </label>
-                          <span className="text-[10px] bg-status-staged-bg-strong text-status-staged-fg px-2 py-0.5 rounded font-bold inline-flex items-center gap-1">
-                            {returnAirportDetection.isPrivateAviation ? (
-                              <>
-                                <PlaneIcon className="w-3 h-3 shrink-0" />
-                                <span>Private Aviation (FBO)</span>
-                              </>
-                            ) : returnAirportDetection.isPickupAirport ? (
-                              'Arrival Tracking'
-                            ) : (
-                              'Terminal Routing'
-                            )}
-                          </span>
+                          {returnAirportDetection.isPrivateAviation && (
+                            <span className="text-[10px] bg-status-staged-bg-strong text-status-staged-fg px-2 py-0.5 rounded font-bold inline-flex items-center gap-1">
+                              <PlaneIcon className="w-3 h-3 shrink-0" />
+                              <span>Private Aviation (FBO)</span>
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -550,8 +611,8 @@ export function DispatchReturnRepeatSection({
                             </div>
                           ) : (
                             <>
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                <div>
+                              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                                <div className="sm:col-span-5">
                                   <span className="block text-[10px] text-fg-secondary font-semibold mb-0.5">
                                     Airline
                                   </span>
@@ -582,7 +643,7 @@ export function DispatchReturnRepeatSection({
                                     triggerClassName="border-status-staged-border"
                                   />
                                 </div>
-                                <div>
+                                <div className="sm:col-span-2">
                                   <span className="block text-[10px] text-fg-secondary font-semibold mb-0.5">
                                     Flight #
                                   </span>
@@ -591,7 +652,7 @@ export function DispatchReturnRepeatSection({
                                     inputMode="numeric"
                                     pattern="[0-9]{1,4}"
                                     maxLength={4}
-                                    placeholder="e.g. 1234"
+                                    placeholder="1234"
                                     value={returnFlightNumber}
                                     onChange={(e) => {
                                       const val = e.target.value.replace(/\D/g, '').slice(0, 4);
@@ -607,7 +668,7 @@ export function DispatchReturnRepeatSection({
                                     className="w-full px-2 py-1 bg-surface-card border border-status-staged-border rounded text-xs font-mono font-bold"
                                   />
                                 </div>
-                                <div>
+                                <div className="sm:col-span-5">
                                   <span className="block text-[10px] text-fg-secondary font-semibold mb-0.5">
                                     {returnAirportDetection.isPickupAirport
                                       ? 'Origin'
@@ -670,7 +731,13 @@ export function DispatchReturnRepeatSection({
                               <input
                                 type="checkbox"
                                 checked={returnHasCheckedLuggage}
-                                onChange={(e) => setReturnHasCheckedLuggage(e.target.checked)}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setReturnHasCheckedLuggage(checked);
+                                  setReturnCheckedBags(
+                                    checked ? Math.max(1, returnCheckedBags) : 0
+                                  );
+                                }}
                                 className="rounded border-status-staged-border text-indigo-600"
                               />
                               <span>Checked Baggage</span>
@@ -679,6 +746,7 @@ export function DispatchReturnRepeatSection({
                         </div>
                       </CollapsibleSection>
                     </div>
+                    )}
                   </CollapsibleSection>
                 </div>
 

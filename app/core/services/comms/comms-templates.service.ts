@@ -23,7 +23,9 @@ import type {
 import {
   detectAirportInAddresses,
   resolveStlTerminalInfo,
+  type TerminalPickupLocations,
 } from '../../config/airports';
+import { getAdminConfigService } from '../config/admin-config.service';
 import {
   normalizeCannedSmsTemplates,
   type AppSettings,
@@ -276,6 +278,7 @@ export function resolveAirportCurbsideSmsGuidance(input: {
   pickupAddress?: string;
   dropoffAddress?: string;
   carUnit?: string;
+  pickupConfig?: TerminalPickupLocations | null;
 }): string {
   const formattedCar = formatCommsCarUnit(input.carUnit) || 'your assigned vehicle';
   const pickupAddr = (input.pickupAddress || '').trim();
@@ -293,7 +296,9 @@ export function resolveAirportCurbsideSmsGuidance(input: {
     pickupAddr ||
     dropoffAddr;
 
-  const termInfo = resolveStlTerminalInfo(combinedHint, effectiveAirportCode);
+  const effectivePickupConfig =
+    input.pickupConfig ?? getAdminConfigService().getCachedSettings().customerBookingConfig;
+  const termInfo = resolveStlTerminalInfo(combinedHint, effectiveAirportCode, effectivePickupConfig);
 
   if (termInfo.airportCode === 'SUS') {
     return `Meet ${formattedCar} at SUS FBO (${termInfo.pickupDoorGuidance})`;
@@ -302,13 +307,13 @@ export function resolveAirportCurbsideSmsGuidance(input: {
     return `Meet ${formattedCar} at CPS FBO (${termInfo.pickupDoorGuidance})`;
   }
   if (termInfo.terminal === 'Terminal 2') {
-    return `Proceed to Lower Level Baggage Claim and meet ${formattedCar} outside STL Terminal 2 Exit Door 12`;
+    return `Proceed to Lower Level Baggage Claim and meet ${formattedCar} outside STL ${termInfo.pickupDoorGuidance}`;
   }
   if (termInfo.terminal === 'Terminal 1') {
-    return `Proceed to Lower Level Baggage Claim and meet ${formattedCar} outside STL Terminal 1 Exit Door 6`;
+    return `Proceed to Lower Level Baggage Claim and meet ${formattedCar} outside STL ${termInfo.pickupDoorGuidance}`;
   }
 
-  return `Meet ${formattedCar} outside Baggage Claim — STL Terminal 1 Exit Door 6, STL Terminal 2 (Southwest/Lufthansa) Exit Door 12, or SUS FBO lobby`;
+  return `Meet ${formattedCar} outside Baggage Claim — ${termInfo.pickupDoorGuidance}`;
 }
 
 function resolveSmsTemplateVariableMap(

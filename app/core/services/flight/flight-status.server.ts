@@ -15,6 +15,7 @@ import {
   FLIGHT_LOOKUP_PAST_WINDOW_MS,
   parseFlightIdent,
   resolveStlTerminalInfo,
+  type TerminalPickupLocations,
 } from '../../config/airports';
 import {
   normalizeFlightTrackingPolicy,
@@ -106,9 +107,10 @@ function normalizeIsoTimestamp(raw: unknown): string | undefined {
 function normalizeStlTerminalLabel(
   rawTerminal: unknown,
   airlineCodeOrName?: string,
-  destinationIata?: string
+  destinationIata?: string,
+  pickupConfig?: TerminalPickupLocations | null
 ): { terminal?: string; pickupDoorGuidance: string } {
-  const baseInfo = resolveStlTerminalInfo(airlineCodeOrName, destinationIata || 'STL');
+  const baseInfo = resolveStlTerminalInfo(airlineCodeOrName, destinationIata || 'STL', pickupConfig);
   const raw = typeof rawTerminal === 'string' || typeof rawTerminal === 'number'
     ? String(rawTerminal).trim()
     : '';
@@ -125,13 +127,13 @@ function normalizeStlTerminalLabel(
     if (/^(2|t2|terminal\s*2|east)$/i.test(raw)) {
       return {
         terminal: 'Terminal 2',
-        pickupDoorGuidance: 'Terminal 2 · Baggage Claim Exit Door 12',
+        pickupDoorGuidance: resolveStlTerminalInfo('t2', 'STL', pickupConfig).pickupDoorGuidance,
       };
     }
     if (/^(1|t1|terminal\s*1|main)$/i.test(raw)) {
       return {
         terminal: 'Terminal 1',
-        pickupDoorGuidance: 'Terminal 1 · Lower Level Exit Door 6 / Door 12',
+        pickupDoorGuidance: resolveStlTerminalInfo('t1', 'STL', pickupConfig).pickupDoorGuidance,
       };
     }
     if (raw) {
@@ -344,12 +346,13 @@ export class AeroDataBoxProvider implements IFlightStatusProvider {
     const airlineName =
       (typeof leg?.airline?.name === 'string' && leg.airline.name.trim()) ||
       query.airlineName ||
-      resolveStlTerminalInfo(query.airlineCode, destinationIata).airlineName;
+      resolveStlTerminalInfo(query.airlineCode, destinationIata, query.pickupConfig).airlineName;
 
     const terminalInfo = normalizeStlTerminalLabel(
       arr?.terminal,
       query.airlineCode || airlineName,
-      destinationIata
+      destinationIata,
+      query.pickupConfig
     );
 
     const gate =
@@ -550,11 +553,16 @@ export class FlightAwareProvider implements IFlightStatusProvider {
         : undefined;
     const destinationIata = extractIata(leg?.destination, targetDest) || targetDest;
 
-    const baseInfo = resolveStlTerminalInfo(query.airlineCode || query.airlineName, destinationIata);
+    const baseInfo = resolveStlTerminalInfo(
+      query.airlineCode || query.airlineName,
+      destinationIata,
+      query.pickupConfig
+    );
     const terminalInfo = normalizeStlTerminalLabel(
       leg?.terminal_destination,
       query.airlineCode || query.airlineName,
-      destinationIata
+      destinationIata,
+      query.pickupConfig
     );
 
     const gate =
@@ -614,7 +622,8 @@ export class FallbackScheduleProvider implements IFlightStatusProvider {
     const dest = (query.destinationIata || 'STL').toUpperCase();
     const terminalInfo = resolveStlTerminalInfo(
       query.airlineCode || query.airlineName,
-      dest
+      dest,
+      query.pickupConfig
     );
     const nowMs = this.nowFn();
 
@@ -673,11 +682,14 @@ export interface LookupFlightServerResult {
   error?: string;
 }
 
-async function resolveServerFlightTrackingPolicy(
+async function resolveServerFlightRuntimeConfig(
   options?: Pick<LookupFlightServerOptions, 'policyOverride' | 'staffBearerToken' | 'skipFirestoreCache'>
-): Promise<FlightTrackingPolicyConfig> {
+): Promise<{
+  policy: FlightTrackingPolicyConfig;
+  pickupLocations?: TerminalPickupLocations;
+}> {
   if (options?.policyOverride) {
-    return normalizeFlightTrackingPolicy(options.policyOverride);
+    return { policy: normalizeFlightTrackingPolicy(options.policyOverride) };
   }
   if (!options?.skipFirestoreCache && isFirebaseConfigured()) {
     try {
@@ -689,15 +701,36 @@ async function resolveServerFlightTrackingPolicy(
           'appSettings',
           readToken
         );
+        const rawBooking = appSettingsDoc?.customerBookingConfig as
+          | Partial<TerminalPickupLocations>
+          | undefined;
+        const pickupLocations: TerminalPickupLocations | undefined = rawBooking
+          ? {
+              terminal1PickupLocation: rawBooking.terminal1PickupLocation,
+              terminal2PickupLocation: rawBooking.terminal2PickupLocation,
+              privateFboPickupLocation: rawBooking.privateFboPickupLocation,
+            }
+          : undefined;
         if (appSettingsDoc?.integrations?.flightTracking) {
-          return normalizeFlightTrackingPolicy(appSettingsDoc.integrations.flightTracking);
+          return {
+            policy: normalizeFlightTrackingPolicy(appSettingsDoc.integrations.flightTracking),
+            pickupLocations,
+          };
         }
+        return { policy: normalizeFlightTrackingPolicy(), pickupLocations };
       }
     } catch {
       // Fallback to default policy
     }
   }
-  return normalizeFlightTrackingPolicy();
+  return { policy: normalizeFlightTrackingPolicy() };
+}
+
+async function resolveServerFlightTrackingPolicy(
+  options?: Pick<LookupFlightServerOptions, 'policyOverride' | 'staffBearerToken' | 'skipFirestoreCache'>
+): Promise<FlightTrackingPolicyConfig> {
+  const { policy } = await resolveServerFlightRuntimeConfig(options);
+  return policy;
 }
 
 function resolveProvidersFromEnv(
@@ -858,7 +891,7 @@ export async function lookupFlightTelemetryServer(
     };
   }
 
-  const policy = await resolveServerFlightTrackingPolicy(options);
+  const { policy, pickupLocations } = await resolveServerFlightRuntimeConfig(options);
   const futureWindowMs = policy.flightLookupWindowHours * 3_600_000;
   const cacheTtlMs = policy.cacheTtlMinutes * 60_000;
   const maxFutureCalendarDays = Math.max(1, Math.ceil(policy.flightLookupWindowHours / 24));
@@ -970,6 +1003,7 @@ export async function lookupFlightTelemetryServer(
     destinationIata: input.destinationIata?.trim().toUpperCase() || 'STL',
     originIata: input.originIata?.trim().toUpperCase() || undefined,
     scheduledPickupIso: input.scheduledPickupIso,
+    pickupConfig: pickupLocations,
   };
 
   let resolvedSnapshot: FlightTelemetrySnapshot | null = null;

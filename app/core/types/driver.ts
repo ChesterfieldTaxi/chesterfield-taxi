@@ -9,6 +9,18 @@ import type { DriverTelemetryPing, GeoPoint } from './trip';
 
 export type DriverDutyStatus = 'on_duty' | 'off_duty' | 'on_break';
 
+export type DriverCarOwnership = 'owner_operator' | 'company_owned';
+
+export type DriverPayoutType = 'percent' | 'flat';
+
+export type FlatPayoutPeriod = 'day' | 'week' | 'month';
+
+export interface PaymentTypeCommissionRates {
+  cash?: number | null;
+  card?: number | null;
+  account?: number | null;
+}
+
 /**
  * Canonical Live Fleet Map Status (Option C CAD Palette):
  * - available: Green  (on_duty, not currently en_route / arrived / in_progress)
@@ -58,8 +70,18 @@ export interface DriverProfile {
   vehicleModel?: string;
   vehicleColor?: string;
   licensePlate?: string;
-  /** Configurable driver fare commission share (0.0 - 1.0, default 0.75) */
+  /** Car ownership classification (defaults to 'owner_operator') */
+  carOwnership?: DriverCarOwnership;
+  /** Driver payout mode ('percent' commission split vs 'flat' lease/fee) */
+  payoutType?: DriverPayoutType;
+  /** Period unit when payoutType === 'flat' */
+  flatPayoutPeriod?: FlatPayoutPeriod;
+  /** Flat fee/lease amount ($) owed per flatPayoutPeriod */
+  flatPayoutAmount?: number;
+  /** Configurable driver fare commission share (0.0 - 1.0 or 0 - 100%, default 0.75 / 75%) */
   commissionRate?: number;
+  /** Optional per-driver payment-type commission percentages (0 - 100) */
+  paymentTypeCommissionRates?: PaymentTypeCommissionRates;
   currentTripId?: string | null;
   zone?: string;
   avatarUrl?: string;

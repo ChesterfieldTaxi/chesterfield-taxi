@@ -67,13 +67,17 @@ export const SUB_PAGES: Record<string, AdminSubPageItem[]> = {
   invoicing: [
     { key: 'ledger', label: 'Invoices & AR Ledger' },
     { key: 'accounts', label: 'Corporate Billing' },
-    { key: 'payouts', label: 'Driver, Staff & Other Payouts' },
+    { key: 'driver-payouts', label: 'Driver Payouts' },
+    { key: 'staff-payouts', label: 'Staff Payroll' },
+    { key: 'other-payees', label: 'Other Payees' },
     { key: 'accounting-sync', label: 'Policy & QuickBooks' },
   ],
   financials: [
     { key: 'ledger', label: 'Invoices & AR Ledger' },
     { key: 'accounts', label: 'Corporate Billing' },
-    { key: 'payouts', label: 'Driver, Staff & Other Payouts' },
+    { key: 'driver-payouts', label: 'Driver Payouts' },
+    { key: 'staff-payouts', label: 'Staff Payroll' },
+    { key: 'other-payees', label: 'Other Payees' },
     { key: 'accounting-sync', label: 'Policy & QuickBooks' },
   ],
   rates: [
@@ -95,7 +99,7 @@ export const SUB_PAGES: Record<string, AdminSubPageItem[]> = {
   ],
   operators: [
     { key: 'roster', label: 'Roster' },
-    { key: 'permissions', label: 'Role & Lead-Window Access' },
+    { key: 'permissions', label: 'Roles & Permissions' },
     { key: 'driver-policies', label: 'Driver App Policies' },
     { key: 'onboarding', label: 'Applications' },
   ],
@@ -271,9 +275,10 @@ export function resolveAdminTabAndSub(
     };
   }
   if (tabInput === 'financials') {
+    const mappedSub = subInput === 'payouts' ? 'driver-payouts' : subInput;
     return {
       tab: 'invoicing',
-      sub: resolveValidSubOrFallback('invoicing', subInput, 'ledger'),
+      sub: resolveValidSubOrFallback('invoicing', mappedSub, 'ledger'),
     };
   }
   if (tabInput === 'pricing') {
@@ -314,6 +319,12 @@ export function resolveAdminTabAndSub(
   }
 
   // 6. Canonical Primary Tabs
+  if (tabInput === 'invoicing' && subInput === 'payouts') {
+    return {
+      tab: 'invoicing',
+      sub: 'driver-payouts',
+    };
+  }
   if (tabInput === 'rates') {
     return {
       tab: 'rates',

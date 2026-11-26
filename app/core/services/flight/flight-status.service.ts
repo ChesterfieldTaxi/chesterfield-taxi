@@ -39,7 +39,10 @@ import { authorizedFetch } from '../auth/auth-headers';
 import { getBookingService } from '../booking';
 import type { IBookingService } from '../booking-service';
 import { getAdminConfigService } from '../config/admin-config.service';
-import { normalizeFlightTrackingPolicy } from '../../types/config';
+import {
+  normalizeFlightTrackingPolicy,
+  type DispatchFlightBadgeFormat,
+} from '../../types/config';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';
 import { sanitizePayload } from '../firestore-sanitizer';
 
@@ -178,9 +181,13 @@ export function extractTripFlightCredentials(trip: Trip): {
  * Pure presenter helper producing compact color-coded Flight Telemetry Pill metadata
  * for Dispatch Queue cards/rows, Trip Details drawers, and Driver Manifests.
  */
-export function resolveTripFlightBadge(trip: Trip): TripFlightBadgeDescriptor {
+export function resolveTripFlightBadge(
+  trip: Trip,
+  options?: { format?: DispatchFlightBadgeFormat }
+): TripFlightBadgeDescriptor {
   const creds = extractTripFlightCredentials(trip);
   const telemetry = trip.flightTelemetry;
+  const badgeFormat: DispatchFlightBadgeFormat = options?.format || 'ident_from_origin';
 
   if (creds.isPrivateAviation) {
     return {
@@ -210,16 +217,28 @@ export function resolveTripFlightBadge(trip: Trip): TripFlightBadgeDescriptor {
 
   const termInfo = resolveStlTerminalInfo(
     telemetry?.airlineCode || creds.airline,
-    telemetry?.destinationIata || creds.airportCode || 'STL'
+    telemetry?.destinationIata || creds.airportCode || 'STL',
+    getAdminConfigService().getCachedSettings().customerBookingConfig
   );
   const terminalLabel = telemetry?.terminal || termInfo.terminal;
+  const originIata = (telemetry?.originIata || creds.originIata || '').trim().toUpperCase();
+  const ident = telemetry?.flightIdent || creds.flightIdent;
+  const formattedIdent = ident.replace(/^([A-Z0-9]{2})(\d+)$/, '$1#$2');
   const shortTerm =
     terminalLabel === 'Terminal 2'
       ? 'STL T2'
       : terminalLabel === 'Terminal 1'
       ? 'STL T1'
       : termInfo.shortTerminal;
-  const ident = telemetry?.flightIdent || creds.flightIdent;
+  const routeText =
+    badgeFormat === 'ident_terminal'
+      ? `${formattedIdent} · ${shortTerm}`
+      : badgeFormat === 'origin_only'
+      ? originIata || formattedIdent
+      : originIata
+      ? `${formattedIdent} from ${originIata}`
+      : formattedIdent;
+  const effectivePickupDoorGuidance = termInfo.pickupDoorGuidance || telemetry?.pickupDoorGuidance;
 
   if (!telemetry) {
     return {
@@ -227,11 +246,11 @@ export function resolveTripFlightBadge(trip: Trip): TripFlightBadgeDescriptor {
       isAirportPickup: creds.isAirportPickup,
       isPrivateAviation: false,
       flightIdent: ident,
-      label: `${ident} · ${shortTerm}`,
-      shortLabel: `${ident} · ${shortTerm}`,
+      label: routeText,
+      shortLabel: routeText,
       tone: 'slate',
       terminal: terminalLabel,
-      pickupDoorGuidance: termInfo.pickupDoorGuidance,
+      pickupDoorGuidance: effectivePickupDoorGuidance,
       delayMinutes: 0,
       isSimulatedFallback: true,
     };
@@ -245,13 +264,13 @@ export function resolveTripFlightBadge(trip: Trip): TripFlightBadgeDescriptor {
       isAirportPickup: creds.isAirportPickup,
       isPrivateAviation: false,
       flightIdent: ident,
-      label: `${ident} · Cancelled`,
-      shortLabel: 'Cancelled',
+      label: `${routeText} · Cancelled`,
+      shortLabel: `${routeText} · Cancelled`,
       tone: 'rose',
       terminal: terminalLabel,
       gate: telemetry.gate,
       baggageClaim: telemetry.baggageClaim,
-      pickupDoorGuidance: telemetry.pickupDoorGuidance || termInfo.pickupDoorGuidance,
+      pickupDoorGuidance: effectivePickupDoorGuidance,
       delayMinutes: delay,
       isSimulatedFallback: telemetry.isSimulatedFallback,
     };
@@ -263,32 +282,31 @@ export function resolveTripFlightBadge(trip: Trip): TripFlightBadgeDescriptor {
       isAirportPickup: creds.isAirportPickup,
       isPrivateAviation: false,
       flightIdent: ident,
-      label: `${ident} · Diverted`,
-      shortLabel: 'Diverted',
+      label: `${routeText} · Diverted`,
+      shortLabel: `${routeText} · Diverted`,
       tone: 'rose',
       terminal: terminalLabel,
       gate: telemetry.gate,
       baggageClaim: telemetry.baggageClaim,
-      pickupDoorGuidance: telemetry.pickupDoorGuidance || termInfo.pickupDoorGuidance,
+      pickupDoorGuidance: effectivePickupDoorGuidance,
       delayMinutes: delay,
       isSimulatedFallback: telemetry.isSimulatedFallback,
     };
   }
 
   if (telemetry.status === 'landed') {
-    const shortT = shortTerm.replace(/^STL\s+/, '');
     return {
       hasFlight: true,
       isAirportPickup: creds.isAirportPickup,
       isPrivateAviation: false,
       flightIdent: ident,
-      label: `${ident} · Landed · ${shortT}`,
-      shortLabel: `Landed · ${shortT}`,
+      label: `${routeText} · Landed`,
+      shortLabel: `${routeText} · Landed`,
       tone: 'blue',
       terminal: terminalLabel,
       gate: telemetry.gate,
       baggageClaim: telemetry.baggageClaim,
-      pickupDoorGuidance: telemetry.pickupDoorGuidance || termInfo.pickupDoorGuidance,
+      pickupDoorGuidance: effectivePickupDoorGuidance,
       delayMinutes: delay,
       isSimulatedFallback: telemetry.isSimulatedFallback,
     };
@@ -301,13 +319,13 @@ export function resolveTripFlightBadge(trip: Trip): TripFlightBadgeDescriptor {
       isAirportPickup: creds.isAirportPickup,
       isPrivateAviation: false,
       flightIdent: ident,
-      label: `${ident} · Delayed +${plusMin}m`,
-      shortLabel: `Delayed +${plusMin}m`,
+      label: `${routeText} · Delayed +${plusMin}m`,
+      shortLabel: `${routeText} · +${plusMin}m`,
       tone: 'amber',
       terminal: terminalLabel,
       gate: telemetry.gate,
       baggageClaim: telemetry.baggageClaim,
-      pickupDoorGuidance: telemetry.pickupDoorGuidance || termInfo.pickupDoorGuidance,
+      pickupDoorGuidance: effectivePickupDoorGuidance,
       delayMinutes: plusMin,
       isSimulatedFallback: telemetry.isSimulatedFallback,
     };
@@ -319,13 +337,13 @@ export function resolveTripFlightBadge(trip: Trip): TripFlightBadgeDescriptor {
       isAirportPickup: creds.isAirportPickup,
       isPrivateAviation: false,
       flightIdent: ident,
-      label: `${ident} · ${shortTerm}`,
-      shortLabel: `Verified · ${shortTerm}`,
+      label: routeText,
+      shortLabel: routeText,
       tone: 'slate',
       terminal: terminalLabel,
       gate: telemetry.gate,
       baggageClaim: telemetry.baggageClaim,
-      pickupDoorGuidance: telemetry.pickupDoorGuidance || termInfo.pickupDoorGuidance,
+      pickupDoorGuidance: effectivePickupDoorGuidance,
       delayMinutes: 0,
       isSimulatedFallback: true,
     };
@@ -336,13 +354,13 @@ export function resolveTripFlightBadge(trip: Trip): TripFlightBadgeDescriptor {
     isAirportPickup: creds.isAirportPickup,
     isPrivateAviation: false,
     flightIdent: ident,
-    label: `${ident} · On Time · ${shortTerm}`,
-    shortLabel: `On Time · ${shortTerm}`,
+    label: `${routeText} · On Time`,
+    shortLabel: routeText,
     tone: 'emerald',
     terminal: terminalLabel,
     gate: telemetry.gate,
     baggageClaim: telemetry.baggageClaim,
-    pickupDoorGuidance: telemetry.pickupDoorGuidance || termInfo.pickupDoorGuidance,
+    pickupDoorGuidance: effectivePickupDoorGuidance,
     delayMinutes: delay,
     isSimulatedFallback: false,
   };
