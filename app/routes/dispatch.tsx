@@ -1,6 +1,7 @@
 import React, { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { type AdminUser } from '../core/services/auth/admin-auth.service';
+import { useTheme } from '../hooks/useTheme';
 import {
   getAdminConfigService,
   normalizeDispatchConsoleConfig,
@@ -76,6 +77,7 @@ export default function DispatchRoute() {
   // Auth & Settings state (deterministic SSR defaults)
   const [user, setUser] = useState<AdminUser | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  useTheme({ uid: user?.uid, profilePreference: user?.themePreference });
   const [settings, setSettings] = useState<AppSettings>(() =>
     getAdminConfigService().getCachedSettings()
   );
@@ -904,14 +906,14 @@ export default function DispatchRoute() {
 
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white">
+      <div className="min-h-screen bg-surface-header flex flex-col items-center justify-center text-fg-on-header">
         <SpinnerIcon className="w-8 h-8 animate-spin text-amber-500" />
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-full bg-slate-100 flex flex-col overflow-hidden text-slate-900 select-none">
+    <div className="h-screen w-full bg-surface-canvas flex flex-col overflow-hidden text-fg-primary select-none">
       {/* Full-screen drag overlay while resizing so Google Maps canvas / iframes never hijack pointer events */}
       {activeResizeHandle && (
         <div
@@ -1223,7 +1225,7 @@ export default function DispatchRoute() {
             <button
               type="button"
               onClick={() => setActiveMobileTab('map')}
-              className="absolute bottom-3.5 right-3.5 z-30 px-4 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-extrabold shadow-xl ring-1 ring-white/15 flex items-center gap-2 cursor-pointer transition-all"
+              className="absolute bottom-3.5 right-3.5 z-30 px-4 py-2.5 rounded-full bg-surface-header hover:bg-surface-header-elevated active:scale-95 text-fg-on-header text-xs font-extrabold shadow-xl ring-1 ring-white/15 flex items-center gap-2 cursor-pointer transition-all"
               title="Switch to Live Fleet Map"
               aria-label="Switch to Live Fleet Map"
             >
@@ -1237,10 +1239,10 @@ export default function DispatchRoute() {
           (activeMobileTab === 'comms' ||
             activeMobileTab === 'messages' ||
             activeMobileTab === 'phone') && (
-            <div className="flex-1 flex flex-col h-full overflow-hidden bg-white lg:hidden">
+            <div className="flex-1 flex flex-col h-full overflow-hidden bg-surface-card lg:hidden">
               <Suspense
                 fallback={
-                  <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-500">
+                  <div className="flex-1 flex flex-col items-center justify-center gap-2 text-fg-muted">
                     <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
                     <span className="text-xs font-semibold">Loading communications...</span>
                   </div>
@@ -1275,10 +1277,10 @@ export default function DispatchRoute() {
           )}
 
         {!isDesktop && activeMobileTab === 'email' && (
-          <div className="flex-1 flex flex-col h-full overflow-hidden bg-white lg:hidden">
+          <div className="flex-1 flex flex-col h-full overflow-hidden bg-surface-card lg:hidden">
             <Suspense
               fallback={
-                <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-500">
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 text-fg-muted">
                   <SpinnerIcon className="w-5 h-5 animate-spin text-indigo-600" />
                   <span className="text-xs font-semibold">Loading email console...</span>
                 </div>
@@ -1374,7 +1376,7 @@ export default function DispatchRoute() {
         <Suspense
           fallback={
             <div className="fixed bottom-4 right-4 z-[210] pointer-events-none">
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xl px-4 py-3 flex items-center gap-2.5 text-xs font-bold text-slate-700">
+              <div className="bg-surface-card rounded-2xl border border-border-subtle shadow-xl px-4 py-3 flex items-center gap-2.5 text-xs font-bold text-fg-secondary">
                 <SpinnerIcon className="w-4 h-4 animate-spin text-blue-600" />
                 <span>Loading trip details...</span>
               </div>

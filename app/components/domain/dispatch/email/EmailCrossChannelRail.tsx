@@ -49,23 +49,23 @@ const CHANNEL_STYLE_MAP: Record<
 > = {
   call: {
     label: 'Call',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    badgeClass: 'bg-status-success-bg text-status-success-fg border-status-success-border',
   },
   voicemail: {
     label: 'Voicemail',
-    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+    badgeClass: 'bg-status-warning-bg text-status-warning-fg border-status-warning-border',
   },
   sms: {
     label: 'SMS',
-    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
+    badgeClass: 'bg-status-info-bg text-status-info-fg border-status-info-border',
   },
   note: {
     label: 'Internal Note',
-    badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',
+    badgeClass: 'bg-status-staged-bg text-purple-700 border-status-staged-border',
   },
   email: {
     label: 'Email',
-    badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    badgeClass: 'bg-status-staged-bg text-status-staged-fg border-status-staged-border',
   },
 };
 
@@ -204,34 +204,34 @@ export function EmailCrossChannelRail({
 
   return (
     <aside
-      className={`flex flex-col h-full bg-slate-50/80 border-l border-slate-200 overflow-hidden ${className}`}
+      className={`flex flex-col h-full bg-surface-subtle/80 border-l border-border-subtle overflow-hidden ${className}`}
       aria-label="Unified Customer Activity and Trips"
     >
       {/* ─── RAIL HEADER: SENDER PROFILE & CROSS-CHANNEL ACTIONS ─── */}
-      <div className="p-3 bg-white border-b border-slate-200 space-y-2.5 shrink-0">
+      <div className="p-3 bg-surface-card border-b border-border-subtle space-y-2.5 shrink-0">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-surface-header text-white flex items-center justify-center shrink-0">
               <UserIcon className="w-4 h-4" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <h4 className="text-xs font-extrabold text-slate-900 truncate">
+                <h4 className="text-xs font-extrabold text-fg-primary truncate">
                   {context.contactName}
                 </h4>
                 {context.isVip && (
-                  <span className="text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                  <span className="text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border">
                     VIP
                   </span>
                 )}
               </div>
               {context.primaryEmail && (
-                <p className="text-[10.5px] font-mono text-slate-500 truncate">
+                <p className="text-[10.5px] font-mono text-fg-muted truncate">
                   {context.primaryEmail}
                 </p>
               )}
               {context.displayPhone && (
-                <p className="text-[10.5px] font-mono text-slate-600 font-semibold">
+                <p className="text-[10.5px] font-mono text-fg-secondary font-semibold">
                   {context.displayPhone}
                 </p>
               )}
@@ -242,7 +242,7 @@ export function EmailCrossChannelRail({
             <button
               type="button"
               onClick={onClose}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer shrink-0"
+              className="p-1 rounded-lg text-fg-subtle hover:text-fg-secondary hover:bg-surface-muted cursor-pointer shrink-0"
               title="Close Customer Activity panel"
               aria-label="Close Customer Activity panel"
             >
@@ -252,7 +252,7 @@ export function EmailCrossChannelRail({
         </div>
 
         {(context.corporateAccountName || context.corporateAccountNumber) && (
-          <div className="px-2 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-[10.5px] font-bold text-indigo-800 flex items-center gap-1.5">
+          <div className="px-2 py-1 rounded-lg bg-status-staged-bg border border-status-staged-border text-[10.5px] font-bold text-status-staged-fg flex items-center gap-1.5">
             <BuildingIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
             <span className="truncate">
               {context.corporateAccountName || 'Corporate Account'}
@@ -281,7 +281,7 @@ export function EmailCrossChannelRail({
           <button
             type="button"
             onClick={handleOpenInCommsHub}
-            className="py-1.5 px-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+            className="py-1.5 px-2.5 rounded-lg bg-surface-header hover:bg-surface-header-elevated text-white text-[11px] font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
             title="Open full unified thread in Comms Hub"
           >
             <ExternalLinkIcon className="w-3 h-3 shrink-0" />
@@ -295,19 +295,19 @@ export function EmailCrossChannelRail({
         {/* SECTION 1: MATCHED ACTIVE / UPCOMING / RECENT TRIPS */}
         <section className="space-y-2">
           <div className="flex items-center justify-between">
-            <h5 className="text-[10.5px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <h5 className="text-[10.5px] font-black uppercase tracking-wider text-fg-muted flex items-center gap-1.5">
               <CarIcon className="w-3.5 h-3.5 text-blue-600" />
               <span>Customer Trips ({context.matchedTrips.length})</span>
             </h5>
             {context.activeTrips.length > 0 && (
-              <span className="text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800">
+              <span className="text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-status-success-bg-strong text-status-success-fg">
                 {context.activeTrips.length} active
               </span>
             )}
           </div>
 
           {context.matchedTrips.length === 0 ? (
-            <div className="p-3 rounded-xl bg-white border border-slate-200 text-[11px] text-slate-500 text-center">
+            <div className="p-3 rounded-xl bg-surface-card border border-border-subtle text-[11px] text-fg-muted text-center">
               No active or recent trips linked to this sender yet.
             </div>
           ) : (
@@ -318,47 +318,47 @@ export function EmailCrossChannelRail({
                 return (
                   <div
                     key={trip.id}
-                    className={`p-2.5 rounded-xl border bg-white space-y-2 shadow-2xs ${
-                      isActive ? 'border-blue-200' : 'border-slate-200'
+                    className={`p-2.5 rounded-xl border bg-surface-card space-y-2 shadow-2xs ${
+                      isActive ? 'border-status-info-border' : 'border-border-subtle'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-1.5">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-[11px] font-mono font-extrabold text-slate-900 truncate">
+                        <span className="text-[11px] font-mono font-extrabold text-fg-primary truncate">
                           {trip.id}
                         </span>
                         <span
                           className={`text-[9.5px] font-bold uppercase px-1.5 py-0.2 rounded-full border shrink-0 ${
                             isActive
-                              ? 'bg-blue-50 text-blue-700 border-blue-200'
-                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                              ? 'bg-status-info-bg text-status-info-fg border-status-info-border'
+                              : 'bg-surface-muted text-fg-secondary border-border-subtle'
                           }`}
                         >
                           {trip.status}
                         </span>
                         {trip.flightTelemetry?.flightIdent && (
-                          <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-sky-50 text-sky-700 border border-sky-200 shrink-0">
+                          <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-status-info-bg text-sky-700 border border-status-info-border shrink-0">
                             <PlaneIcon className="w-2.5 h-2.5" />
                             <span>{trip.flightTelemetry.flightIdent}</span>
                           </span>
                         )}
                       </div>
-                      <span className="text-[11px] font-extrabold text-emerald-700 shrink-0">
+                      <span className="text-[11px] font-extrabold text-status-success-fg shrink-0">
                         ${(trip.pricing?.totalFare ?? 0).toFixed(2)}
                       </span>
                     </div>
 
-                    <div className="text-[11px] text-slate-600 space-y-0.5">
+                    <div className="text-[11px] text-fg-secondary space-y-0.5">
                       <p className="truncate">
-                        <span className="font-bold text-slate-800">From:</span>{' '}
+                        <span className="font-bold text-fg-strong">From:</span>{' '}
                         {trip.pickupLocation?.address || 'N/A'}
                       </p>
                       <p className="truncate">
-                        <span className="font-bold text-slate-800">To:</span>{' '}
+                        <span className="font-bold text-fg-strong">To:</span>{' '}
                         {trip.dropoffLocation?.address || 'N/A'}
                       </p>
                       {trip.scheduledPickupTime && (
-                        <p className="text-[10px] text-slate-400">
+                        <p className="text-[10px] text-fg-subtle">
                           Pickup:{' '}
                           {new Date(trip.scheduledPickupTime).toLocaleString([], {
                             month: 'short',
@@ -375,7 +375,7 @@ export function EmailCrossChannelRail({
                       <button
                         type="button"
                         onClick={() => handleOpenTrip(trip)}
-                        className="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-[10.5px] font-bold text-slate-800 inline-flex items-center justify-center gap-1 cursor-pointer"
+                        className="py-1 px-2 rounded-lg bg-surface-muted hover:bg-surface-emphasis text-[10.5px] font-bold text-fg-strong inline-flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <ExternalLinkIcon className="w-3 h-3" />
                         <span>Open Trip</span>
@@ -384,7 +384,7 @@ export function EmailCrossChannelRail({
                       <button
                         type="button"
                         onClick={() => handleRebookTrip(trip)}
-                        className="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-[10.5px] font-bold text-slate-800 inline-flex items-center justify-center gap-1 cursor-pointer"
+                        className="py-1 px-2 rounded-lg bg-surface-muted hover:bg-surface-emphasis text-[10.5px] font-bold text-fg-strong inline-flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <RepeatIcon className="w-3 h-3" />
                         <span>Populate Rebook</span>
@@ -393,7 +393,7 @@ export function EmailCrossChannelRail({
                       <button
                         type="button"
                         onClick={() => handleInsertTripTracking(trip)}
-                        className="py-1 px-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[10.5px] font-bold text-blue-700 inline-flex items-center justify-center gap-1 cursor-pointer"
+                        className="py-1 px-2 rounded-lg bg-status-info-bg hover:bg-status-info-bg-strong border border-status-info-border text-[10.5px] font-bold text-status-info-fg inline-flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <LinkIcon className="w-3 h-3" />
                         <span>Insert Tracking</span>
@@ -403,7 +403,7 @@ export function EmailCrossChannelRail({
                         type="button"
                         onClick={() => void handleInsertTripPayLink(trip)}
                         disabled={generatingPayTripId === trip.id}
-                        className="py-1 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-[10.5px] font-bold text-emerald-800 inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                        className="py-1 px-2 rounded-lg bg-status-success-bg hover:bg-status-success-bg-strong border border-status-success-border text-[10.5px] font-bold text-status-success-fg inline-flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                       >
                         {generatingPayTripId === trip.id ? (
                           <SpinnerIcon className="w-3 h-3 animate-spin" />
@@ -423,7 +423,7 @@ export function EmailCrossChannelRail({
         {/* SECTION 2: UNIFIED MULTI-CHANNEL SENDER TIMELINE */}
         <section className="space-y-2">
           <div className="flex items-center justify-between gap-1">
-            <h5 className="text-[10.5px] font-black uppercase tracking-wider text-slate-500">
+            <h5 className="text-[10.5px] font-black uppercase tracking-wider text-fg-muted">
               Multi-Channel Timeline ({context.timelineEvents.length})
             </h5>
             <button
@@ -437,13 +437,13 @@ export function EmailCrossChannelRail({
           </div>
 
           {isAddingNote && (
-            <div className="p-2.5 rounded-xl bg-purple-50/70 border border-purple-200 space-y-2">
+            <div className="p-2.5 rounded-xl bg-status-staged-bg/70 border border-status-staged-border space-y-2">
               <textarea
                 value={noteDraft}
                 onChange={(e) => setNoteDraft(e.target.value)}
                 rows={2}
                 placeholder="Add internal dispatcher note visible across Phone, SMS & Email..."
-                className="w-full text-xs p-2 rounded-lg border border-purple-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-500 resize-none"
+                className="w-full text-xs p-2 rounded-lg border border-status-staged-border bg-surface-card text-fg-strong placeholder-slate-400 focus:outline-none focus:border-purple-500 resize-none"
               />
               <div className="flex items-center justify-end gap-1.5">
                 <button
@@ -452,7 +452,7 @@ export function EmailCrossChannelRail({
                     setIsAddingNote(false);
                     setNoteDraft('');
                   }}
-                  className="px-2 py-1 rounded-md text-[10.5px] font-bold text-slate-600 hover:bg-slate-200/60 cursor-pointer"
+                  className="px-2 py-1 rounded-md text-[10.5px] font-bold text-fg-secondary hover:bg-surface-emphasis/60 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -485,8 +485,8 @@ export function EmailCrossChannelRail({
                 onClick={() => setTimelineFilter(pill.id)}
                 className={`px-2 py-0.5 rounded-full text-[10px] font-bold border cursor-pointer shrink-0 ${
                   timelineFilter === pill.id
-                    ? 'bg-slate-900 text-white border-slate-900'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                    ? 'bg-surface-header text-white border-slate-900'
+                    : 'bg-surface-card text-fg-secondary border-border-subtle hover:bg-surface-muted'
                 }`}
               >
                 {pill.label}
@@ -495,7 +495,7 @@ export function EmailCrossChannelRail({
           </div>
 
           {filteredEvents.length === 0 ? (
-            <div className="p-3 rounded-xl bg-white border border-slate-200 text-[11px] text-slate-400 text-center">
+            <div className="p-3 rounded-xl bg-surface-card border border-border-subtle text-[11px] text-fg-subtle text-center">
               No interactions recorded in this channel yet.
             </div>
           ) : (
@@ -514,8 +514,8 @@ export function EmailCrossChannelRail({
                         onSelectEmailFromTimeline?.(evt.emailMessageId);
                       }
                     }}
-                    className={`p-2.5 rounded-xl bg-white border border-slate-200 space-y-1 shadow-2xs ${
-                      isClickableEmail ? 'cursor-pointer hover:border-blue-300' : ''
+                    className={`p-2.5 rounded-xl bg-surface-card border border-border-subtle space-y-1 shadow-2xs ${
+                      isClickableEmail ? 'cursor-pointer hover:border-status-info-border' : ''
                     }`}
                   >
                     <div className="flex items-center justify-between gap-1.5">
@@ -526,30 +526,30 @@ export function EmailCrossChannelRail({
                           <ChannelMiniIcon channel={evt.channel} />
                           <span>{chStyle.label}</span>
                         </span>
-                        <span className="text-[10px] font-semibold text-slate-500 capitalize truncate">
+                        <span className="text-[10px] font-semibold text-fg-muted capitalize truncate">
                           {evt.direction === 'internal'
                             ? evt.actorName || 'Dispatcher'
                             : evt.direction}
                           {evt.durationSeconds ? ` · ${evt.durationSeconds}s` : ''}
                         </span>
                       </div>
-                      <span className="text-[10px] text-slate-400 shrink-0">
+                      <span className="text-[10px] text-fg-subtle shrink-0">
                         {formatDispatchEmailTimestamp(evt.timestampMs, evt.timestampIso)}
                       </span>
                     </div>
 
                     {evt.subject && (
-                      <p className="text-[11px] font-bold text-slate-800 truncate">
+                      <p className="text-[11px] font-bold text-fg-strong truncate">
                         {evt.subject}
                       </p>
                     )}
 
-                    <p className="text-[11px] text-slate-600 line-clamp-2 leading-snug">
+                    <p className="text-[11px] text-fg-secondary line-clamp-2 leading-snug">
                       {evt.bodyText || evt.snippet || 'Recorded activity'}
                     </p>
 
                     {evt.channel === 'voicemail' && evt.transcription && (
-                      <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-200/80 text-[10.5px] text-amber-900 italic line-clamp-3">
+                      <div className="p-1.5 rounded-lg bg-status-warning-bg/70 border border-status-warning-border/80 text-[10.5px] text-status-warning-fg italic line-clamp-3">
                         &ldquo;{evt.transcription}&rdquo;
                       </div>
                     )}

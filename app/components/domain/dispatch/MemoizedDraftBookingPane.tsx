@@ -56,9 +56,9 @@ export const MemoizedDraftBookingPane = React.memo(function MemoizedDraftBooking
   return (
     <div className={`h-full w-full ${isActive ? 'block' : 'hidden'}`}>
       {!isNew && !trip && tripId ? (
-        <div className="h-full flex flex-col items-center justify-center p-6 text-center text-slate-500 gap-2 bg-slate-50">
+        <div className="h-full flex flex-col items-center justify-center p-6 text-center text-fg-muted gap-2 bg-surface-subtle">
           <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
-          <span className="text-xs font-semibold text-slate-700">
+          <span className="text-xs font-semibold text-fg-secondary">
             Restoring trip #{tripId.slice(-6).toUpperCase()}...
           </span>
         </div>

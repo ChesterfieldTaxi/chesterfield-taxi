@@ -236,7 +236,7 @@ export function TripQueueBatchActionBar({
   return (
     <div
       data-batch-bar-tier={tier}
-      className="px-3 py-1.5 bg-slate-900 text-white border-b border-slate-800 flex items-center justify-between gap-2 text-xs font-semibold shrink-0 h-10 animate-in fade-in slide-in-from-top-1 duration-150"
+      className="px-3 py-1.5 bg-surface-header text-white border-b border-border-header flex items-center justify-between gap-2 text-xs font-semibold shrink-0 h-10 animate-in fade-in slide-in-from-top-1 duration-150"
     >
       {/* Left: Selected Count + Select/Deselect All */}
       <div className="flex items-center gap-2 min-w-0 shrink-0">
@@ -275,7 +275,7 @@ export function TripQueueBatchActionBar({
                 stagedPlanner?.setBatchAssignMode('send_to_driver');
                 onBatchAssignDriver();
               }}
-              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-100 font-bold text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0"
+              className="px-2.5 py-1 bg-surface-header-elevated hover:bg-surface-header-muted border border-border-header rounded-lg text-fg-on-header font-bold text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0"
               title="Assign driver to selected trips"
             >
               <UsersIcon className="w-3.5 h-3.5 shrink-0" />
@@ -316,11 +316,11 @@ export function TripQueueBatchActionBar({
           className={`px-2.5 py-1 rounded-lg font-extrabold text-[11px] transition-all cursor-pointer inline-flex items-center gap-1.5 shrink-0 border ${
             isCompactDropdown
               ? isMenuOpen
-                ? 'bg-blue-500 border-blue-300 text-white ring-2 ring-blue-400/30'
+                ? 'bg-blue-500 border-status-info-border text-white ring-2 ring-blue-400/30'
                 : 'bg-blue-600 hover:bg-blue-500 border-blue-500 text-white shadow-xs'
               : isMenuOpen
-              ? 'bg-slate-700 border-slate-500 text-white'
-              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'
+              ? 'bg-surface-header-muted border-slate-500 text-white'
+              : 'bg-surface-header-elevated hover:bg-surface-header-muted border-border-header text-fg-on-header'
           }`}
           aria-haspopup="true"
           aria-expanded={isMenuOpen}
@@ -337,7 +337,7 @@ export function TripQueueBatchActionBar({
         <button
           type="button"
           onClick={onClearSelectedTripIds}
-          className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer shrink-0"
+          className="p-1 text-fg-subtle hover:text-white rounded-lg hover:bg-surface-header-elevated cursor-pointer shrink-0"
           title="Clear selection"
           aria-label="Clear selection"
         >
@@ -359,14 +359,14 @@ export function TripQueueBatchActionBar({
               zIndex: 99999,
               transformOrigin: coords.openUpward ? 'bottom right' : 'top right',
             }}
-            className="bg-white rounded-xl shadow-2xl border border-slate-200 py-1 text-xs text-slate-800 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100 select-none"
+            className="bg-surface-card rounded-xl shadow-2xl border border-border-subtle py-1 text-xs text-fg-strong animate-in fade-in zoom-in-95 duration-100 divide-y divide-border-faint select-none"
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-3 py-1.5 bg-slate-50/80 rounded-t-xl flex items-center justify-between gap-2">
-              <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+            <div className="px-3 py-1.5 bg-surface-subtle/80 rounded-t-xl flex items-center justify-between gap-2">
+              <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-fg-muted">
                 Batch Actions ({selectedTripIds.length})
               </span>
               <button
@@ -374,7 +374,7 @@ export function TripQueueBatchActionBar({
                 onClick={() => {
                   onToggleSelectAll();
                 }}
-                className="text-[10.5px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                className="text-[10.5px] font-bold text-blue-600 hover:text-status-info-fg cursor-pointer"
               >
                 {allFilteredSelected ? 'Deselect All' : 'Select All'}
               </button>
@@ -387,13 +387,13 @@ export function TripQueueBatchActionBar({
                   type="button"
                   disabled={confirmableCount === 0}
                   onClick={() => runAndClose(onBatchConfirmTrips)}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50/80 disabled:opacity-45 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold text-status-warning-fg hover:bg-status-warning-bg/80 disabled:opacity-45 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed"
                 >
                   <span className="flex items-center gap-2 min-w-0">
                     <BoltIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                     <span>Confirm Trips</span>
                   </span>
-                  <span className="text-[10.5px] font-extrabold px-1.5 py-0.2 rounded bg-amber-100 text-amber-900">
+                  <span className="text-[10.5px] font-extrabold px-1.5 py-0.2 rounded bg-status-warning-bg-strong text-status-warning-fg">
                     {confirmableCount}
                   </span>
                 </button>
@@ -408,13 +408,13 @@ export function TripQueueBatchActionBar({
                       onBatchAssignDriver();
                     })
                   }
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700 transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg transition-colors cursor-pointer"
                 >
                   <span className="flex items-center gap-2 min-w-0">
                     <UsersIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                     <span>Assign Driver</span>
                   </span>
-                  <span className="text-[10.5px] font-bold text-slate-400">
+                  <span className="text-[10.5px] font-bold text-fg-subtle">
                     {selectedTripIds.length}
                   </span>
                 </button>
@@ -424,7 +424,7 @@ export function TripQueueBatchActionBar({
                 <button
                   type="button"
                   onClick={() => runAndClose(() => void stagedPlanner.sendSelectedStagedTrips())}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-extrabold text-indigo-800 bg-indigo-50/60 hover:bg-indigo-100/80 transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-extrabold text-status-staged-fg bg-status-staged-bg/60 hover:bg-status-staged-bg-strong/80 transition-colors cursor-pointer"
                 >
                   <span className="flex items-center gap-2 min-w-0">
                     <CarIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
@@ -440,13 +440,13 @@ export function TripQueueBatchActionBar({
                 <button
                   type="button"
                   onClick={() => runAndClose(() => stagedPlanner.openBatchStageDriverModal())}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50/80 transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-status-staged-fg hover:bg-status-staged-bg/80 transition-colors cursor-pointer"
                 >
                   <span className="flex items-center gap-2 min-w-0">
                     <span className="text-xs leading-none shrink-0">📌</span>
                     <span>Stage Driver (Hold)</span>
                   </span>
-                  <span className="text-[10.5px] font-bold px-1.5 py-0.2 rounded border border-dashed border-indigo-300 bg-indigo-50 text-indigo-800">
+                  <span className="text-[10.5px] font-bold px-1.5 py-0.2 rounded border border-dashed border-status-staged-border bg-status-staged-bg text-status-staged-fg">
                     {stageableCount}
                   </span>
                 </button>
@@ -460,13 +460,13 @@ export function TripQueueBatchActionBar({
                       void stagedPlanner.requestBatchAutoDispatchWithStagedCheck()
                     )
                   }
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50/90 transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold text-status-staged-fg hover:bg-status-staged-bg/90 transition-colors cursor-pointer"
                 >
                   <span className="flex items-center gap-2 min-w-0">
                     <RadarBroadcastIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                     <span>Auto-Dispatch</span>
                   </span>
-                  <span className="text-[10.5px] font-extrabold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800">
+                  <span className="text-[10.5px] font-extrabold px-1.5 py-0.2 rounded bg-status-staged-bg-strong text-status-staged-fg">
                     {autoDispatchableCount}
                   </span>
                 </button>
@@ -480,13 +480,13 @@ export function TripQueueBatchActionBar({
                   type="button"
                   disabled={completableCount === 0}
                   onClick={() => runAndClose(onBatchCompleteTrips)}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-45 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold text-status-success-fg hover:bg-status-success-bg disabled:opacity-45 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed"
                 >
                   <span className="flex items-center gap-2 min-w-0">
                     <CheckIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     <span>Complete Trips</span>
                   </span>
-                  <span className="text-[10.5px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
+                  <span className="text-[10.5px] font-extrabold px-1.5 py-0.2 rounded bg-status-success-bg-strong text-status-success-fg">
                     {completableCount === 0 ? 'Closed' : completableCount}
                   </span>
                 </button>
@@ -495,13 +495,13 @@ export function TripQueueBatchActionBar({
               <button
                 type="button"
                 onClick={() => runAndClose(onBatchExportCsv)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-fg-secondary hover:bg-surface-muted transition-colors cursor-pointer"
               >
                 <span className="flex items-center gap-2 min-w-0">
-                  <DocumentTextIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <DocumentTextIcon className="w-3.5 h-3.5 text-fg-muted shrink-0" />
                   <span>Export CSV</span>
                 </span>
-                <span className="text-[10.5px] font-bold text-slate-400">
+                <span className="text-[10.5px] font-bold text-fg-subtle">
                   {selectedTripIds.length}
                 </span>
               </button>
@@ -513,13 +513,13 @@ export function TripQueueBatchActionBar({
                 type="button"
                 disabled={cancellableCount === 0}
                 onClick={() => runAndClose(onBatchCancelTrips)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-45 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-status-danger-fg hover:bg-status-danger-bg disabled:opacity-45 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed"
               >
                 <span className="flex items-center gap-2 min-w-0">
                   <BanIcon className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                   <span>Cancel Trips</span>
                 </span>
-                <span className="text-[10.5px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-800">
+                <span className="text-[10.5px] font-bold px-1.5 py-0.2 rounded bg-status-danger-bg-strong text-status-danger-fg">
                   {cancellableCount}
                 </span>
               </button>
@@ -528,9 +528,9 @@ export function TripQueueBatchActionBar({
                 <button
                   type="button"
                   onClick={() => runAndClose(onClearSelectedTripIds)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-fg-muted hover:bg-surface-muted hover:text-fg-strong transition-colors cursor-pointer"
                 >
-                  <XIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <XIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
                   <span>Clear Selection</span>
                 </button>
               )}

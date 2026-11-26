@@ -56,7 +56,7 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
       {preferences.interactiveRoutePinPopovers && selectedWaypoint && (() => {
         const pal = ROUTE_WAYPOINT_PALETTE[selectedWaypoint.kind];
         return (
-          <div className="absolute top-15 left-2.5 right-2.5 sm:left-auto sm:right-3 sm:w-80 z-30 bg-white/98 backdrop-blur-md rounded-2xl border border-slate-200 shadow-2xl p-3 space-y-2 text-xs animate-in fade-in zoom-in-95 duration-150 select-text">
+          <div className="absolute top-15 left-2.5 right-2.5 sm:left-auto sm:right-3 sm:w-80 z-30 bg-surface-card/98 backdrop-blur-md rounded-2xl border border-border-subtle shadow-2xl p-3 space-y-2 text-xs animate-in fade-in zoom-in-95 duration-150 select-text">
             <div className="flex items-center justify-between gap-2">
               <span
                 className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-extrabold border ${pal.badgeBgClass} ${pal.badgeTextClass} ${pal.badgeBorderClass}`}
@@ -78,7 +78,7 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
                   <button
                     type="button"
                     onClick={() => onPanToWaypoint(selectedWaypoint)}
-                    className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] inline-flex items-center gap-1 cursor-pointer transition-colors"
+                    className="px-2 py-0.5 rounded-lg bg-surface-muted hover:bg-surface-emphasis text-fg-secondary font-bold text-[10.5px] inline-flex items-center gap-1 cursor-pointer transition-colors"
                     title="Center map on this waypoint"
                   >
                     <MapPinIcon className="w-3 h-3 text-blue-600" />
@@ -88,7 +88,7 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
                 <button
                   type="button"
                   onClick={onCloseWaypointPopover}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer transition-colors"
+                  className="p-1 rounded-lg text-fg-subtle hover:text-fg-secondary hover:bg-surface-muted cursor-pointer transition-colors"
                   title="Close pin details"
                   aria-label="Close pin details"
                 >
@@ -97,13 +97,13 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
               </div>
             </div>
 
-            <div className="font-bold text-slate-900 text-xs leading-snug break-words">
+            <div className="font-bold text-fg-primary text-xs leading-snug break-words">
               {selectedWaypoint.address}
             </div>
 
             {selectedWaypoint.notes && (
-              <div className="px-2.5 py-1.5 rounded-xl bg-amber-50/80 border border-amber-200 text-[11px] text-amber-950 font-medium leading-snug break-words">
-                <span className="font-extrabold uppercase tracking-wider text-[9.5px] text-amber-700 mr-1.5">
+              <div className="px-2.5 py-1.5 rounded-xl bg-status-warning-bg/80 border border-status-warning-border text-[11px] text-status-warning-fg font-medium leading-snug break-words">
+                <span className="font-extrabold uppercase tracking-wider text-[9.5px] text-status-warning-fg mr-1.5">
                   Notes:
                 </span>
                 {selectedWaypoint.notes}
@@ -116,7 +116,7 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
       {/* ─── BOTTOM-LEFT FLOATING ROUTE SUMMARY PILL ─── */}
       {preferences.showRouteSummaryPill && !hasSelectedDriverHud && (
         <div className="absolute bottom-6 left-2.5 z-20 max-w-[calc(100%-132px)] sm:max-w-lg pointer-events-auto animate-in fade-in slide-in-from-bottom-1 duration-150">
-          <div className="bg-slate-900/94 backdrop-blur-md text-white border border-slate-700/80 shadow-xl rounded-full px-3 py-1.5 flex items-center gap-2 text-[11px] font-semibold">
+          <div className="bg-surface-header/94 backdrop-blur-md text-white border border-border-header/80 shadow-xl rounded-full px-3 py-1.5 flex items-center gap-2 text-[11px] font-semibold">
             {/* Chain Summary: Pickup -> Optional Stops -> Dropoff (supports partial single-pin preview) */}
             <div className="flex items-center gap-1.5 shrink-0">
               {hasPickupPin && (
@@ -126,17 +126,17 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
                 </span>
               )}
               {hasPickupPin && (stopCount > 0 || hasDropoffPin) && (
-                <span className="text-slate-500 text-[10px]">→</span>
+                <span className="text-fg-muted text-[10px]">→</span>
               )}
               {stopCount > 0 && (
                 <>
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-extrabold text-[10.5px]">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-amber-500/20 border border-status-warning-border/40 text-amber-300 font-extrabold text-[10.5px]">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
                     <span>
                       {stopCount} {stopCount === 1 ? 'Stop' : 'Stops'}
                     </span>
                   </span>
-                  {hasDropoffPin && <span className="text-slate-500 text-[10px]">→</span>}
+                  {hasDropoffPin && <span className="text-fg-muted text-[10px]">→</span>}
                 </>
               )}
               {hasDropoffPin && (
@@ -148,14 +148,14 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
             </div>
 
             {singlePinAddress && (
-              <span className="truncate max-w-[160px] text-slate-200 font-medium border-l border-slate-700 pl-2">
+              <span className="truncate max-w-[160px] text-fg-on-header font-medium border-l border-border-header pl-2">
                 {singlePinAddress}
               </span>
             )}
 
             {/* Passenger / #TRIP context */}
             {(shortTripTag || activeRoute.passengerLabel) && (
-              <div className="hidden md:flex items-center gap-1 min-w-0 border-l border-slate-700 pl-2 text-slate-200">
+              <div className="hidden md:flex items-center gap-1 min-w-0 border-l border-border-header pl-2 text-fg-on-header">
                 {shortTripTag && (
                   activeRoute.tripId && onOpenTripDetails ? (
                     <button
@@ -182,9 +182,9 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
 
             {/* Distance & ETA */}
             {resolvedMetrics && (
-              <div className="flex items-center gap-1 shrink-0 border-l border-slate-700 pl-2 font-mono text-[10.5px] font-bold text-sky-300">
+              <div className="flex items-center gap-1 shrink-0 border-l border-border-header pl-2 font-mono text-[10.5px] font-bold text-sky-300">
                 <span>{resolvedMetrics.distanceMiles.toFixed(1)} mi</span>
-                <span className="text-slate-500">·</span>
+                <span className="text-fg-muted">·</span>
                 <span>{resolvedMetrics.durationMinutes} min</span>
               </div>
             )}
@@ -194,7 +194,7 @@ export const MapRouteOverlayHud = React.memo(function MapRouteOverlayHud({
               <button
                 type="button"
                 onClick={onClearSelectedTrip}
-                className="ml-0.5 w-5 h-5 rounded-full bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                className="ml-0.5 w-5 h-5 rounded-full bg-surface-header-elevated hover:bg-rose-600 text-slate-300 hover:text-white flex items-center justify-center shrink-0 transition-colors cursor-pointer"
                 title="Clear selected route from map"
                 aria-label="Clear selected route from map"
               >

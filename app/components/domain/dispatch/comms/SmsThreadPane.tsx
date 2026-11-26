@@ -43,8 +43,8 @@ export interface SmsThreadPaneProps {
 function renderTripBadges(trip: Trip, drivers?: any[]) {
   const cab = resolveTripCabBadgeLabel(trip, drivers);
   const fb = resolveTripFlightBadge(trip);
-  const cabCls = cab.tone === 'assigned' ? 'bg-slate-800 text-white' : cab.tone === 'staged' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' : 'bg-slate-100 text-slate-600 border border-slate-200';
-  const flCls = fb.tone === 'amber' ? 'bg-amber-100 text-amber-900 border-amber-300' : fb.tone === 'rose' ? 'bg-rose-100 text-rose-800 border-rose-300' : fb.tone === 'emerald' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-sky-50 text-sky-800 border-sky-200';
+  const cabCls = cab.tone === 'assigned' ? 'bg-surface-header-elevated text-white' : cab.tone === 'staged' ? 'bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border' : 'bg-surface-muted text-fg-secondary border border-border-subtle';
+  const flCls = fb.tone === 'amber' ? 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border' : fb.tone === 'rose' ? 'bg-status-danger-bg-strong text-status-danger-fg border-status-danger-border' : fb.tone === 'emerald' ? 'bg-status-success-bg-strong text-status-success-fg border-status-success-border' : 'bg-status-info-bg text-status-info-fg border-status-info-border';
   return (
     <>
       <span data-trip-cab-badge={cab.tone} className={`px-1.5 py-0.5 rounded text-[9.5px] font-mono font-bold shrink-0 ${cabCls}`}>{cab.label}</span>
@@ -142,76 +142,76 @@ export function SmsThreadPane({
     const triggerProfileOverview = () => onOpenClientProfile ? onOpenClientProfile() : getWorkspaceBus().publish('OPEN_CLIENT_PROFILE', { phone: effectivePhone || undefined, email: effectiveEmail || undefined, name: displayName || undefined, source: 'comms_hub' });
 
     return (
-      <div className="flex-1 min-h-0 flex flex-col min-w-0 overflow-hidden bg-white">
-        <div data-comms-thread-header="v2" className="h-10 px-2 border-b border-slate-200 bg-white flex items-center justify-between gap-1.5 shrink-0">
+      <div className="flex-1 min-h-0 flex flex-col min-w-0 overflow-hidden bg-surface-card">
+        <div data-comms-thread-header="v2" className="h-10 px-2 border-b border-border-subtle bg-surface-card flex items-center justify-between gap-1.5 shrink-0">
           <div className="flex items-center gap-1 min-w-0">
-            <button type="button" onClick={onBackFromThread} title="Back to list (Esc)" className="h-7 px-1.5 rounded-md hover:bg-slate-100 text-xs font-bold text-slate-600 cursor-pointer shrink-0">←</button>
+            <button type="button" onClick={onBackFromThread} title="Back to list (Esc)" className="h-7 px-1.5 rounded-md hover:bg-surface-muted text-xs font-bold text-fg-secondary cursor-pointer shrink-0">←</button>
             {isQuickNaming ? (
               <div className="flex items-center gap-1 min-w-0">
-                <input type="text" autoFocus data-quick-name-input="true" value={quickNameDraft} onChange={(e) => setQuickNameDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveQuickCallerName(); } else if (e.key === 'Escape') setIsQuickNaming(false); }} placeholder="Caller name..." className="h-6 w-28 px-2 text-xs rounded border border-blue-400 bg-white text-slate-900 focus:outline-none" />
+                <input type="text" autoFocus data-quick-name-input="true" value={quickNameDraft} onChange={(e) => setQuickNameDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveQuickCallerName(); } else if (e.key === 'Escape') setIsQuickNaming(false); }} placeholder="Caller name..." className="h-6 w-28 px-2 text-xs rounded border border-blue-400 bg-surface-card text-fg-primary focus:outline-none" />
                 <button type="button" onClick={saveQuickCallerName} className="h-6 px-1.5 rounded bg-blue-600 text-white text-[10px] font-bold cursor-pointer"><CheckIcon className="w-3 h-3" /></button>
               </div>
             ) : (
               <>
-                <button type="button" onClick={onOpenContactEdit} className="min-w-0 text-left flex items-center gap-1 hover:text-blue-700 cursor-pointer">
-                  <span className="text-xs font-extrabold text-slate-900 truncate max-w-[115px]">{displayName}</span>
-                  {effectivePhone && <span className="text-[10.5px] font-mono text-slate-500 hidden @[370px]/commshub:inline shrink-0">{formatDisplayPhone(effectivePhone)}</span>}
+                <button type="button" onClick={onOpenContactEdit} className="min-w-0 text-left flex items-center gap-1 hover:text-status-info-fg cursor-pointer">
+                  <span className="text-xs font-extrabold text-fg-primary truncate max-w-[115px]">{displayName}</span>
+                  {effectivePhone && <span className="text-[10.5px] font-mono text-fg-muted hidden @[370px]/commshub:inline shrink-0">{formatDisplayPhone(effectivePhone)}</span>}
                 </button>
-                <button type="button" data-quick-name-trigger="true" title="Quick-save caller name" onClick={() => { setQuickNameDraft(isUnsavedCaller && (displayName.startsWith('(') || displayName.startsWith('+') || displayName === 'Unknown Caller') ? '' : displayName); setIsQuickNaming(true); }} className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-blue-600 cursor-pointer shrink-0"><PencilIcon className="w-3 h-3" /></button>
+                <button type="button" data-quick-name-trigger="true" title="Quick-save caller name" onClick={() => { setQuickNameDraft(isUnsavedCaller && (displayName.startsWith('(') || displayName.startsWith('+') || displayName === 'Unknown Caller') ? '' : displayName); setIsQuickNaming(true); }} className="p-1 rounded hover:bg-surface-muted text-fg-subtle hover:text-blue-600 cursor-pointer shrink-0"><PencilIcon className="w-3 h-3" /></button>
               </>
             )}
-            {isBlocked ? <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[9px] font-black uppercase shrink-0">Blocked</span>
-              : isVip ? <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-black uppercase shrink-0">VIP</span>
-              : isDriver ? <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold shrink-0">Driver</span>
-              : isCorp ? <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[9px] font-bold shrink-0">Corp</span> : null}
+            {isBlocked ? <span className="px-1.5 py-0.5 rounded bg-status-danger-bg-strong text-status-danger-fg text-[9px] font-black uppercase shrink-0">Blocked</span>
+              : isVip ? <span className="px-1.5 py-0.5 rounded bg-status-warning-bg-strong text-status-warning-fg text-[9px] font-black uppercase shrink-0">VIP</span>
+              : isDriver ? <span className="px-1.5 py-0.5 rounded bg-status-success-bg-strong text-status-success-fg text-[9px] font-bold shrink-0">Driver</span>
+              : isCorp ? <span className="px-1.5 py-0.5 rounded bg-status-staged-bg-strong text-status-staged-fg text-[9px] font-bold shrink-0">Corp</span> : null}
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <button type="button" disabled={!effectivePhone} onClick={() => effectivePhone && onStartCall(effectivePhone, displayName)} className="h-7 px-2 rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"><PhoneIcon className="w-3 h-3" /><span>Call</span></button>
             <button type="button" onClick={onBookContactRide} className="h-7 px-2 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold cursor-pointer">Book</button>
-            <button type="button" onClick={triggerProfileOverview} title="Profile" className="h-7 px-2 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"><UserIcon className="w-3 h-3 text-indigo-600" /><span className="hidden @[390px]/commshub:inline">Profile</span></button>
-            <button ref={filterBtnRef} type="button" onClick={() => setIsFilterOpen((v) => !v)} className={`h-7 px-1.5 rounded-md border text-[11px] font-bold inline-flex items-center gap-0.5 cursor-pointer ${filterCount > 0 ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
+            <button type="button" onClick={triggerProfileOverview} title="Profile" className="h-7 px-2 rounded-md border border-border-subtle bg-surface-card hover:bg-surface-subtle text-fg-secondary text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"><UserIcon className="w-3 h-3 text-indigo-600" /><span className="hidden @[390px]/commshub:inline">Profile</span></button>
+            <button ref={filterBtnRef} type="button" onClick={() => setIsFilterOpen((v) => !v)} className={`h-7 px-1.5 rounded-md border text-[11px] font-bold inline-flex items-center gap-0.5 cursor-pointer ${filterCount > 0 ? 'bg-status-info-bg border-status-info-border text-status-info-fg' : 'bg-surface-card border-border-subtle text-fg-secondary hover:bg-surface-subtle'}`}>
               <span>Filter</span>{filterCount > 0 && <span className="px-1 rounded-full bg-blue-600 text-white text-[9px] font-black">{filterCount}</span>}<ChevronDownIcon className="w-3 h-3" />
             </button>
           </div>
         </div>
 
         {pinned && (
-          <div data-pinned-upcoming-trip={pinned.id} className="px-2.5 py-1 bg-blue-50/90 border-b border-blue-200/80 flex items-center justify-between gap-2 text-[11px] shrink-0">
+          <div data-pinned-upcoming-trip={pinned.id} className="px-2.5 py-1 bg-status-info-bg/90 border-b border-status-info-border/80 flex items-center justify-between gap-2 text-[11px] shrink-0">
             <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
-              <button type="button" data-open-trip-details={pinned.id} onClick={() => openTripDetails(pinned.id)} className="font-mono font-extrabold text-blue-700 hover:underline cursor-pointer shrink-0">{formatShortTripId(pinned.id)}</button>
-              <span className="text-slate-600 font-semibold shrink-0">{formatTripTimelineDateTime(pinned)}</span>
+              <button type="button" data-open-trip-details={pinned.id} onClick={() => openTripDetails(pinned.id)} className="font-mono font-extrabold text-status-info-fg hover:underline cursor-pointer shrink-0">{formatShortTripId(pinned.id)}</button>
+              <span className="text-fg-secondary font-semibold shrink-0">{formatTripTimelineDateTime(pinned)}</span>
               {renderTripBadges(pinned, drivers)}
-              <span className="text-slate-700 truncate">{formatShortRouteEndpoint(pinned.pickupLocation?.address)} → {formatShortRouteEndpoint(pinned.dropoffLocation?.address)}</span>
+              <span className="text-fg-secondary truncate">{formatShortRouteEndpoint(pinned.pickupLocation?.address)} → {formatShortRouteEndpoint(pinned.dropoffLocation?.address)}</span>
               <DispatchStatusBadge status={pinned.status} compact={true} trip={pinned} nowMs={nowMs} />
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <button type="button" onClick={() => onOpenTripById?.(pinned.id)} className="px-1.5 py-0.5 rounded bg-white hover:bg-blue-100 border border-blue-200 text-blue-800 text-[10px] font-bold cursor-pointer">Edit</button>
-              <button type="button" onClick={() => { getWorkspaceBus().publish('FOCUS_TRIP_ON_MAP', { tripId: pinned.id }); onFocusTripOnMap?.(pinned.id); }} className="px-1.5 py-0.5 rounded bg-white hover:bg-emerald-50 border border-slate-200 text-emerald-700 text-[10px] font-bold cursor-pointer">Map</button>
+              <button type="button" onClick={() => onOpenTripById?.(pinned.id)} className="px-1.5 py-0.5 rounded bg-surface-card hover:bg-status-info-bg-strong border border-status-info-border text-status-info-fg text-[10px] font-bold cursor-pointer">Edit</button>
+              <button type="button" onClick={() => { getWorkspaceBus().publish('FOCUS_TRIP_ON_MAP', { tripId: pinned.id }); onFocusTripOnMap?.(pinned.id); }} className="px-1.5 py-0.5 rounded bg-surface-card hover:bg-status-success-bg border border-border-subtle text-status-success-fg text-[10px] font-bold cursor-pointer">Map</button>
             </div>
           </div>
         )}
 
-        <div ref={timelineContainerRef} className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2 bg-slate-50/30">
+        <div ref={timelineContainerRef} className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2 bg-surface-subtle/30">
           {timeline.items.map((item) => {
             if (item.kind === 'trip') {
               const tr = item.trip;
               const fare = (tr.pricing?.totalFare ?? tr.payment?.amount ?? 0).toFixed(2);
               return (
-                <div key={`trip_${tr.id}`} data-timeline-trip-card={tr.id} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-2xs space-y-1">
+                <div key={`trip_${tr.id}`} data-timeline-trip-card={tr.id} className="w-full rounded-xl border border-border-subtle bg-surface-card px-3 py-2 shadow-2xs space-y-1">
                   <div className="flex items-center justify-between gap-2 text-[11px]">
                     <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                      <button type="button" data-open-trip-details={tr.id} onClick={() => openTripDetails(tr.id)} className="font-mono font-extrabold text-blue-700 hover:underline cursor-pointer">{formatShortTripId(tr.id)}</button>
-                      <span className="text-slate-500">{formatTripTimelineDateTime(tr)}</span>
-                      <span className="font-bold text-slate-900">${fare}</span>
+                      <button type="button" data-open-trip-details={tr.id} onClick={() => openTripDetails(tr.id)} className="font-mono font-extrabold text-status-info-fg hover:underline cursor-pointer">{formatShortTripId(tr.id)}</button>
+                      <span className="text-fg-muted">{formatTripTimelineDateTime(tr)}</span>
+                      <span className="font-bold text-fg-primary">${fare}</span>
                       {renderTripBadges(tr, drivers)}
                     </div>
                     <DispatchStatusBadge status={tr.status} compact={false} trip={tr} nowMs={nowMs} />
                   </div>
                   <div className="flex items-center justify-between gap-2 text-xs">
-                    <span className="text-slate-700 truncate">{formatShortRouteEndpoint(tr.pickupLocation?.address)} → {formatShortRouteEndpoint(tr.dropoffLocation?.address)}</span>
+                    <span className="text-fg-secondary truncate">{formatShortRouteEndpoint(tr.pickupLocation?.address)} → {formatShortRouteEndpoint(tr.dropoffLocation?.address)}</span>
                     <div className="flex items-center gap-1 shrink-0">
-                      <button type="button" onClick={() => onOpenTripById?.(tr.id)} className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10.5px] font-bold cursor-pointer">Edit</button>
-                      <button type="button" onClick={() => { const p = buildReturnTripDraftPayload(tr, nowMs); getWorkspaceBus().publish('POPULATE_BOOKING', p); onRebookLastRide?.(p); }} className="px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-[10.5px] font-bold cursor-pointer">⇄ Return</button>
+                      <button type="button" onClick={() => onOpenTripById?.(tr.id)} className="px-2 py-0.5 rounded-md bg-surface-muted hover:bg-surface-emphasis text-fg-secondary text-[10.5px] font-bold cursor-pointer">Edit</button>
+                      <button type="button" onClick={() => { const p = buildReturnTripDraftPayload(tr, nowMs); getWorkspaceBus().publish('POPULATE_BOOKING', p); onRebookLastRide?.(p); }} className="px-2 py-0.5 rounded-md bg-status-info-bg hover:bg-status-info-bg-strong border border-status-info-border text-status-info-fg text-[10.5px] font-bold cursor-pointer">⇄ Return</button>
                     </div>
                   </div>
                 </div>
@@ -220,26 +220,26 @@ export function SmsThreadPane({
             const evt = item.event;
             const playable = hasPlayableCallAudio(evt);
             const isHighlighted = highlightedEvent?.eventId === evt.id;
-            const glowCls = isHighlighted ? 'ring-2 ring-amber-400 shadow-[0_0_16px_rgba(251,191,36,0.45)] transition-all duration-500' : '';
+            const glowCls = isHighlighted ? 'ring-2 ring-status-warning-border shadow-[0_0_16px_rgba(251,191,36,0.45)] transition-all duration-500' : '';
             if (evt.type.startsWith('call_')) {
               const callLabel = evt.type === 'call_inbound' ? 'Inbound Call' : evt.type === 'call_outbound' ? 'Outbound Call' : 'Missed Call';
               const dur = evt.audioDuration || (evt.durationSeconds ? `${Math.floor(evt.durationSeconds / 60)}:${String(evt.durationSeconds % 60).padStart(2, '0')}` : '0:00');
               return (
-                <div key={evt.id} data-call-row={evt.id} data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`min-h-[36px] px-2.5 py-1 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-2 text-[11px] ${glowCls}`}>
+                <div key={evt.id} data-call-row={evt.id} data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`min-h-[36px] px-2.5 py-1 rounded-xl border border-border-subtle bg-surface-card flex items-center justify-between gap-2 text-[11px] ${glowCls}`}>
                   <div className="flex items-center gap-1.5 min-w-0">
                     <PhoneIcon className={`w-3.5 h-3.5 shrink-0 ${evt.type === 'call_missed' ? 'text-rose-600' : 'text-emerald-600'}`} />
-                    <span className="font-bold text-slate-800 truncate">{callLabel}</span>
-                    <span className="text-slate-400 font-mono shrink-0">{formatMessageTimestamp(evt.timestampMs, evt.timestamp)}</span>
-                    <span className="text-slate-500 font-mono shrink-0">· {dur}</span>
+                    <span className="font-bold text-fg-strong truncate">{callLabel}</span>
+                    <span className="text-fg-subtle font-mono shrink-0">{formatMessageTimestamp(evt.timestampMs, evt.timestamp)}</span>
+                    <span className="text-fg-muted font-mono shrink-0">· {dur}</span>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {playable && (
                       <div data-call-audio-player="true" className="inline-flex items-center gap-1">
                         <button type="button" onClick={() => onTogglePlayCall(evt.id)} className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center cursor-pointer">{playingCallId === evt.id ? <PauseIcon className="w-3 h-3" /> : <PlayIcon className="w-3 h-3" />}</button>
-                        <button type="button" onClick={onCyclePlaybackSpeed} className="px-1 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-[9.5px] font-bold cursor-pointer">{playbackSpeed}x</button>
+                        <button type="button" onClick={onCyclePlaybackSpeed} className="px-1 py-0.5 rounded bg-status-success-bg border border-status-success-border text-status-success-fg text-[9.5px] font-bold cursor-pointer">{playbackSpeed}x</button>
                       </div>
                     )}
-                    {evt.contactPhone && <button type="button" onClick={() => onStartCall(evt.contactPhone, evt.contactName)} className="px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[10.5px] cursor-pointer">Call</button>}
+                    {evt.contactPhone && <button type="button" onClick={() => onStartCall(evt.contactPhone, evt.contactName)} className="px-2 py-0.5 rounded-md bg-status-success-bg hover:bg-status-success-bg-strong text-status-success-fg font-bold text-[10.5px] cursor-pointer">Call</button>}
                   </div>
                 </div>
               );
@@ -247,9 +247,9 @@ export function SmsThreadPane({
             if (evt.type === 'voicemail') {
               const isVmExpanded = expandedVoicemailIds.has(evt.id);
               return (
-                <div key={evt.id} data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`rounded-xl border border-amber-200 bg-amber-50/70 p-2.5 space-y-1.5 text-xs ${glowCls}`}>
+                <div key={evt.id} data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`rounded-xl border border-status-warning-border bg-status-warning-bg/70 p-2.5 space-y-1.5 text-xs ${glowCls}`}>
                   <div className="flex items-center justify-between gap-2 text-[11px]">
-                    <span className="font-bold text-amber-900 inline-flex items-center gap-1"><MicIcon className="w-3 h-3" />Voicemail · {formatMessageTimestamp(evt.timestampMs, evt.timestamp)} · {evt.audioDuration || '0:30'}</span>
+                    <span className="font-bold text-status-warning-fg inline-flex items-center gap-1"><MicIcon className="w-3 h-3" />Voicemail · {formatMessageTimestamp(evt.timestampMs, evt.timestamp)} · {evt.audioDuration || '0:30'}</span>
                     <div className="flex items-center gap-1">
                       {evt.transcription && (
                         <button
@@ -258,7 +258,7 @@ export function SmsThreadPane({
                           aria-expanded={isVmExpanded}
                           aria-label={isVmExpanded ? 'Collapse transcription' : 'Expand transcription'}
                           onClick={() => toggleVoicemailExpanded(evt.id)}
-                          className="p-0.5 rounded hover:bg-amber-200/60 text-amber-800 cursor-pointer"
+                          className="p-0.5 rounded hover:bg-status-warning-bg-strong/60 text-status-warning-fg cursor-pointer"
                         >
                           <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isVmExpanded ? 'rotate-180' : ''}`} />
                         </button>
@@ -268,7 +268,7 @@ export function SmsThreadPane({
                     </div>
                   </div>
                   {evt.transcription && (
-                    <p className={`text-[11px] text-slate-700 italic ${isVmExpanded ? 'whitespace-pre-wrap leading-relaxed' : 'line-clamp-2'}`}>
+                    <p className={`text-[11px] text-fg-secondary italic ${isVmExpanded ? 'whitespace-pre-wrap leading-relaxed' : 'line-clamp-2'}`}>
                       &ldquo;{evt.transcription}&rdquo;
                     </p>
                   )}
@@ -278,24 +278,24 @@ export function SmsThreadPane({
             if (evt.type.startsWith('email_')) {
               const badge = resolveCommsEmailDeliveryBadge(evt.deliveryStatus, evt.type === 'email_outbound' ? 'outbound' : 'inbound');
               return (
-                <div key={evt.id} data-email-card={evt.id} data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`rounded-xl border border-indigo-200/80 bg-white p-2.5 space-y-1 text-xs ${glowCls}`}>
+                <div key={evt.id} data-email-card={evt.id} data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`rounded-xl border border-status-staged-border/80 bg-surface-card p-2.5 space-y-1 text-xs ${glowCls}`}>
                   <div className="flex items-center justify-between gap-2 text-[10.5px]">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="font-extrabold text-indigo-900 inline-flex items-center gap-1 truncate"><MailIcon className="w-3 h-3 text-indigo-600 shrink-0" />{evt.subject || (evt.type === 'email_outbound' ? 'Sent Email' : 'Inbound Email')}</span>
-                      {evt.tripId && <button type="button" data-open-trip-details={evt.tripId} onClick={() => openTripDetails(evt.tripId!)} className="font-mono font-extrabold text-blue-700 hover:underline cursor-pointer shrink-0">{formatShortTripId(evt.tripId)}</button>}
+                      <span className="font-extrabold text-status-staged-fg inline-flex items-center gap-1 truncate"><MailIcon className="w-3 h-3 text-indigo-600 shrink-0" />{evt.subject || (evt.type === 'email_outbound' ? 'Sent Email' : 'Inbound Email')}</span>
+                      {evt.tripId && <button type="button" data-open-trip-details={evt.tripId} onClick={() => openTripDetails(evt.tripId!)} className="font-mono font-extrabold text-status-info-fg hover:underline cursor-pointer shrink-0">{formatShortTripId(evt.tripId)}</button>}
                     </div>
-                    <span className="text-slate-400 font-mono shrink-0">{badge.label} · {formatMessageTimestamp(evt.timestampMs, evt.timestamp)}</span>
+                    <span className="text-fg-subtle font-mono shrink-0">{badge.label} · {formatMessageTimestamp(evt.timestampMs, evt.timestamp)}</span>
                   </div>
-                  <p className="text-slate-600 line-clamp-2 leading-snug">{cleanCommsEmailSnippet(evt.bodyText || evt.snippet)}</p>
-                  <div className="flex justify-end"><button type="button" onClick={() => onOpenEmailInDock?.(evt)} className="inline-flex items-center gap-1 text-[10.5px] font-bold text-indigo-700 hover:underline cursor-pointer">Open in Email ↗</button></div>
+                  <p className="text-fg-secondary line-clamp-2 leading-snug">{cleanCommsEmailSnippet(evt.bodyText || evt.snippet)}</p>
+                  <div className="flex justify-end"><button type="button" onClick={() => onOpenEmailInDock?.(evt)} className="inline-flex items-center gap-1 text-[10.5px] font-bold text-status-staged-fg hover:underline cursor-pointer">Open in Email ↗</button></div>
                 </div>
               );
             }
             if (evt.type === 'internal_note') {
               return (
-                <div key={evt.id} data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs ${glowCls}`}>
-                  <div className="flex items-center justify-between text-[10px] font-bold text-amber-800"><span>Note · {evt.actorName || 'Dispatcher'}</span><span className="font-mono">{formatMessageTimestamp(evt.timestampMs, evt.timestamp)}</span></div>
-                  <p className="text-slate-800 mt-0.5 whitespace-pre-wrap">{evt.bodyText || evt.snippet}</p>
+                <div key={evt.id} data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`rounded-xl border border-status-warning-border bg-status-warning-bg/80 px-3 py-2 text-xs ${glowCls}`}>
+                  <div className="flex items-center justify-between text-[10px] font-bold text-status-warning-fg"><span>Note · {evt.actorName || 'Dispatcher'}</span><span className="font-mono">{formatMessageTimestamp(evt.timestampMs, evt.timestamp)}</span></div>
+                  <p className="text-fg-strong mt-0.5 whitespace-pre-wrap">{evt.bodyText || evt.snippet}</p>
                 </div>
               );
             }
@@ -303,9 +303,9 @@ export function SmsThreadPane({
             const isFailed = isOut && (evt.deliveryStatus === 'failed' || evt.deliveryStatus === 'undelivered');
             return (
               <div key={evt.id} className={`flex flex-col ${isOut ? 'items-end' : 'items-start'}`}>
-                <div data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`max-w-[84%] rounded-2xl px-3 py-2 text-xs shadow-2xs ${isOut ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'} ${glowCls}`}>
+                <div data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`max-w-[84%] rounded-2xl px-3 py-2 text-xs shadow-2xs ${isOut ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-surface-card border border-border-subtle text-fg-strong rounded-tl-sm'} ${glowCls}`}>
                   <p className="whitespace-pre-wrap leading-relaxed">{evt.bodyText || evt.snippet}</p>
-                  <div className={`flex items-center justify-end gap-1.5 mt-1 text-[9.5px] ${isOut ? 'text-blue-200' : 'text-slate-400'}`}>
+                  <div className={`flex items-center justify-end gap-1.5 mt-1 text-[9.5px] ${isOut ? 'text-blue-200' : 'text-fg-subtle'}`}>
                     <span className="font-mono">{formatMessageTimestamp(evt.timestampMs, evt.timestamp)}</span>
                     {isFailed && (
                       <span className="inline-flex items-center gap-1 text-amber-200 font-bold">
@@ -318,29 +318,29 @@ export function SmsThreadPane({
               </div>
             );
           })}
-          {timeline.items.length === 0 && <div className="py-10 text-center text-xs text-slate-400">No items in this view yet.</div>}
+          {timeline.items.length === 0 && <div className="py-10 text-center text-xs text-fg-subtle">No items in this view yet.</div>}
           <div ref={messagesEndRef} />
         </div>
 
         <CommsComposerBar effectivePhone={effectivePhone} voiceOnlyMode={voiceOnlyMode} templateContext={threadCrmContext?.templateContext} hasMatchedTrip={Boolean(threadCrmContext?.primaryMatchedTrip || pinned)} smsReplyText={smsReplyText} onChangeSmsReplyText={onChangeSmsReplyText} onSendSms={onSendSms} isSendingSms={isSendingSms} noteDraftText={noteDraftText} onChangeNoteDraftText={onChangeNoteDraftText || (() => {})} onAddInternalNote={onAddInternalNote || (() => {})} onInsertTrackingLink={onInsertTrackingLink} onInsertPayLink={onInsertPayLink} isGeneratingPayLink={isGeneratingPayLink} smsStatusMessage={smsStatusMessage} />
 
         {isFilterOpen && menuCoords !== null && typeof document !== 'undefined' && createPortal(
-          <div ref={filterMenuRef} style={{ position: 'fixed', top: `${menuCoords.top}px`, left: `${menuCoords.left}px`, width: '212px' }} className="z-[260] bg-white rounded-xl shadow-xl ring-1 ring-slate-900/5 py-1 text-xs divide-y divide-slate-100 select-none">
+          <div ref={filterMenuRef} style={{ position: 'fixed', top: `${menuCoords.top}px`, left: `${menuCoords.left}px`, width: '212px' }} className="z-[260] bg-surface-card rounded-xl shadow-xl ring-1 ring-slate-900/5 py-1 text-xs divide-y divide-border-faint select-none">
             <div>
-              <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/60">
+              <div className="px-3 py-1.5 text-[10px] font-extrabold text-fg-subtle uppercase tracking-wider flex items-center justify-between bg-surface-subtle/60">
                 <span>Timeline Types</span>
                 <div className="flex items-center gap-1.5 normal-case tracking-normal">
-                  <button type="button" onClick={() => updateFilters(THREAD_TIMELINE_FILTER_OPTS.map((o) => o.value))} className="text-[10px] font-bold text-slate-600 hover:text-blue-700 cursor-pointer">All</button>
+                  <button type="button" onClick={() => updateFilters(THREAD_TIMELINE_FILTER_OPTS.map((o) => o.value))} className="text-[10px] font-bold text-fg-secondary hover:text-status-info-fg cursor-pointer">All</button>
                   <span className="text-slate-300">·</span>
-                  <button type="button" disabled={activeFilters.length === 0 && threadTab === 'all'} onClick={() => updateFilters([])} className="text-[10px] font-bold text-blue-600 hover:text-blue-700 disabled:opacity-40 cursor-pointer">Clear</button>
+                  <button type="button" disabled={activeFilters.length === 0 && threadTab === 'all'} onClick={() => updateFilters([])} className="text-[10px] font-bold text-blue-600 hover:text-status-info-fg disabled:opacity-40 cursor-pointer">Clear</button>
                 </div>
               </div>
               <div className="py-0.5">
                 {THREAD_TIMELINE_FILTER_OPTS.map((opt) => {
                   const checked = activeFilters.includes(opt.value);
                   return (
-                    <button key={opt.value} type="button" onClick={() => updateFilters(toggleCommsMultiFilter(activeFilters, opt.value))} className={`w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors cursor-pointer ${checked ? 'bg-blue-50/80 text-blue-700 font-bold hover:bg-blue-100/70' : 'text-slate-700 font-semibold hover:bg-blue-50/80 hover:text-blue-700'}`}>
-                      <span aria-hidden="true" className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center shrink-0 ${checked ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-300'}`}>{checked && <CheckIcon className="w-2.5 h-2.5 stroke-[3]" />}</span>
+                    <button key={opt.value} type="button" onClick={() => updateFilters(toggleCommsMultiFilter(activeFilters, opt.value))} className={`w-full px-3 py-1.5 text-left flex items-center gap-2 transition-colors cursor-pointer ${checked ? 'bg-status-info-bg/80 text-status-info-fg font-bold hover:bg-status-info-bg-strong/70' : 'text-fg-secondary font-semibold hover:bg-status-info-bg/80 hover:text-status-info-fg'}`}>
+                      <span aria-hidden="true" className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center shrink-0 ${checked ? 'bg-blue-600 border-blue-600 text-white' : 'bg-surface-card border-border-strong'}`}>{checked && <CheckIcon className="w-2.5 h-2.5 stroke-[3]" />}</span>
                       <span>{opt.label}</span>
                     </button>
                   );
@@ -348,8 +348,8 @@ export function SmsThreadPane({
               </div>
             </div>
             <div className="py-0.5">
-              {onOpenContactEmailInDock && <button type="button" onClick={() => { onOpenContactEmailInDock(); setIsFilterOpen(false); }} className="w-full px-3 py-1.5 text-left font-semibold text-indigo-700 hover:bg-indigo-50 flex items-center gap-1.5 cursor-pointer"><ExternalLinkIcon className="w-3 h-3" /><span>Open in Email Dock</span></button>}
-              {onMarkThreadUnread && <button type="button" onClick={() => { onMarkThreadUnread(); setIsFilterOpen(false); }} className="w-full px-3 py-1.5 text-left font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer">Mark Unread</button>}
+              {onOpenContactEmailInDock && <button type="button" onClick={() => { onOpenContactEmailInDock(); setIsFilterOpen(false); }} className="w-full px-3 py-1.5 text-left font-semibold text-status-staged-fg hover:bg-status-staged-bg flex items-center gap-1.5 cursor-pointer"><ExternalLinkIcon className="w-3 h-3" /><span>Open in Email Dock</span></button>}
+              {onMarkThreadUnread && <button type="button" onClick={() => { onMarkThreadUnread(); setIsFilterOpen(false); }} className="w-full px-3 py-1.5 text-left font-semibold text-fg-secondary hover:bg-surface-subtle cursor-pointer">Mark Unread</button>}
             </div>
           </div>,
           document.body
@@ -365,10 +365,10 @@ export function SmsThreadPane({
   });
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 bg-white">
+    <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-border-faint bg-surface-card">
       {rows.length === 0 ? (
         <div className="py-12 px-4 text-center space-y-2">
-          <p className="text-xs font-bold text-slate-600">No Conversations Found</p>
+          <p className="text-xs font-bold text-fg-secondary">No Conversations Found</p>
           <button type="button" onClick={onOpenFreshNewMessageModal} className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold cursor-pointer">+ New Message</button>
         </div>
       ) : rows.map((row) => {
@@ -389,10 +389,10 @@ export function SmsThreadPane({
             {...gestureProps}
             className={`group min-h-[52px] px-3 py-1.5 cursor-pointer transition-colors select-none ${
               isSelected
-                ? 'bg-blue-100/70 hover:bg-blue-100'
+                ? 'bg-status-info-bg-strong/70 hover:bg-status-info-bg-strong'
                 : isUnread
-                ? 'bg-blue-50/50 hover:bg-blue-50'
-                : 'bg-white hover:bg-slate-50'
+                ? 'bg-status-info-bg/50 hover:bg-status-info-bg'
+                : 'bg-surface-card hover:bg-surface-subtle'
             }`}
           >
             <div className="flex items-center gap-2.5">
@@ -410,10 +410,10 @@ export function SmsThreadPane({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1 min-w-0">
-                    <span className={`text-xs truncate ${isUnread ? 'font-extrabold text-slate-900' : 'font-semibold text-slate-800'}`}>{row.contactName}</span>
-                    {row.isVip && <span className="px-1 rounded bg-amber-100 text-amber-800 text-[9px] font-black uppercase shrink-0">VIP</span>}
-                    {row.contactType === 'driver' && <span className="px-1 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold shrink-0">Driver</span>}
-                    {row.contactType === 'corporate' && <span className="px-1 rounded bg-indigo-100 text-indigo-800 text-[9px] font-bold shrink-0">Corp</span>}
+                    <span className={`text-xs truncate ${isUnread ? 'font-extrabold text-fg-primary' : 'font-semibold text-fg-strong'}`}>{row.contactName}</span>
+                    {row.isVip && <span className="px-1 rounded bg-status-warning-bg-strong text-status-warning-fg text-[9px] font-black uppercase shrink-0">VIP</span>}
+                    {row.contactType === 'driver' && <span className="px-1 rounded bg-status-success-bg-strong text-status-success-fg text-[9px] font-bold shrink-0">Driver</span>}
+                    {row.contactType === 'corporate' && <span className="px-1 rounded bg-status-staged-bg-strong text-status-staged-fg text-[9px] font-bold shrink-0">Corp</span>}
                     {row.unreadCountTotal > 0 && <span className="px-1.5 rounded-full bg-blue-600 text-white text-[9.5px] font-black shrink-0">{row.unreadCountTotal}</span>}
                   </div>
                   <CommsTimestampWithHoverReadToggle
@@ -426,7 +426,7 @@ export function SmsThreadPane({
                 <div className="flex items-center justify-between gap-2 mt-0.5">
                   <div className="flex items-center gap-1 min-w-0 flex-1">
                     <CommsChannelDirectionIcon type={row.latestEvent.type} />
-                    <p className={`text-[11px] truncate ${isUnread ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>{row2Snippet}</p>
+                    <p className={`text-[11px] truncate ${isUnread ? 'text-fg-strong font-medium' : 'text-fg-muted'}`}>{row2Snippet}</p>
                     {isLatestVoicemail && vmTranscript && (
                       <button
                         type="button"
@@ -438,15 +438,15 @@ export function SmsThreadPane({
                           e.stopPropagation();
                           toggleVoicemailExpanded(row.latestEvent.id);
                         }}
-                        className="p-0.5 rounded hover:bg-amber-100 text-amber-700 shrink-0 cursor-pointer"
+                        className="p-0.5 rounded hover:bg-status-warning-bg-strong text-status-warning-fg shrink-0 cursor-pointer"
                       >
                         <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isVmExpanded ? 'rotate-180' : ''}`} />
                       </button>
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {row.primaryPhone && <button type="button" onClick={() => onStartCall(row.primaryPhone, row.contactName)} title={`Call ${row.contactName}`} aria-label={`Call ${row.contactName}`} className="w-6 h-6 rounded-md bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white flex items-center justify-center cursor-pointer"><PhoneIcon className="w-3 h-3" /></button>}
-                    <button type="button" onClick={() => getWorkspaceBus().publish('OPEN_CLIENT_PROFILE', { phone: row.primaryPhone, email: row.primaryEmail, name: row.contactName, source: 'comms_hub' })} title="Profile" aria-label="Profile" className="w-6 h-6 rounded-md bg-slate-100 hover:bg-indigo-600 text-slate-600 hover:text-white flex items-center justify-center cursor-pointer"><UserIcon className="w-3 h-3" /></button>
+                    {row.primaryPhone && <button type="button" onClick={() => onStartCall(row.primaryPhone, row.contactName)} title={`Call ${row.contactName}`} aria-label={`Call ${row.contactName}`} className="w-6 h-6 rounded-md bg-status-success-bg hover:bg-emerald-600 text-status-success-fg hover:text-white flex items-center justify-center cursor-pointer"><PhoneIcon className="w-3 h-3" /></button>}
+                    <button type="button" onClick={() => getWorkspaceBus().publish('OPEN_CLIENT_PROFILE', { phone: row.primaryPhone, email: row.primaryEmail, name: row.contactName, source: 'comms_hub' })} title="Profile" aria-label="Profile" className="w-6 h-6 rounded-md bg-surface-muted hover:bg-indigo-600 text-fg-secondary hover:text-white flex items-center justify-center cursor-pointer"><UserIcon className="w-3 h-3" /></button>
                   </div>
                 </div>
               </div>
@@ -455,7 +455,7 @@ export function SmsThreadPane({
               <div
                 data-voicemail-expanded-body={row.latestEvent.id}
                 onClick={(e) => e.stopPropagation()}
-                className="mt-1.5 ml-[42px] pl-2 border-l-2 border-amber-400 text-[11px] text-slate-700 italic whitespace-pre-wrap leading-relaxed"
+                className="mt-1.5 ml-[42px] pl-2 border-l-2 border-status-warning-border text-[11px] text-fg-secondary italic whitespace-pre-wrap leading-relaxed"
               >
                 &ldquo;{vmTranscript}&rdquo;
               </div>

@@ -8,6 +8,8 @@ import {
 import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
+import { APPEARANCE_OPTIONS, type AppearanceOption } from '../../../../config/theme-tokens';
+import { useTheme } from '../../../../hooks/useTheme';
 import { DispatchHeaderCallHud } from '../DispatchHeaderCallHud';
 import { FleetAlertCard, type DispatchMessageItem } from '../FleetAlertCard';
 import {
@@ -26,6 +28,8 @@ import {
   VolumeXIcon,
   ClockIcon,
   SunIcon,
+  MoonIcon,
+  MonitorIcon,
   SettingsIcon,
   MapPinIcon,
   BoltIcon,
@@ -186,6 +190,10 @@ export function DispatchDesktopTopHeader({
   onUpdateLeadWindows,
 }: DispatchDesktopTopHeaderProps) {
   const { preferences: mapPrefs, togglePreference: toggleMapPref } = useDispatchMapPreferences();
+  const { preference: themePreference, setPreference: setThemePreference } = useTheme({
+    uid: user?.uid,
+    profilePreference: user?.themePreference,
+  });
   const autoConfig = normalizeDispatchAutomationConfig(settings.dispatchAutomation);
   const canEditLeadWindows = canOperatorConfigureLeadWindows(user, autoConfig);
 
@@ -230,27 +238,27 @@ export function DispatchDesktopTopHeader({
   return (
     <>
       {/* ─── TOP NAVIGATION BAR ─── */}
-      <header className="h-12 bg-white border-b border-slate-200 px-3 sm:px-4 flex items-center justify-between shrink-0 z-30 shadow-xs">
+      <header className="h-12 bg-surface-card border-b border-border-subtle px-3 sm:px-4 flex items-center justify-between shrink-0 z-30 shadow-xs">
         {/* Left: Mobile Drawer Trigger + Desktop Workspace Switcher */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={onOpenMobileDrawer}
-            className="p-1.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
+            className="p-1.5 rounded-xl text-fg-secondary hover:text-fg-primary hover:bg-surface-muted transition-colors shrink-0 cursor-pointer"
             title="Open Operations & Profile Drawer"
           >
             <MenuIcon className="w-5 h-5" />
           </button>
 
           {/* Single Unified Desktop Workspace Switcher: Main | Phone | Email | Drivers */}
-          <div className="hidden lg:flex items-center gap-0.5 bg-slate-100/90 p-0.5 rounded-xl border border-slate-200/80">
+          <div className="hidden lg:flex items-center gap-0.5 bg-surface-muted/90 p-0.5 rounded-xl border border-border-subtle/80">
             <button
               type="button"
               onClick={() => onActiveDockTabChange('none')}
               className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeDockTab === 'none'
-                  ? 'bg-white text-blue-700 shadow-2xs ring-1 ring-slate-200/80'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-surface-card text-status-info-fg shadow-2xs ring-1 ring-border-subtle/80'
+                  : 'text-fg-secondary hover:text-fg-primary'
               }`}
               title="Main Console: Booking form, Map, and Trips queue (M)"
             >
@@ -271,8 +279,8 @@ export function DispatchDesktopTopHeader({
               }}
               className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeDockTab === 'phone' || activeDockTab === 'comms'
-                  ? 'bg-white text-blue-700 shadow-2xs ring-1 ring-slate-200/80'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-surface-card text-status-info-fg shadow-2xs ring-1 ring-border-subtle/80'
+                  : 'text-fg-secondary hover:text-fg-primary'
               }`}
               title="Phone & Messages Hub (Alt+P)"
             >
@@ -293,8 +301,8 @@ export function DispatchDesktopTopHeader({
               onClick={() => onActiveDockTabChange(activeDockTab === 'email' ? 'none' : 'email')}
               className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeDockTab === 'email'
-                  ? 'bg-white text-blue-700 shadow-2xs ring-1 ring-slate-200/80'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-surface-card text-status-info-fg shadow-2xs ring-1 ring-border-subtle/80'
+                  : 'text-fg-secondary hover:text-fg-primary'
               }`}
               title="Email Inbox: dispatch@chesterfieldtaxi.com (Alt+E)"
             >
@@ -312,8 +320,8 @@ export function DispatchDesktopTopHeader({
               onClick={() => onActiveDockTabChange(activeDockTab === 'drivers' ? 'none' : 'drivers')}
               className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeDockTab === 'drivers'
-                  ? 'bg-white text-blue-700 shadow-2xs ring-1 ring-slate-200/80'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-surface-card text-status-info-fg shadow-2xs ring-1 ring-border-subtle/80'
+                  : 'text-fg-secondary hover:text-fg-primary'
               }`}
               title="Live Fleet Roster & Status (Alt+D)"
             >
@@ -322,8 +330,8 @@ export function DispatchDesktopTopHeader({
               <span
                 className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
                   activeDockTab === 'drivers'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-emerald-100 text-emerald-700'
+                    ? 'bg-status-info-bg-strong text-status-info-fg'
+                    : 'bg-status-success-bg-strong text-status-success-fg'
                 }`}
               >
                 {drivers.filter((d) => d.mapStatus === 'available').length}
@@ -351,7 +359,7 @@ export function DispatchDesktopTopHeader({
               <CarIcon className="w-4 h-4 text-white" />
             )}
           </div>
-          <span className="font-extrabold text-sm tracking-tight text-slate-900 hidden sm:inline">
+          <span className="font-extrabold text-sm tracking-tight text-fg-primary hidden sm:inline">
             {settings.company?.name || COMPANY_CONFIG.name}
           </span>
         </div>
@@ -364,7 +372,7 @@ export function DispatchDesktopTopHeader({
               setFocusedStandingSeriesId(null);
               setShowStandingOrdersDrawer(true);
             }}
-            className="h-8 px-2.5 rounded-xl border border-emerald-200 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-900 text-[11px] font-extrabold tracking-tight flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs"
+            className="h-8 px-2.5 rounded-xl border border-status-success-border bg-status-success-bg/90 hover:bg-status-success-bg-strong text-status-success-fg text-[11px] font-extrabold tracking-tight flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs"
             title="Standing Orders & Recurring Rides Series Manager"
           >
             <span>🔁</span>
@@ -377,7 +385,7 @@ export function DispatchDesktopTopHeader({
               onClick={() => void onToggleAutoPilotPause?.()}
               className={`h-8 px-2.5 sm:px-3 rounded-full border text-[11px] font-extrabold tracking-tight flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-2xs ${
                 autoConfig.isPaused
-                  ? 'bg-amber-100 hover:bg-amber-200 text-amber-950 border-amber-300'
+                  ? 'bg-status-warning-bg-strong hover:bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border'
                   : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-700'
               }`}
               title={
@@ -451,7 +459,7 @@ export function DispatchDesktopTopHeader({
               className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
                 showAlertsDropdown
                   ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
+                  : 'text-fg-secondary hover:text-fg-primary hover:bg-surface-muted bg-surface-card border border-border-subtle shadow-2xs'
               }`}
               title="Fleet Broadcasts & Tactical Alerts"
               aria-label="Alerts"
@@ -465,11 +473,11 @@ export function DispatchDesktopTopHeader({
             </button>
 
             {showAlertsDropdown && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-                <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-surface-card rounded-2xl shadow-2xl border border-border-subtle z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div className="p-3 bg-surface-header text-white flex items-center justify-between border-b border-border-header">
                   <div className="flex items-center gap-2">
                     <BellIcon className="w-4 h-4 text-amber-400" />
-                    <span className="font-extrabold text-xs uppercase tracking-wider text-slate-200">
+                    <span className="font-extrabold text-xs uppercase tracking-wider text-fg-on-header">
                       Fleet Tactical Alerts
                     </span>
                     {unreadAlertsCount > 0 ? (
@@ -477,7 +485,7 @@ export function DispatchDesktopTopHeader({
                         {unreadAlertsCount} new
                       </span>
                     ) : activeAndSortedMessages.length > 0 ? (
-                      <span className="bg-slate-700 text-[10px] font-bold px-1.5 py-0.2 rounded-full text-slate-300">
+                      <span className="bg-surface-header-muted text-[10px] font-bold px-1.5 py-0.2 rounded-full text-slate-300">
                         {activeAndSortedMessages.length}
                       </span>
                     ) : null}
@@ -485,16 +493,16 @@ export function DispatchDesktopTopHeader({
                   <button
                     type="button"
                     onClick={() => onShowAlertsDropdownChange(false)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                    className="p-1 rounded-lg text-fg-subtle hover:text-white hover:bg-surface-header-elevated transition-colors cursor-pointer"
                     title="Close alerts"
                   >
                     <XIcon className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-b border-slate-200 text-[10px] text-slate-600">
+                <div className="flex items-center justify-between px-3 py-1.5 bg-surface-subtle border-b border-border-subtle text-[10px] text-fg-secondary">
                   <div className="flex items-center gap-1">
-                    <ClockIcon className="w-3 h-3 text-slate-400 shrink-0" />
+                    <ClockIcon className="w-3 h-3 text-fg-subtle shrink-0" />
                     <span>Auto-dismiss:</span>
                     <Select
                       size="xs"
@@ -521,7 +529,7 @@ export function DispatchDesktopTopHeader({
                       <button
                         type="button"
                         onClick={onMarkAllAlertsRead}
-                        className="text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+                        className="text-blue-600 hover:text-status-info-fg font-bold hover:underline cursor-pointer"
                       >
                         Mark all read
                       </button>
@@ -530,7 +538,7 @@ export function DispatchDesktopTopHeader({
                       <button
                         type="button"
                         onClick={onClearUnpinnedAlerts}
-                        className="text-slate-500 hover:text-rose-600 font-bold hover:underline cursor-pointer"
+                        className="text-fg-muted hover:text-rose-600 font-bold hover:underline cursor-pointer"
                       >
                         Clear unpinned
                       </button>
@@ -540,14 +548,14 @@ export function DispatchDesktopTopHeader({
 
                 <form
                   onSubmit={onSendMessage}
-                  className="p-2.5 bg-slate-50/50 border-b border-slate-200 flex gap-1.5"
+                  className="p-2.5 bg-surface-subtle/50 border-b border-border-subtle flex gap-1.5"
                 >
                   <input
                     type="text"
                     value={msgText}
                     onChange={(e) => onMsgTextChange(e.target.value)}
                     placeholder="Broadcast alert to all drivers..."
-                    className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-blue-500"
+                    className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-border-strong bg-surface-card focus:outline-blue-500"
                   />
                   <button
                     type="submit"
@@ -559,8 +567,8 @@ export function DispatchDesktopTopHeader({
 
                 <div className="max-h-72 overflow-y-auto p-3 space-y-2 text-xs">
                   {activeAndSortedMessages.length === 0 ? (
-                    <div className="text-center py-6 text-slate-400 space-y-1">
-                      <p className="font-bold text-slate-600">No active fleet alerts</p>
+                    <div className="text-center py-6 text-fg-subtle space-y-1">
+                      <p className="font-bold text-fg-secondary">No active fleet alerts</p>
                       <p className="text-[11px]">All drivers operating under normal conditions.</p>
                     </div>
                   ) : (
@@ -576,7 +584,7 @@ export function DispatchDesktopTopHeader({
                   )}
                 </div>
 
-                <div className="p-2 bg-slate-50 border-t border-slate-200 text-center text-[10px] text-slate-500 flex items-center justify-between px-3">
+                <div className="p-2 bg-surface-subtle border-t border-border-subtle text-center text-[10px] text-fg-muted flex items-center justify-between px-3">
                   <span>
                     {activeAndSortedMessages.length} active ({pinnedAlertsCount} pinned)
                   </span>
@@ -594,8 +602,8 @@ export function DispatchDesktopTopHeader({
             onClick={onToggleSoundMuted}
             className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
               isSoundMuted
-                ? 'bg-slate-100 text-slate-400 border border-slate-200 hover:text-slate-600'
-                : 'bg-white text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border border-slate-200 shadow-2xs'
+                ? 'bg-surface-muted text-fg-subtle border border-border-subtle hover:text-fg-secondary'
+                : 'bg-surface-card text-emerald-600 hover:text-status-success-fg hover:bg-status-success-bg border border-border-subtle shadow-2xs'
             }`}
             title={
               isSoundMuted
@@ -623,11 +631,11 @@ export function DispatchDesktopTopHeader({
                 showDeviceSettingsMenu
                   ? 'bg-blue-600 text-white shadow-md'
                   : keepScreenAwake && dispatchWakeLock.isActive
-                  ? 'bg-white text-blue-600 hover:bg-blue-50 border border-blue-200 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
+                  ? 'bg-surface-card text-blue-600 hover:bg-status-info-bg border border-status-info-border shadow-2xs'
+                  : 'text-fg-secondary hover:text-fg-primary hover:bg-surface-muted bg-surface-card border border-border-subtle shadow-2xs'
               }`}
-              title="Console Settings: Keep Screen Awake & Browser Push Alerts"
-              aria-label="Console Settings"
+              title="Dispatch Settings: Appearance, Screen Wake Lock & Map Display"
+              aria-label="Dispatch Settings"
             >
               <SettingsIcon className="w-4 h-4 shrink-0" />
               {(keepScreenAwake || dispatchPush.alertsEnabled) && (
@@ -636,18 +644,18 @@ export function DispatchDesktopTopHeader({
             </button>
 
             {showDeviceSettingsMenu && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-[348px] max-h-[84vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 animate-in fade-in zoom-in-95 duration-150">
-                <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 sticky top-0 z-10">
+              <div className="absolute right-0 mt-2 w-80 sm:w-[348px] max-h-[84vh] overflow-y-auto bg-surface-card rounded-2xl shadow-2xl border border-border-subtle z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="p-3 bg-surface-header text-white flex items-center justify-between border-b border-border-header sticky top-0 z-10">
                   <div className="flex items-center gap-2">
                     <SettingsIcon className="w-4 h-4 text-blue-400" />
-                    <span className="font-extrabold text-xs uppercase tracking-wider text-slate-200">
-                      Console &amp; Map Settings
+                    <span className="font-extrabold text-xs uppercase tracking-wider text-fg-on-header">
+                      Dispatch Settings
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => onShowDeviceSettingsMenuChange(false)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                    className="p-1 rounded-lg text-fg-subtle hover:text-white hover:bg-surface-header-elevated transition-colors cursor-pointer"
                     aria-label="Close settings menu"
                   >
                     <XIcon className="w-4 h-4" />
@@ -655,20 +663,62 @@ export function DispatchDesktopTopHeader({
                 </div>
 
                 <div className="p-3 space-y-2.5 text-xs">
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+                  {/* Appearance Control (Light / Dark / System) */}
+                  <div className="p-2.5 rounded-xl bg-surface-subtle border border-border-subtle space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-fg-strong leading-tight">Appearance</span>
+                      <span className="text-[10.5px] font-semibold text-fg-muted capitalize">
+                        {themePreference}
+                      </span>
+                    </div>
+                    <div
+                      role="radiogroup"
+                      aria-label="Appearance"
+                      className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-surface-muted border border-border-subtle"
+                    >
+                      {APPEARANCE_OPTIONS.map((opt: AppearanceOption) => {
+                        const isSelected = themePreference === opt.value;
+                        const IconComp =
+                          opt.icon === 'moon'
+                            ? MoonIcon
+                            : opt.icon === 'monitor'
+                            ? MonitorIcon
+                            : SunIcon;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            onClick={() => setThemePreference(opt.value)}
+                            title={opt.description}
+                            className={`px-2 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-surface-card text-blue-600 dark:text-blue-400 shadow-2xs ring-1 ring-border-subtle'
+                                : 'text-fg-muted hover:text-fg-primary'
+                            }`}
+                          >
+                            <IconComp className="w-3.5 h-3.5 shrink-0" />
+                            <span>{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-surface-subtle border border-border-subtle flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <SunIcon
                         className={`w-4 h-4 shrink-0 ${
                           keepScreenAwake && dispatchWakeLock.isActive
                             ? 'text-amber-500'
-                            : 'text-slate-400'
+                            : 'text-fg-subtle'
                         }`}
                       />
                       <div className="min-w-0">
-                        <span className="font-bold text-slate-800 block leading-tight">
+                        <span className="font-bold text-fg-strong block leading-tight">
                           Keep Screen Awake
                         </span>
-                        <span className="text-[11px] text-slate-500 block">
+                        <span className="text-[11px] text-fg-muted block">
                           {!dispatchWakeLock.isSupported
                             ? 'Not supported in this browser'
                             : keepScreenAwake
@@ -685,30 +735,30 @@ export function DispatchDesktopTopHeader({
                       onClick={onToggleKeepScreenAwake}
                       className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold shrink-0 transition-colors ${
                         !dispatchWakeLock.isSupported
-                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          ? 'bg-surface-emphasis text-fg-subtle cursor-not-allowed'
                           : keepScreenAwake
                           ? 'bg-emerald-600 text-white hover:bg-emerald-500 cursor-pointer'
-                          : 'bg-slate-200 text-slate-700 hover:bg-slate-300 cursor-pointer'
+                          : 'bg-surface-emphasis text-fg-secondary hover:bg-surface-strong cursor-pointer'
                       }`}
                     >
                       {keepScreenAwake ? 'Active' : 'Off'}
                     </button>
                   </div>
 
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2">
+                  <div className="p-2.5 rounded-xl bg-surface-subtle border border-border-subtle flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <BellIcon
                         className={`w-4 h-4 shrink-0 ${
                           dispatchPush.permission === 'granted' && dispatchPush.alertsEnabled
                             ? 'text-blue-600'
-                            : 'text-slate-400'
+                            : 'text-fg-subtle'
                         }`}
                       />
                       <div className="min-w-0">
-                        <span className="font-bold text-slate-800 block leading-tight">
+                        <span className="font-bold text-fg-strong block leading-tight">
                           Browser Push Alerts
                         </span>
-                        <span className="text-[11px] text-slate-500 block">
+                        <span className="text-[11px] text-fg-muted block">
                           {!dispatchPush.isSupported
                             ? 'Notifications unsupported'
                             : dispatchPush.permission === 'denied'
@@ -722,11 +772,11 @@ export function DispatchDesktopTopHeader({
                       </div>
                     </div>
                     {!dispatchPush.isSupported ? (
-                      <span className="px-2 py-1 rounded-lg bg-slate-200 text-slate-500 text-[10px] font-bold shrink-0">
+                      <span className="px-2 py-1 rounded-lg bg-surface-emphasis text-fg-muted text-[10px] font-bold shrink-0">
                         N/A
                       </span>
                     ) : dispatchPush.permission === 'denied' ? (
-                      <span className="px-2 py-1 rounded-lg bg-rose-100 text-rose-700 text-[10px] font-bold shrink-0">
+                      <span className="px-2 py-1 rounded-lg bg-status-danger-bg-strong text-status-danger-fg text-[10px] font-bold shrink-0">
                         Blocked
                       </span>
                     ) : dispatchPush.permission === 'default' ? (
@@ -746,7 +796,7 @@ export function DispatchDesktopTopHeader({
                         className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer transition-colors ${
                           dispatchPush.alertsEnabled
                             ? 'bg-blue-600 text-white hover:bg-blue-500'
-                            : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                            : 'bg-surface-emphasis text-fg-secondary hover:bg-surface-strong'
                         }`}
                       >
                         {dispatchPush.alertsEnabled ? 'Enabled' : 'Paused'}
@@ -755,10 +805,10 @@ export function DispatchDesktopTopHeader({
                   </div>
 
                   {/* Map & Route Display Section */}
-                  <div className="pt-2 border-t border-slate-200 space-y-2">
+                  <div className="pt-2 border-t border-border-subtle space-y-2">
                     <div className="flex items-center gap-1.5 px-0.5">
                       <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-500">
+                      <span className="text-[10.5px] font-black uppercase tracking-wider text-fg-muted">
                         Map &amp; Route Display
                       </span>
                     </div>
@@ -786,13 +836,13 @@ export function DispatchDesktopTopHeader({
                       return (
                         <div
                           key={opt.key}
-                          className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2"
+                          className="p-2.5 rounded-xl bg-surface-subtle border border-border-subtle flex items-center justify-between gap-2"
                         >
                           <div className="min-w-0">
-                            <span className="font-bold text-slate-800 block leading-tight">
+                            <span className="font-bold text-fg-strong block leading-tight">
                               {opt.label}
                             </span>
-                            <span className="text-[11px] text-slate-500 block leading-snug">
+                            <span className="text-[11px] text-fg-muted block leading-snug">
                               {opt.subtitle}
                             </span>
                           </div>
@@ -804,7 +854,7 @@ export function DispatchDesktopTopHeader({
                             className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer transition-colors ${
                               active
                                 ? 'bg-blue-600 text-white hover:bg-blue-500'
-                                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                : 'bg-surface-emphasis text-fg-secondary hover:bg-surface-strong'
                             }`}
                           >
                             {active ? 'On' : 'Off'}
@@ -815,16 +865,16 @@ export function DispatchDesktopTopHeader({
                   </div>
 
                   {/* Pre-Pickup Lead Window Quick Control (Phase 50) */}
-                  <div className="pt-2 border-t border-slate-200 space-y-2">
+                  <div className="pt-2 border-t border-border-subtle space-y-2">
                     <div className="flex items-center justify-between gap-1.5 px-0.5">
                       <div className="flex items-center gap-1.5">
                         <BoltIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                        <span className="text-[10.5px] font-black uppercase tracking-wider text-slate-500">
+                        <span className="text-[10.5px] font-black uppercase tracking-wider text-fg-muted">
                           Pre-Pickup Lead Window
                         </span>
                       </div>
                       {!canEditLeadWindows && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-[9.5px] font-bold text-slate-600">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-muted border border-border-subtle text-[9.5px] font-bold text-fg-secondary">
                           <LockIcon className="w-2.5 h-2.5" />
                           <span>Set by Admin</span>
                         </span>
@@ -832,10 +882,10 @@ export function DispatchDesktopTopHeader({
                     </div>
 
                     {canEditLeadWindows ? (
-                      <div className="p-2.5 rounded-xl bg-blue-50/50 border border-blue-200 space-y-2.5">
+                      <div className="p-2.5 rounded-xl bg-status-info-bg/50 border border-status-info-border space-y-2.5">
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="text-[10.5px] font-bold text-slate-700 block mb-0.5">
+                            <label className="text-[10.5px] font-bold text-fg-secondary block mb-0.5">
                               Standard (15–240m)
                             </label>
                             <input
@@ -846,11 +896,11 @@ export function DispatchDesktopTopHeader({
                               onChange={(e) =>
                                 setDraftLeadMinutes(parseInt(e.target.value, 10) || 45)
                               }
-                              className="w-full h-7 px-2 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900"
+                              className="w-full h-7 px-2 rounded-lg border border-border-strong bg-surface-card text-xs font-bold text-fg-primary"
                             />
                           </div>
                           <div>
-                            <label className="text-[10.5px] font-bold text-slate-700 block mb-0.5">
+                            <label className="text-[10.5px] font-bold text-fg-secondary block mb-0.5">
                               Airport +Buffer (m)
                             </label>
                             <input
@@ -863,15 +913,15 @@ export function DispatchDesktopTopHeader({
                                   Math.max(0, parseInt(e.target.value, 10) || 0)
                                 )
                               }
-                              className="w-full h-7 px-2 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-900"
+                              className="w-full h-7 px-2 rounded-lg border border-border-strong bg-surface-card text-xs font-bold text-fg-primary"
                             />
                           </div>
                         </div>
 
                         {/* Staged Auto-Release Window Controls (Phase 51) */}
-                        <div className="pt-2 border-t border-blue-200/80 space-y-1.5">
+                        <div className="pt-2 border-t border-status-info-border/80 space-y-1.5">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10.5px] font-extrabold text-indigo-950">
+                            <span className="text-[10.5px] font-extrabold text-status-staged-fg">
                               📌 Auto-Release Staged Drivers
                             </span>
                             <button
@@ -882,14 +932,14 @@ export function DispatchDesktopTopHeader({
                               className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold cursor-pointer transition-colors ${
                                 draftAutoReleaseStaged
                                   ? 'bg-indigo-600 text-white hover:bg-indigo-500'
-                                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                  : 'bg-surface-emphasis text-fg-secondary hover:bg-surface-strong'
                               }`}
                             >
                               {draftAutoReleaseStaged ? 'On' : 'Off'}
                             </button>
                           </div>
                           <div className="flex items-center justify-between gap-2">
-                            <label className="text-[10.5px] font-bold text-slate-700">
+                            <label className="text-[10.5px] font-bold text-fg-secondary">
                               Staged Release Lead (15–240m)
                             </label>
                             <input
@@ -901,13 +951,13 @@ export function DispatchDesktopTopHeader({
                               onChange={(e) =>
                                 setDraftStagedReleaseMinutes(parseInt(e.target.value, 10) || 45)
                               }
-                              className="w-20 h-7 px-2 rounded-lg border border-indigo-300 bg-white disabled:opacity-50 text-xs font-bold text-indigo-950"
+                              className="w-20 h-7 px-2 rounded-lg border border-status-staged-border bg-surface-card disabled:opacity-50 text-xs font-bold text-status-staged-fg"
                             />
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between gap-2 pt-0.5">
-                          <span className="text-[10px] text-slate-600">
+                          <span className="text-[10px] text-fg-secondary">
                             STL/SUS: <strong>T &minus; {draftLeadMinutes + draftAirportExtraMinutes}m</strong>
                           </span>
                           <button
@@ -934,18 +984,18 @@ export function DispatchDesktopTopHeader({
                         </div>
                       </div>
                     ) : (
-                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                      <div className="p-2.5 rounded-xl bg-surface-subtle border border-border-subtle space-y-1">
                         <div>
-                          <span className="font-bold text-slate-800 block leading-tight">
+                          <span className="font-bold text-fg-strong block leading-tight">
                             {autoConfig.scheduledDispatchLeadMinutes}m Standard · +
                             {autoConfig.airportExtraLeadMinutes}m Airport
                           </span>
-                          <span className="text-[10.5px] text-slate-500 block">
+                          <span className="text-[10.5px] text-fg-muted block">
                             Scheduled rides hold in CONFIRMED until T &minus;{' '}
                             {autoConfig.scheduledDispatchLeadMinutes}m
                           </span>
                         </div>
-                        <div className="pt-1 border-t border-slate-200/80 text-[10.5px] font-semibold text-indigo-800">
+                        <div className="pt-1 border-t border-border-subtle/80 text-[10.5px] font-semibold text-status-staged-fg">
                           📌 Staged Auto-Release:{' '}
                           {autoConfig.autoReleaseStagedDrivers
                             ? `On (T − ${autoConfig.stagedAutoReleaseLeadMinutes}m)`
@@ -963,7 +1013,7 @@ export function DispatchDesktopTopHeader({
           <Suspense
             fallback={
               <div
-                className="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-2xs shrink-0"
+                className="w-9 h-9 rounded-xl bg-surface-card border border-border-subtle shadow-2xs shrink-0"
                 aria-hidden="true"
               />
             }
@@ -1001,7 +1051,7 @@ export function DispatchDesktopTopHeader({
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="relative flex items-center justify-center shrink-0">
-                <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping absolute" />
+                <span className="w-2.5 h-2.5 rounded-full bg-surface-card animate-ping absolute" />
                 <PhoneIcon className="w-4 h-4 text-white relative shrink-0" />
               </div>
               <span className="font-extrabold text-xs truncate">

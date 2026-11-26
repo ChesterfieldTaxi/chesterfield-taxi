@@ -45,7 +45,7 @@ export interface TripQueueOverflowMenuProps {
 }
 
 const PORTAL_MENU_SHELL_CLASS =
-  'bg-white rounded-xl shadow-xl border border-slate-200/90 text-xs animate-in fade-in zoom-in-95 duration-100 text-left select-none z-[99999] overflow-hidden';
+  'bg-surface-card rounded-xl shadow-xl border border-border-subtle/90 text-xs animate-in fade-in zoom-in-95 duration-100 text-left select-none z-[99999] overflow-hidden';
 
 /**
  * Consolidated overflow portal menu (`⋯`) for secondary queue filters,
@@ -146,12 +146,12 @@ export function TripQueueOverflowMenu({
         onClick={handleTriggerClick}
         className={`h-7 px-2 rounded-lg border text-xs font-bold shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-1 shrink-0 ${
           isOpen
-            ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-500/20'
+            ? 'bg-status-info-bg border-blue-400 text-status-info-fg ring-2 ring-blue-500/20'
             : showFilterBadgeOnTrigger
-            ? 'bg-blue-50/80 border-blue-400 text-blue-800 hover:bg-blue-50'
+            ? 'bg-status-info-bg/80 border-blue-400 text-status-info-fg hover:bg-status-info-bg'
             : showAssignmentInMenu && (hasAutoDispatchReady || hasAutoStageReady)
-            ? 'bg-indigo-50/90 border-indigo-300 text-indigo-800 hover:bg-indigo-100/70'
-            : 'bg-white border-slate-300 hover:bg-slate-50 text-slate-700'
+            ? 'bg-status-staged-bg/90 border-status-staged-border text-status-staged-fg hover:bg-status-staged-bg-strong/70'
+            : 'bg-surface-card border-border-strong hover:bg-surface-subtle text-fg-secondary'
         }`}
         title="More options: filters, layout, columns, staging & auto-dispatch"
         aria-haspopup="true"
@@ -191,17 +191,17 @@ export function TripQueueOverflowMenu({
             onTouchStart={(e) => e.stopPropagation()}
             className={PORTAL_MENU_SHELL_CLASS}
           >
-            <div className="max-h-[75vh] overflow-y-auto divide-y divide-slate-100">
+            <div className="max-h-[75vh] overflow-y-auto divide-y divide-border-faint">
               {/* ─── 1. Filters ─── */}
               {showFiltersInMenu && (
                 <div>
-                  <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/70">
+                  <div className="px-3 py-1.5 text-[10px] font-extrabold text-fg-subtle uppercase tracking-wider flex items-center justify-between bg-surface-subtle/70">
                     <span>Filters</span>
                     <button
                       type="button"
                       disabled={activeFilterKeys.length === 0}
                       onClick={() => onActiveFilterKeysChange([])}
-                      className="text-[10px] font-bold text-rose-600 hover:text-rose-700 disabled:opacity-40 disabled:pointer-events-none cursor-pointer normal-case tracking-normal"
+                      className="text-[10px] font-bold text-rose-600 hover:text-status-danger-fg disabled:opacity-40 disabled:pointer-events-none cursor-pointer normal-case tracking-normal"
                     >
                       Clear
                     </button>
@@ -216,8 +216,8 @@ export function TripQueueOverflowMenu({
                           onClick={() => toggleFilterKey(item.key)}
                           className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11.5px] transition-colors cursor-pointer text-left min-w-0 ${
                             active
-                              ? 'font-bold text-blue-700 bg-blue-50/90 hover:bg-blue-100/70'
-                              : 'font-semibold text-slate-700 hover:bg-slate-100'
+                              ? 'font-bold text-status-info-fg bg-status-info-bg/90 hover:bg-status-info-bg-strong/70'
+                              : 'font-semibold text-fg-secondary hover:bg-surface-muted'
                           }`}
                         >
                           <MenuCheckIndicator checked={active} />
@@ -231,10 +231,10 @@ export function TripQueueOverflowMenu({
 
               {/* ─── 2. View / Layout ─── */}
               <div>
-                <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/70">
+                <div className="px-3 py-1.5 text-[10px] font-extrabold text-fg-subtle uppercase tracking-wider flex items-center justify-between bg-surface-subtle/70">
                   <span>View / Layout</span>
                   {displayLayout === 'auto' && (
-                    <span className="px-1.5 py-0.5 rounded bg-blue-100/80 text-blue-700 text-[9.5px] font-bold normal-case tracking-normal">
+                    <span className="px-1.5 py-0.5 rounded bg-status-info-bg-strong/80 text-status-info-fg text-[9.5px] font-bold normal-case tracking-normal">
                       {isAutoCardsFallback ? 'Auto: Cards' : 'Auto: Table'}
                     </span>
                   )}
@@ -250,7 +250,7 @@ export function TripQueueOverflowMenu({
                         className={`flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
                           isSelected
                             ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                            : 'bg-surface-card hover:bg-surface-subtle text-fg-secondary border-border-subtle'
                         }`}
                       >
                         {opt.icon}
@@ -264,13 +264,13 @@ export function TripQueueOverflowMenu({
               {/* ─── 3. Table Columns (when Table or Auto is active) ─── */}
               {showColumnsSection && (
                 <div>
-                  <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/70">
+                  <div className="px-3 py-1.5 text-[10px] font-extrabold text-fg-subtle uppercase tracking-wider flex items-center justify-between bg-surface-subtle/70">
                     <span>Columns</span>
                     <button
                       type="button"
                       disabled={isDefaultColumns}
                       onClick={() => setVisibleColumns(DEFAULT_QUEUE_COLUMNS)}
-                      className="text-[10px] font-bold text-blue-600 hover:text-blue-700 disabled:opacity-40 disabled:pointer-events-none cursor-pointer normal-case tracking-normal"
+                      className="text-[10px] font-bold text-blue-600 hover:text-status-info-fg disabled:opacity-40 disabled:pointer-events-none cursor-pointer normal-case tracking-normal"
                     >
                       Reset
                     </button>
@@ -286,7 +286,7 @@ export function TripQueueOverflowMenu({
                           className={`flex-1 px-1.5 py-1 rounded-md text-[10px] font-extrabold border transition-colors cursor-pointer truncate text-center ${
                             isPresetActive
                               ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                              : 'bg-white hover:bg-blue-50 text-slate-600 hover:text-blue-700 border-slate-200'
+                              : 'bg-surface-card hover:bg-status-info-bg text-fg-secondary hover:text-status-info-fg border-border-subtle'
                           }`}
                         >
                           {preset.label}
@@ -309,10 +309,10 @@ export function TripQueueOverflowMenu({
                           }
                           className={`flex items-center justify-between gap-1 px-2 py-1 rounded-lg text-[11px] text-left min-w-0 transition-colors ${
                             isLocked
-                              ? 'opacity-70 cursor-default font-semibold text-slate-500 bg-slate-50/60'
+                              ? 'opacity-70 cursor-default font-semibold text-fg-muted bg-surface-subtle/60'
                               : checked
-                              ? 'cursor-pointer font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/70'
-                              : 'cursor-pointer font-semibold text-slate-700 hover:bg-slate-100'
+                              ? 'cursor-pointer font-bold text-status-info-fg bg-status-info-bg/80 hover:bg-status-info-bg-strong/70'
+                              : 'cursor-pointer font-semibold text-fg-secondary hover:bg-surface-muted'
                           }`}
                         >
                           <span className="flex items-center gap-1.5 min-w-0">
@@ -329,23 +329,23 @@ export function TripQueueOverflowMenu({
               {/* ─── 4. Staging & Auto-Dispatch Actions (conditional) ─── */}
               {hasDispatchSection && (
                 <div>
-                  <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider bg-slate-50/70">
+                  <div className="px-3 py-1.5 text-[10px] font-extrabold text-fg-subtle uppercase tracking-wider bg-surface-subtle/70">
                     Dispatch &amp; Staging
                   </div>
                   <div className="p-2 space-y-1.5">
                     {hasAssignModeToggle && stagedPlanner && (
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-semibold text-slate-600">
+                        <span className="text-[11px] font-semibold text-fg-secondary">
                           Assign Mode
                         </span>
-                        <div className="inline-flex items-center rounded-lg border border-slate-300 bg-white p-0.5 shadow-2xs">
+                        <div className="inline-flex items-center rounded-lg border border-border-strong bg-surface-card p-0.5 shadow-2xs">
                           <button
                             type="button"
                             onClick={() => stagedPlanner.setQueueAssignMode('send_to_driver')}
                             className={`px-2 py-0.5 rounded-md text-[10.5px] font-extrabold cursor-pointer transition-colors ${
                               stagedPlanner.queueAssignMode === 'send_to_driver'
-                                ? 'bg-slate-900 text-white'
-                                : 'text-slate-600 hover:text-slate-900'
+                                ? 'bg-surface-header text-white'
+                                : 'text-fg-secondary hover:text-fg-primary'
                             }`}
                           >
                             Send
@@ -356,7 +356,7 @@ export function TripQueueOverflowMenu({
                             className={`px-2 py-0.5 rounded-md text-[10.5px] font-extrabold cursor-pointer transition-colors ${
                               stagedPlanner.queueAssignMode === 'stage_hold'
                                 ? 'bg-indigo-600 text-white'
-                                : 'text-slate-600 hover:text-indigo-700'
+                                : 'text-fg-secondary hover:text-status-staged-fg'
                             }`}
                           >
                             📌 Hold
@@ -373,7 +373,7 @@ export function TripQueueOverflowMenu({
                           closeMenu();
                           stagedPlanner.openAutoStagePreview();
                         }}
-                        className="w-full h-7 px-2.5 rounded-lg border border-dashed border-indigo-400 bg-indigo-50/90 hover:bg-indigo-100 text-indigo-800 text-[11px] font-extrabold tracking-tight flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                        className="w-full h-7 px-2.5 rounded-lg border border-dashed border-indigo-400 bg-status-staged-bg/90 hover:bg-status-staged-bg-strong text-status-staged-fg text-[11px] font-extrabold tracking-tight flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
                       >
                         {stagedPlanner.isAutoStaging
                           ? '📌 Staging...'
@@ -392,7 +392,7 @@ export function TripQueueOverflowMenu({
                         className={`w-full h-7 px-2.5 rounded-lg border text-[11px] font-extrabold tracking-tight flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs disabled:opacity-50 ${
                           isManualOrPaused
                             ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700'
-                            : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border-indigo-300'
+                            : 'bg-status-staged-bg hover:bg-status-staged-bg-strong text-status-staged-fg border-status-staged-border'
                         }`}
                         title={`Run ${effectiveSweepMode.replace(/_/g, ' ')} for ${readyAutoDispatchCount} open trip(s) inside the ${scheduledDispatchLeadMinutes}m Pre-Pickup Lead Window`}
                       >
@@ -406,9 +406,9 @@ export function TripQueueOverflowMenu({
               )}
 
               {/* ─── 5. Trip Count Summary ─── */}
-              <div className="px-3 py-1.5 bg-slate-50/80 text-[11px] font-semibold text-slate-500 flex items-center justify-between">
+              <div className="px-3 py-1.5 bg-surface-subtle/80 text-[11px] font-semibold text-fg-muted flex items-center justify-between">
                 <span>Queue Summary</span>
-                <span className="font-bold text-slate-700">
+                <span className="font-bold text-fg-secondary">
                   Displaying {filteredTripsCount} {filteredTripsCount === 1 ? 'trip' : 'trips'}
                 </span>
               </div>

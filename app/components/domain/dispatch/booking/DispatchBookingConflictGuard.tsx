@@ -23,8 +23,8 @@ export function DispatchInlineConflictBanner({
     <div
       className={`rounded-xl border p-2.5 space-y-2 text-[11px] shadow-2xs ${
         isCritical
-          ? 'bg-rose-50/95 border-rose-300 text-rose-950'
-          : 'bg-amber-50/95 border-amber-300 text-amber-950'
+          ? 'bg-status-danger-bg/95 border-status-danger-border text-status-danger-fg'
+          : 'bg-status-warning-bg/95 border-status-warning-border text-status-warning-fg'
       }`}
       role="status"
     >
@@ -52,22 +52,22 @@ export function DispatchInlineConflictBanner({
         {summary.conflicts.slice(0, 3).map((conflict) => (
           <div
             key={conflict.id}
-            className="bg-white/90 rounded-lg border border-slate-200/90 px-2.5 py-1.5 flex items-start justify-between gap-2"
+            className="bg-surface-card/90 rounded-lg border border-border-subtle/90 px-2.5 py-1.5 flex items-start justify-between gap-2"
           >
             <div className="min-w-0 space-y-0.5">
-              <div className="font-extrabold text-slate-900 leading-tight">
+              <div className="font-extrabold text-fg-primary leading-tight">
                 {conflict.severity === 'critical' ? '❌ ' : '⚠️ '}
                 {conflict.title}
               </div>
-              <div className="text-[10.5px] text-slate-600 leading-snug">{conflict.description}</div>
-              <div className="text-[10px] text-slate-500 truncate">{conflict.routeLabel}</div>
+              <div className="text-[10.5px] text-fg-secondary leading-snug">{conflict.description}</div>
+              <div className="text-[10px] text-fg-muted truncate">{conflict.routeLabel}</div>
             </div>
 
             {onOpenTrip && (
               <button
                 type="button"
                 onClick={() => onOpenTrip(conflict.conflictingTripId)}
-                className="px-2 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold shrink-0 cursor-pointer transition-colors"
+                className="px-2 py-1 rounded-md bg-surface-header hover:bg-surface-header-elevated text-white text-[10px] font-bold shrink-0 cursor-pointer transition-colors"
                 title={`Open existing Trip #${conflict.conflictingTripNumber}`}
               >
                 Open #{conflict.conflictingTripNumber}
@@ -130,12 +130,12 @@ export function DispatchBookingConflictModal({
       isMaximizable={false}
       zIndex={235}
       footer={
-        <div className="px-4 py-3 bg-slate-50 flex flex-wrap items-center justify-end gap-2">
+        <div className="px-4 py-3 bg-surface-subtle flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
             disabled={isSubmitting}
             onClick={onCancel}
-            className="px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-xs font-extrabold text-slate-800 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl border border-border-strong bg-surface-card hover:bg-surface-muted text-xs font-extrabold text-fg-strong cursor-pointer"
           >
             Cancel &amp; Review
           </button>
@@ -147,7 +147,7 @@ export function DispatchBookingConflictModal({
                 onCancel();
                 onOpenTrip(primaryConflict.conflictingTripId);
               }}
-              className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-surface-header hover:bg-surface-header-elevated text-white text-xs font-extrabold cursor-pointer"
             >
               Open Existing #{primaryConflict.conflictingTripNumber}
             </button>
@@ -171,8 +171,8 @@ export function DispatchBookingConflictModal({
             key={conflict.id}
             className={`p-3 rounded-xl border space-y-1 text-xs ${
               conflict.severity === 'critical'
-                ? 'bg-rose-50/70 border-rose-300 text-rose-950'
-                : 'bg-amber-50/70 border-amber-300 text-amber-950'
+                ? 'bg-status-danger-bg/70 border-status-danger-border text-status-danger-fg'
+                : 'bg-status-warning-bg/70 border-status-warning-border text-status-warning-fg'
             }`}
           >
             <div className="flex items-center justify-between gap-2">
@@ -180,14 +180,14 @@ export function DispatchBookingConflictModal({
                 {conflict.severity === 'critical' ? '❌ ' : '⚠️ '}
                 {conflict.title}
               </span>
-              <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 shrink-0">
-                <ClockIcon className="w-3 h-3 text-slate-500" />
+              <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-surface-card border border-border-subtle text-fg-secondary shrink-0">
+                <ClockIcon className="w-3 h-3 text-fg-muted" />
                 <span>{conflict.pickupTimeLabel}</span>
               </span>
             </div>
-            <p className="text-[11px] text-slate-700 leading-snug">{conflict.description}</p>
+            <p className="text-[11px] text-fg-secondary leading-snug">{conflict.description}</p>
             <div className="flex items-center justify-between gap-2 pt-0.5">
-              <span className="text-[10.5px] text-slate-500 truncate">{conflict.routeLabel}</span>
+              <span className="text-[10.5px] text-fg-muted truncate">{conflict.routeLabel}</span>
               {onOpenTrip && (
                 <button
                   type="button"
@@ -195,7 +195,7 @@ export function DispatchBookingConflictModal({
                     onCancel();
                     onOpenTrip(conflict.conflictingTripId);
                   }}
-                  className="px-2 py-0.5 rounded-md bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 text-[10.5px] font-bold shrink-0 cursor-pointer"
+                  className="px-2 py-0.5 rounded-md bg-surface-card hover:bg-surface-muted border border-border-strong text-fg-strong text-[10.5px] font-bold shrink-0 cursor-pointer"
                 >
                   Open #{conflict.conflictingTripNumber}
                 </button>

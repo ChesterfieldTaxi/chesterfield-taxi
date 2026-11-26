@@ -326,10 +326,10 @@ export function DispatchLocationInput({
 
   const dotColor =
     variant === 'pickup'
-      ? 'bg-emerald-500 ring-emerald-200'
+      ? 'bg-emerald-500 ring-status-success-border'
       : variant === 'dropoff'
-      ? 'bg-rose-500 ring-rose-200'
-      : 'bg-amber-500 ring-amber-200';
+      ? 'bg-rose-500 ring-status-danger-border'
+      : 'bg-amber-500 ring-status-warning-border';
 
   const isComfortable = size === 'comfortable';
   const showLocateBtn = showCurrentLocationButton && !inputValue && !disabled;
@@ -359,14 +359,14 @@ export function DispatchLocationInput({
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => setIsOpen(true)}
-          className={`w-full bg-white border transition-colors focus:outline-none placeholder-slate-400 ${
+          className={`w-full bg-surface-card border transition-colors focus:outline-none placeholder-slate-400 ${
             isComfortable
-              ? `pl-9 ${showLocateBtn ? 'pr-24' : 'pr-11'} py-2.5 text-base sm:text-sm rounded-xl text-slate-900`
-              : 'pl-8 pr-12 py-1.5 text-xs rounded text-slate-800'
+              ? `pl-9 ${showLocateBtn ? 'pr-24' : 'pr-11'} py-2.5 text-base sm:text-sm rounded-xl text-fg-primary`
+              : 'pl-8 pr-12 py-1.5 text-xs rounded text-fg-strong'
           } ${
             hasError
-              ? 'border-red-400 bg-red-50/30 focus:ring-2 focus:ring-red-500/30 focus:border-red-500'
-              : 'border-slate-300 focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500'
+              ? 'border-red-400 bg-status-danger-bg/30 focus:ring-2 focus:ring-red-500/30 focus:border-red-500'
+              : 'border-border-strong focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500'
           }`}
         />
 
@@ -382,7 +382,7 @@ export function DispatchLocationInput({
             onClick={handleUseCurrentLocation}
             title="Use my current GPS location"
             aria-label="Use my current location"
-            className="absolute right-2 px-2 py-1 rounded-lg text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 transition-colors cursor-pointer flex items-center gap-1"
+            className="absolute right-2 px-2 py-1 rounded-lg text-[11px] font-bold text-blue-600 bg-status-info-bg hover:bg-status-info-bg-strong border border-status-info-border/80 transition-colors cursor-pointer flex items-center gap-1"
           >
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <circle cx="12" cy="12" r="3" />
@@ -407,7 +407,7 @@ export function DispatchLocationInput({
             }}
             className={`absolute ${
               isComfortable ? 'right-2 w-7 h-7' : 'right-1.5 w-6 h-6'
-            } flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full text-xs transition-colors cursor-pointer`}
+            } flex items-center justify-center text-fg-subtle hover:text-fg-secondary hover:bg-surface-muted rounded-full text-xs transition-colors cursor-pointer`}
           >
             ✕
           </button>
@@ -415,7 +415,7 @@ export function DispatchLocationInput({
       </div>
 
       {locateError && (
-        <p className="text-[11px] text-amber-700 font-medium mt-1 ml-1">{locateError}</p>
+        <p className="text-[11px] text-status-warning-fg font-medium mt-1 ml-1">{locateError}</p>
       )}
 
       {/* Debounced Predictions / Regional Quick-Pick Dropdown */}
@@ -423,7 +423,7 @@ export function DispatchLocationInput({
         <div
           id={listboxId}
           role="listbox"
-          className={`absolute z-50 left-0 right-0 top-full mt-1 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl transition-all ${
+          className={`absolute z-50 left-0 right-0 top-full mt-1 max-h-60 overflow-auto rounded-xl border border-border-subtle bg-surface-card p-1.5 shadow-xl transition-all ${
             isComfortable ? 'text-sm sm:text-xs' : 'text-xs'
           }`}
         >
@@ -441,19 +441,19 @@ export function DispatchLocationInput({
                 onMouseEnter={() => setHighlightedIndex(idx)}
                 className={`w-full flex flex-col text-left px-3 py-2 rounded-lg transition-colors cursor-pointer ${
                   idx === highlightedIndex
-                    ? 'bg-blue-50 text-blue-900 font-semibold'
-                    : 'hover:bg-slate-50 text-slate-700'
+                    ? 'bg-status-info-bg text-status-info-fg font-semibold'
+                    : 'hover:bg-surface-subtle text-fg-secondary'
                 }`}
               >
                 <span className="truncate font-semibold">{pred.mainText}</span>
                 {pred.secondaryText && (
-                  <span className="truncate text-[11px] text-slate-500">{pred.secondaryText}</span>
+                  <span className="truncate text-[11px] text-fg-muted">{pred.secondaryText}</span>
                 )}
               </button>
             ))
           ) : filteredRegional.length > 0 ? (
             <>
-              <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
                 {inputValue.trim().length === 0 ? 'Popular St. Louis & Chesterfield Locations' : 'Matching Locations'}
               </div>
               {filteredRegional.map((loc, idx) => (
@@ -469,8 +469,8 @@ export function DispatchLocationInput({
                   onMouseEnter={() => setHighlightedIndex(idx)}
                   className={`w-full text-left px-3 py-2 rounded-lg transition-colors cursor-pointer truncate ${
                     idx === highlightedIndex
-                      ? 'bg-blue-50 text-blue-900 font-semibold'
-                      : 'hover:bg-slate-50 text-slate-700'
+                      ? 'bg-status-info-bg text-status-info-fg font-semibold'
+                      : 'hover:bg-surface-subtle text-fg-secondary'
                   }`}
                 >
                   {loc.address}
@@ -483,7 +483,7 @@ export function DispatchLocationInput({
                     e.preventDefault();
                     handleConfirmFreeformAddress(inputValue);
                   }}
-                  className="w-full text-left px-3 py-2 mt-0.5 border-t border-slate-100 text-blue-600 hover:bg-blue-50 font-semibold rounded-lg transition-colors cursor-pointer"
+                  className="w-full text-left px-3 py-2 mt-0.5 border-t border-border-faint text-blue-600 hover:bg-status-info-bg font-semibold rounded-lg transition-colors cursor-pointer"
                 >
                   Use &ldquo;{inputValue.trim()}&rdquo; as address
                 </button>
@@ -496,14 +496,14 @@ export function DispatchLocationInput({
                 e.preventDefault();
                 handleConfirmFreeformAddress(inputValue);
               }}
-              className="w-full text-left px-3 py-2 text-blue-600 hover:bg-blue-50 font-semibold rounded-lg transition-colors cursor-pointer"
+              className="w-full text-left px-3 py-2 text-blue-600 hover:bg-status-info-bg font-semibold rounded-lg transition-colors cursor-pointer"
             >
               Use &ldquo;{inputValue.trim()}&rdquo; as address
             </button>
           ) : null}
 
           {(mapsStatus === 'error' || hasQuotaError) && (
-            <div className="mt-1 px-2.5 py-1.5 bg-slate-50 border-t border-slate-200 rounded-b-lg text-[11px] text-slate-600 flex items-center justify-between">
+            <div className="mt-1 px-2.5 py-1.5 bg-surface-subtle border-t border-border-subtle rounded-b-lg text-[11px] text-fg-secondary flex items-center justify-between">
               <span>Type your full street address or choose a popular hub above.</span>
             </div>
           )}

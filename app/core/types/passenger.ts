@@ -7,6 +7,7 @@
 
 import type { VehicleTier } from './trip';
 import type { VaultedCard } from './payment';
+import type { ThemePreference } from '../../config/theme-tokens';
 
 export type SavedPlaceCategory =
   | 'home'
@@ -57,6 +58,7 @@ export interface PassengerAccount {
   savedPlaces: SavedPlace[];
   recentSearches?: string[];
   vaultedPaymentMethods?: VaultedCard[];
+  themePreference?: ThemePreference;
 
   /** Universal Governance & Scoring (Phase 29) */
   isArchived?: boolean;

@@ -44,12 +44,12 @@ export interface EmailReaderPaneProps {
 }
 
 const DELIVERY_TONE_CLASSES: Record<string, string> = {
-  emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  blue: 'bg-blue-50 text-blue-700 border-blue-200',
-  amber: 'bg-amber-50 text-amber-800 border-amber-200',
-  rose: 'bg-rose-50 text-rose-700 border-rose-200',
-  indigo: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  slate: 'bg-slate-100 text-slate-600 border-slate-200',
+  emerald: 'bg-status-success-bg text-status-success-fg border-status-success-border',
+  blue: 'bg-status-info-bg text-status-info-fg border-status-info-border',
+  amber: 'bg-status-warning-bg text-status-warning-fg border-status-warning-border',
+  rose: 'bg-status-danger-bg text-status-danger-fg border-status-danger-border',
+  indigo: 'bg-status-staged-bg text-status-staged-fg border-status-staged-border',
+  slate: 'bg-surface-muted text-fg-secondary border-border-subtle',
 };
 
 function formatAttachmentBytes(bytes?: number): string {
@@ -146,15 +146,15 @@ export function EmailReaderPane({
     senderContext.timelineEvents.length + senderContext.activeTrips.length;
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 h-full bg-white overflow-hidden">
+    <div className="flex-1 flex flex-col min-w-0 h-full bg-surface-card overflow-hidden">
       {/* ─── READER TOP BAR ─── */}
-      <div className="px-3 py-2.5 border-b border-slate-200 bg-slate-50/90 space-y-2 shrink-0">
+      <div className="px-3 py-2.5 border-b border-border-subtle bg-surface-subtle/90 space-y-2 shrink-0">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <button
               type="button"
               onClick={onBackToList}
-              className="@2xl/emaildock:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer shrink-0 shadow-2xs"
+              className="@2xl/emaildock:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card border border-border-subtle text-xs font-bold text-fg-secondary hover:bg-surface-muted cursor-pointer shrink-0 shadow-2xs"
             >
               <ChevronLeftIcon className="w-3.5 h-3.5" />
               <span>Back</span>
@@ -165,8 +165,8 @@ export function EmailReaderPane({
               onClick={() => onToggleStar(selectedEmail.id)}
               className={`p-1 rounded-lg transition-colors cursor-pointer shrink-0 ${
                 selectedEmail.isStarred
-                  ? 'text-amber-500 hover:bg-amber-50'
-                  : 'text-slate-400 hover:text-amber-500 hover:bg-slate-100'
+                  ? 'text-amber-500 hover:bg-status-warning-bg'
+                  : 'text-fg-subtle hover:text-amber-500 hover:bg-surface-muted'
               }`}
               title={selectedEmail.isStarred ? 'Remove star' : 'Star conversation'}
             >
@@ -176,12 +176,12 @@ export function EmailReaderPane({
               />
             </button>
 
-            <h3 className="font-extrabold text-xs sm:text-sm text-slate-900 truncate">
+            <h3 className="font-extrabold text-xs sm:text-sm text-fg-primary truncate">
               {selectedEmail.subject || '(No Subject)'}
             </h3>
 
             {conversationMessages.length > 1 && (
-              <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-700 shrink-0">
+              <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-surface-emphasis text-fg-secondary shrink-0">
                 {conversationMessages.length} msgs
               </span>
             )}
@@ -193,8 +193,8 @@ export function EmailReaderPane({
               onClick={onToggleRail}
               className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border inline-flex items-center gap-1 cursor-pointer transition-colors ${
                 isRailOpen
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  ? 'bg-surface-header text-white border-slate-900'
+                  : 'bg-surface-card text-fg-secondary border-border-subtle hover:bg-surface-muted'
               }`}
               title="Toggle Unified Customer Activity & Trips panel"
             >
@@ -203,7 +203,7 @@ export function EmailReaderPane({
               {timelineBadgeCount > 0 && (
                 <span
                   className={`text-[9.5px] font-black px-1 rounded-full ${
-                    isRailOpen ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-800'
+                    isRailOpen ? 'bg-blue-500 text-white' : 'bg-status-info-bg-strong text-status-info-fg'
                   }`}
                 >
                   {timelineBadgeCount}
@@ -214,7 +214,7 @@ export function EmailReaderPane({
             <button
               type="button"
               onClick={() => onMarkUnread(selectedEmail.id)}
-              className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-blue-50 cursor-pointer"
+              className="p-1.5 rounded-lg bg-surface-card border border-border-subtle text-fg-muted hover:text-blue-600 hover:bg-status-info-bg cursor-pointer"
               title="Mark as Unread"
               aria-label="Mark as Unread"
             >
@@ -233,7 +233,7 @@ export function EmailReaderPane({
               <button
                 type="button"
                 onClick={() => onMoveToFolder(selectedEmail.id, 'archive')}
-                className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-bold cursor-pointer"
+                className="px-2 py-1 rounded-lg bg-surface-card border border-border-subtle hover:bg-surface-muted text-fg-secondary text-[11px] font-bold cursor-pointer"
                 title="Archive email"
               >
                 Archive
@@ -244,7 +244,7 @@ export function EmailReaderPane({
               <button
                 type="button"
                 onClick={() => onMoveToFolder(selectedEmail.id, 'trash')}
-                className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 cursor-pointer"
+                className="p-1.5 rounded-lg bg-surface-card border border-border-subtle text-fg-muted hover:text-rose-600 hover:bg-status-danger-bg hover:border-status-danger-border cursor-pointer"
                 title="Move to Trash"
                 aria-label="Move to Trash"
               >
@@ -256,17 +256,17 @@ export function EmailReaderPane({
       </div>
 
       {/* ─── SCROLLABLE THREADED CONVERSATION STREAM ─── */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 bg-slate-50/40">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 bg-surface-subtle/40">
         {/* 1. BOUNCE / DELIVERY FAILURE ALERT BANNER */}
         {bouncedOrFailedMessage && (
-          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 flex items-start gap-2.5 shadow-2xs">
+          <div className="p-3 rounded-xl bg-status-danger-bg border border-status-danger-border text-status-danger-fg flex items-start gap-2.5 shadow-2xs">
             <AlertCircleIcon className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <div className="min-w-0 flex-1 text-xs space-y-0.5">
-              <p className="font-extrabold text-rose-900">
+              <p className="font-extrabold text-status-danger-fg">
                 Email Delivery {bouncedOrFailedMessage.deliveryStatus.toUpperCase()} —{' '}
                 {bouncedOrFailedMessage.toEmail}
               </p>
-              <p className="text-[11px] text-rose-700">
+              <p className="text-[11px] text-status-danger-fg">
                 {bouncedOrFailedMessage.deliveryError ||
                   'The recipient mail server rejected or failed to accept this message. Follow up via Phone or SMS in the Customer Activity panel.'}
               </p>
@@ -276,17 +276,17 @@ export function EmailReaderPane({
 
         {/* 2. EXTRACTED RIDE RESERVATION CARD (1-Click `POPULATE_BOOKING`) */}
         {hasStructuredBooking && (
-          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-50/90 via-white to-blue-50/60 border border-emerald-200 shadow-2xs space-y-2.5">
+          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-status-success-bg/90 via-surface-card to-status-info-bg/60 border border-status-success-border shadow-2xs space-y-2.5">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 min-w-0">
                 <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
                   <CarIcon className="w-3.5 h-3.5" />
                 </div>
                 <div>
-                  <span className="text-xs font-extrabold text-slate-900 block leading-tight">
+                  <span className="text-xs font-extrabold text-fg-primary block leading-tight">
                     Extracted Dispatch Booking Intelligence
                   </span>
-                  <span className="text-[10px] text-slate-500">
+                  <span className="text-[10px] text-fg-muted">
                     Deterministic parser ready to populate Dispatch Console
                   </span>
                 </div>
@@ -302,19 +302,19 @@ export function EmailReaderPane({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] bg-white/85 rounded-xl p-2.5 border border-slate-200/80">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] bg-surface-card/85 rounded-xl p-2.5 border border-border-subtle/80">
               <div className="flex items-start gap-1.5 min-w-0">
-                <UserIcon className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                <UserIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0 mt-0.5" />
                 <div className="min-w-0">
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                  <span className="text-[10px] font-bold uppercase text-fg-subtle block">
                     Passenger &amp; Contact
                   </span>
-                  <span className="font-bold text-slate-900 block truncate">
+                  <span className="font-bold text-fg-primary block truncate">
                     {bookingSourceEmail.suggestedBooking?.passengerName ||
                       extractedBookingMeta.passengerName ||
                       bookingSourceEmail.fromName}
                   </span>
-                  <span className="font-mono text-[10.5px] text-slate-600 block truncate">
+                  <span className="font-mono text-[10.5px] text-fg-secondary block truncate">
                     {bookingSourceEmail.suggestedBooking?.passengerPhone ||
                       extractedBookingMeta.passengerPhone ||
                       'Phone not specified'}{' '}
@@ -334,19 +334,19 @@ export function EmailReaderPane({
                 <div className="flex items-start gap-1.5 min-w-0">
                   <ClockIcon className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
                   <div className="min-w-0 space-y-1">
-                    <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                    <span className="text-[10px] font-bold uppercase text-fg-subtle block">
                       Schedule, Flight &amp; Billing
                     </span>
                     {(bookingSourceEmail.suggestedBooking?.pickupTime ||
                       extractedBookingMeta.pickupTime) && (
-                      <span className="font-bold text-slate-900 block">
+                      <span className="font-bold text-fg-primary block">
                         {bookingSourceEmail.suggestedBooking?.pickupTime ||
                           extractedBookingMeta.pickupTime}
                       </span>
                     )}
                     <div className="flex items-center gap-1 flex-wrap">
                       {extractedBookingMeta.flightIdent && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded bg-sky-50 text-sky-800 border border-sky-200">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded bg-status-info-bg text-status-info-fg border border-status-info-border">
                           <PlaneIcon className="w-3 h-3" />
                           <span>
                             {extractedBookingMeta.flightIdent}
@@ -358,7 +358,7 @@ export function EmailReaderPane({
                       )}
                       {(bookingSourceEmail.corporateAccountNumber ||
                         extractedBookingMeta.corporateAccountNumber) && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-800 border border-indigo-200">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded bg-status-staged-bg text-status-staged-fg border border-status-staged-border">
                           <BuildingIcon className="w-3 h-3" />
                           <span>
                             {bookingSourceEmail.corporateAccountNumber ||
@@ -371,14 +371,14 @@ export function EmailReaderPane({
                 </div>
               )}
 
-              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-border-faint">
                 <div className="flex items-start gap-1.5 min-w-0">
                   <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
                   <div className="min-w-0">
-                    <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                    <span className="text-[10px] font-bold uppercase text-fg-subtle block">
                       Pickup Location
                     </span>
-                    <span className="font-semibold text-slate-800 break-words">
+                    <span className="font-semibold text-fg-strong break-words">
                       {bookingSourceEmail.suggestedBooking?.pickupLocation ||
                         bookingSourceEmail.suggestedBooking?.pickup ||
                         extractedBookingMeta.pickupLocation ||
@@ -390,10 +390,10 @@ export function EmailReaderPane({
                 <div className="flex items-start gap-1.5 min-w-0">
                   <MapPinIcon className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
                   <div className="min-w-0">
-                    <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                    <span className="text-[10px] font-bold uppercase text-fg-subtle block">
                       Dropoff Destination
                     </span>
-                    <span className="font-semibold text-slate-800 break-words">
+                    <span className="font-semibold text-fg-strong break-words">
                       {bookingSourceEmail.suggestedBooking?.dropoffLocation ||
                         bookingSourceEmail.suggestedBooking?.dropoff ||
                         extractedBookingMeta.dropoffLocation ||
@@ -423,16 +423,16 @@ export function EmailReaderPane({
                   key={msg.id}
                   type="button"
                   onClick={() => toggleMessageExpanded(msg.id)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 flex items-center justify-between gap-2 text-left cursor-pointer transition-colors shadow-2xs"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-surface-card hover:bg-surface-subtle border border-border-subtle flex items-center justify-between gap-2 text-left cursor-pointer transition-colors shadow-2xs"
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <ChevronRightIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="text-xs font-extrabold text-slate-800 shrink-0">
+                    <ChevronRightIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
+                    <span className="text-xs font-extrabold text-fg-strong shrink-0">
                       {msg.direction === 'outbound'
                         ? 'Chesterfield Dispatch'
                         : msg.fromName || msg.fromEmail}
                     </span>
-                    <span className="text-[11px] text-slate-500 truncate">
+                    <span className="text-[11px] text-fg-muted truncate">
                       — {msg.snippet || msg.textBody}
                     </span>
                   </div>
@@ -447,7 +447,7 @@ export function EmailReaderPane({
                         {deliveryCfg.label}
                       </span>
                     )}
-                    <span className="text-[10px] text-slate-400">
+                    <span className="text-[10px] text-fg-subtle">
                       {formatDispatchEmailTimestamp(msg.timestampMs, msg.createdAt)}
                     </span>
                   </div>
@@ -458,8 +458,8 @@ export function EmailReaderPane({
             return (
               <article
                 key={msg.id}
-                className={`rounded-2xl bg-white border shadow-2xs overflow-hidden ${
-                  isLatest ? 'border-slate-300' : 'border-slate-200'
+                className={`rounded-2xl bg-surface-card border shadow-2xs overflow-hidden ${
+                  isLatest ? 'border-border-strong' : 'border-border-subtle'
                 }`}
               >
                 {/* Message Header */}
@@ -469,19 +469,19 @@ export function EmailReaderPane({
                       toggleMessageExpanded(msg.id);
                     }
                   }}
-                  className={`px-3.5 py-2.5 bg-slate-50/70 border-b border-slate-100 flex items-start justify-between gap-2 ${
-                    conversationMessages.length > 1 ? 'cursor-pointer hover:bg-slate-100/70' : ''
+                  className={`px-3.5 py-2.5 bg-surface-subtle/70 border-b border-border-faint flex items-start justify-between gap-2 ${
+                    conversationMessages.length > 1 ? 'cursor-pointer hover:bg-surface-muted/70' : ''
                   }`}
                 >
                   <div className="min-w-0 space-y-0.5">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {conversationMessages.length > 1 && (
-                        <ChevronDownIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <ChevronDownIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
                       )}
-                      <span className="text-xs font-extrabold text-slate-900">
+                      <span className="text-xs font-extrabold text-fg-primary">
                         {msg.fromName || msg.fromEmail}
                       </span>
-                      <span className="text-[11px] font-mono text-slate-400 truncate">
+                      <span className="text-[11px] font-mono text-fg-subtle truncate">
                         &lt;{msg.fromEmail}&gt;
                       </span>
                       {msg.direction === 'outbound' && deliveryCfg && (
@@ -495,14 +495,14 @@ export function EmailReaderPane({
                         </span>
                       )}
                     </div>
-                    <div className="text-[10.5px] text-slate-500 flex flex-wrap items-center gap-x-2">
+                    <div className="text-[10.5px] text-fg-muted flex flex-wrap items-center gap-x-2">
                       <span>
-                        To: <span className="font-mono text-slate-600">{msg.toEmail}</span>
+                        To: <span className="font-mono text-fg-secondary">{msg.toEmail}</span>
                       </span>
                       {msg.ccEmails && msg.ccEmails.length > 0 && (
                         <span>
                           Cc:{' '}
-                          <span className="font-mono text-slate-600">
+                          <span className="font-mono text-fg-secondary">
                             {msg.ccEmails.join(', ')}
                           </span>
                         </span>
@@ -510,23 +510,23 @@ export function EmailReaderPane({
                     </div>
                   </div>
 
-                  <span className="text-[10.5px] text-slate-400 font-medium shrink-0">
+                  <span className="text-[10.5px] text-fg-subtle font-medium shrink-0">
                     {formatDispatchEmailTimestamp(msg.timestampMs, msg.createdAt)}
                   </span>
                 </div>
 
                 {/* Attachments Strip */}
                 {msg.attachments && msg.attachments.length > 0 && (
-                  <div className="px-3.5 py-2 bg-slate-50/40 border-b border-slate-100 flex items-center gap-1.5 flex-wrap">
+                  <div className="px-3.5 py-2 bg-surface-subtle/40 border-b border-border-faint flex items-center gap-1.5 flex-wrap">
                     {msg.attachments.map((att) => {
                       const sizeLabel = formatAttachmentBytes(att.sizeBytes);
                       const chipBody = (
                         <>
-                          <span className="font-bold text-slate-800 truncate max-w-[180px]">
+                          <span className="font-bold text-fg-strong truncate max-w-[180px]">
                             {att.filename}
                           </span>
                           {sizeLabel && (
-                            <span className="text-slate-400 font-mono">({sizeLabel})</span>
+                            <span className="text-fg-subtle font-mono">({sizeLabel})</span>
                           )}
                           {att.downloadUrl && (
                             <ExternalLinkIcon className="w-3 h-3 text-blue-600 shrink-0" />
@@ -539,14 +539,14 @@ export function EmailReaderPane({
                           href={att.downloadUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-blue-300 text-[11px] shadow-2xs"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-card border border-border-subtle hover:border-status-info-border text-[11px] shadow-2xs"
                         >
                           {chipBody}
                         </a>
                       ) : (
                         <span
                           key={att.id || att.filename}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-[11px]"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-card border border-border-subtle text-[11px]"
                         >
                           {chipBody}
                         </span>
@@ -557,7 +557,7 @@ export function EmailReaderPane({
 
                 {/* Safe Sanitized HTML Email Body */}
                 <div
-                  className="p-4 text-xs sm:text-[13px] text-slate-800 leading-relaxed overflow-x-auto select-text [&_a]:text-blue-600 [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:text-slate-500 [&_p]:mb-2 last:[&_p]:mb-0"
+                  className="p-4 text-xs sm:text-[13px] text-fg-strong leading-relaxed overflow-x-auto select-text [&_a]:text-blue-600 [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:text-slate-500 [&_p]:mb-2 last:[&_p]:mb-0"
                   dangerouslySetInnerHTML={{ __html: safeHtml }}
                 />
               </article>
@@ -580,14 +580,14 @@ export function EmailReaderPane({
             <button
               type="button"
               onClick={() => onStartReply('reply_all', latestMessage)}
-              className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold cursor-pointer transition-colors"
+              className="px-3 py-1.5 rounded-xl bg-surface-card hover:bg-surface-muted border border-border-subtle text-fg-secondary text-xs font-bold cursor-pointer transition-colors"
             >
               Reply All
             </button>
             <button
               type="button"
               onClick={() => onStartReply('forward', latestMessage)}
-              className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold cursor-pointer transition-colors"
+              className="px-3 py-1.5 rounded-xl bg-surface-card hover:bg-surface-muted border border-border-subtle text-fg-secondary text-xs font-bold cursor-pointer transition-colors"
             >
               Forward
             </button>

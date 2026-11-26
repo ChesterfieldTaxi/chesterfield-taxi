@@ -340,12 +340,12 @@ export function CustomDateTimePicker({
 
     return (
       <div className="flex-1 min-w-[210px]">
-        <div className="text-center font-bold text-xs text-slate-800 mb-2">
+        <div className="text-center font-bold text-xs text-fg-strong mb-2">
           {monthName} {year}
         </div>
 
         {/* Days of week header */}
-        <div className="grid grid-cols-7 text-center text-[10px] font-bold text-slate-400 mb-1">
+        <div className="grid grid-cols-7 text-center text-[10px] font-bold text-fg-subtle mb-1">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
             <div key={d} className="py-0.5">{d}</div>
           ))}
@@ -370,18 +370,18 @@ export function CustomDateTimePicker({
             if (isStart || isEnd) {
               cellClass += 'bg-blue-600 text-white font-bold shadow-xs';
             } else if (isRange) {
-              cellClass += 'bg-blue-100 text-blue-900 rounded-none w-full';
+              cellClass += 'bg-status-info-bg-strong text-status-info-fg rounded-none w-full';
             } else if (isToday) {
-              cellClass += 'border border-blue-500 text-blue-600 font-bold hover:bg-slate-100';
+              cellClass += 'border border-blue-500 text-blue-600 font-bold hover:bg-surface-muted';
             } else {
-              cellClass += 'text-slate-700 hover:bg-slate-100';
+              cellClass += 'text-fg-secondary hover:bg-surface-muted';
             }
 
             return (
               <div
                 key={ymd}
                 onClick={() => handleDateClick(ymd)}
-                className={`flex items-center justify-center ${isRange ? 'bg-blue-100' : ''}`}
+                className={`flex items-center justify-center ${isRange ? 'bg-status-info-bg-strong' : ''}`}
               >
                 <button type="button" className={cellClass}>
                   {dayNum}
@@ -400,19 +400,19 @@ export function CustomDateTimePicker({
   return (
     <>
       {/* ─── Mobile Modal Overlay (< md) ─── */}
-      <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 md:hidden animate-in fade-in">
+      <div className="fixed inset-0 z-50 bg-surface-overlay/60 backdrop-blur-xs flex items-center justify-center p-3 md:hidden animate-in fade-in">
         <div
           ref={containerRef}
-          className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm max-h-[88vh] flex flex-col text-xs text-slate-800 overflow-hidden"
+          className="bg-surface-card rounded-2xl shadow-2xl border border-border-subtle w-full max-w-sm max-h-[88vh] flex flex-col text-xs text-fg-strong overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Mobile Modal Header */}
-          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100 bg-slate-50 shrink-0">
-            <span className="font-extrabold text-sm text-slate-800">Date Range Filter</span>
+          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border-faint bg-surface-subtle shrink-0">
+            <span className="font-extrabold text-sm text-fg-strong">Date Range Filter</span>
             <button
               type="button"
               onClick={onClose}
-              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-200 text-slate-500 font-bold"
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-emphasis text-fg-muted font-bold"
             >
               ✕
             </button>
@@ -420,7 +420,7 @@ export function CustomDateTimePicker({
 
           <div className="flex-1 overflow-y-auto">
             {/* Horizontal Presets */}
-            <div className="p-2 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar bg-slate-50/50">
+            <div className="p-2 border-b border-border-faint flex items-center gap-1.5 overflow-x-auto no-scrollbar bg-surface-subtle/50">
               {PRESETS.map((preset) => {
                 const isSelected = activePreset === preset.key;
                 return (
@@ -431,7 +431,7 @@ export function CustomDateTimePicker({
                     className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
                       isSelected
                         ? 'bg-blue-600 text-white shadow-2xs font-bold'
-                        : 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-100'
+                        : 'text-fg-secondary bg-surface-card border border-border-subtle hover:bg-surface-muted'
                     }`}
                   >
                     {preset.label}
@@ -442,21 +442,21 @@ export function CustomDateTimePicker({
 
             {/* Calendar */}
             <div className="p-3">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-border-faint">
                 <button
                   type="button"
                   onClick={handlePrevMonth}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 font-bold"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-muted text-fg-secondary font-bold"
                 >
                   ‹
                 </button>
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <div className="text-[11px] font-bold text-fg-muted uppercase tracking-wider">
                   Select Dates
                 </div>
                 <button
                   type="button"
                   onClick={handleNextMonth}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 font-bold"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-muted text-fg-secondary font-bold"
                 >
                   ›
                 </button>
@@ -467,11 +467,11 @@ export function CustomDateTimePicker({
           </div>
 
           {/* Mobile Footer */}
-          <div className="p-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
+          <div className="p-3 border-t border-border-faint bg-surface-subtle flex items-center justify-between shrink-0">
             <button
               type="button"
               onClick={handleClear}
-              className="px-3 py-1.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100"
+              className="px-3 py-1.5 rounded-xl border border-border-strong text-fg-secondary font-bold text-xs hover:bg-surface-muted"
             >
               Clear
             </button>
@@ -479,7 +479,7 @@ export function CustomDateTimePicker({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded-xl text-slate-600 hover:bg-slate-200 font-semibold text-xs"
+                className="px-3 py-1.5 rounded-xl text-fg-secondary hover:bg-surface-emphasis font-semibold text-xs"
               >
                 Cancel
               </button>
@@ -500,11 +500,11 @@ export function CustomDateTimePicker({
         ref={desktopContainerRef}
         className={`hidden md:flex absolute left-0 ${
           computedPlacement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
-        } bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 flex-col md:flex-row text-xs text-slate-800 animate-in fade-in zoom-in-95 duration-150 overflow-hidden max-w-[calc(100vw-32px)]`}
+        } bg-surface-card rounded-2xl shadow-2xl border border-border-subtle z-50 flex-col md:flex-row text-xs text-fg-strong animate-in fade-in zoom-in-95 duration-150 overflow-hidden max-w-[calc(100vw-32px)]`}
         style={{ minWidth: '640px' }}
       >
       {/* ─── 1. Left Sidebar of Presets ─── */}
-      <div className="w-38 border-r border-slate-100 bg-slate-50/70 p-2 space-y-0.5 max-h-[380px] overflow-y-auto shrink-0 select-none">
+      <div className="w-38 border-r border-border-faint bg-surface-subtle/70 p-2 space-y-0.5 max-h-[380px] overflow-y-auto shrink-0 select-none">
         {PRESETS.map((preset) => {
           const isSelected = activePreset === preset.key;
           return (
@@ -515,7 +515,7 @@ export function CustomDateTimePicker({
               className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 isSelected
                   ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'
+                  : 'text-fg-secondary hover:bg-surface-emphasis/60 hover:text-fg-primary'
               }`}
             >
               {preset.label}
@@ -527,22 +527,22 @@ export function CustomDateTimePicker({
       {/* ─── 2. Right Area: Dual Calendar & Time Range ─── */}
       <div className="flex-1 p-4 flex flex-col justify-between">
         {/* Navigation Header */}
-        <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+        <div className="flex items-center justify-between pb-2 mb-2 border-b border-border-faint">
           <button
             type="button"
             onClick={handlePrevMonth}
-            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 font-bold transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-muted text-fg-secondary font-bold transition-colors"
             title="Previous month"
           >
             ‹
           </button>
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+          <div className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider">
             Dual Month Range Picker
           </div>
           <button
             type="button"
             onClick={handleNextMonth}
-            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 font-bold transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-muted text-fg-secondary font-bold transition-colors"
             title="Next month"
           >
             ›
@@ -556,11 +556,11 @@ export function CustomDateTimePicker({
         </div>
 
         {/* ─── 3. Time Range Selectors & Actions ─── */}
-        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="pt-3 border-t border-border-faint flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-4 text-xs">
             {/* Start time */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-500">Start time:</span>
+              <span className="text-[11px] font-bold text-fg-muted">Start time:</span>
               <Select
                 size="xs"
                 fullWidth={false}
@@ -598,7 +598,7 @@ export function CustomDateTimePicker({
 
             {/* End time */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-500">End time:</span>
+              <span className="text-[11px] font-bold text-fg-muted">End time:</span>
               <Select
                 size="xs"
                 fullWidth={false}
@@ -640,7 +640,7 @@ export function CustomDateTimePicker({
             <button
               type="button"
               onClick={handleClear}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-xl border border-border-subtle text-fg-secondary hover:bg-surface-muted font-bold text-xs transition-colors cursor-pointer"
             >
               Clear
             </button>

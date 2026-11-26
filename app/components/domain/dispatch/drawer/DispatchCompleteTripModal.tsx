@@ -312,8 +312,8 @@ export function DispatchCompleteTripModal({
       minHeight={380}
       zIndex={225}
       footer={
-        <div className="px-4 sm:px-5 py-3 bg-slate-50 flex items-center justify-end gap-2">
-          <button type="button" disabled={isCompletingTrip} onClick={onCloseCompleteTripModal} className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer disabled:opacity-50">
+        <div className="px-4 sm:px-5 py-3 bg-surface-subtle flex items-center justify-end gap-2">
+          <button type="button" disabled={isCompletingTrip} onClick={onCloseCompleteTripModal} className="px-4 py-2 rounded-xl border border-border-strong text-xs font-bold text-fg-secondary hover:bg-surface-muted cursor-pointer disabled:opacity-50">
             Cancel
           </button>
           <button type="button" disabled={isCompletingTrip} onClick={handleDispatchCompleteTrip} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs cursor-pointer inline-flex items-center gap-1.5">
@@ -323,14 +323,14 @@ export function DispatchCompleteTripModal({
       }
     >
       <div className="p-4 sm:p-5 space-y-3.5 text-xs">
-        <div className="p-2.5 bg-white rounded-xl border border-slate-200 space-y-1">
+        <div className="p-2.5 bg-surface-card rounded-xl border border-border-subtle space-y-1">
           <div className="flex items-start gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
-            <span className="text-slate-700 font-medium truncate">{completeTripTarget.pickupLocation?.address || 'Pickup'}</span>
+            <span className="text-fg-secondary font-medium truncate">{completeTripTarget.pickupLocation?.address || 'Pickup'}</span>
           </div>
           <div className="flex items-start gap-2">
             <span className="w-2 h-2 rounded-full bg-rose-500 mt-1 shrink-0" />
-            <span className="text-slate-700 font-medium truncate">{completeTripTarget.dropoffLocation?.address || 'Dropoff'}</span>
+            <span className="text-fg-secondary font-medium truncate">{completeTripTarget.dropoffLocation?.address || 'Dropoff'}</span>
           </div>
         </div>
 
@@ -340,11 +340,11 @@ export function DispatchCompleteTripModal({
 
         <div data-complete-trip-datetime="true" className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600">Completion Date &amp; Time</label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary">Completion Date &amp; Time</label>
             <div className="inline-flex items-center gap-1">
-              <button type="button" onClick={() => { const p = toLocalCompletionDateTimeParts(); setCompleteDate(p.date); setCompleteTime(p.time); }} className="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 cursor-pointer">Now</button>
+              <button type="button" onClick={() => { const p = toLocalCompletionDateTimeParts(); setCompleteDate(p.date); setCompleteTime(p.time); }} className="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-surface-muted hover:bg-status-info-bg text-fg-secondary hover:text-status-info-fg border border-border-subtle cursor-pointer">Now</button>
               {scheduledDropoffParts && (
-                <button type="button" onClick={() => { setCompleteDate(scheduledDropoffParts.date); setCompleteTime(scheduledDropoffParts.time); }} className="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 cursor-pointer">Scheduled Dropoff</button>
+                <button type="button" onClick={() => { setCompleteDate(scheduledDropoffParts.date); setCompleteTime(scheduledDropoffParts.time); }} className="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg border border-status-info-border cursor-pointer">Scheduled Dropoff</button>
               )}
             </div>
           </div>
@@ -356,23 +356,23 @@ export function DispatchCompleteTripModal({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Final Fare (USD)</label>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-fg-secondary mb-1">Final Fare (USD)</label>
             <div className="relative">
-              <DollarSignIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-              <input type="number" step="0.01" min="0" value={completeFareInput} onChange={(e) => setCompleteFareInput(e.target.value)} className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden" />
+              <DollarSignIcon className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 top-2.5" />
+              <input type="number" step="0.01" min="0" value={completeFareInput} onChange={(e) => setCompleteFareInput(e.target.value)} className="w-full pl-8 pr-3 py-2 bg-surface-card border border-border-strong rounded-xl text-sm font-mono font-bold text-fg-primary focus:ring-2 focus:ring-emerald-500 focus:outline-hidden" />
             </div>
           </div>
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Tip / Gratuity (USD)</label>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-fg-secondary mb-1">Tip / Gratuity (USD)</label>
             <div className="relative">
-              <DollarSignIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-              <input type="number" step="0.01" min="0" value={completeTipInput} onChange={(e) => setCompleteTipInput(e.target.value)} className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden" />
+              <DollarSignIcon className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 top-2.5" />
+              <input type="number" step="0.01" min="0" value={completeTipInput} onChange={(e) => setCompleteTipInput(e.target.value)} className="w-full pl-8 pr-3 py-2 bg-surface-card border border-border-strong rounded-xl text-sm font-mono font-bold text-fg-primary focus:ring-2 focus:ring-emerald-500 focus:outline-hidden" />
             </div>
           </div>
         </div>
 
         <div>
-          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">Payment Settlement Method</label>
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-fg-secondary mb-1.5">Payment Settlement Method</label>
           <div className="grid grid-cols-2 gap-2">
             {([
               { id: 'cash', label: 'Cash (In Car)', icon: CashIcon },
@@ -388,41 +388,41 @@ export function DispatchCompleteTripModal({
                   type="button"
                   onClick={() => setCompletePaymentMethod(opt.id)}
                   className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
-                    active ? 'bg-emerald-50 border-emerald-500 text-emerald-900 ring-1 ring-emerald-500' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    active ? 'bg-status-success-bg border-emerald-500 text-status-success-fg ring-1 ring-emerald-500' : 'bg-surface-card border-border-subtle text-fg-secondary hover:bg-surface-subtle'
                   }`}
                 >
-                  <IconComp className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-emerald-600' : 'text-slate-400'}`} />
+                  <IconComp className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-emerald-600' : 'text-fg-subtle'}`} />
                   <span className="truncate">{opt.label}</span>
                 </button>
               );
             })}
           </div>
           {completePaymentMethod === 'card_on_file' && stripeSavedCard && (
-            <label data-complete-charge-saved-card="true" className="mt-2 flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-emerald-50/80 border border-emerald-200 cursor-pointer">
-              <span className="inline-flex items-center gap-1.5 font-bold text-emerald-900">
+            <label data-complete-charge-saved-card="true" className="mt-2 flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-status-success-bg/80 border border-status-success-border cursor-pointer">
+              <span className="inline-flex items-center gap-1.5 font-bold text-status-success-fg">
                 <input type="checkbox" checked={chargeSavedCardNow} onChange={(e) => setChargeSavedCardNow(e.target.checked)} className="rounded border-emerald-400 text-emerald-600 w-3.5 h-3.5" />
                 <LockIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 <span>Charge Saved Card ({formatCardBrandLabel(stripeSavedCard.brand)} •••• {stripeSavedCard.last4})</span>
               </span>
-              <span className="text-[10px] font-extrabold text-emerald-700 bg-white px-1.5 py-0.5 rounded border border-emerald-200">Stripe Vault</span>
+              <span className="text-[10px] font-extrabold text-status-success-fg bg-surface-card px-1.5 py-0.5 rounded border border-status-success-border">Stripe Vault</span>
             </label>
           )}
         </div>
 
         <div>
-          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Completion Note (Audit Log — Optional)</label>
-          <input type="text" value={completeNotes} onChange={(e) => setCompleteNotes(e.target.value)} placeholder="e.g. Driver lost cellular signal at airport dropoff" className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden" />
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-fg-secondary mb-1">Completion Note (Audit Log — Optional)</label>
+          <input type="text" value={completeNotes} onChange={(e) => setCompleteNotes(e.target.value)} placeholder="e.g. Driver lost cellular signal at airport dropoff" className="w-full px-3 py-2 bg-surface-card border border-border-strong rounded-xl text-xs text-fg-strong focus:ring-2 focus:ring-emerald-500 focus:outline-hidden" />
         </div>
 
-        <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/80 cursor-pointer">
-          <input type="checkbox" checked={completeSendReceipt} disabled={!completeTripTarget.passenger?.email} onChange={(e) => setCompleteSendReceipt(e.target.checked)} className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50" />
+        <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-status-info-bg/70 border border-status-info-border/80 cursor-pointer">
+          <input type="checkbox" checked={completeSendReceipt} disabled={!completeTripTarget.passenger?.email} onChange={(e) => setCompleteSendReceipt(e.target.checked)} className="mt-0.5 rounded border-border-strong text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50" />
           <div className="min-w-0">
-            <div className="font-bold text-slate-800">Send Official Receipt Email to Passenger</div>
-            <div className="text-[11px] text-slate-600 truncate">{completeTripTarget.passenger?.email || 'No email address on file for this passenger'}</div>
+            <div className="font-bold text-fg-strong">Send Official Receipt Email to Passenger</div>
+            <div className="text-[11px] text-fg-secondary truncate">{completeTripTarget.passenger?.email || 'No email address on file for this passenger'}</div>
           </div>
         </label>
 
-        <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-900 text-white">
+        <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-surface-header text-white">
           <span className="text-xs font-semibold text-slate-300">Total Settled</span>
           <span className="text-base font-mono font-black text-emerald-400 tabular-nums">${computedGrandTotal.toFixed(2)}</span>
         </div>

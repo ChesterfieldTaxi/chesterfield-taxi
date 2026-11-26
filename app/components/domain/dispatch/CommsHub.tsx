@@ -352,12 +352,12 @@ function CommsHubComponent({
   return (
     <div
       data-client-profile-label={CLIENT_PROFILE_ACTION_LABEL}
-      className={`@container/commshub relative flex-1 min-h-0 flex flex-col min-w-0 overflow-hidden h-full bg-white text-slate-900 ${isPopout ? 'h-screen' : ''}`}
+      className={`@container/commshub relative flex-1 min-h-0 flex flex-col min-w-0 overflow-hidden h-full bg-surface-card text-fg-primary ${isPopout ? 'h-screen' : ''}`}
     >
       <audio ref={sync.audioPlayerRef} onEnded={sync.handleAudioEnded} className="hidden" />
 
       {/* Row 1 (h-10): Passive WebRTC Dot + 4-Segment Switch (Window Title/Controls only in popout/window mode) */}
-      <div data-comms-row="header" className="h-10 px-2.5 border-b border-slate-200 bg-white flex items-center justify-between gap-1.5 shrink-0">
+      <div data-comms-row="header" className="h-10 px-2.5 border-b border-border-subtle bg-surface-card flex items-center justify-between gap-1.5 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0 shrink-0">
           {softphone.softphoneStatus === 'initializing' ? (
             <SpinnerIcon className="w-2.5 h-2.5 animate-spin text-blue-600 shrink-0" />
@@ -369,13 +369,13 @@ function CommsHubComponent({
             />
           )}
           {(isPopout || showWindowControls) && (
-            <span className="text-[11px] font-extrabold text-slate-900 truncate">Phone &amp; Messages</span>
+            <span className="text-[11px] font-extrabold text-fg-primary truncate">Phone &amp; Messages</span>
           )}
         </div>
 
-        <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg text-[11px] font-bold min-w-0">
+        <div className="flex items-center gap-0.5 bg-surface-muted p-0.5 rounded-lg text-[11px] font-bold min-w-0">
           {([
-            { id: 'all' as const, label: 'All', icon: LayersIcon, badge: sync.unreadCountAll, cls: 'bg-slate-700' },
+            { id: 'all' as const, label: 'All', icon: LayersIcon, badge: sync.unreadCountAll, cls: 'bg-surface-header-muted' },
             { id: 'phone' as const, label: 'Calls', icon: PhoneIcon, badge: sync.unreadCountMissed, cls: 'bg-rose-500' },
             { id: 'messages' as const, label: 'Messages', icon: ChatBubbleLeftRightIcon, badge: sync.unreadCountMessages, cls: 'bg-blue-600' },
             { id: 'voicemail' as const, label: 'Voicemail', icon: VoicemailIcon, badge: sync.unreadCountVoicemail, cls: 'bg-amber-500' },
@@ -388,7 +388,7 @@ function CommsHubComponent({
                 title={t.label}
                 aria-label={t.label}
                 onClick={() => { handleSelectTab(t.id); if (t.id !== 'messages') messaging.setSelectedContactPhone(null); }}
-                className={`h-7 px-2 rounded-md inline-flex items-center gap-1 transition-colors cursor-pointer ${activeTab === t.id ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80' : 'text-slate-500 hover:text-slate-800'}`}
+                className={`h-7 px-2 rounded-md inline-flex items-center gap-1 transition-colors cursor-pointer ${activeTab === t.id ? 'bg-surface-card text-fg-primary shadow-2xs ring-1 ring-border-subtle/80' : 'text-fg-muted hover:text-fg-strong'}`}
               >
                 <TabIcon className="w-3.5 h-3.5 shrink-0" />
                 <span className="hidden @[340px]/commshub:inline">{t.label}</span>
@@ -401,10 +401,10 @@ function CommsHubComponent({
         {isPopout || showWindowControls ? (
           <div className="flex items-center gap-1 shrink-0 min-w-[4px]">
             {showWindowControls && !isPopout && onPopOut && (
-              <button type="button" onClick={onPopOut} title="Pop out window" className="p-1 rounded-md hover:bg-slate-100 text-slate-500 cursor-pointer"><ExternalLinkIcon className="w-3.5 h-3.5" /></button>
+              <button type="button" onClick={onPopOut} title="Pop out window" className="p-1 rounded-md hover:bg-surface-muted text-fg-muted cursor-pointer"><ExternalLinkIcon className="w-3.5 h-3.5" /></button>
             )}
             {showWindowControls && !isPopout && onClose && (
-              <button type="button" onClick={onClose} title="Close" className="p-1 rounded-md hover:bg-slate-100 text-slate-500 hover:text-rose-600 cursor-pointer"><XIcon className="w-3.5 h-3.5" /></button>
+              <button type="button" onClick={onClose} title="Close" className="p-1 rounded-md hover:bg-surface-muted text-fg-muted hover:text-rose-600 cursor-pointer"><XIcon className="w-3.5 h-3.5" /></button>
             )}
           </div>
         ) : (
@@ -429,12 +429,12 @@ function CommsHubComponent({
           onToggleSelectAll={handleToggleSelectAll} onBulkMarkReadUnread={handleBulkMarkReadUnread}
           onBulkArchive={handleBulkArchive} onBulkDelete={handleBulkDelete} onClearSelection={handleClearSelection}
           leadingSlot={activeTab === 'phone' ? (
-            <div data-comms-calls-subtoggle="true" className="flex items-center bg-slate-200/80 p-0.5 rounded-lg text-[10.5px] font-bold shrink-0">
+            <div data-comms-calls-subtoggle="true" className="flex items-center bg-surface-emphasis/80 p-0.5 rounded-lg text-[10.5px] font-bold shrink-0">
               {([
                 { id: 'history' as const, label: 'All' },
                 { id: 'missed' as const, label: 'Missed' },
               ] as const).map((sub) => (
-                <button key={sub.id} type="button" onClick={() => softphone.setCallsSubTab(sub.id)} className={`h-6 px-2 rounded-md transition-colors cursor-pointer ${softphone.callsSubTab === sub.id ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}>
+                <button key={sub.id} type="button" onClick={() => softphone.setCallsSubTab(sub.id)} className={`h-6 px-2 rounded-md transition-colors cursor-pointer ${softphone.callsSubTab === sub.id ? 'bg-surface-card text-fg-primary shadow-2xs' : 'text-fg-secondary hover:text-fg-primary'}`}>
                   {sub.label}
                 </button>
               ))}

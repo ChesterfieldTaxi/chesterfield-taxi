@@ -3,11 +3,13 @@ import {
   isAlertReadByDriver,
   type DispatchAlertRecord,
 } from '../../../core/services/dispatch/dispatch-alerts.service';
+import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import {
   AlertTriangleIcon,
   BellIcon,
   CheckIcon,
   MailOpenIcon,
+  PhoneIcon,
 } from '../../ui/Icons';
 
 export interface DriverMessagesPaneProps {
@@ -25,21 +27,28 @@ export const DriverMessagesPane = React.memo(function DriverMessagesPane({
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
           <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <BellIcon className="w-5 h-5 text-blue-400" />
-            Dispatch Messages
+            <BellIcon className="w-5 h-5 text-blue-400 shrink-0" />
+            <span>Dispatch Messages</span>
+            {unreadCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-blue-600/20 border border-blue-500/40 text-blue-300 text-[11px] font-black">
+                {unreadCount}
+              </span>
+            )}
           </h2>
           <p className="text-xs text-slate-400">
             Real-time fleet broadcasts and direct messages from dispatch.
           </p>
         </div>
-        {unreadCount > 0 && (
-          <span className="px-2.5 py-1 rounded-full bg-blue-600/20 border border-blue-500/40 text-blue-300 text-xs font-black">
-            {unreadCount} Unread
-          </span>
-        )}
+        <a
+          href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
+          className="px-3 py-2 min-h-[40px] bg-slate-800 hover:bg-slate-700 border border-slate-700 text-blue-300 font-bold text-xs rounded-xl flex items-center gap-1.5 shrink-0"
+        >
+          <PhoneIcon className="w-3.5 h-3.5" />
+          <span>Call Dispatch</span>
+        </a>
       </div>
 
       {alerts.length === 0 ? (

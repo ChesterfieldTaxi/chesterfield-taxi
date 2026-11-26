@@ -279,10 +279,10 @@ export function EmailFolderToolbar({
   const isArchiveOrTrashView = activeFolder === 'archive' || activeFolder === 'trash';
 
   return (
-    <div className="relative z-40 shrink-0 bg-white border-b border-slate-200">
+    <div className="relative z-40 shrink-0 bg-surface-card border-b border-border-subtle">
       {/* ─── SINGLE-MAILBOX HEADER (Hidden when docked inside Dispatch right drawer to avoid double header) ─── */}
       {!isDocked && (
-        <div className="bg-slate-900 text-white px-3 py-2.5 flex items-center justify-between gap-2 border-b border-slate-800">
+        <div className="bg-surface-header text-white px-3 py-2.5 flex items-center justify-between gap-2 border-b border-border-header">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-7 h-7 rounded-lg bg-blue-600/25 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
               <MailIcon className="w-4 h-4" />
@@ -298,7 +298,7 @@ export function EmailFolderToolbar({
                   </span>
                 )}
               </div>
-              <p className="text-[10px] font-mono text-slate-400 truncate">
+              <p className="text-[10px] font-mono text-fg-subtle truncate">
                 {DISPATCH_MAILBOX_ADDRESS}
               </p>
             </div>
@@ -309,7 +309,7 @@ export function EmailFolderToolbar({
               <button
                 type="button"
                 onClick={onPopOut}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-fg-subtle hover:text-white hover:bg-surface-header-elevated transition-colors cursor-pointer"
                 title="Pop out into standalone window"
                 aria-label="Pop out Email Console"
               >
@@ -321,7 +321,7 @@ export function EmailFolderToolbar({
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-fg-subtle hover:text-white hover:bg-surface-header-elevated transition-colors cursor-pointer"
                 title="Close panel"
                 aria-label="Close Email Console"
               >
@@ -341,27 +341,27 @@ export function EmailFolderToolbar({
               type="checkbox"
               checked={isAllSelected}
               onChange={onToggleSelectAll}
-              className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
+              className="w-3.5 h-3.5 rounded border-border-strong text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
               title="Select or deselect all emails in this view"
               aria-label="Select all emails in view"
             />
           )}
 
           <div className="relative flex-1 min-w-0">
-            <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <SearchIcon className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => onChangeSearchQuery(e.target.value)}
               placeholder="Search mail, trip #, phone... (/)"
-              className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50/80 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
+              className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border border-border-subtle bg-surface-subtle/80 focus:bg-surface-card text-fg-strong placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => onChangeSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-secondary cursor-pointer"
                 aria-label="Clear email search"
               >
                 <XIcon className="w-3.5 h-3.5" />
@@ -375,8 +375,8 @@ export function EmailFolderToolbar({
               onClick={onToggleUnreadOnly}
               className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer shrink-0 ${
                 unreadOnly
-                  ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-2xs'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  ? 'bg-status-info-bg text-status-info-fg border-status-info-border shadow-2xs'
+                  : 'bg-surface-card text-fg-secondary border-border-subtle hover:bg-surface-subtle'
               }`}
               title="Show unread messages only"
             >
@@ -388,7 +388,7 @@ export function EmailFolderToolbar({
             type="button"
             onClick={onSyncNow}
             disabled={isSyncing}
-            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 disabled:opacity-50 transition-colors cursor-pointer shrink-0"
+            className="p-1.5 rounded-lg border border-border-subtle bg-surface-card hover:bg-surface-subtle text-fg-secondary hover:text-fg-primary disabled:opacity-50 transition-colors cursor-pointer shrink-0"
             title={`Sync ${DISPATCH_MAILBOX_ADDRESS}`}
             aria-label="Sync mailbox"
           >
@@ -398,13 +398,13 @@ export function EmailFolderToolbar({
 
         {/* Docked subtle single-mailbox address subtitle */}
         {isDocked && (
-          <div className="flex items-center justify-between text-[10px] text-slate-400 px-0.5">
+          <div className="flex items-center justify-between text-[10px] text-fg-subtle px-0.5">
             <span className="font-mono truncate">{DISPATCH_MAILBOX_ADDRESS}</span>
             {counts.drafts > 0 && (
               <button
                 type="button"
                 onClick={() => onSelectFolder('drafts')}
-                className="text-amber-700 hover:underline font-bold cursor-pointer"
+                className="text-status-warning-fg hover:underline font-bold cursor-pointer"
               >
                 {counts.drafts} saved {counts.drafts === 1 ? 'draft' : 'drafts'}
               </button>
@@ -482,8 +482,8 @@ export function EmailFolderToolbar({
                 }}
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer inline-flex items-center gap-1 shrink-0 border ${
                   isActive
-                    ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
-                    : 'bg-slate-50/90 text-slate-600 border-slate-200/80 hover:bg-slate-100 hover:text-slate-900'
+                    ? 'bg-surface-header text-white border-slate-900 shadow-2xs'
+                    : 'bg-surface-subtle/90 text-fg-secondary border-border-subtle/80 hover:bg-surface-muted hover:text-fg-primary'
                 }`}
               >
                 <span>{folder.shortLabel}</span>
@@ -493,9 +493,9 @@ export function EmailFolderToolbar({
                       isActive
                         ? 'bg-blue-500 text-white'
                         : isDraftBadge
-                        ? 'bg-amber-100 text-amber-800'
+                        ? 'bg-status-warning-bg-strong text-status-warning-fg'
                         : isStarBadge
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                        ? 'bg-status-warning-bg text-status-warning-fg border border-status-warning-border'
                         : 'bg-blue-600 text-white'
                     }`}
                   >
@@ -515,10 +515,10 @@ export function EmailFolderToolbar({
                 onClick={() => setIsMoreOpen((prev) => !prev)}
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer inline-flex items-center gap-1 shrink-0 border ${
                   activeOverflowFolder
-                    ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                    ? 'bg-surface-header text-white border-slate-900 shadow-2xs'
                     : isMoreOpen
-                    ? 'bg-slate-100 text-slate-900 border-slate-300'
-                    : 'bg-slate-50/90 text-slate-600 border-slate-200/80 hover:bg-slate-100 hover:text-slate-900'
+                    ? 'bg-surface-muted text-fg-primary border-border-strong'
+                    : 'bg-surface-subtle/90 text-fg-secondary border-border-subtle/80 hover:bg-surface-muted hover:text-fg-primary'
                 }`}
                 title="More email folders"
               >
@@ -549,7 +549,7 @@ export function EmailFolderToolbar({
                 <div
                   role="menu"
                   aria-label="Additional email folders"
-                  className="absolute right-0 top-full mt-1.5 w-48 rounded-xl bg-white border border-slate-200 shadow-xl py-1 z-50"
+                  className="absolute right-0 top-full mt-1.5 w-48 rounded-xl bg-surface-card border border-border-subtle shadow-xl py-1 z-50"
                 >
                   {overflowFolders.map((folder) => {
                     const isActive = activeFolder === folder.id;
@@ -569,8 +569,8 @@ export function EmailFolderToolbar({
                         }}
                         className={`w-full px-3 py-1.5 text-left text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
                           isActive
-                            ? 'bg-slate-900 text-white font-extrabold'
-                            : 'text-slate-700 font-semibold hover:bg-slate-50 hover:text-slate-900'
+                            ? 'bg-surface-header text-white font-extrabold'
+                            : 'text-fg-secondary font-semibold hover:bg-surface-subtle hover:text-fg-primary'
                         }`}
                       >
                         <span className="inline-flex items-center gap-1.5 truncate">
@@ -588,9 +588,9 @@ export function EmailFolderToolbar({
                               isActive
                                 ? 'bg-blue-500 text-white'
                                 : isDraftBadge
-                                ? 'bg-amber-100 text-amber-800'
+                                ? 'bg-status-warning-bg-strong text-status-warning-fg'
                                 : isStarBadge
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                ? 'bg-status-warning-bg text-status-warning-fg border border-status-warning-border'
                                 : 'bg-blue-600 text-white'
                             }`}
                           >
@@ -609,10 +609,10 @@ export function EmailFolderToolbar({
 
       {/* ─── MULTI-SELECT BATCH ACTION BAR ─── */}
       {selectedCount > 0 && (
-        <div className="px-3 py-2 bg-slate-900 text-white flex items-center justify-between gap-2 border-t border-slate-800 animate-in fade-in duration-150">
+        <div className="px-3 py-2 bg-surface-header text-white flex items-center justify-between gap-2 border-t border-border-header animate-in fade-in duration-150">
           <div className="flex items-center gap-2 min-w-0">
             <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" />
-            <span className="text-[11px] font-extrabold text-slate-100 truncate">
+            <span className="text-[11px] font-extrabold text-fg-on-header truncate">
               {selectedCount} selected
             </span>
           </div>
@@ -621,7 +621,7 @@ export function EmailFolderToolbar({
             <button
               type="button"
               onClick={onBatchMarkRead}
-              className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 hover:text-white cursor-pointer inline-flex items-center gap-1"
+              className="px-2 py-1 rounded-md bg-surface-header-elevated hover:bg-surface-header-muted text-[11px] font-bold text-fg-on-header hover:text-white cursor-pointer inline-flex items-center gap-1"
               title="Mark selected as Read"
             >
               <CheckIcon className="w-3 h-3 text-emerald-400" />
@@ -630,7 +630,7 @@ export function EmailFolderToolbar({
             <button
               type="button"
               onClick={onBatchMarkUnread}
-              className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 hover:text-white cursor-pointer inline-flex items-center gap-1"
+              className="px-2 py-1 rounded-md bg-surface-header-elevated hover:bg-surface-header-muted text-[11px] font-bold text-fg-on-header hover:text-white cursor-pointer inline-flex items-center gap-1"
               title="Mark selected as Unread"
             >
               <MailIcon className="w-3 h-3 text-blue-400" />
@@ -639,7 +639,7 @@ export function EmailFolderToolbar({
             <button
               type="button"
               onClick={onBatchStar}
-              className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 hover:text-white cursor-pointer inline-flex items-center gap-1"
+              className="px-2 py-1 rounded-md bg-surface-header-elevated hover:bg-surface-header-muted text-[11px] font-bold text-fg-on-header hover:text-white cursor-pointer inline-flex items-center gap-1"
               title="Star selected"
             >
               <StarIcon className="w-3 h-3 text-amber-400" />
@@ -658,7 +658,7 @@ export function EmailFolderToolbar({
               <button
                 type="button"
                 onClick={onBatchArchive}
-                className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-200 hover:text-white cursor-pointer"
+                className="px-2 py-1 rounded-md bg-surface-header-elevated hover:bg-surface-header-muted text-[11px] font-bold text-fg-on-header hover:text-white cursor-pointer"
                 title="Archive selected"
               >
                 Archive
@@ -678,7 +678,7 @@ export function EmailFolderToolbar({
             <button
               type="button"
               onClick={onClearSelection}
-              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              className="p-1 rounded-md text-fg-subtle hover:text-white hover:bg-surface-header-elevated cursor-pointer"
               title="Clear selection"
               aria-label="Clear selection"
             >

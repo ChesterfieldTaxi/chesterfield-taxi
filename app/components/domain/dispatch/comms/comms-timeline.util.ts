@@ -39,14 +39,14 @@ export interface ActiveRideSmsPassengerChip {
 }
 
 export const COMMS_AVATAR_PASTEL_PALETTE = [
-  'bg-sky-100 text-sky-800',
-  'bg-rose-100 text-rose-800',
-  'bg-emerald-100 text-emerald-800',
-  'bg-violet-100 text-violet-800',
-  'bg-amber-100 text-amber-800',
-  'bg-teal-100 text-teal-800',
-  'bg-indigo-100 text-indigo-800',
-  'bg-fuchsia-100 text-fuchsia-800',
+  'bg-status-info-bg-strong text-status-info-fg',
+  'bg-status-danger-bg-strong text-status-danger-fg',
+  'bg-status-success-bg-strong text-status-success-fg',
+  'bg-status-staged-bg-strong text-status-staged-fg',
+  'bg-status-warning-bg-strong text-status-warning-fg',
+  'bg-status-success-bg-strong text-status-success-fg',
+  'bg-status-staged-bg-strong text-status-staged-fg',
+  'bg-status-staged-bg-strong text-status-staged-fg',
 ] as const;
 
 export interface ContactAvatarSpec {

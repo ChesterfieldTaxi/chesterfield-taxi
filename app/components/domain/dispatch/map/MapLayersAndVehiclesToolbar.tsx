@@ -46,7 +46,7 @@ function MenuCheckBox({ checked }: { checked: boolean }) {
     <span
       aria-hidden="true"
       className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
-        checked ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-300'
+        checked ? 'bg-blue-600 border-blue-600 text-white' : 'bg-surface-card border-border-strong'
       }`}
     >
       {checked && <CheckIcon className="w-2.5 h-2.5 stroke-[3]" />}
@@ -156,7 +156,7 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
       : 'px-2.5 py-1.5 rounded-xl text-[11px] font-bold shadow-md backdrop-blur-md cursor-pointer flex items-center gap-1 border transition-all';
 
   const headerStripClass =
-    'px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/60 rounded-t-xl min-h-[28px]';
+    'px-3 py-1.5 text-[10px] font-extrabold text-fg-subtle uppercase tracking-wider flex items-center justify-between bg-surface-subtle/60 rounded-t-xl min-h-[28px]';
 
   return (
     <>
@@ -166,16 +166,16 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
         onClick={(e) => { e.stopPropagation(); toggleMenu('vehicles'); }}
         className={`${buttonBaseClass} ${
           selectedVehicleCount > 0
-            ? 'bg-slate-900 text-white border-slate-900'
+            ? 'bg-surface-header text-white border-slate-900'
             : openMenu === 'vehicles'
-            ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-500/20'
-            : 'bg-white/95 hover:bg-slate-50 text-slate-800 border-slate-200'
+            ? 'bg-status-info-bg border-blue-400 text-status-info-fg ring-2 ring-blue-500/20'
+            : 'bg-surface-card/95 hover:bg-surface-subtle text-fg-strong border-border-subtle'
         }`}
         title="Filter live map vehicles by vehicle type (multi-select)"
         aria-haspopup="true"
         aria-expanded={openMenu === 'vehicles'}
       >
-        <CarIcon className={`w-3.5 h-3.5 shrink-0 ${selectedVehicleCount > 0 ? 'text-sky-400' : openMenu === 'vehicles' ? 'text-blue-600' : 'text-slate-600'}`} />
+        <CarIcon className={`w-3.5 h-3.5 shrink-0 ${selectedVehicleCount > 0 ? 'text-sky-400' : openMenu === 'vehicles' ? 'text-blue-600' : 'text-fg-secondary'}`} />
         <span>Vehicles</span>
         <ChevronDownIcon className={`w-3 h-3 shrink-0 transition-transform duration-150 ${openMenu === 'vehicles' ? (selectedVehicleCount > 0 ? 'rotate-180 text-white' : 'rotate-180 text-blue-600') : ''}`} />
       </button>
@@ -188,8 +188,8 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
           activeOverlayCount > 0
             ? 'bg-indigo-600 text-white border-indigo-600'
             : openMenu === 'layers'
-            ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-500/20'
-            : 'bg-white/95 hover:bg-slate-50 text-slate-800 border-slate-200'
+            ? 'bg-status-info-bg border-blue-400 text-status-info-fg ring-2 ring-blue-500/20'
+            : 'bg-surface-card/95 hover:bg-surface-subtle text-fg-strong border-border-subtle'
         }`}
         title="Toggle custom map overlays (Zones, Live Traffic, Places, Exclusions)"
         aria-haspopup="true"
@@ -213,7 +213,7 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
-            className="bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none z-[99999]"
+            className="bg-surface-card rounded-xl shadow-xl border border-border-subtle/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-border-faint select-none z-[99999]"
           >
             {openMenu === 'vehicles' ? (
               <>
@@ -223,7 +223,7 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
                     <button
                       type="button"
                       onClick={() => onSetSelectedVehicleTypes(vehicleOptions.map((opt) => opt.key))}
-                      className="text-[10px] font-bold text-slate-600 hover:text-blue-700 cursor-pointer"
+                      className="text-[10px] font-bold text-fg-secondary hover:text-status-info-fg cursor-pointer"
                     >
                       All
                     </button>
@@ -232,7 +232,7 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
                       type="button"
                       onClick={() => onSetSelectedVehicleTypes([])}
                       disabled={selectedVehicleCount === 0}
-                      className="text-[10px] font-bold text-blue-600 hover:text-blue-700 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                      className="text-[10px] font-bold text-blue-600 hover:text-status-info-fg disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
                     >
                       Clear
                     </button>
@@ -248,7 +248,7 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
                         type="button"
                         onClick={() => onToggleVehicleType(opt.key)}
                         className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer ${
-                          checked ? 'font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/70' : 'font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
+                          checked ? 'font-bold text-status-info-fg bg-status-info-bg/80 hover:bg-status-info-bg-strong/70' : 'font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg'
                         }`}
                       >
                         <span className="flex items-center gap-2 min-w-0">
@@ -256,7 +256,7 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
                           <span className="truncate">{opt.label}</span>
                         </span>
                         <span
-                          className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 shrink-0"
+                          className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-surface-muted text-fg-secondary shrink-0"
                           title={`${opt.onShiftDriversCount} on-shift / ${opt.totalDriversCount} total`}
                         >
                           {opt.onShiftDriversCount}
@@ -278,7 +278,7 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
                         if (preferences[item.key]) onTogglePreference(item.key);
                       }
                     }}
-                    className="text-[10px] font-bold text-rose-600 hover:text-rose-700 disabled:opacity-40 disabled:pointer-events-none cursor-pointer normal-case tracking-normal shrink-0"
+                    className="text-[10px] font-bold text-rose-600 hover:text-status-danger-fg disabled:opacity-40 disabled:pointer-events-none cursor-pointer normal-case tracking-normal shrink-0"
                   >
                     All Off
                   </button>
@@ -293,14 +293,14 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
                         type="button"
                         onClick={() => onTogglePreference(item.key)}
                         className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs text-left transition-colors cursor-pointer ${
-                          checked ? 'font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/70' : 'font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
+                          checked ? 'font-bold text-status-info-fg bg-status-info-bg/80 hover:bg-status-info-bg-strong/70' : 'font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg'
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.dotColor }} />
                           <div className="min-w-0">
                             <div className="leading-tight truncate">{item.label}</div>
-                            <div className="text-[10px] font-normal text-slate-400 truncate">{item.hint}</div>
+                            <div className="text-[10px] font-normal text-fg-subtle truncate">{item.hint}</div>
                           </div>
                         </div>
                         <MenuCheckBox checked={checked} />
@@ -310,7 +310,7 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
                 </div>
 
                 <div className="py-1">
-                  <div className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  <div className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-fg-subtle">
                     Route Display
                   </div>
                   {ROUTE_DISPLAY_ITEMS.map((item) => {
@@ -321,7 +321,7 @@ export const MapLayersAndVehiclesToolbar = React.memo(function MapLayersAndVehic
                         type="button"
                         onClick={() => onTogglePreference(item.key)}
                         className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer ${
-                          checked ? 'font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/70' : 'font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
+                          checked ? 'font-bold text-status-info-fg bg-status-info-bg/80 hover:bg-status-info-bg-strong/70' : 'font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg'
                         }`}
                       >
                         <span className="truncate">{item.label}</span>

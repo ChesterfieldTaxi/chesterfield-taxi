@@ -67,15 +67,15 @@ export function CommsContactAvatar({
           aria-label={selectionAriaLabel || (isSelected ? 'Deselect item' : 'Select item')}
           className={`absolute inset-0 rounded-full flex items-center justify-center transition-opacity cursor-pointer ${
             isSelected || isSelectionMode
-              ? 'opacity-100 bg-white/95'
-              : 'opacity-0 group-hover:opacity-100 bg-white/95'
+              ? 'opacity-100 bg-surface-card/95'
+              : 'opacity-0 group-hover:opacity-100 bg-surface-card/95'
           }`}
         >
           <span
             className={`w-4 h-4 rounded-[4px] border flex items-center justify-center transition-colors ${
               isSelected
                 ? 'bg-blue-600 border-blue-600 text-white'
-                : 'bg-white border-slate-400'
+                : 'bg-surface-card border-border-emphasis'
             }`}
           >
             {isSelected && <CheckIcon className="w-2.5 h-2.5 stroke-[3]" />}
@@ -128,7 +128,7 @@ export function CommsTimestampWithHoverReadToggle({
       }}
     >
       <span
-        className={`text-[10px] font-mono text-slate-400 whitespace-nowrap transition-opacity ${
+        className={`text-[10px] font-mono text-fg-subtle whitespace-nowrap transition-opacity ${
           onToggleRowReadStatus ? 'group-hover:opacity-0' : ''
         }`}
       >
@@ -144,7 +144,7 @@ export function CommsTimestampWithHoverReadToggle({
           }}
           title={isUnread ? 'Mark as Read' : 'Mark as Unread'}
           aria-label={isUnread ? 'Mark as Read' : 'Mark as Unread'}
-          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 absolute right-0 top-1/2 -translate-y-1/2 w-6 h-5 rounded-md bg-white/95 shadow-2xs ring-1 ring-slate-200 hover:bg-blue-600 text-slate-600 hover:text-white flex items-center justify-center transition-opacity cursor-pointer"
+          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 absolute right-0 top-1/2 -translate-y-1/2 w-6 h-5 rounded-md bg-surface-card/95 shadow-2xs ring-1 ring-border-subtle hover:bg-blue-600 text-fg-secondary hover:text-white flex items-center justify-center transition-opacity cursor-pointer"
         >
           {isUnread ? <MailOpenIcon className="w-3 h-3" /> : <MailIcon className="w-3 h-3" />}
         </button>

@@ -130,11 +130,11 @@ export function DispatchDriverRosterPane({
     });
 
     return (
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/70 lg:hidden">
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-surface-subtle/70 lg:hidden">
         {/* Top Status Counter Strip (Locked at exact top-2.5/px-2.5 level as LiveFleetMap) + Search Below */}
-        <div className="px-2.5 pt-2.5 pb-2 bg-white border-b border-slate-200/90 space-y-2 shrink-0 shadow-2xs">
+        <div className="px-2.5 pt-2.5 pb-2 bg-surface-card border-b border-border-subtle/90 space-y-2 shrink-0 shadow-2xs">
           {/* 6-Column 2-Line Status + Count Tiles */}
-          <div className="grid grid-cols-6 gap-1 bg-white border border-slate-200/90 shadow-2xs rounded-2xl p-1">
+          <div className="grid grid-cols-6 gap-1 bg-surface-card border border-border-subtle/90 shadow-2xs rounded-2xl p-1">
             {(
               [
                 { key: 'all', label: 'All', hex: null },
@@ -157,8 +157,8 @@ export function DispatchDriverRosterPane({
                   onClick={() => onDriverFilterChange(tab.key)}
                   className={`py-1 px-0.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-slate-900 text-white shadow-2xs'
-                      : 'text-slate-600 hover:bg-slate-100'
+                      ? 'bg-surface-header text-white shadow-2xs'
+                      : 'text-fg-secondary hover:bg-surface-muted'
                   }`}
                 >
                   <span className="inline-flex items-center gap-1 leading-none">
@@ -180,7 +180,7 @@ export function DispatchDriverRosterPane({
 
           {/* Search Input Directly Below Status Pills */}
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none">
               <MagnifyingGlassIcon className="w-3.5 h-3.5" />
             </span>
             <input
@@ -188,13 +188,13 @@ export function DispatchDriverRosterPane({
               placeholder="Search driver, car #, zone..."
               value={driverSearch}
               onChange={(e) => onDriverSearchChange(e.target.value)}
-              className="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              className="w-full pl-8 pr-8 py-1.5 bg-surface-subtle border border-border-subtle rounded-xl text-xs text-fg-primary placeholder-slate-400 focus:bg-surface-card focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             />
             {driverSearch && (
               <button
                 type="button"
                 onClick={() => onDriverSearchChange('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-secondary p-1 cursor-pointer"
                 aria-label="Clear driver search"
               >
                 <XIcon className="w-3.5 h-3.5" />
@@ -206,7 +206,7 @@ export function DispatchDriverRosterPane({
         {/* Drivers Card Stream (1-tap → Queue Sheet; Touch & Hold or ⋮ → Quick Actions & Duty Status) */}
         <div className="flex-1 overflow-y-auto p-3 pb-16 space-y-2.5 text-xs">
           {visibleMobileDrivers.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 font-semibold text-xs">
+            <div className="py-12 text-center text-fg-subtle font-semibold text-xs">
               No drivers match this filter.
             </div>
           ) : (
@@ -237,10 +237,10 @@ export function DispatchDriverRosterPane({
                     }
                     onOpenDriverQueue(driver);
                   }}
-                  className={`p-3.5 rounded-2xl border bg-white transition-all cursor-pointer select-none shadow-2xs space-y-2.5 ${
+                  className={`p-3.5 rounded-2xl border bg-surface-card transition-all cursor-pointer select-none shadow-2xs space-y-2.5 ${
                     isHolding
                       ? 'scale-[0.985] border-blue-400 ring-2 ring-blue-500/30'
-                      : 'border-slate-200 hover:border-slate-300'
+                      : 'border-border-subtle hover:border-border-strong'
                   }`}
                 >
                   {/* Top Row: Avatar + Name + Status Chip + More */}
@@ -259,19 +259,19 @@ export function DispatchDriverRosterPane({
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-extrabold text-slate-900 text-sm truncate">
+                          <span className="font-extrabold text-fg-primary text-sm truncate">
                             {driver.name}
                           </span>
                           {driver.driverScore !== undefined && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-black px-1.5 py-0.5 rounded-md bg-status-warning-bg text-status-warning-fg border border-status-warning-border shrink-0">
                               <StarIcon className="w-2.5 h-2.5 text-amber-500 shrink-0" />
                               <span>{driver.driverScore}</span>
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-500 font-medium truncate">
+                        <div className="text-[11px] text-fg-muted font-medium truncate">
                           {driver.vehicle && driver.vehicle !== 'Unassigned' ? `${driver.vehicle} · ` : ''}
-                          <span className="font-semibold text-slate-700">{driver.tier}</span>
+                          <span className="font-semibold text-fg-secondary">{driver.tier}</span>
                         </div>
                       </div>
                     </div>
@@ -295,7 +295,7 @@ export function DispatchDriverRosterPane({
                           e.stopPropagation();
                           onOpenMobileActionSheetDriver(driver);
                         }}
-                        className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+                        className="w-7 h-7 rounded-lg text-fg-subtle hover:text-fg-secondary hover:bg-surface-muted flex items-center justify-center cursor-pointer"
                         aria-label="Open driver actions"
                       >
                         <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
@@ -308,12 +308,12 @@ export function DispatchDriverRosterPane({
                   </div>
 
                   {/* Bottom Compact Meta Strip: Zone/GPS + Queue Pill + 1-Tap Call */}
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 text-[11px]">
-                    <div className="flex items-center gap-1.5 min-w-0 text-slate-600">
-                      <MapPinIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="font-semibold text-slate-700 truncate">{driver.zone}</span>
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-border-faint text-[11px]">
+                    <div className="flex items-center gap-1.5 min-w-0 text-fg-secondary">
+                      <MapPinIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
+                      <span className="font-semibold text-fg-secondary truncate">{driver.zone}</span>
                       {driver.telemetry && (
-                        <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded shrink-0">
+                        <span className="text-[10px] font-mono text-status-success-fg bg-status-success-bg border border-status-success-border px-1.5 py-0.2 rounded shrink-0">
                           GPS
                         </span>
                       )}
@@ -323,8 +323,8 @@ export function DispatchDriverRosterPane({
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10.5px] font-bold border ${
                           totalAssignedCount > 0
-                            ? 'bg-blue-50 text-blue-700 border-blue-200'
-                            : 'bg-slate-50 text-slate-500 border-slate-200'
+                            ? 'bg-status-info-bg text-status-info-fg border-status-info-border'
+                            : 'bg-surface-subtle text-fg-muted border-border-subtle'
                         }`}
                       >
                         <span>{totalAssignedCount > 0 ? `${totalAssignedCount} Queued` : 'No Queue'}</span>
@@ -336,7 +336,7 @@ export function DispatchDriverRosterPane({
                             e.stopPropagation();
                             onCallDriver(driver.phone, driver.name);
                           }}
-                          className="w-8 h-8 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+                          className="w-8 h-8 rounded-full bg-status-success-bg hover:bg-status-success-bg-strong text-status-success-fg border border-status-success-border flex items-center justify-center transition-all active:scale-95 cursor-pointer"
                           title={`Call ${driver.name}`}
                           aria-label={`Call ${driver.name}`}
                         >
@@ -376,10 +376,10 @@ export function DispatchDriverRosterPane({
   });
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-surface-subtle/50">
       {/* 6-Column 2-Line Status Counter Strip + Search Below */}
-      <div className="px-2.5 pt-2.5 pb-2 bg-white border-b border-slate-200/80 space-y-2 shrink-0">
-        <div className="grid grid-cols-6 gap-1 bg-slate-50 border border-slate-200/80 rounded-2xl p-1">
+      <div className="px-2.5 pt-2.5 pb-2 bg-surface-card border-b border-border-subtle/80 space-y-2 shrink-0">
+        <div className="grid grid-cols-6 gap-1 bg-surface-subtle border border-border-subtle/80 rounded-2xl p-1">
           {(
             [
               { key: 'all', label: 'All', hex: null },
@@ -399,8 +399,8 @@ export function DispatchDriverRosterPane({
                 onClick={() => onDriverFilterChange(tab.key)}
                 className={`py-1 px-0.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
                   active
-                    ? 'bg-slate-900 text-white shadow-2xs'
-                    : 'text-slate-600 hover:bg-slate-200/60'
+                    ? 'bg-surface-header text-white shadow-2xs'
+                    : 'text-fg-secondary hover:bg-surface-emphasis/60'
                 }`}
               >
                 <span className="inline-flex items-center gap-1 leading-none">
@@ -421,19 +421,19 @@ export function DispatchDriverRosterPane({
         </div>
 
         <div className="relative">
-          <MagnifyingGlassIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+          <MagnifyingGlassIcon className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 top-2" />
           <input
             type="text"
             value={driverSearch}
             onChange={(e) => onDriverSearchChange(e.target.value)}
             placeholder="Search driver, car #, or zone..."
-            className="w-full pl-8 pr-7 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50/70 focus:bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-400"
+            className="w-full pl-8 pr-7 py-1 text-xs rounded-lg border border-border-subtle bg-surface-subtle/70 focus:bg-surface-card text-fg-strong placeholder-slate-400 focus:outline-none focus:border-blue-400"
           />
           {driverSearch && (
             <button
               type="button"
               onClick={() => onDriverSearchChange('')}
-              className="absolute right-2 top-1.5 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+              className="absolute right-2 top-1.5 text-fg-subtle hover:text-fg-secondary text-xs font-bold cursor-pointer"
             >
               ✕
             </button>
@@ -442,9 +442,9 @@ export function DispatchDriverRosterPane({
       </div>
 
       {/* Clean Scannable Driver List */}
-      <div className="flex-1 overflow-y-auto divide-y divide-slate-200/70 bg-white">
+      <div className="flex-1 overflow-y-auto divide-y divide-border-subtle/70 bg-surface-card">
         {visibleDrivers.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-400">
+          <div className="p-8 text-center text-xs text-fg-subtle">
             No drivers match this filter.
           </div>
         ) : (
@@ -456,7 +456,7 @@ export function DispatchDriverRosterPane({
             return (
               <div
                 key={driver.id}
-                className="px-3.5 py-2.5 hover:bg-slate-50/90 transition-colors space-y-2"
+                className="px-3.5 py-2.5 hover:bg-surface-subtle/90 transition-colors space-y-2"
               >
                 {/* Row 1: Color Dot + Name/Cab + Status Pill */}
                 <div className="flex items-center justify-between gap-2">
@@ -468,15 +468,15 @@ export function DispatchDriverRosterPane({
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         {driver.cabNumber && (
-                          <span className="font-mono text-[11px] font-black text-slate-500 shrink-0">
+                          <span className="font-mono text-[11px] font-black text-fg-muted shrink-0">
                             #{driver.cabNumber}
                           </span>
                         )}
-                        <span className="font-bold text-slate-900 text-xs truncate">
+                        <span className="font-bold text-fg-primary text-xs truncate">
                           {driver.name}
                         </span>
                       </div>
-                      <div className="text-[11px] text-slate-500 truncate flex items-center gap-1.5">
+                      <div className="text-[11px] text-fg-muted truncate flex items-center gap-1.5">
                         <span>{driver.vehicle || driver.tier}</span>
                         <span>·</span>
                         <span>{driver.zone || 'Dispatch'}</span>
@@ -502,7 +502,7 @@ export function DispatchDriverRosterPane({
                     <button
                       type="button"
                       onClick={() => onOpenDriverQueue(driver)}
-                      className="px-2 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-semibold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                      className="px-2 py-1 bg-surface-muted hover:bg-status-info-bg text-fg-secondary hover:text-status-info-fg font-semibold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1"
                       title="Open driver's assigned queue"
                     >
                       <span>Queue</span>
@@ -515,7 +515,7 @@ export function DispatchDriverRosterPane({
                     <button
                       type="button"
                       onClick={() => onFocusMapDriver(driver.id)}
-                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] rounded-lg transition-colors cursor-pointer"
+                      className="px-2 py-1 bg-surface-muted hover:bg-surface-emphasis text-fg-secondary font-semibold text-[11px] rounded-lg transition-colors cursor-pointer"
                       title="Locate on fleet map"
                     >
                       Locate
@@ -524,7 +524,7 @@ export function DispatchDriverRosterPane({
                       <button
                         type="button"
                         onClick={() => onCallDriver(driver.phone, driver.name)}
-                        className="p-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 rounded-lg transition-colors cursor-pointer"
+                        className="p-1.5 bg-surface-muted hover:bg-status-success-bg text-fg-secondary hover:text-status-success-fg rounded-lg transition-colors cursor-pointer"
                         title={`Call ${driver.name} (${driver.phone})`}
                       >
                         <PhoneIcon className="w-3.5 h-3.5" />
@@ -654,7 +654,7 @@ export function DispatchDriverSheets({
             minHeight={360}
             zIndex={224}
             footer={
-              <div className="px-4 py-3 bg-slate-50 flex items-center justify-between gap-2 flex-wrap">
+              <div className="px-4 py-3 bg-surface-subtle flex items-center justify-between gap-2 flex-wrap">
                 {targetTrip.assignedDriverId ? (
                   <button
                     type="button"
@@ -662,7 +662,7 @@ export function DispatchDriverSheets({
                       onQuickAssignDriver(targetTrip.id, 'unassigned');
                       onCloseDriverPicker();
                     }}
-                    className="px-3.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold text-xs cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-xl bg-status-warning-bg hover:bg-status-warning-bg-strong border border-status-warning-border text-status-warning-fg font-bold text-xs cursor-pointer"
                   >
                     Unassign Driver
                   </button>
@@ -684,13 +684,13 @@ export function DispatchDriverSheets({
                         void stagedPlanner.clearTripStage(targetTrip);
                         onCloseDriverPicker();
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-rose-50 border border-slate-300 text-rose-600 font-bold text-xs cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-surface-card hover:bg-status-danger-bg border border-border-strong text-rose-600 font-bold text-xs cursor-pointer"
                     >
                       Clear Stage
                     </button>
                   </div>
                 ) : (
-                  <span className="text-[11px] text-slate-500 font-medium">
+                  <span className="text-[11px] text-fg-muted font-medium">
                     {stagedPlanner?.driverPickerMode === 'stage_hold'
                       ? 'Click any driver to stage (held in Dispatch)'
                       : 'Click any driver to send immediately'}
@@ -699,7 +699,7 @@ export function DispatchDriverSheets({
                 <button
                   type="button"
                   onClick={onCloseDriverPicker}
-                  className="px-4 py-1.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 font-bold text-xs cursor-pointer ml-auto"
+                  className="px-4 py-1.5 rounded-xl border border-border-strong bg-surface-card text-fg-secondary hover:bg-surface-muted font-bold text-xs cursor-pointer ml-auto"
                 >
                   Cancel
                 </button>
@@ -707,16 +707,16 @@ export function DispatchDriverSheets({
             }
           >
             {/* Search, Placement Mode & Filter */}
-            <div className="p-3 bg-slate-50 border-b border-slate-200 space-y-2 shrink-0">
+            <div className="p-3 bg-surface-subtle border-b border-border-subtle space-y-2 shrink-0">
                 {stagedPlanner && isTripEligibleForStaging(targetTrip) && (
-                  <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-200/70 border border-slate-300/70">
+                  <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-surface-emphasis/70 border border-border-strong/70">
                     <button
                       type="button"
                       onClick={() => stagedPlanner.setDriverPickerMode('send_to_driver')}
                       className={`py-1.5 px-2.5 rounded-lg text-xs font-extrabold transition-colors cursor-pointer ${
                         stagedPlanner.driverPickerMode !== 'stage_hold'
                           ? 'bg-blue-600 text-white shadow-2xs'
-                          : 'text-slate-700 hover:text-slate-900'
+                          : 'text-fg-secondary hover:text-fg-primary'
                       }`}
                     >
                       Send to Driver
@@ -727,7 +727,7 @@ export function DispatchDriverSheets({
                       className={`py-1.5 px-2.5 rounded-lg text-xs font-extrabold transition-colors cursor-pointer ${
                         stagedPlanner.driverPickerMode === 'stage_hold'
                           ? 'bg-indigo-600 text-white shadow-2xs'
-                          : 'text-slate-700 hover:text-slate-900'
+                          : 'text-fg-secondary hover:text-fg-primary'
                       }`}
                     >
                       📌 Stage Driver (Hold)
@@ -735,19 +735,19 @@ export function DispatchDriverSheets({
                   </div>
                 )}
                 <div className="relative">
-                  <MagnifyingGlassIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <MagnifyingGlassIcon className="w-3.5 h-3.5 text-fg-subtle absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     value={driverPickerSearch}
                     onChange={(e) => onDriverPickerSearchChange(e.target.value)}
                     placeholder="Search driver name or car #..."
-                    className="w-full pl-8 pr-8 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    className="w-full pl-8 pr-8 py-2 bg-surface-card border border-border-strong rounded-xl text-xs text-fg-strong focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                   />
                   {driverPickerSearch && (
                     <button
                       type="button"
                       onClick={() => onDriverPickerSearchChange('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-secondary cursor-pointer"
                       aria-label="Clear driver search"
                     >
                       <XIcon className="w-3.5 h-3.5" />
@@ -768,8 +768,8 @@ export function DispatchDriverSheets({
                       onClick={() => onDriverPickerFilterChange(f.id)}
                       className={`px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
                         driverPickerFilter === f.id
-                          ? 'bg-slate-900 text-white border-slate-900'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                          ? 'bg-surface-header text-white border-slate-900'
+                          : 'bg-surface-card text-fg-secondary border-border-subtle hover:bg-surface-muted'
                       }`}
                     >
                       {f.label}
@@ -781,7 +781,7 @@ export function DispatchDriverSheets({
               {/* Driver List */}
               <div className="flex-1 overflow-y-auto overscroll-contain p-3 space-y-2">
                 {filteredPickerDrivers.length === 0 ? (
-                  <div className="py-10 text-center text-xs text-slate-400 font-semibold">
+                  <div className="py-10 text-center text-xs text-fg-subtle font-semibold">
                     No drivers match this filter.
                   </div>
                 ) : (
@@ -818,14 +818,14 @@ export function DispatchDriverSheets({
                         className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between gap-2.5 transition-all cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed ${
                           isCurrent
                             ? isStagePicker
-                              ? 'bg-indigo-50 border-dashed border-indigo-500 ring-1 ring-indigo-500'
-                              : 'bg-blue-50 border-blue-500 ring-1 ring-blue-500'
-                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.99]'
+                              ? 'bg-status-staged-bg border-dashed border-indigo-500 ring-1 ring-indigo-500'
+                              : 'bg-status-info-bg border-blue-500 ring-1 ring-blue-500'
+                            : 'bg-surface-card border-border-subtle hover:border-border-strong hover:bg-surface-subtle active:scale-[0.99]'
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div className="relative shrink-0">
-                            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white font-black text-xs flex items-center justify-center">
+                            <div className="w-9 h-9 rounded-xl bg-surface-header text-white font-black text-xs flex items-center justify-center">
                               {initials}
                             </div>
                             <span
@@ -833,10 +833,10 @@ export function DispatchDriverSheets({
                             />
                           </div>
                           <div className="min-w-0">
-                            <div className="font-extrabold text-xs text-slate-900 truncate">
+                            <div className="font-extrabold text-xs text-fg-primary truncate">
                               {drv.formattedLabel || formatDriverAssignmentLabel(drv)}
                             </div>
-                            <div className="text-[11px] text-slate-500 truncate">
+                            <div className="text-[11px] text-fg-muted truncate">
                               {drv.name} {drv.vehicle && drv.vehicle !== 'Unassigned' ? `· ${drv.vehicle}` : ''}
                             </div>
                           </div>
@@ -894,7 +894,7 @@ export function DispatchDriverSheets({
             <div className="p-4 space-y-3.5">
                 {/* Direct Duty Status Switcher */}
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-fg-muted block">
                     Set Duty Status
                   </span>
                   <div className="grid grid-cols-3 gap-1.5">
@@ -902,7 +902,7 @@ export function DispatchDriverSheets({
                       [
                         { id: 'on_duty', label: 'Available', dot: 'bg-emerald-500', active: 'bg-emerald-600 text-white border-emerald-600' },
                         { id: 'on_break', label: 'On Break', dot: 'bg-amber-400', active: 'bg-amber-500 text-slate-950 border-amber-500' },
-                        { id: 'off_duty', label: 'Offline', dot: 'bg-slate-400', active: 'bg-slate-800 text-white border-slate-800' },
+                        { id: 'off_duty', label: 'Offline', dot: 'bg-fg-subtle', active: 'bg-surface-header-elevated text-white border-border-header' },
                       ] as const
                     ).map((opt) => {
                       const isCurrent = liveDriver.dutyStatus === opt.id;
@@ -922,10 +922,10 @@ export function DispatchDriverSheets({
                           className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                             isCurrent
                               ? `${opt.active} shadow-xs`
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                              : 'bg-surface-card text-fg-secondary border-border-subtle hover:bg-surface-subtle'
                           }`}
                         >
-                          <span className={`w-2 h-2 rounded-full ${isCurrent ? 'bg-white/90' : opt.dot}`} />
+                          <span className={`w-2 h-2 rounded-full ${isCurrent ? 'bg-surface-card/90' : opt.dot}`} />
                           <span>{opt.label}</span>
                         </button>
                       );
@@ -941,7 +941,7 @@ export function DispatchDriverSheets({
                       onCloseMobileActionSheetDriver();
                       onOpenDriverQueue(liveDriver);
                     }}
-                    className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                    className="p-3 rounded-2xl bg-status-info-bg hover:bg-status-info-bg-strong border border-status-info-border text-status-info-fg flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
                   >
                     <CalendarIcon className="w-4 h-4 text-blue-600" />
                     <span className="text-xs font-extrabold">
@@ -955,7 +955,7 @@ export function DispatchDriverSheets({
                       onCloseMobileActionSheetDriver();
                       onLocateDriverOnMobileMap(liveDriver.id);
                     }}
-                    className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                    className="p-3 rounded-2xl bg-surface-subtle hover:bg-surface-muted border border-border-subtle text-fg-primary flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
                   >
                     <MapPinIcon className="w-4 h-4 text-emerald-600" />
                     <span className="text-xs font-extrabold">Locate on Map</span>
@@ -968,7 +968,7 @@ export function DispatchDriverSheets({
                         onCloseMobileActionSheetDriver();
                         onCallDriverOnMobile(liveDriver.phone, liveDriver.name);
                       }}
-                      className="p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                      className="p-3 rounded-2xl bg-status-success-bg hover:bg-status-success-bg-strong border border-status-success-border text-status-success-fg flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
                     >
                       <PhoneIcon className="w-4 h-4 text-emerald-600" />
                       <span className="text-xs font-extrabold">Call Driver</span>
@@ -981,7 +981,7 @@ export function DispatchDriverSheets({
                       onCloseMobileActionSheetDriver();
                       onAssignDriverToActiveDraftOnMobile(liveDriver);
                     }}
-                    className="p-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                    className="p-3 rounded-2xl bg-status-staged-bg hover:bg-status-staged-bg-strong border border-status-staged-border text-status-staged-fg flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
                   >
                     <PlusIcon className="w-4 h-4 text-indigo-600" />
                     <span className="text-xs font-extrabold">Assign Active Draft</span>

@@ -37,7 +37,7 @@ export const STATUS_FILTER_OPTIONS: ReadonlyArray<{
   { key: 'in_progress', label: 'In Progress', dotClass: 'bg-teal-500' },
   { key: 'completed', label: 'Completed', dotClass: 'bg-emerald-700' },
   { key: 'cancelled', label: 'Cancelled', dotClass: 'bg-rose-500' },
-  { key: 'declined', label: 'Declined', dotClass: 'bg-slate-400' },
+  { key: 'declined', label: 'Declined', dotClass: 'bg-fg-subtle' },
 ];
 
 export const QUEUE_FILTER_MENU_ITEMS: ReadonlyArray<{ key: QueueFilterType; label: string }> = [
@@ -52,16 +52,16 @@ export const QUEUE_FILTER_MENU_ITEMS: ReadonlyArray<{ key: QueueFilterType; labe
 ];
 
 const PORTAL_MENU_SHELL_CLASS =
-  'bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none z-[99999]';
+  'bg-surface-card rounded-xl shadow-xl border border-border-subtle/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-border-faint select-none z-[99999]';
 const PORTAL_HEADER_STRIP_CLASS =
-  'px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/60 rounded-t-xl min-h-[28px]';
+  'px-3 py-1.5 text-[10px] font-extrabold text-fg-subtle uppercase tracking-wider flex items-center justify-between bg-surface-subtle/60 rounded-t-xl min-h-[28px]';
 
 export function MenuCheckIndicator({ checked, indeterminate = false }: { checked: boolean; indeterminate?: boolean }) {
   return (
     <span
       aria-hidden="true"
       className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
-        checked ? 'bg-blue-600 border-blue-600 text-white' : indeterminate ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-slate-300'
+        checked ? 'bg-blue-600 border-blue-600 text-white' : indeterminate ? 'bg-status-info-bg border-blue-500 text-blue-600' : 'bg-surface-card border-border-strong'
       }`}
     >
       {checked ? <CheckIcon className="w-2.5 h-2.5 stroke-[3]" /> : indeterminate ? <span className="w-2 h-0.5 bg-blue-600 rounded-full" /> : null}
@@ -249,12 +249,12 @@ export function TripStatusMultiSelectDropdown({
       <button
         ref={triggerRef} type="button" onClick={handleTriggerClick}
         className={`h-7 px-2 sm:px-2.5 border rounded-lg text-xs shadow-2xs cursor-pointer flex items-center gap-1.5 max-w-[155px] sm:max-w-[185px] transition-all ${
-          isOpen ? 'bg-blue-50 border-blue-400 text-blue-700 font-bold ring-2 ring-blue-500/20'
-            : isExternalUnconfirmedActive ? 'bg-slate-100/80 hover:bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-600 font-medium opacity-75'
-            : isLegacyUnconfirmedOnly ? 'bg-rose-50 border-rose-400 text-rose-800 font-bold'
-            : isActivePresetSelected ? 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700 font-semibold'
-            : !isNeutral ? 'bg-blue-50 border-blue-500 text-blue-800 font-bold'
-            : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700 font-semibold'
+          isOpen ? 'bg-status-info-bg border-blue-400 text-status-info-fg font-bold ring-2 ring-blue-500/20'
+            : isExternalUnconfirmedActive ? 'bg-surface-muted/80 hover:bg-surface-muted border-border-subtle text-fg-subtle hover:text-fg-secondary font-medium opacity-75'
+            : isLegacyUnconfirmedOnly ? 'bg-status-danger-bg border-rose-400 text-status-danger-fg font-bold'
+            : isActivePresetSelected ? 'bg-surface-card hover:bg-surface-subtle border-border-strong text-fg-secondary font-semibold'
+            : !isNeutral ? 'bg-status-info-bg border-blue-500 text-status-info-fg font-bold'
+            : 'bg-surface-card hover:bg-surface-subtle border-border-strong text-fg-secondary font-semibold'
         }`}
         title={
           isExternalUnconfirmedActive
@@ -268,7 +268,7 @@ export function TripStatusMultiSelectDropdown({
         {isActivePresetSelected && (
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-              isExternalUnconfirmedActive ? 'bg-slate-300' : 'bg-emerald-500'
+              isExternalUnconfirmedActive ? 'bg-surface-strong' : 'bg-emerald-500'
             }`}
             aria-hidden="true"
           />
@@ -282,7 +282,7 @@ export function TripStatusMultiSelectDropdown({
             {unconfirmedCount}
           </span>
         )}
-        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`} />
+        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-fg-subtle'}`} />
       </button>
 
       {isOpen && coords !== null && typeof document !== 'undefined' &&
@@ -296,7 +296,7 @@ export function TripStatusMultiSelectDropdown({
             <div className={PORTAL_HEADER_STRIP_CLASS}>
               <button
                 type="button" onClick={() => onStatusFilterChange(allSelected ? 'none' : 'all')}
-                className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-600 hover:text-blue-700 cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-fg-secondary hover:text-status-info-fg cursor-pointer"
               >
                 <MenuCheckIndicator checked={allSelected} indeterminate={someSelected} />
                 <span>{allSelected ? 'Deselect All' : 'Select All'}</span>
@@ -304,7 +304,7 @@ export function TripStatusMultiSelectDropdown({
               <button
                 type="button" onClick={() => onStatusFilterChange(serializeStatusFilterSelection(ACTIVE_QUEUE_STATUS_KEYS))}
                 className={`px-2 py-0.5 rounded-md text-[10px] font-bold border cursor-pointer transition-colors normal-case tracking-normal ${
-                  isActivePresetSelected && !isExternalUnconfirmedActive ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-blue-50 text-blue-700 border-blue-200'
+                  isActivePresetSelected && !isExternalUnconfirmedActive ? 'bg-blue-600 text-white border-blue-600' : 'bg-surface-card hover:bg-status-info-bg text-status-info-fg border-status-info-border'
                 }`}
                 title="Check only live/open statuses (hide Completed, Cancelled, Declined)"
               >
@@ -317,10 +317,10 @@ export function TripStatusMultiSelectDropdown({
                 <button
                   type="button"
                   onClick={handleToggleUnconfirmedQuickFilter}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer border-b border-slate-100 mb-0.5 ${
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer border-b border-border-faint mb-0.5 ${
                     isUnconfirmedRowActive
-                      ? 'font-bold text-rose-700 bg-rose-50/90 hover:bg-rose-100/70'
-                      : 'font-semibold text-slate-700 hover:bg-rose-50/60 hover:text-rose-700'
+                      ? 'font-bold text-status-danger-fg bg-status-danger-bg/90 hover:bg-status-danger-bg-strong/70'
+                      : 'font-semibold text-fg-secondary hover:bg-status-danger-bg/60 hover:text-status-danger-fg'
                   }`}
                 >
                   <span className="flex items-center gap-2 min-w-0">
@@ -342,7 +342,7 @@ export function TripStatusMultiSelectDropdown({
                   <button
                     key={opt.key} type="button" onClick={() => toggleStatusKey(opt.key)}
                     className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer ${
-                      checked ? 'font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/70' : 'font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
+                      checked ? 'font-bold text-status-info-fg bg-status-info-bg/80 hover:bg-status-info-bg-strong/70' : 'font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg'
                     }`}
                   >
                     <span className="flex items-center gap-2 min-w-0">
@@ -397,18 +397,18 @@ export function TripAddFilterDropdown({
         className={`flex items-center gap-1 border rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer ${
           compactMobile ? 'px-2.5 py-0.5 h-6' : 'px-2.5 py-1 h-7'
         } ${
-          isOpen ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-500/20'
-            : activeFilterKeys.length > 0 ? 'border-blue-400 bg-blue-50/70 text-blue-800 hover:bg-blue-50'
-            : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700'
+          isOpen ? 'bg-status-info-bg border-blue-400 text-status-info-fg ring-2 ring-blue-500/20'
+            : activeFilterKeys.length > 0 ? 'border-blue-400 bg-status-info-bg/70 text-status-info-fg hover:bg-status-info-bg'
+            : 'bg-surface-card hover:bg-surface-subtle border-border-strong text-fg-secondary'
         }`}
         title="Add or toggle queue filters" aria-haspopup="true" aria-expanded={isOpen}
       >
-        <FunnelIcon className={`w-3.5 h-3.5 shrink-0 ${isOpen ? 'text-blue-600' : 'text-slate-500'}`} />
+        <FunnelIcon className={`w-3.5 h-3.5 shrink-0 ${isOpen ? 'text-blue-600' : 'text-fg-muted'}`} />
         <span>{compactMobile ? '+ Filter' : 'Filter'}</span>
         {activeFilterKeys.length > 0 && (
           <span className="px-1.5 py-0.1 rounded-full bg-blue-600 text-white text-[9.5px] font-black">{activeFilterKeys.length}</span>
         )}
-        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`} />
+        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-fg-subtle'}`} />
       </button>
 
       {isOpen && coords !== null && typeof document !== 'undefined' &&
@@ -423,7 +423,7 @@ export function TripAddFilterDropdown({
               <span>Queue Filters</span>
               <button
                 type="button" disabled={activeFilterKeys.length === 0} onClick={() => onActiveFilterKeysChange([])}
-                className="text-[10px] font-bold text-rose-600 hover:text-rose-700 disabled:opacity-40 disabled:pointer-events-none cursor-pointer normal-case tracking-normal"
+                className="text-[10px] font-bold text-rose-600 hover:text-status-danger-fg disabled:opacity-40 disabled:pointer-events-none cursor-pointer normal-case tracking-normal"
               >
                 Clear
               </button>
@@ -436,7 +436,7 @@ export function TripAddFilterDropdown({
                   <button
                     key={item.key} type="button" onClick={() => toggleFilterKey(item.key)}
                     className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer ${
-                      active ? 'font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/70' : 'font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
+                      active ? 'font-bold text-status-info-fg bg-status-info-bg/80 hover:bg-status-info-bg-strong/70' : 'font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg'
                     }`}
                   >
                     <span className="flex items-center gap-2 min-w-0">
@@ -512,9 +512,9 @@ export function TripQueueLayoutDropdown({
 
   const items: ReadonlyArray<{ mode: DisplayLayout; label: string; sublabel?: string; icon: React.ReactNode }> = [
     { mode: 'auto', label: 'Auto', sublabel: 'Table ↔ Cards', icon: <BoltIcon className="w-3.5 h-3.5 text-blue-500 shrink-0" /> },
-    { mode: 'table', label: 'Table', icon: <TableCellsIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" /> },
-    { mode: 'cards', label: 'Cards', icon: <Squares2X2Icon className="w-3.5 h-3.5 text-slate-500 shrink-0" /> },
-    { mode: 'compact', label: 'Compact', icon: <ListBulletIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" /> },
+    { mode: 'table', label: 'Table', icon: <TableCellsIcon className="w-3.5 h-3.5 text-fg-muted shrink-0" /> },
+    { mode: 'cards', label: 'Cards', icon: <Squares2X2Icon className="w-3.5 h-3.5 text-fg-muted shrink-0" /> },
+    { mode: 'compact', label: 'Compact', icon: <ListBulletIcon className="w-3.5 h-3.5 text-fg-muted shrink-0" /> },
   ];
 
   return (
@@ -525,24 +525,24 @@ export function TripQueueLayoutDropdown({
         onClick={handleTriggerClick}
         className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 border rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer h-7 ${
           isOpen
-            ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-500/20'
+            ? 'bg-status-info-bg border-blue-400 text-status-info-fg ring-2 ring-blue-500/20'
             : isAutoCardsFallback
-            ? 'bg-blue-50/80 hover:bg-blue-50 border-blue-300 text-blue-800'
-            : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700'
+            ? 'bg-status-info-bg/80 hover:bg-status-info-bg border-status-info-border text-status-info-fg'
+            : 'bg-surface-card hover:bg-surface-subtle border-border-strong text-fg-secondary'
         }`}
         title={layoutTriggerTooltip}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
         {effectiveDisplayLayout === 'cards' ? (
-          <Squares2X2Icon className={`w-3.5 h-3.5 ${isOpen || isAutoCardsFallback ? 'text-blue-600' : 'text-slate-600'}`} />
+          <Squares2X2Icon className={`w-3.5 h-3.5 ${isOpen || isAutoCardsFallback ? 'text-blue-600' : 'text-fg-secondary'}`} />
         ) : effectiveDisplayLayout === 'table' ? (
-          <TableCellsIcon className={`w-3.5 h-3.5 ${isOpen ? 'text-blue-600' : 'text-slate-600'}`} />
+          <TableCellsIcon className={`w-3.5 h-3.5 ${isOpen ? 'text-blue-600' : 'text-fg-secondary'}`} />
         ) : (
-          <ListBulletIcon className={`w-3.5 h-3.5 ${isOpen ? 'text-blue-600' : 'text-slate-600'}`} />
+          <ListBulletIcon className={`w-3.5 h-3.5 ${isOpen ? 'text-blue-600' : 'text-fg-secondary'}`} />
         )}
         <span className="hidden sm:inline">{layoutTriggerLabel}</span>
-        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`} />
+        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-fg-subtle'}`} />
       </button>
 
       {isOpen && coords !== null && typeof document !== 'undefined' &&
@@ -576,19 +576,19 @@ export function TripQueueLayoutDropdown({
                     aria-selected={isSelected}
                     onClick={() => selectMode(item.mode)}
                     className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer ${
-                      isSelected ? 'font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/70' : 'font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
+                      isSelected ? 'font-bold text-status-info-fg bg-status-info-bg/80 hover:bg-status-info-bg-strong/70' : 'font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       {item.icon}
                       <div className="min-w-0">
                         <div className="truncate leading-tight">{item.label}</div>
-                        {item.sublabel && <div className="text-[10px] font-normal text-slate-400 leading-tight">{item.sublabel}</div>}
+                        {item.sublabel && <div className="text-[10px] font-normal text-fg-subtle leading-tight">{item.sublabel}</div>}
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {item.mode === 'auto' && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-blue-100/80 text-blue-700 text-[10px] font-bold">
+                        <span className="px-1.5 py-0.5 rounded-md bg-status-info-bg-strong/80 text-status-info-fg text-[10px] font-bold">
                           {isAutoCardsFallback ? 'Cards' : 'Table'}
                         </span>
                       )}
@@ -677,10 +677,10 @@ export function TripQueueAssignmentDropdown({
         onClick={handleTriggerClick}
         className={`h-7 px-2 sm:px-2.5 border rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
           isOpen
-            ? 'bg-indigo-50 border-indigo-400 text-indigo-800 ring-2 ring-indigo-500/20'
+            ? 'bg-status-staged-bg border-indigo-400 text-status-staged-fg ring-2 ring-indigo-500/20'
             : isHoldMode || totalActionCount > 0
-            ? 'bg-indigo-50/80 hover:bg-indigo-100/70 border-indigo-300 text-indigo-800'
-            : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700'
+            ? 'bg-status-staged-bg/80 hover:bg-status-staged-bg-strong/70 border-status-staged-border text-status-staged-fg'
+            : 'bg-surface-card hover:bg-surface-subtle border-border-strong text-fg-secondary'
         }`}
         title="Assignment mode, auto-staging & auto-dispatch sweep"
         aria-haspopup="true"
@@ -694,7 +694,7 @@ export function TripQueueAssignmentDropdown({
         )}
         <ChevronDownIcon
           className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${
-            isOpen ? 'rotate-180 text-indigo-600' : 'text-slate-400'
+            isOpen ? 'rotate-180 text-indigo-600' : 'text-fg-subtle'
           }`}
         />
       </button>
@@ -726,15 +726,15 @@ export function TripQueueAssignmentDropdown({
             <div className="p-2 space-y-2">
               {hasAssignModeToggle && stagedPlanner && (
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-semibold text-slate-600">Queue Mode</span>
-                  <div className="inline-flex items-center rounded-lg border border-slate-300 bg-white p-0.5 shadow-2xs">
+                  <span className="text-[11px] font-semibold text-fg-secondary">Queue Mode</span>
+                  <div className="inline-flex items-center rounded-lg border border-border-strong bg-surface-card p-0.5 shadow-2xs">
                     <button
                       type="button"
                       onClick={() => stagedPlanner.setQueueAssignMode('send_to_driver')}
                       className={`px-2 py-0.5 rounded-md text-[10.5px] font-extrabold cursor-pointer transition-colors ${
                         stagedPlanner.queueAssignMode === 'send_to_driver'
-                          ? 'bg-slate-900 text-white'
-                          : 'text-slate-600 hover:text-slate-900'
+                          ? 'bg-surface-header text-white'
+                          : 'text-fg-secondary hover:text-fg-primary'
                       }`}
                     >
                       Send
@@ -745,7 +745,7 @@ export function TripQueueAssignmentDropdown({
                       className={`px-2 py-0.5 rounded-md text-[10.5px] font-extrabold cursor-pointer transition-colors ${
                         stagedPlanner.queueAssignMode === 'stage_hold'
                           ? 'bg-indigo-600 text-white'
-                          : 'text-slate-600 hover:text-indigo-700'
+                          : 'text-fg-secondary hover:text-status-staged-fg'
                       }`}
                     >
                       📌 Hold
@@ -762,7 +762,7 @@ export function TripQueueAssignmentDropdown({
                     closeMenu();
                     stagedPlanner.openAutoStagePreview();
                   }}
-                  className="w-full h-7 px-2.5 rounded-lg border border-dashed border-indigo-400 bg-indigo-50/90 hover:bg-indigo-100 text-indigo-800 text-[11px] font-extrabold tracking-tight flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                  className="w-full h-7 px-2.5 rounded-lg border border-dashed border-indigo-400 bg-status-staged-bg/90 hover:bg-status-staged-bg-strong text-status-staged-fg text-[11px] font-extrabold tracking-tight flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
                 >
                   {stagedPlanner.isAutoStaging
                     ? '📌 Staging...'
@@ -781,7 +781,7 @@ export function TripQueueAssignmentDropdown({
                   className={`w-full h-7 px-2.5 rounded-lg border text-[11px] font-extrabold tracking-tight flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs disabled:opacity-50 ${
                     isManualOrPaused
                       ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700'
-                      : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border-indigo-300'
+                      : 'bg-status-staged-bg hover:bg-status-staged-bg-strong text-status-staged-fg border-status-staged-border'
                   }`}
                   title={`Run ${effectiveSweepMode.replace(/_/g, ' ')} for ${readyAutoDispatchCount} open trip(s) inside the ${scheduledDispatchLeadMinutes}m Pre-Pickup Lead Window`}
                 >

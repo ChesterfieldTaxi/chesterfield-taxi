@@ -32,12 +32,12 @@ export function DispatchConvoyBanners({
   return (
     <>
       {isCompleted && (
-        <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-950 text-xs space-y-1">
-          <div className="flex items-center gap-1.5 font-bold text-emerald-900">
-            <LockIcon className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+        <div className="p-2.5 bg-status-success-bg border border-status-success-border rounded-xl text-status-success-fg text-xs space-y-1">
+          <div className="flex items-center gap-1.5 font-bold text-status-success-fg">
+            <LockIcon className="w-3.5 h-3.5 text-status-success-fg shrink-0" />
             <span>Completed Trip (Date &amp; Schedule Locked)</span>
           </div>
-          <p className="text-[11px] text-emerald-800 leading-relaxed">
+          <p className="text-[11px] text-status-success-fg leading-relaxed">
             Date, time, and recurrence are locked for shift &amp; payout integrity.
             Passenger/contact details, location labels, notes, fare, and payment remain editable.
           </p>
@@ -45,12 +45,12 @@ export function DispatchConvoyBanners({
       )}
 
       {isCancelled && (
-        <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-950 text-xs space-y-1">
-          <div className="flex items-center gap-1.5 font-bold text-rose-900">
+        <div className="p-2.5 bg-status-danger-bg border border-status-danger-border rounded-xl text-status-danger-fg text-xs space-y-1">
+          <div className="flex items-center gap-1.5 font-bold text-status-danger-fg">
             <BanIcon className="w-3.5 h-3.5 text-rose-600 shrink-0" />
             <span>Cancelled Trip (Schedule &amp; Route Locked)</span>
           </div>
-          <p className="text-[11px] text-rose-800 leading-relaxed">
+          <p className="text-[11px] text-status-danger-fg leading-relaxed">
             You may update contact details and internal remarks, or use &quot;Copy Booking&quot;
             below to create a new active trip.
           </p>
@@ -60,7 +60,7 @@ export function DispatchConvoyBanners({
       {submitError && (
         <div
           ref={submitErrorRef}
-          className="p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs font-semibold flex items-center gap-1.5"
+          className="p-2 bg-status-danger-bg border border-status-danger-border rounded text-status-danger-fg text-xs font-semibold flex items-center gap-1.5"
         >
           <AlertTriangleIcon className="w-3.5 h-3.5 text-red-600 shrink-0" />
           <span>{submitError}</span>
@@ -100,9 +100,9 @@ export function DispatchConvoyBanners({
                 }));
 
           return (
-            <div className="p-2.5 bg-violet-50 border border-violet-200 rounded-xl space-y-2 text-xs">
+            <div className="p-2.5 bg-status-staged-bg border border-status-staged-border rounded-xl space-y-2 text-xs">
               <div className="flex items-center justify-between gap-2">
-                <div className="font-bold text-violet-900 flex items-center gap-1.5">
+                <div className="font-bold text-status-staged-fg flex items-center gap-1.5">
                   <span className="px-1.5 py-0.5 rounded bg-violet-600 text-white text-[10px] font-black">
                     CAR {initialTrip.multiCarIndex || 1}/{initialTrip.multiCarTotal}
                   </span>
@@ -120,20 +120,20 @@ export function DispatchConvoyBanners({
                       key={car.tripId}
                       className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg border text-[11px] ${
                         isCurrent
-                          ? 'bg-white border-violet-300 font-bold text-violet-950'
-                          : 'bg-violet-100/50 border-violet-200/70 text-slate-700'
+                          ? 'bg-surface-card border-status-staged-border font-bold text-status-staged-fg'
+                          : 'bg-status-staged-bg-strong/50 border-status-staged-border/70 text-fg-secondary'
                       }`}
                     >
                       <div className="min-w-0 truncate">
                         <span className="font-bold">Car #{car.carIndex}</span>
-                        <span className="text-slate-500"> · {car.vehicleDisplayName}</span>
-                        <span className="ml-1.5 text-[10px] font-semibold text-blue-700">
+                        <span className="text-fg-muted"> · {car.vehicleDisplayName}</span>
+                        <span className="ml-1.5 text-[10px] font-semibold text-status-info-fg">
                           {car.driverName || (car.driverId ? 'Assigned' : 'Unassigned')}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {isCurrent ? (
-                          <span className="text-[10px] font-black text-violet-700">Editing</span>
+                          <span className="text-[10px] font-black text-status-staged-fg">Editing</span>
                         ) : (
                           onOpenLinkedTrip && (
                             <button
@@ -156,7 +156,7 @@ export function DispatchConvoyBanners({
 
       {/* Multi-Car Split Info Notice when >1 vehicle selected on New or Unsplit Edit */}
       {selectedVehicles.length > 1 && !initialTrip?.multiCarGroupId && (
-        <div className="px-2.5 py-2 bg-violet-50/90 border border-violet-200 rounded-lg text-[11px] text-violet-900 flex items-center justify-between gap-2">
+        <div className="px-2.5 py-2 bg-status-staged-bg/90 border border-status-staged-border rounded-lg text-[11px] text-status-staged-fg flex items-center justify-between gap-2">
           <span>
             <strong>{selectedVehicles.length} separate linked trips</strong> will be created so each
             car can be assigned individually with associate driver awareness.

@@ -108,30 +108,30 @@ export function ClientSavedCardsCard({
   };
 
   return (
-    <div data-client-saved-cards="true" className="bg-white rounded-xl border border-slate-200/90 p-3 space-y-2 shadow-2xs text-xs">
+    <div data-client-saved-cards="true" className="bg-surface-card rounded-xl border border-border-subtle/90 p-3 space-y-2 shadow-2xs text-xs">
       <div className="flex items-center justify-between gap-1.5 flex-wrap">
-        <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+        <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-fg-muted">
           <CreditCardIcon className="w-3.5 h-3.5 text-emerald-600" /><span>Saved Payment Methods</span>
         </span>
         <div className="flex items-center gap-1">
-          <button type="button" data-send-card-setup-link="true" disabled={isSendingLink} onClick={handleSendSetupLink} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[10.5px] border border-indigo-200 cursor-pointer disabled:opacity-50">
+          <button type="button" data-send-card-setup-link="true" disabled={isSendingLink} onClick={handleSendSetupLink} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-status-staged-bg hover:bg-status-staged-bg-strong text-status-staged-fg font-bold text-[10.5px] border border-status-staged-border cursor-pointer disabled:opacity-50">
             {isSendingLink ? <SpinnerIcon className="w-3 h-3 animate-spin" /> : <LockIcon className="w-3 h-3" />}
             <span>Send Card Setup Link</span>
           </button>
-          <button type="button" data-add-card-reference-btn="true" onClick={() => { setIsAddingRef((v) => !v); setRefError(null); }} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[10.5px] border border-emerald-200 cursor-pointer">
+          <button type="button" data-add-card-reference-btn="true" onClick={() => { setIsAddingRef((v) => !v); setRefError(null); }} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-status-success-bg hover:bg-status-success-bg-strong text-status-success-fg font-bold text-[10.5px] border border-status-success-border cursor-pointer">
             <PlusIcon className="w-3 h-3" /><span>+ Add Reference</span>
           </button>
         </div>
       </div>
 
       {(linkNotice || setupLinkUrl) && (
-        <div className="p-2 rounded-lg bg-indigo-50/80 border border-indigo-200 text-[11px] text-indigo-900 flex items-center justify-between gap-2">
+        <div className="p-2 rounded-lg bg-status-staged-bg/80 border border-status-staged-border text-[11px] text-status-staged-fg flex items-center justify-between gap-2">
           <div className="min-w-0 truncate">
             <span className="font-bold">{linkNotice}</span>
-            {setupLinkUrl && <span className="ml-1.5 font-mono text-[10px] text-indigo-700">{setupLinkUrl}</span>}
+            {setupLinkUrl && <span className="ml-1.5 font-mono text-[10px] text-status-staged-fg">{setupLinkUrl}</span>}
           </div>
           {setupLinkUrl && (
-            <button type="button" onClick={() => navigator.clipboard?.writeText(setupLinkUrl).catch(() => {})} className="px-1.5 py-0.5 rounded bg-white border border-indigo-200 text-indigo-700 font-bold text-[10px] inline-flex items-center gap-1 shrink-0 cursor-pointer">
+            <button type="button" onClick={() => navigator.clipboard?.writeText(setupLinkUrl).catch(() => {})} className="px-1.5 py-0.5 rounded bg-surface-card border border-status-staged-border text-status-staged-fg font-bold text-[10px] inline-flex items-center gap-1 shrink-0 cursor-pointer">
               <CopyIcon className="w-3 h-3" /><span>Copy</span>
             </button>
           )}
@@ -139,28 +139,28 @@ export function ClientSavedCardsCard({
       )}
 
       {savedMethods.length === 0 && !isAddingRef ? (
-        <div className="text-[11px] text-slate-500 py-1">No saved cards on file. Send a secure Stripe setup link or add a 4-digit card reference.</div>
+        <div className="text-[11px] text-fg-muted py-1">No saved cards on file. Send a secure Stripe setup link or add a 4-digit card reference.</div>
       ) : (
         <div className="space-y-1.5">
           {savedMethods.map((m) => (
-            <div key={m.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/70">
+            <div key={m.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-border-subtle bg-surface-subtle/70">
               <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
-                <span className="font-bold text-slate-900 font-mono text-[11.5px]">
+                <span className="font-bold text-fg-primary font-mono text-[11.5px]">
                   {formatCardBrandLabel(m.brand)} •••• {m.last4} · {formatCardExpiryDisplay(m.expMonth, m.expYear)}
                   {m.isDefault ? ' · Default' : ''}
                 </span>
-                <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-extrabold ${m.mode === 'stripe_pm' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-200/80 text-slate-700'}`}>
+                <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-extrabold ${m.mode === 'stripe_pm' ? 'bg-status-success-bg-strong text-status-success-fg border border-status-success-border' : 'bg-surface-emphasis/80 text-fg-secondary'}`}>
                   {m.mode === 'stripe_pm' ? 'Stripe Vault' : 'Ref Only'}
                 </span>
-                {m.cardholderName && <span className="text-[10.5px] text-slate-500 truncate">({m.cardholderName})</span>}
+                {m.cardholderName && <span className="text-[10.5px] text-fg-muted truncate">({m.cardholderName})</span>}
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {!m.isDefault && (
-                  <button type="button" onClick={() => handleSetDefault(m.id)} className="px-1.5 py-0.5 rounded bg-white hover:bg-blue-50 border border-slate-200 text-slate-700 hover:text-blue-700 font-bold text-[10px] cursor-pointer">
+                  <button type="button" onClick={() => handleSetDefault(m.id)} className="px-1.5 py-0.5 rounded bg-surface-card hover:bg-status-info-bg border border-border-subtle text-fg-secondary hover:text-status-info-fg font-bold text-[10px] cursor-pointer">
                     Set Default
                   </button>
                 )}
-                <button type="button" onClick={() => handleRemove(m.id)} className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer" title="Remove saved card" aria-label="Remove saved card">
+                <button type="button" onClick={() => handleRemove(m.id)} className="p-1 text-fg-subtle hover:text-rose-600 rounded cursor-pointer" title="Remove saved card" aria-label="Remove saved card">
                   <TrashIcon className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -170,18 +170,18 @@ export function ClientSavedCardsCard({
       )}
 
       {isAddingRef && (
-        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
-          <div className="text-[10px] font-semibold text-emerald-800 flex items-center gap-1">
+        <div className="p-2.5 rounded-lg bg-surface-subtle border border-border-subtle space-y-2">
+          <div className="text-[10px] font-semibold text-status-success-fg flex items-center gap-1">
             <LockIcon className="w-3 h-3 text-emerald-600 shrink-0" /><span>PCI-Safe Reference — Brand, Last 4 &amp; Expiry only (never full PAN or CVC)</span>
           </div>
           <div className="grid grid-cols-3 gap-1.5">
             <Select size="xs" options={CARD_BRAND_OPTIONS} value={refBrand} onValueChange={setRefBrand} aria-label="Card brand" />
-            <input type="text" maxLength={4} value={refLast4} onChange={(e) => setRefLast4(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="Last 4 (4242)" className="px-2 py-1 rounded-lg border border-slate-300 bg-white font-mono text-center" />
-            <input type="text" maxLength={5} value={refExp} onChange={(e) => setRefExp(e.target.value)} placeholder="MM/YY" className="px-2 py-1 rounded-lg border border-slate-300 bg-white font-mono text-center" />
+            <input type="text" maxLength={4} value={refLast4} onChange={(e) => setRefLast4(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="Last 4 (4242)" className="px-2 py-1 rounded-lg border border-border-strong bg-surface-card font-mono text-center" />
+            <input type="text" maxLength={5} value={refExp} onChange={(e) => setRefExp(e.target.value)} placeholder="MM/YY" className="px-2 py-1 rounded-lg border border-border-strong bg-surface-card font-mono text-center" />
           </div>
           <div className="flex items-center gap-1.5">
-            <input type="text" value={refHolder} onChange={(e) => setRefHolder(e.target.value)} placeholder="Cardholder Name" className="flex-1 px-2 py-1 rounded-lg border border-slate-300 bg-white" />
-            <button type="button" onClick={() => setIsAddingRef(false)} className="px-2 py-1 rounded-lg border border-slate-300 bg-white text-slate-600 font-bold text-[10.5px] cursor-pointer">Cancel</button>
+            <input type="text" value={refHolder} onChange={(e) => setRefHolder(e.target.value)} placeholder="Cardholder Name" className="flex-1 px-2 py-1 rounded-lg border border-border-strong bg-surface-card" />
+            <button type="button" onClick={() => setIsAddingRef(false)} className="px-2 py-1 rounded-lg border border-border-strong bg-surface-card text-fg-secondary font-bold text-[10.5px] cursor-pointer">Cancel</button>
             <button type="button" onClick={handleSaveReference} className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10.5px] inline-flex items-center gap-1 cursor-pointer">
               <CheckIcon className="w-3 h-3" /><span>Save</span>
             </button>

@@ -170,7 +170,7 @@ export function DispatchRightOperationsDock({
 
   return (
     <aside
-      className={`relative bg-white border-l border-slate-200 flex-col shrink-0 h-full overflow-hidden z-20 shadow-xl ${
+      className={`relative bg-surface-card border-l border-border-subtle flex-col shrink-0 h-full overflow-hidden z-20 shadow-xl ${
         activeDockTab !== 'none' ? 'hidden lg:flex' : 'hidden'
       }`}
       style={{ width: `${operationsWidth}px` }}
@@ -188,24 +188,24 @@ export function DispatchRightOperationsDock({
           className={`w-0.5 h-10 rounded-full transition-colors ${
             activeResizeHandle === 'operations'
               ? 'bg-blue-600'
-              : 'bg-slate-300/80 group-hover:bg-blue-500'
+              : 'bg-surface-strong/80 group-hover:bg-blue-500'
           }`}
         />
       </div>
 
       {/* Clean Single-Row Drawer Title Bar */}
-      <div className="h-10 px-3 pl-4 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between shrink-0 text-xs">
+      <div className="h-10 px-3 pl-4 bg-surface-subtle/90 border-b border-border-subtle flex items-center justify-between shrink-0 text-xs">
         <div className="flex items-center gap-2 min-w-0">
           {(activeDockTab === 'phone' || activeDockTab === 'comms') && (
             <>
-              <div className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-200/80 text-blue-600 flex items-center justify-center shrink-0">
+              <div className="w-6 h-6 rounded-lg bg-status-info-bg border border-status-info-border/80 text-blue-600 flex items-center justify-center shrink-0">
                 <PhoneIcon className="w-3.5 h-3.5" />
               </div>
-              <span className="font-extrabold text-slate-900 tracking-tight truncate">
+              <span className="font-extrabold text-fg-primary tracking-tight truncate">
                 Phone &amp; Messages
               </span>
               {activeCallStatus !== 'idle' && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-status-success-bg-strong text-status-success-fg border border-status-success-border flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                   Live Call
                 </span>
@@ -214,10 +214,10 @@ export function DispatchRightOperationsDock({
           )}
           {activeDockTab === 'email' && (
             <>
-              <div className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-200/80 text-indigo-600 flex items-center justify-center shrink-0">
+              <div className="w-6 h-6 rounded-lg bg-status-staged-bg border border-status-staged-border/80 text-indigo-600 flex items-center justify-center shrink-0">
                 <MailIcon className="w-3.5 h-3.5" />
               </div>
-              <span className="font-extrabold text-slate-900 tracking-tight truncate">
+              <span className="font-extrabold text-fg-primary tracking-tight truncate">
                 Email Inbox
               </span>
               {unreadEmailCount > 0 && (
@@ -229,21 +229,21 @@ export function DispatchRightOperationsDock({
           )}
           {activeDockTab === 'drivers' && (
             <>
-              <div className="w-6 h-6 rounded-lg bg-emerald-50 border border-emerald-200/80 text-emerald-600 flex items-center justify-center shrink-0">
+              <div className="w-6 h-6 rounded-lg bg-status-success-bg border border-status-success-border/80 text-emerald-600 flex items-center justify-center shrink-0">
                 <CarIcon className="w-3.5 h-3.5" />
               </div>
-              <span className="font-extrabold text-slate-900 tracking-tight truncate">Live Fleet</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="font-extrabold text-fg-primary tracking-tight truncate">Live Fleet</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-status-success-bg text-status-success-fg border border-status-success-border">
                 {drivers.filter((d) => d.mapStatus === 'available').length} avail
               </span>
             </>
           )}
           {activeDockTab === 'alerts' && (
             <>
-              <div className="w-6 h-6 rounded-lg bg-amber-50 border border-amber-200/80 text-amber-600 flex items-center justify-center shrink-0">
+              <div className="w-6 h-6 rounded-lg bg-status-warning-bg border border-status-warning-border/80 text-amber-600 flex items-center justify-center shrink-0">
                 <BellIcon className="w-3.5 h-3.5" />
               </div>
-              <span className="font-extrabold text-slate-900 tracking-tight truncate">
+              <span className="font-extrabold text-fg-primary tracking-tight truncate">
                 Fleet Alerts
               </span>
             </>
@@ -265,7 +265,7 @@ export function DispatchRightOperationsDock({
               }
             }}
             title="Pop out into separate window"
-            className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg hover:bg-surface-emphasis/70 text-fg-muted hover:text-fg-strong transition-colors cursor-pointer"
           >
             <ExternalLinkIcon className="w-3.5 h-3.5" />
           </button>
@@ -273,7 +273,7 @@ export function DispatchRightOperationsDock({
           <button
             type="button"
             onClick={() => onActiveDockTabChange('none')}
-            className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg hover:bg-surface-emphasis/70 text-fg-muted hover:text-rose-600 transition-colors cursor-pointer"
             title="Close drawer (Esc)"
             aria-label="Close drawer"
           >
@@ -285,7 +285,7 @@ export function DispatchRightOperationsDock({
       {/* Active Panel Viewport */}
       <div
         ref={operationsContainerRef}
-        className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white"
+        className="flex-1 overflow-hidden flex flex-col min-h-0 bg-surface-card"
       >
         {/* 1. PHONE / COMMUNICATIONS HUB (Persistently mounted on desktop so WebRTC softphone stays online) */}
         <div
@@ -295,7 +295,7 @@ export function DispatchRightOperationsDock({
         >
           <Suspense
             fallback={
-              <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-500">
+              <div className="flex-1 flex flex-col items-center justify-center gap-2 text-fg-muted">
                 <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
                 <span className="text-xs font-semibold">Loading communications...</span>
               </div>
@@ -323,7 +323,7 @@ export function DispatchRightOperationsDock({
           <div className="flex-1 flex flex-col h-full overflow-hidden">
             <Suspense
               fallback={
-                <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-500">
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 text-fg-muted">
                   <SpinnerIcon className="w-5 h-5 animate-spin text-indigo-600" />
                   <span className="text-xs font-semibold">Loading email console...</span>
                 </div>
@@ -364,9 +364,9 @@ export function DispatchRightOperationsDock({
         {/* 4. FLEET ALERTS & BROADCASTS */}
         {activeDockTab === 'alerts' && (
           <div className="flex-1 flex flex-col h-full overflow-hidden">
-            <div className="p-2.5 bg-slate-50 border-b border-slate-200 space-y-1.5 shrink-0">
+            <div className="p-2.5 bg-surface-subtle border-b border-border-subtle space-y-1.5 shrink-0">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wide inline-flex items-center gap-1">
+                <span className="text-[10px] font-black text-fg-muted uppercase tracking-wide inline-flex items-center gap-1">
                   <BoltIcon className="w-3 h-3 text-amber-500 shrink-0" />
                   <span>Tactical Broadcast Presets</span>
                 </span>
@@ -374,7 +374,7 @@ export function DispatchRightOperationsDock({
                   <button
                     type="button"
                     onClick={() => onIsAddingPresetChange(true)}
-                    className="text-xs text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+                    className="text-xs text-blue-600 hover:text-status-info-fg font-bold hover:underline cursor-pointer"
                   >
                     + Add Preset
                   </button>
@@ -406,13 +406,13 @@ export function DispatchRightOperationsDock({
               </Select>
 
               {isAddingPreset && (
-                <div className="flex items-center gap-1.5 mt-1.5 p-1.5 bg-blue-50 border border-blue-200 rounded-xl">
+                <div className="flex items-center gap-1.5 mt-1.5 p-1.5 bg-status-info-bg border border-status-info-border rounded-xl">
                   <input
                     type="text"
                     placeholder="Enter new preset message..."
                     value={newPresetText}
                     onChange={(e) => onNewPresetTextChange(e.target.value)}
-                    className="flex-1 px-2.5 py-1 bg-white border border-blue-300 rounded-lg text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                    className="flex-1 px-2.5 py-1 bg-surface-card border border-status-info-border rounded-lg text-xs text-fg-strong focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -433,7 +433,7 @@ export function DispatchRightOperationsDock({
                       onIsAddingPresetChange(false);
                       onNewPresetTextChange('');
                     }}
-                    className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium text-xs rounded-lg cursor-pointer"
+                    className="px-2 py-1 bg-surface-emphasis hover:bg-surface-strong text-fg-secondary font-medium text-xs rounded-lg cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -443,11 +443,11 @@ export function DispatchRightOperationsDock({
 
             <form
               onSubmit={onSendMessage}
-              className="p-3 bg-white border-b border-slate-200 space-y-2 shrink-0"
+              className="p-3 bg-surface-card border-b border-border-subtle space-y-2 shrink-0"
             >
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <span className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                  <span className="block text-[10px] font-bold text-fg-muted uppercase mb-0.5">
                     Send To
                   </span>
                   <Select
@@ -464,7 +464,7 @@ export function DispatchRightOperationsDock({
                   </Select>
                 </div>
                 <div>
-                  <span className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">
+                  <span className="block text-[10px] font-bold text-fg-muted uppercase mb-0.5">
                     Priority
                   </span>
                   <Select
@@ -484,7 +484,7 @@ export function DispatchRightOperationsDock({
                   placeholder="Type dispatch broadcast or alert..."
                   value={msgText}
                   onChange={(e) => onMsgTextChange(e.target.value)}
-                  className="flex-1 px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl text-xs focus:ring-1 focus:ring-blue-500"
+                  className="flex-1 px-2.5 py-1.5 bg-surface-card border border-border-strong rounded-xl text-xs focus:ring-1 focus:ring-blue-500"
                 />
                 <button
                   type="submit"
@@ -495,15 +495,15 @@ export function DispatchRightOperationsDock({
               </div>
             </form>
 
-            <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 text-xs">
-              <div className="flex items-center gap-1 bg-slate-200/70 p-0.5 rounded-lg">
+            <div className="px-3 py-2 bg-surface-subtle border-b border-border-subtle flex items-center justify-between gap-2 shrink-0 text-xs">
+              <div className="flex items-center gap-1 bg-surface-emphasis/70 p-0.5 rounded-lg">
                 <button
                   type="button"
                   onClick={() => onAlertsFilterChange('unread')}
                   className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors cursor-pointer ${
                     alertsFilter === 'unread'
-                      ? 'bg-white text-blue-700 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-surface-card text-status-info-fg shadow-2xs'
+                      : 'text-fg-secondary hover:text-fg-primary'
                   }`}
                   title="Active unread alerts (read alerts auto-hide)"
                 >
@@ -514,8 +514,8 @@ export function DispatchRightOperationsDock({
                   onClick={() => onAlertsFilterChange('pinned')}
                   className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors cursor-pointer ${
                     alertsFilter === 'pinned'
-                      ? 'bg-white text-blue-700 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-surface-card text-status-info-fg shadow-2xs'
+                      : 'text-fg-secondary hover:text-fg-primary'
                   }`}
                 >
                   <span className="inline-flex items-center gap-1">
@@ -528,8 +528,8 @@ export function DispatchRightOperationsDock({
                   onClick={() => onAlertsFilterChange('all')}
                   className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors cursor-pointer ${
                     alertsFilter === 'all'
-                      ? 'bg-white text-blue-700 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-surface-card text-status-info-fg shadow-2xs'
+                      : 'text-fg-secondary hover:text-fg-primary'
                   }`}
                   title="All active and previously read alerts within retention window"
                 >
@@ -538,7 +538,7 @@ export function DispatchRightOperationsDock({
               </div>
 
               <div className="flex items-center gap-1.5 text-[10px]">
-                <span className="text-slate-500 font-medium inline-flex items-center gap-1">
+                <span className="text-fg-muted font-medium inline-flex items-center gap-1">
                   <ClockIcon className="w-3 h-3 shrink-0" />
                   <span>Retention:</span>
                 </span>
@@ -563,7 +563,7 @@ export function DispatchRightOperationsDock({
               </div>
             </div>
 
-            <div className="px-3 py-1 bg-slate-100/70 border-b border-slate-200 flex items-center justify-between text-[10px] text-slate-600 shrink-0">
+            <div className="px-3 py-1 bg-surface-muted/70 border-b border-border-subtle flex items-center justify-between text-[10px] text-fg-secondary shrink-0">
               <span>
                 Showing{' '}
                 {alertsFilter === 'unread'
@@ -578,7 +578,7 @@ export function DispatchRightOperationsDock({
                   <button
                     type="button"
                     onClick={onMarkAllAlertsRead}
-                    className="text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+                    className="text-blue-600 hover:text-status-info-fg font-bold hover:underline cursor-pointer"
                   >
                     Mark all read
                   </button>
@@ -587,7 +587,7 @@ export function DispatchRightOperationsDock({
                   <button
                     type="button"
                     onClick={onClearUnpinnedAlerts}
-                    className="text-slate-500 hover:text-rose-600 font-bold hover:underline cursor-pointer"
+                    className="text-fg-muted hover:text-rose-600 font-bold hover:underline cursor-pointer"
                   >
                     Clear unpinned
                   </button>
@@ -597,16 +597,16 @@ export function DispatchRightOperationsDock({
 
             <div className="flex-1 overflow-y-auto p-3 space-y-2 text-xs">
               {filteredAlertMessages.length === 0 ? (
-                <div className="text-center py-8 text-slate-400">
+                <div className="text-center py-8 text-fg-subtle">
                   <BellIcon className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p className="text-xs font-semibold text-slate-600">
+                  <p className="text-xs font-semibold text-fg-secondary">
                     {alertsFilter === 'unread'
                       ? 'No unread alerts'
                       : alertsFilter === 'pinned'
                       ? 'No pinned alerts'
                       : 'No alerts in history'}
                   </p>
-                  <p className="text-[11px] text-slate-400 mt-1">
+                  <p className="text-[11px] text-fg-subtle mt-1">
                     {alertsFilter === 'unread' && activeAndSortedMessages.length > unreadAlertsCount
                       ? `${activeAndSortedMessages.length - unreadAlertsCount} read alert(s) auto-hidden from active view.`
                       : `Non-pinned alerts auto-dismiss after ${
@@ -617,7 +617,7 @@ export function DispatchRightOperationsDock({
                     <button
                       type="button"
                       onClick={() => onAlertsFilterChange('all')}
-                      className="mt-2.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-blue-700 font-bold text-[11px] transition-colors cursor-pointer"
+                      className="mt-2.5 px-2.5 py-1 rounded-lg bg-surface-muted hover:bg-surface-emphasis text-status-info-fg font-bold text-[11px] transition-colors cursor-pointer"
                     >
                       View All / History ({activeAndSortedMessages.length})
                     </button>

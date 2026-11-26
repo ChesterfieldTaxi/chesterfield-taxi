@@ -20,19 +20,19 @@ export interface DispatchStatusMeta {
 }
 
 const STATUS_META_BY_KEY: Record<string, DispatchStatusMeta> = {
-  late: { key: 'late', label: 'Late', tooltip: 'Late — Past scheduled pickup time', pillClass: 'bg-rose-600 text-white border-rose-700 animate-pulse' },
-  unconfirmed: { key: 'unconfirmed', label: 'Unconfirmed', tooltip: 'Unconfirmed — Awaiting dispatch review', pillClass: 'bg-amber-100 text-amber-900 border-amber-300 animate-pulse' },
-  confirmed: { key: 'confirmed', label: 'Confirmed', tooltip: 'Confirmed — Ready for dispatch', pillClass: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
-  pending: { key: 'pending', label: 'Pending', tooltip: 'Pending — Queued', pillClass: 'bg-amber-50 text-amber-800 border-amber-300' },
-  offered: { key: 'offered', label: 'Offered', tooltip: 'Offered — Waiting for driver response', pillClass: 'bg-sky-100 text-sky-800 border-sky-300' },
-  assigned: { key: 'assigned', label: 'Assigned', tooltip: 'Assigned to driver', pillClass: 'bg-blue-100 text-blue-800 border-blue-300' },
-  accepted: { key: 'accepted', label: 'Accepted', tooltip: 'Accepted — Driver acknowledged', pillClass: 'bg-purple-100 text-purple-800 border-purple-300' },
-  en_route: { key: 'en_route', label: 'En Route', tooltip: 'En Route to pickup', pillClass: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
-  arrived: { key: 'arrived', label: 'Arrived', tooltip: 'Arrived at pickup', pillClass: 'bg-orange-100 text-orange-900 border-orange-300' },
-  in_progress: { key: 'in_progress', label: 'In Progress', tooltip: 'In Progress — Passenger on board', pillClass: 'bg-emerald-100 text-emerald-900 border-emerald-400' },
-  completed: { key: 'completed', label: 'Completed', tooltip: 'Completed', pillClass: 'bg-emerald-700 text-white border-emerald-800' },
-  cancelled: { key: 'cancelled', label: 'Cancelled', tooltip: 'Cancelled', pillClass: 'bg-rose-800 text-white border-rose-900' },
-  declined: { key: 'declined', label: 'Declined', tooltip: 'Declined', pillClass: 'bg-slate-200 text-slate-700 border-slate-300' },
+  late: { key: 'late', label: 'Late', tooltip: 'Late — Past scheduled pickup time', pillClass: 'bg-rose-600 text-white border-rose-500 animate-pulse' },
+  unconfirmed: { key: 'unconfirmed', label: 'Unconfirmed', tooltip: 'Unconfirmed — Awaiting dispatch review', pillClass: 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border animate-pulse' },
+  confirmed: { key: 'confirmed', label: 'Confirmed', tooltip: 'Confirmed — Ready for dispatch', pillClass: 'bg-status-success-bg-strong text-status-success-fg border-status-success-border' },
+  pending: { key: 'pending', label: 'Pending', tooltip: 'Pending — Queued', pillClass: 'bg-status-warning-bg text-status-warning-fg border-status-warning-border' },
+  offered: { key: 'offered', label: 'Offered', tooltip: 'Offered — Waiting for driver response', pillClass: 'bg-status-info-bg-strong text-status-info-fg border-status-info-border dark:bg-sky-950/80 dark:text-sky-300 dark:border-sky-700' },
+  assigned: { key: 'assigned', label: 'Assigned', tooltip: 'Assigned to driver', pillClass: 'bg-status-info-bg-strong text-status-info-fg border-status-info-border' },
+  accepted: { key: 'accepted', label: 'Accepted', tooltip: 'Accepted — Driver acknowledged', pillClass: 'bg-status-staged-bg-strong text-status-staged-fg border-status-staged-border dark:bg-purple-950/80 dark:text-purple-300 dark:border-purple-700' },
+  en_route: { key: 'en_route', label: 'En Route', tooltip: 'En Route to pickup', pillClass: 'bg-status-staged-bg-strong text-status-staged-fg border-status-staged-border' },
+  arrived: { key: 'arrived', label: 'Arrived', tooltip: 'Arrived at pickup', pillClass: 'bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-950/80 dark:text-orange-300 dark:border-orange-700' },
+  in_progress: { key: 'in_progress', label: 'In Progress', tooltip: 'In Progress — Passenger on board', pillClass: 'bg-status-success-bg-strong text-status-success-fg border-status-success-border' },
+  completed: { key: 'completed', label: 'Completed', tooltip: 'Completed', pillClass: 'bg-emerald-700 text-white border-emerald-600' },
+  cancelled: { key: 'cancelled', label: 'Cancelled', tooltip: 'Cancelled', pillClass: 'bg-status-danger-bg-strong text-status-danger-fg border-status-danger-border' },
+  declined: { key: 'declined', label: 'Declined', tooltip: 'Declined', pillClass: 'bg-surface-emphasis text-fg-secondary border-border-strong' },
 };
 
 export function resolveDispatchStatusMeta(
@@ -58,7 +58,7 @@ export function resolveDispatchStatusMeta(
     key: normalized || 'unknown',
     label: fallbackLabel,
     tooltip: fallbackLabel,
-    pillClass: 'bg-slate-100 text-slate-700 border-slate-300',
+    pillClass: 'bg-surface-muted text-fg-secondary border-border-strong',
   };
 }
 

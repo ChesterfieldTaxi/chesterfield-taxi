@@ -28,46 +28,46 @@ export function FleetAlertCard({
     <div
       className={`group relative p-2.5 rounded-xl border text-xs transition-all ${
         m.isPinned
-          ? 'border-amber-400 bg-amber-50/70 shadow-2xs'
+          ? 'border-status-warning-border bg-status-warning-bg/70 shadow-2xs'
           : m.priority === 'urgent'
           ? m.isRead
-            ? 'bg-rose-50/40 border-rose-200 text-rose-950'
-            : 'bg-rose-50 border-rose-300 text-rose-900 border-l-4 border-l-rose-600 shadow-2xs'
+            ? 'bg-status-danger-bg/40 border-status-danger-border text-status-danger-fg'
+            : 'bg-status-danger-bg border-status-danger-border text-status-danger-fg border-l-4 border-l-rose-600 shadow-2xs'
           : m.isRead
-          ? 'bg-slate-50/70 border-slate-200 text-slate-600'
-          : 'bg-white border-slate-200 text-slate-800 border-l-4 border-l-blue-600 shadow-2xs'
+          ? 'bg-surface-subtle/70 border-border-subtle text-fg-secondary'
+          : 'bg-surface-card border-border-subtle text-fg-strong border-l-4 border-l-blue-600 shadow-2xs'
       }`}
     >
       {/* Top Header: Recipient, Priority, Pinned Badge, Unread Dot, Timestamp */}
       <div className="flex items-center justify-between font-bold text-[10px] mb-1">
         <div className="flex items-center gap-1.5 flex-wrap">
           {m.isPinned && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-amber-200/90 text-amber-950 font-black text-[9px]">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-status-warning-bg-strong/90 text-status-warning-fg font-black text-[9px]">
               📌 Pinned
             </span>
           )}
           {!m.isRead && (
             <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" title="Unread alert" />
           )}
-          <span className="text-slate-600">
-            To: <span className="font-extrabold text-slate-900">{m.to}</span>
+          <span className="text-fg-secondary">
+            To: <span className="font-extrabold text-fg-primary">{m.to}</span>
           </span>
           {m.priority === 'urgent' && (
-            <span className="text-rose-600 font-extrabold uppercase text-[9px] bg-rose-100 px-1 py-0.2 rounded">
+            <span className="text-rose-600 font-extrabold uppercase text-[9px] bg-status-danger-bg-strong px-1 py-0.2 rounded">
               Urgent
             </span>
           )}
         </div>
-        <span className="text-slate-400 font-mono text-[10px] shrink-0">{m.timestamp}</span>
+        <span className="text-fg-subtle font-mono text-[10px] shrink-0">{m.timestamp}</span>
       </div>
 
       {/* Message Text */}
-      <p className={`text-xs leading-snug pr-12 ${m.isRead ? 'text-slate-600 font-normal' : 'text-slate-900 font-medium'}`}>
+      <p className={`text-xs leading-snug pr-12 ${m.isRead ? 'text-fg-secondary font-normal' : 'text-fg-primary font-medium'}`}>
         {m.text}
       </p>
 
       {/* Action Toolbar (always accessible on touch/keyboard; hover-revealed on desktop) */}
-      <div className="mt-2 pt-1.5 border-t border-slate-200/60 flex items-center justify-end gap-1 sm:mt-0 sm:pt-0 sm:border-0 sm:absolute sm:bottom-1.5 sm:right-1.5 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity sm:bg-white/95 sm:backdrop-blur-xs sm:px-1 sm:py-0.5 sm:rounded-lg sm:shadow-md sm:border sm:border-slate-200 z-10">
+      <div className="mt-2 pt-1.5 border-t border-border-subtle/60 flex items-center justify-end gap-1 sm:mt-0 sm:pt-0 sm:border-0 sm:absolute sm:bottom-1.5 sm:right-1.5 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity sm:bg-surface-card/95 sm:backdrop-blur-xs sm:px-1 sm:py-0.5 sm:rounded-lg sm:shadow-md sm:border sm:border-border-subtle z-10">
         {/* Pin / Unpin Button */}
         <button
           type="button"
@@ -78,8 +78,8 @@ export function FleetAlertCard({
           title={m.isPinned ? 'Unpin alert (subject to auto-dismissal)' : 'Pin alert (retains at top, excludes from auto-dismiss)'}
           className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-0.5 ${
             m.isPinned
-              ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
-              : 'text-slate-600 hover:text-amber-700 hover:bg-slate-100'
+              ? 'bg-status-warning-bg-strong text-status-warning-fg hover:bg-status-warning-bg-strong'
+              : 'text-fg-secondary hover:text-status-warning-fg hover:bg-surface-muted'
           }`}
         >
           <span>📌</span>
@@ -96,8 +96,8 @@ export function FleetAlertCard({
           title={m.isRead ? 'Mark alert as unread' : 'Mark alert as read'}
           className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-0.5 ${
             m.isRead
-              ? 'text-slate-600 hover:text-blue-600 hover:bg-slate-100'
-              : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+              ? 'text-fg-secondary hover:text-blue-600 hover:bg-surface-muted'
+              : 'bg-status-info-bg text-status-info-fg hover:bg-status-info-bg-strong'
           }`}
         >
           <span>{m.isRead ? '✉️' : '✓'}</span>
@@ -112,7 +112,7 @@ export function FleetAlertCard({
             onDismiss(m.id);
           }}
           title="Dismiss alert immediately"
-          className="px-1.5 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+          className="px-1.5 py-0.5 rounded text-[10px] font-bold text-fg-subtle hover:text-rose-600 hover:bg-status-danger-bg transition-colors cursor-pointer"
         >
           ✕
         </button>

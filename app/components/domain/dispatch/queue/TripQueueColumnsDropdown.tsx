@@ -22,9 +22,9 @@ import {
 } from './trip-queue-columns.util';
 
 const PORTAL_SHELL_CLASS =
-  'bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none z-[99999]';
+  'bg-surface-card rounded-xl shadow-xl border border-border-subtle/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-border-faint select-none z-[99999]';
 const PORTAL_HEADER_CLASS =
-  'px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/60 rounded-t-xl min-h-[28px]';
+  'px-3 py-1.5 text-[10px] font-extrabold text-fg-subtle uppercase tracking-wider flex items-center justify-between bg-surface-subtle/60 rounded-t-xl min-h-[28px]';
 
 export interface UseQueueTableColumnsResult {
   visibleColumns: TripQueueColumnKey[];
@@ -150,18 +150,18 @@ export function TripQueueColumnsDropdown({
         onClick={handleTriggerClick}
         className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 border rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer h-7 ${
           isOpen
-            ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-500/20'
+            ? 'bg-status-info-bg border-blue-400 text-status-info-fg ring-2 ring-blue-500/20'
             : !isDefaultSelected
-            ? 'bg-blue-50/80 hover:bg-blue-50 border-blue-400 text-blue-800'
-            : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700'
+            ? 'bg-status-info-bg/80 hover:bg-status-info-bg border-blue-400 text-status-info-fg'
+            : 'bg-surface-card hover:bg-surface-subtle border-border-strong text-fg-secondary'
         }`}
         title="Customize visible table columns and column presets"
         aria-haspopup="true"
         aria-expanded={isOpen}
       >
-        <SlidersIcon className={`w-3.5 h-3.5 shrink-0 ${isOpen || !isDefaultSelected ? 'text-blue-600' : 'text-slate-500'}`} />
+        <SlidersIcon className={`w-3.5 h-3.5 shrink-0 ${isOpen || !isDefaultSelected ? 'text-blue-600' : 'text-fg-muted'}`} />
         <span className="hidden sm:inline">Columns</span>
-        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`} />
+        <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-fg-subtle'}`} />
       </button>
 
       {isOpen && coords !== null && typeof document !== 'undefined' &&
@@ -188,13 +188,13 @@ export function TripQueueColumnsDropdown({
                 type="button"
                 disabled={isDefaultSelected}
                 onClick={() => updateColumns(DEFAULT_QUEUE_COLUMNS)}
-                className="text-[10px] font-bold text-blue-600 hover:text-blue-700 disabled:opacity-40 disabled:pointer-events-none cursor-pointer normal-case tracking-normal"
+                className="text-[10px] font-bold text-blue-600 hover:text-status-info-fg disabled:opacity-40 disabled:pointer-events-none cursor-pointer normal-case tracking-normal"
               >
                 Reset
               </button>
             </div>
 
-            <div className="px-2.5 py-1.5 flex items-center gap-1 bg-slate-50/30">
+            <div className="px-2.5 py-1.5 flex items-center gap-1 bg-surface-subtle/30">
               {TRIP_QUEUE_COLUMN_PRESETS.map((preset) => {
                 const isPresetActive = activePresetKey === preset.key;
                 return (
@@ -205,7 +205,7 @@ export function TripQueueColumnsDropdown({
                     className={`flex-1 px-1.5 py-1 rounded-md text-[10px] font-extrabold border transition-colors cursor-pointer truncate text-center ${
                       isPresetActive
                         ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                        : 'bg-white hover:bg-blue-50 text-slate-600 hover:text-blue-700 border-slate-200'
+                        : 'bg-surface-card hover:bg-status-info-bg text-fg-secondary hover:text-status-info-fg border-border-subtle'
                     }`}
                   >
                     {preset.label}
@@ -227,10 +227,10 @@ export function TripQueueColumnsDropdown({
                     onClick={() => updateColumns(toggleQueueColumnSelection(activeColumns, col.key))}
                     className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors ${
                       isLocked
-                        ? 'opacity-75 cursor-default font-semibold text-slate-500 bg-slate-50/40'
+                        ? 'opacity-75 cursor-default font-semibold text-fg-muted bg-surface-subtle/40'
                         : checked
-                        ? 'cursor-pointer font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/70'
-                        : 'cursor-pointer font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
+                        ? 'cursor-pointer font-bold text-status-info-fg bg-status-info-bg/80 hover:bg-status-info-bg-strong/70'
+                        : 'cursor-pointer font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg'
                     }`}
                   >
                     <span className="flex items-center gap-2 min-w-0">
@@ -238,7 +238,7 @@ export function TripQueueColumnsDropdown({
                       <span className="truncate">{col.menuLabel}</span>
                     </span>
                     {col.isPinned && (
-                      <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[9.5px] font-bold shrink-0">
+                      <span className="px-1.5 py-0.5 rounded bg-surface-muted text-fg-muted text-[9.5px] font-bold shrink-0">
                         Pinned
                       </span>
                     )}

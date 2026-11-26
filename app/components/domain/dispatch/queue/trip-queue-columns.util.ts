@@ -199,12 +199,12 @@ export function formatQueuePaymentBadgeMeta(method?: string | null): {
 } {
   const clean = String(method || 'cash').trim().toLowerCase();
   if (clean === 'card') {
-    return { label: 'Card', badgeClass: 'bg-sky-50 text-sky-800 border-sky-200' };
+    return { label: 'Card', badgeClass: 'bg-status-info-bg text-status-info-fg border-status-info-border' };
   }
   if (clean === 'account' || clean === 'corporate') {
-    return { label: 'Account', badgeClass: 'bg-violet-50 text-violet-800 border-violet-200' };
+    return { label: 'Account', badgeClass: 'bg-status-staged-bg text-status-staged-fg border-status-staged-border' };
   }
-  return { label: 'Cash', badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
+  return { label: 'Cash', badgeClass: 'bg-status-success-bg text-status-success-fg border-status-success-border' };
 }
 
 export function getColumnSortTooltip(

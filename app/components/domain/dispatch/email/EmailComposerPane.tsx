@@ -465,8 +465,8 @@ export function EmailComposerPane({
       onKeyDown={handleKeyDown}
       className={
         isInline
-          ? 'rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden'
-          : 'flex flex-col flex-1 min-h-0 overflow-hidden bg-white'
+          ? 'rounded-2xl border border-border-subtle bg-surface-card shadow-sm overflow-hidden'
+          : 'flex flex-col flex-1 min-h-0 overflow-hidden bg-surface-card'
       }
     >
       {/* Header Bar */}
@@ -474,8 +474,8 @@ export function EmailComposerPane({
         onClick={!isInline ? () => setIsMinimized((prev) => !prev) : undefined}
         className={`px-3 py-2 flex items-center justify-between gap-2 shrink-0 ${
           !isInline
-            ? 'bg-slate-900 text-white cursor-pointer hover:bg-slate-800/95 transition-colors'
-            : 'bg-slate-50 border-b border-slate-200 text-slate-800'
+            ? 'bg-surface-header text-white cursor-pointer hover:bg-surface-header-elevated/95 transition-colors'
+            : 'bg-surface-subtle border-b border-border-subtle text-fg-strong'
         }`}
       >
         <div className="min-w-0 flex-1">
@@ -492,8 +492,8 @@ export function EmailComposerPane({
               <span
                 className={`hidden @md/emaildock:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded truncate ${
                   !isInline
-                    ? 'bg-slate-800 text-slate-300'
-                    : 'bg-white border border-slate-200 text-slate-500'
+                    ? 'bg-surface-header-elevated text-slate-300'
+                    : 'bg-surface-card border border-border-subtle text-fg-muted'
                 }`}
               >
                 {DISPATCH_MAILBOX_ADDRESS}
@@ -509,7 +509,7 @@ export function EmailComposerPane({
           {lastSavedAtMs && (
             <span
               className={`hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold mr-1 ${
-                !isInline ? 'text-emerald-300' : 'text-emerald-700'
+                !isInline ? 'text-emerald-300' : 'text-status-success-fg'
               }`}
             >
               <CheckIcon className="w-3 h-3" />
@@ -520,7 +520,7 @@ export function EmailComposerPane({
             <button
               type="button"
               onClick={() => setIsMinimized((prev) => !prev)}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/80 cursor-pointer"
+              className="p-1 rounded-lg text-fg-subtle hover:text-white hover:bg-surface-header-muted/80 cursor-pointer"
               title={isMinimized ? 'Expand compose pane' : 'Minimize to bottom bar'}
               aria-label={isMinimized ? 'Expand compose pane' : 'Minimize compose pane'}
             >
@@ -536,8 +536,8 @@ export function EmailComposerPane({
             onClick={onClose}
             className={`p-1 rounded-lg cursor-pointer ${
               !isInline
-                ? 'text-slate-400 hover:text-white hover:bg-slate-700/80'
-                : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200/70'
+                ? 'text-fg-subtle hover:text-white hover:bg-surface-header-muted/80'
+                : 'text-fg-subtle hover:text-fg-secondary hover:bg-surface-emphasis/70'
             }`}
             title="Close & keep draft saved"
             aria-label="Close composer"
@@ -554,7 +554,7 @@ export function EmailComposerPane({
             {/* To + Collapsible Cc */}
             <div className="relative">
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-slate-500 w-12 shrink-0">To:</span>
+                <span className="text-[11px] font-bold text-fg-muted w-12 shrink-0">To:</span>
                 <div className="relative flex-1 min-w-0">
                   <input
                     type="email"
@@ -566,10 +566,10 @@ export function EmailComposerPane({
                       setIsAutocompleteOpen(true);
                     }}
                     placeholder="passenger@company.com (type name or email...)"
-                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                    className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-border-subtle bg-surface-card text-fg-strong placeholder-slate-400 focus:outline-none focus:border-blue-500"
                   />
                   {isAutocompleteOpen && contactSuggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-white border border-slate-200 rounded-xl shadow-lg divide-y divide-slate-100 max-h-44 overflow-y-auto">
+                    <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-surface-card border border-border-subtle rounded-xl shadow-lg divide-y divide-border-faint max-h-44 overflow-y-auto">
                       {contactSuggestions.map((c) => {
                         const displayEmail = c.email || c.secondaryEmail || '';
                         return (
@@ -580,31 +580,31 @@ export function EmailComposerPane({
                               e.preventDefault();
                               handleSelectContact(c);
                             }}
-                            className="w-full px-3 py-1.5 text-left hover:bg-blue-50/70 flex items-center justify-between gap-2 cursor-pointer"
+                            className="w-full px-3 py-1.5 text-left hover:bg-status-info-bg/70 flex items-center justify-between gap-2 cursor-pointer"
                           >
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-bold text-slate-900 truncate">
+                                <span className="text-xs font-bold text-fg-primary truncate">
                                   {c.name}
                                 </span>
                                 {c.isVip && (
-                                  <span className="text-[9px] font-black px-1 py-0.2 rounded bg-amber-100 text-amber-800">
+                                  <span className="text-[9px] font-black px-1 py-0.2 rounded bg-status-warning-bg-strong text-status-warning-fg">
                                     VIP
                                   </span>
                                 )}
                                 {c.corporateAccountName && (
-                                  <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-indigo-50 text-indigo-700 inline-flex items-center gap-0.5 truncate max-w-[110px]">
+                                  <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-status-staged-bg text-status-staged-fg inline-flex items-center gap-0.5 truncate max-w-[110px]">
                                     <BuildingIcon className="w-2.5 h-2.5 shrink-0" />
                                     <span className="truncate">{c.corporateAccountName}</span>
                                   </span>
                                 )}
                               </div>
-                              <p className="text-[11px] font-mono text-slate-500 truncate">
+                              <p className="text-[11px] font-mono text-fg-muted truncate">
                                 {displayEmail}
                               </p>
                             </div>
                             {c.phone && (
-                              <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                              <span className="text-[10px] text-fg-subtle font-mono shrink-0">
                                 {c.phone}
                               </span>
                             )}
@@ -619,7 +619,7 @@ export function EmailComposerPane({
                   <button
                     type="button"
                     onClick={() => setShowCc(true)}
-                    className="px-2 py-1 rounded-lg border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 cursor-pointer shrink-0"
+                    className="px-2 py-1 rounded-lg border border-border-subtle text-[11px] font-bold text-fg-secondary hover:bg-surface-subtle cursor-pointer shrink-0"
                   >
                     + Cc
                   </button>
@@ -629,13 +629,13 @@ export function EmailComposerPane({
 
             {showCc && (
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-slate-500 w-12 shrink-0">Cc:</span>
+                <span className="text-[11px] font-bold text-fg-muted w-12 shrink-0">Cc:</span>
                 <input
                   type="text"
                   value={ccInput}
                   onChange={(e) => setCcInput(e.target.value)}
                   placeholder="assistant@company.com, travel@company.com"
-                  className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                  className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-border-subtle bg-surface-card text-fg-strong placeholder-slate-400 focus:outline-none focus:border-blue-500"
                 />
                 <button
                   type="button"
@@ -643,7 +643,7 @@ export function EmailComposerPane({
                     setCcInput('');
                     setShowCc(false);
                   }}
-                  className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  className="p-1 text-fg-subtle hover:text-fg-secondary cursor-pointer"
                   title="Remove Cc"
                 >
                   <XIcon className="w-3.5 h-3.5" />
@@ -653,18 +653,18 @@ export function EmailComposerPane({
 
             {/* Subject */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-500 w-12 shrink-0">Subject:</span>
+              <span className="text-[11px] font-bold text-fg-muted w-12 shrink-0">Subject:</span>
               <input
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="Reservation Confirmation / Airport Pickup Instructions"
-                className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-border-subtle bg-surface-card text-fg-strong placeholder-slate-400 focus:outline-none focus:border-blue-500"
               />
             </div>
 
             {/* Smart Canned Templates + 1-Tap Tracking / Pay Link Toolbar */}
-            <div className="flex items-center gap-1.5 flex-wrap bg-slate-50/90 p-1.5 rounded-xl border border-slate-200/80">
+            <div className="flex items-center gap-1.5 flex-wrap bg-surface-subtle/90 p-1.5 rounded-xl border border-border-subtle/80">
               <div className="flex items-center gap-1 min-w-[155px] flex-1 sm:flex-none">
                 <SparklesIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                 <Select
@@ -706,7 +706,7 @@ export function EmailComposerPane({
               <button
                 type="button"
                 onClick={handleInsertTrackingLink}
-                className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[11px] font-bold text-blue-700 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                className="px-2 py-1 rounded-lg bg-status-info-bg hover:bg-status-info-bg-strong border border-status-info-border text-[11px] font-bold text-status-info-fg inline-flex items-center gap-1 cursor-pointer transition-colors"
                 title="1-Tap Insert Live Chauffeur Tracking Link (/track/...)"
               >
                 <LinkIcon className="w-3 h-3 shrink-0" />
@@ -717,7 +717,7 @@ export function EmailComposerPane({
                 type="button"
                 onClick={() => void handleInsertPayLink()}
                 disabled={isGeneratingPayLink}
-                className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-bold text-emerald-800 inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors"
+                className="px-2 py-1 rounded-lg bg-status-success-bg hover:bg-status-success-bg-strong border border-status-success-border text-[11px] font-bold text-status-success-fg inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors"
                 title="1-Tap Insert Tokenized Stripe Payment Link (/pay/...)"
               >
                 {isGeneratingPayLink ? (
@@ -736,23 +736,23 @@ export function EmailComposerPane({
               onChange={(e) => setBodyText(e.target.value)}
               rows={isInline ? 6 : 4}
               placeholder="Write message or choose a Canned Dispatch Template above... (Ctrl/Cmd + Enter to send)"
-              className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 leading-relaxed resize-y"
+              className="w-full text-xs p-2.5 rounded-xl border border-border-subtle bg-surface-card text-fg-strong placeholder-slate-400 focus:outline-none focus:border-blue-500 leading-relaxed resize-y"
             />
           </div>
 
           {/* Footer Action Bar */}
-          <div className="px-3 py-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0">
+          <div className="px-3 py-2 bg-surface-subtle border-t border-border-subtle flex items-center justify-between gap-2 shrink-0">
             <div className="flex items-center gap-2 min-w-0">
               <button
                 type="button"
                 onClick={handleDiscard}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 hover:border-rose-200 hover:bg-rose-50 text-[11px] font-bold text-slate-600 hover:text-rose-700 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                className="px-2.5 py-1 rounded-lg border border-border-subtle hover:border-status-danger-border hover:bg-status-danger-bg text-[11px] font-bold text-fg-secondary hover:text-status-danger-fg inline-flex items-center gap-1 cursor-pointer transition-colors"
                 title="Discard draft permanently"
               >
                 <TrashIcon className="w-3.5 h-3.5" />
                 <span>Discard</span>
               </button>
-              <span className="hidden @lg/emaildock:inline text-[10px] text-slate-400">
+              <span className="hidden @lg/emaildock:inline text-[10px] text-fg-subtle">
                 Ctrl/Cmd + Enter to send
               </span>
             </div>
@@ -761,7 +761,7 @@ export function EmailComposerPane({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-[11px] font-bold text-slate-700 cursor-pointer"
+                className="px-2.5 py-1 rounded-lg border border-border-subtle bg-surface-card hover:bg-surface-muted text-[11px] font-bold text-fg-secondary cursor-pointer"
               >
                 Save &amp; Close
               </button>
@@ -787,7 +787,7 @@ export function EmailComposerPane({
 
   return (
     <div
-      className={`shrink-0 z-30 w-full @4xl/emaildock:max-w-2xl @4xl/emaildock:ml-auto @4xl/emaildock:mr-3 bg-white border-t-2 border-slate-900 @4xl/emaildock:border-x @4xl/emaildock:rounded-t-2xl shadow-[0_-8px_24px_rgba(15,23,42,0.12)] flex flex-col overflow-hidden ${
+      className={`shrink-0 z-30 w-full @4xl/emaildock:max-w-2xl @4xl/emaildock:ml-auto @4xl/emaildock:mr-3 bg-surface-card border-t-2 border-slate-900 @4xl/emaildock:border-x @4xl/emaildock:rounded-t-2xl shadow-[0_-8px_24px_rgba(15,23,42,0.12)] flex flex-col overflow-hidden ${
         isMinimized ? '' : 'max-h-[58%] @2xl/emaildock:max-h-[54%]'
       }`}
     >

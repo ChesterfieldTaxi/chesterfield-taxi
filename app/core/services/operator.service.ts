@@ -20,6 +20,7 @@ import { getFirebaseApp, isFirebaseConfigured } from './firebase';
 import type { UserRole } from './auth/admin-auth.service';
 import type { GeoPoint } from '../types/trip';
 import type { DriverScheduleConfig } from '../types/driver';
+import type { ThemePreference } from '../../config/theme-tokens';
 
 /**
  * Standardizes driver username generation: firstname + lastname_initial + cabnumber (e.g. michaelj400)
@@ -110,6 +111,7 @@ export interface OperatorUser {
   homeAddress?: string;
   homeCoordinates?: GeoPoint;
   schedule?: DriverScheduleConfig;
+  themePreference?: ThemePreference;
 }
 
 export interface DriverRosterItem {
@@ -135,6 +137,7 @@ export interface DriverRosterItem {
   homeAddress?: string;
   homeCoordinates?: GeoPoint;
   schedule?: DriverScheduleConfig;
+  themePreference?: ThemePreference;
 }
 
 export const DEFAULT_OPERATORS: OperatorUser[] = [

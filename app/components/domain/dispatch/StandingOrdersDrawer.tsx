@@ -126,10 +126,10 @@ function StandingOrderSeriesCard({
 
   const statusBadgeClass =
     series.status === 'active'
-      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+      ? 'bg-status-success-bg-strong text-status-success-fg border-status-success-border'
       : series.status === 'paused'
-      ? 'bg-amber-100 text-amber-900 border-amber-300'
-      : 'bg-rose-100 text-rose-800 border-rose-300';
+      ? 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border'
+      : 'bg-status-danger-bg-strong text-status-danger-fg border-status-danger-border';
 
   const handleTogglePauseResume = async () => {
     onBusyChange(series.id);
@@ -304,7 +304,7 @@ function StandingOrderSeriesCard({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 space-y-3.5 transition-all hover:border-slate-300">
+    <div className="bg-surface-card rounded-2xl border border-border-subtle/90 shadow-xs p-4 space-y-3.5 transition-all hover:border-border-strong">
       {/* Header Row: Status Badge, Label, Series ID & Fare */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0 space-y-1">
@@ -314,25 +314,25 @@ function StandingOrderSeriesCard({
             >
               {series.status}
             </span>
-            <h4 className="font-extrabold text-sm text-slate-900 truncate">{series.label}</h4>
-            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+            <h4 className="font-extrabold text-sm text-fg-primary truncate">{series.label}</h4>
+            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-muted text-fg-secondary border border-border-subtle">
               #{series.id.slice(-8).toUpperCase()}
             </span>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap text-xs text-slate-600">
-            <span className="inline-flex items-center gap-1 font-semibold text-slate-800">
-              <UserIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <div className="flex items-center gap-2.5 flex-wrap text-xs text-fg-secondary">
+            <span className="inline-flex items-center gap-1 font-semibold text-fg-strong">
+              <UserIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
               <span>{passengerFullName}</span>
             </span>
             {series.passenger.phone && (
               <span className="inline-flex items-center gap-1 font-mono text-[11px] text-blue-600">
-                <PhoneIcon className="w-3 h-3 text-slate-400 shrink-0" />
+                <PhoneIcon className="w-3 h-3 text-fg-subtle shrink-0" />
                 <span>{series.passenger.phone}</span>
               </span>
             )}
             {series.corporateAccountName && (
-              <span className="px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-800 text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-md bg-status-info-bg border border-status-info-border text-status-info-fg text-[10px] font-bold">
                 Corp: {series.corporateAccountName}
                 {series.billingPo ? ` · PO ${series.billingPo}` : ''}
               </span>
@@ -341,27 +341,27 @@ function StandingOrderSeriesCard({
         </div>
 
         <div className="text-right shrink-0">
-          <div className="font-mono font-black text-sm text-emerald-700">
+          <div className="font-mono font-black text-sm text-status-success-fg">
             ${Number(series.pricingSnapshot?.totalFare || 0).toFixed(2)}
-            <span className="text-[10px] font-sans font-semibold text-slate-500">/ride</span>
+            <span className="text-[10px] font-sans font-semibold text-fg-muted">/ride</span>
           </div>
-          <div className="text-[10px] font-bold text-slate-500 uppercase">
+          <div className="text-[10px] font-bold text-fg-muted uppercase">
             {series.vehicleDisplayName || series.vehicleTier || 'standard'} · {series.paymentMethod}
           </div>
         </div>
       </div>
 
       {/* Route & Cadence Summary Box */}
-      <div className="bg-slate-50 rounded-xl border border-slate-200/80 p-2.5 space-y-2 text-xs">
+      <div className="bg-surface-subtle rounded-xl border border-border-subtle/80 p-2.5 space-y-2 text-xs">
         <div className="space-y-1">
           <div className="flex items-start gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
-            <span className="text-slate-800 font-medium line-clamp-1">
+            <span className="text-fg-strong font-medium line-clamp-1">
               {series.route.pickupLocation.address}
             </span>
           </div>
           {series.route.intermediateStops && series.route.intermediateStops.length > 0 && (
-            <div className="pl-3.5 text-[11px] text-amber-800 font-semibold">
+            <div className="pl-3.5 text-[11px] text-status-warning-fg font-semibold">
               + {series.route.intermediateStops.length}{' '}
               {series.route.intermediateStops.length === 1 ? 'Stop' : 'Stops'}:{' '}
               {series.route.intermediateStops.map((s) => s.address.split(',')[0]).join(' → ')}
@@ -369,22 +369,22 @@ function StandingOrderSeriesCard({
           )}
           <div className="flex items-start gap-1.5">
             <span className="w-2 h-2 rounded-full bg-rose-500 mt-1 shrink-0" />
-            <span className="text-slate-800 font-medium line-clamp-1">
+            <span className="text-fg-strong font-medium line-clamp-1">
               {series.route.dropoffLocation.address}
             </span>
           </div>
         </div>
 
-        <div className="pt-1.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-          <span className="inline-flex items-center gap-1 font-bold text-indigo-900">
+        <div className="pt-1.5 border-t border-border-subtle/80 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+          <span className="inline-flex items-center gap-1 font-bold text-status-staged-fg">
             <ClockIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
             <span>{formatStandingOrderCadenceSummary(series)}</span>
           </span>
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded bg-white border border-slate-200 font-bold text-slate-700 text-[10.5px]">
+            <span className="px-2 py-0.5 rounded bg-surface-card border border-border-subtle font-bold text-fg-secondary text-[10.5px]">
               Upcoming Open: {upcomingOpenTrips.length}
             </span>
-            <span className="px-2 py-0.5 rounded bg-white border border-slate-200 font-mono font-bold text-slate-700 text-[10.5px]">
+            <span className="px-2 py-0.5 rounded bg-surface-card border border-border-subtle font-mono font-bold text-fg-secondary text-[10.5px]">
               Horizon: {series.lastGeneratedDate || series.schedule.startDate || '—'}
             </span>
           </div>
@@ -393,7 +393,7 @@ function StandingOrderSeriesCard({
 
       {/* Control Row 1: 1-Click Pause / Resume Series */}
       {series.status !== 'cancelled' && (
-        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50/70 border border-slate-200 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-subtle/70 border border-border-subtle text-xs">
           <div className="flex items-center gap-2 flex-wrap">
             {series.status === 'active' ? (
               <>
@@ -405,12 +405,12 @@ function StandingOrderSeriesCard({
                 >
                   ⏸ Pause Series
                 </button>
-                <label className="inline-flex items-center gap-1.5 text-[11px] text-slate-700 font-medium cursor-pointer select-none">
+                <label className="inline-flex items-center gap-1.5 text-[11px] text-fg-secondary font-medium cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={cancelFutureOnPause}
                     onChange={(e) => setCancelFutureOnPause(e.target.checked)}
-                    className="rounded border-slate-300 text-amber-600"
+                    className="rounded border-border-strong text-amber-600"
                   />
                   <span>Also cancel open future trips</span>
                 </label>
@@ -432,7 +432,7 @@ function StandingOrderSeriesCard({
             type="button"
             disabled={isBusy}
             onClick={handleCancelSeries}
-            className="text-[10.5px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer disabled:opacity-40"
+            className="text-[10.5px] font-bold text-rose-600 hover:text-status-danger-fg hover:underline cursor-pointer disabled:opacity-40"
           >
             Cancel Series
           </button>
@@ -440,17 +440,17 @@ function StandingOrderSeriesCard({
       )}
 
       {/* Control Row 2: Holiday / Skip Dates Manager */}
-      <div className="p-2.5 rounded-xl bg-amber-50/40 border border-amber-200/80 space-y-2 text-xs">
+      <div className="p-2.5 rounded-xl bg-status-warning-bg/40 border border-status-warning-border/80 space-y-2 text-xs">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="font-extrabold text-[11px] text-amber-950 uppercase tracking-wide">
+          <span className="font-extrabold text-[11px] text-status-warning-fg uppercase tracking-wide">
             Holiday / Skip Dates
           </span>
-          <label className="inline-flex items-center gap-1.5 text-[10.5px] text-amber-900 font-medium cursor-pointer select-none">
+          <label className="inline-flex items-center gap-1.5 text-[10.5px] text-status-warning-fg font-medium cursor-pointer select-none">
             <input
               type="checkbox"
               checked={cancelMatchingOnSkip}
               onChange={(e) => setCancelMatchingOnSkip(e.target.checked)}
-              className="rounded border-amber-300 text-amber-600"
+              className="rounded border-status-warning-border text-amber-600"
             />
             <span>Cancel matching open trip if already generated</span>
           </label>
@@ -461,7 +461,7 @@ function StandingOrderSeriesCard({
             type="date"
             value={pendingSkipDate}
             onChange={(e) => setPendingSkipDate(e.target.value)}
-            className="flex-1 px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-mono text-slate-800"
+            className="flex-1 px-2.5 py-1.5 bg-surface-card border border-status-warning-border rounded-lg text-xs font-mono text-fg-strong"
             aria-label="Add skip date"
           />
           <button
@@ -479,14 +479,14 @@ function StandingOrderSeriesCard({
             {series.schedule.skipDates.map((d) => (
               <span
                 key={d}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-amber-300 text-[11px] font-mono font-bold text-amber-950"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-card border border-status-warning-border text-[11px] font-mono font-bold text-status-warning-fg"
               >
                 <span>{d}</span>
                 <button
                   type="button"
                   disabled={isBusy}
                   onClick={() => handleRemoveSkipDate(d)}
-                  className="text-slate-400 hover:text-rose-600 font-sans cursor-pointer leading-none"
+                  className="text-fg-subtle hover:text-rose-600 font-sans cursor-pointer leading-none"
                   title={`Remove skip date ${d}`}
                 >
                   ✕
@@ -495,19 +495,19 @@ function StandingOrderSeriesCard({
             ))}
           </div>
         ) : (
-          <p className="text-[10.5px] text-slate-500">No holiday or skip dates configured.</p>
+          <p className="text-[10.5px] text-fg-muted">No holiday or skip dates configured.</p>
         )}
       </div>
 
       {/* Control Row 3: Preferred Driver & Assignment Mode Control */}
-      <div className="p-2.5 rounded-xl bg-indigo-50/40 border border-indigo-200/80 space-y-2 text-xs">
+      <div className="p-2.5 rounded-xl bg-status-staged-bg/40 border border-status-staged-border/80 space-y-2 text-xs">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="font-extrabold text-[11px] text-indigo-950 uppercase tracking-wide flex items-center gap-1">
+          <span className="font-extrabold text-[11px] text-status-staged-fg uppercase tracking-wide flex items-center gap-1">
             <CarIcon className="w-3.5 h-3.5 text-indigo-600" />
             <span>Preferred Driver &amp; Delivery Mode</span>
           </span>
           {series.preferredDriverId && (
-            <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-900 border border-indigo-300 text-[10px] font-bold">
+            <span className="px-2 py-0.5 rounded-full bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border text-[10px] font-bold">
               {series.preferredDriverMode === 'stage_hold' ? '📌 Staged (Hold)' : 'Send to Driver'}:{' '}
               {series.preferredDriverLabel || series.preferredDriverId}
             </span>
@@ -533,7 +533,7 @@ function StandingOrderSeriesCard({
             />
           </div>
 
-          <div className="inline-flex rounded-lg border border-indigo-300 bg-white p-0.5 shrink-0">
+          <div className="inline-flex rounded-lg border border-status-staged-border bg-surface-card p-0.5 shrink-0">
             <button
               type="button"
               disabled={!draftDriverId}
@@ -541,7 +541,7 @@ function StandingOrderSeriesCard({
               className={`px-2.5 py-1 rounded-md text-[10.5px] font-extrabold transition-colors cursor-pointer disabled:opacity-40 ${
                 draftDriverMode === 'stage_hold'
                   ? 'bg-indigo-600 text-white'
-                  : 'text-indigo-800 hover:bg-indigo-50'
+                  : 'text-status-staged-fg hover:bg-status-staged-bg'
               }`}
               title="Stage Driver (Hold in Dispatch Shift Planner until released)"
             >
@@ -554,7 +554,7 @@ function StandingOrderSeriesCard({
               className={`px-2.5 py-1 rounded-md text-[10.5px] font-extrabold transition-colors cursor-pointer disabled:opacity-40 ${
                 draftDriverMode === 'send_to_driver'
                   ? 'bg-emerald-600 text-white'
-                  : 'text-slate-700 hover:bg-slate-100'
+                  : 'text-fg-secondary hover:bg-surface-muted'
               }`}
               title="Send to Driver immediately when generated"
             >
@@ -568,7 +568,7 @@ function StandingOrderSeriesCard({
             type="button"
             disabled={isBusy}
             onClick={() => handleApplyPreferredDriver(false)}
-            className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 border border-indigo-300 text-indigo-900 font-bold text-[10.5px] transition-colors cursor-pointer disabled:opacity-40"
+            className="px-2.5 py-1 rounded-lg bg-surface-card hover:bg-status-staged-bg border border-status-staged-border text-status-staged-fg font-bold text-[10.5px] transition-colors cursor-pointer disabled:opacity-40"
           >
             Save Default Only
           </button>
@@ -585,12 +585,12 @@ function StandingOrderSeriesCard({
 
       {/* Control Row 4: 1-Click Extend Horizon */}
       {series.status !== 'cancelled' && (
-        <div className="p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+        <div className="p-2.5 rounded-xl bg-status-success-bg/50 border border-status-success-border/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
           <div>
-            <span className="font-extrabold text-[11px] text-emerald-950 uppercase tracking-wide block">
+            <span className="font-extrabold text-[11px] text-status-success-fg uppercase tracking-wide block">
               Extend Standing Horizon
             </span>
-            <span className="text-[10.5px] text-emerald-800">
+            <span className="text-[10.5px] text-status-success-fg">
               Generates non-duplicate rides after{' '}
               <strong className="font-mono">
                 {series.lastGeneratedDate || series.schedule.startDate}
@@ -608,7 +608,7 @@ function StandingOrderSeriesCard({
                   label: `+${defaultGovCfg.defaultHorizonDays} Days (Default)`,
                 })
               }
-              className="px-2.5 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 border border-emerald-400 text-emerald-950 font-extrabold text-[11px] transition-colors cursor-pointer disabled:opacity-40"
+              className="px-2.5 py-1.5 rounded-lg bg-status-success-bg-strong hover:bg-emerald-200 border border-emerald-400 text-status-success-fg font-extrabold text-[11px] transition-colors cursor-pointer disabled:opacity-40"
             >
               +{defaultGovCfg.defaultHorizonDays}d Default
             </button>
@@ -616,7 +616,7 @@ function StandingOrderSeriesCard({
               type="button"
               disabled={isBusy}
               onClick={() => handleExtendHorizon({ extendDays: 7, label: '+1 Week' })}
-              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-extrabold text-[11px] transition-colors cursor-pointer disabled:opacity-40"
+              className="px-2.5 py-1.5 rounded-lg bg-surface-card hover:bg-status-success-bg-strong border border-status-success-border text-status-success-fg font-extrabold text-[11px] transition-colors cursor-pointer disabled:opacity-40"
             >
               +1 Week
             </button>
@@ -624,7 +624,7 @@ function StandingOrderSeriesCard({
               type="button"
               disabled={isBusy}
               onClick={() => handleExtendHorizon({ extendDays: 14, label: '+2 Weeks' })}
-              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-extrabold text-[11px] transition-colors cursor-pointer disabled:opacity-40"
+              className="px-2.5 py-1.5 rounded-lg bg-surface-card hover:bg-status-success-bg-strong border border-status-success-border text-status-success-fg font-extrabold text-[11px] transition-colors cursor-pointer disabled:opacity-40"
             >
               +2 Weeks
             </button>
@@ -777,7 +777,7 @@ export function StandingOrdersDrawer({
   const seriesManagerContent = (
     <>
       {/* Top Header */}
-      <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between gap-3 shrink-0 border-b border-slate-800">
+      <div className="px-5 py-4 bg-surface-header text-white flex items-center justify-between gap-3 shrink-0 border-b border-border-header">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center text-base font-bold shrink-0 shadow-xs">
             🔁
@@ -796,7 +796,7 @@ export function StandingOrdersDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+            className="p-2 rounded-xl text-fg-subtle hover:text-white hover:bg-surface-header-elevated transition-colors cursor-pointer shrink-0"
             title="Close Standing Orders Drawer"
             aria-label="Close Standing Orders Drawer"
           >
@@ -806,37 +806,37 @@ export function StandingOrdersDrawer({
       </div>
 
         {/* Summary KPI Pills */}
-        <div className="px-5 py-3 bg-white border-b border-slate-200 grid grid-cols-3 gap-2.5 shrink-0">
-          <div className="px-3 py-2 rounded-xl bg-emerald-50/80 border border-emerald-200">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">
+        <div className="px-5 py-3 bg-surface-card border-b border-border-subtle grid grid-cols-3 gap-2.5 shrink-0">
+          <div className="px-3 py-2 rounded-xl bg-status-success-bg/80 border border-status-success-border">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-status-success-fg block">
               Active Series
             </span>
-            <span className="text-base font-black font-mono text-emerald-950">
+            <span className="text-base font-black font-mono text-status-success-fg">
               {activeSeriesCount}
             </span>
           </div>
-          <div className="px-3 py-2 rounded-xl bg-blue-50/80 border border-blue-200">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-800 block">
+          <div className="px-3 py-2 rounded-xl bg-status-info-bg/80 border border-status-info-border">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-status-info-fg block">
               Upcoming Linked Trips
             </span>
-            <span className="text-base font-black font-mono text-blue-950">
+            <span className="text-base font-black font-mono text-status-info-fg">
               {upcomingLinkedTripsCount}
             </span>
           </div>
-          <div className="px-3 py-2 rounded-xl bg-indigo-50/80 border border-indigo-200">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-800 block">
+          <div className="px-3 py-2 rounded-xl bg-status-staged-bg/80 border border-status-staged-border">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-status-staged-fg block">
               Staged Preferred Drivers
             </span>
-            <span className="text-base font-black font-mono text-indigo-950">
+            <span className="text-base font-black font-mono text-status-staged-fg">
               {stagedPreferredDriversCount}
             </span>
           </div>
         </div>
 
         {/* Filter Tabs + Search Bar */}
-        <div className="px-5 py-3 bg-white border-b border-slate-200 space-y-2.5 shrink-0">
+        <div className="px-5 py-3 bg-surface-card border-b border-border-subtle space-y-2.5 shrink-0">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-slate-100 border border-slate-200">
+            <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-surface-muted border border-border-subtle">
               {(
                 [
                   { id: 'all', label: 'All', count: seriesList.length },
@@ -863,12 +863,12 @@ export function StandingOrdersDrawer({
                   onClick={() => setFilterTab(tab.id)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                     filterTab === tab.id
-                      ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-surface-card text-fg-primary shadow-2xs ring-1 ring-border-subtle'
+                      : 'text-fg-secondary hover:text-fg-primary'
                   }`}
                 >
                   <span>{tab.label}</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-200/70 text-slate-700">
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-surface-emphasis/70 text-fg-secondary">
                     {tab.count}
                   </span>
                 </button>
@@ -876,7 +876,7 @@ export function StandingOrdersDrawer({
             </div>
 
             {busySeriesId && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-status-info-fg">
                 <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
                 <span>Syncing...</span>
               </span>
@@ -884,19 +884,19 @@ export function StandingOrdersDrawer({
           </div>
 
           <div className="relative">
-            <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <SearchIcon className="w-4 h-4 text-fg-subtle absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search passenger, phone, corporate account, address, series ID..."
-              className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:border-blue-500 outline-hidden"
+              className="w-full pl-9 pr-8 py-2 rounded-xl bg-surface-subtle border border-border-subtle text-xs text-fg-primary focus:bg-surface-card focus:border-blue-500 outline-hidden"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-secondary text-xs cursor-pointer"
                 aria-label="Clear search"
               >
                 ✕
@@ -908,8 +908,8 @@ export function StandingOrdersDrawer({
             <div
               className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center justify-between gap-2 ${
                 toast.variant === 'error'
-                  ? 'bg-rose-50 border-rose-300 text-rose-900'
-                  : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                  ? 'bg-status-danger-bg border-status-danger-border text-status-danger-fg'
+                  : 'bg-status-success-bg border-status-success-border text-status-success-fg'
               }`}
             >
               <span>{toast.text}</span>
@@ -927,16 +927,16 @@ export function StandingOrdersDrawer({
         {/* Scrollable Series Cards List */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
           {filteredSeries.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center space-y-2">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto text-xl">
+            <div className="bg-surface-card rounded-2xl border border-border-subtle p-10 text-center space-y-2">
+              <div className="w-12 h-12 rounded-2xl bg-status-success-bg text-status-success-fg flex items-center justify-center mx-auto text-xl">
                 <RefreshCwIcon className="w-6 h-6" />
               </div>
-              <p className="text-sm font-extrabold text-slate-800">
+              <p className="text-sm font-extrabold text-fg-strong">
                 {seriesList.length === 0
                   ? 'No Standing Order Series Registered Yet'
                   : 'No Standing Orders Match Your Filter'}
               </p>
-              <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+              <p className="text-xs text-fg-muted max-w-md mx-auto leading-relaxed">
                 {seriesList.length === 0
                   ? 'Enable "Repeat / Recurring Ride" when creating a scheduled booking in Dispatch to automatically register a Managed Standing Order Series.'
                   : 'Try clearing the search query or switching status tabs above.'}
@@ -964,7 +964,7 @@ export function StandingOrdersDrawer({
     return (
       <div
         aria-label="Standing Orders and Recurring Rides Series Manager"
-        className="w-full bg-slate-50 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col overflow-hidden"
+        className="w-full bg-surface-subtle rounded-2xl border border-border-subtle/90 shadow-xs flex flex-col overflow-hidden"
       >
         {seriesManagerContent}
       </div>
@@ -974,7 +974,7 @@ export function StandingOrdersDrawer({
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end">
       <div
-        className="fixed inset-0 bg-slate-900/45 backdrop-blur-[1px] transition-opacity"
+        className="fixed inset-0 bg-surface-overlay/45 backdrop-blur-[1px] transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -982,7 +982,7 @@ export function StandingOrdersDrawer({
         role="dialog"
         aria-modal="true"
         aria-label="Standing Orders and Recurring Rides Series Manager"
-        className="relative z-10 w-full max-w-2xl bg-slate-50 h-full shadow-2xl border-l border-slate-200 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200"
+        className="relative z-10 w-full max-w-2xl bg-surface-subtle h-full shadow-2xl border-l border-border-subtle flex flex-col overflow-hidden animate-in slide-in-from-right duration-200"
       >
         {seriesManagerContent}
       </aside>

@@ -1,5 +1,63 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-surface-page: var(--surface-page);
+  --color-surface-canvas: var(--surface-canvas);
+  --color-surface-card: var(--surface-card);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-emphasis: var(--surface-emphasis);
+  --color-surface-strong: var(--surface-strong);
+  --color-surface-header: var(--surface-header);
+  --color-surface-header-elevated: var(--surface-header-elevated);
+  --color-surface-header-muted: var(--surface-header-muted);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-inverted: var(--surface-inverted);
+
+  --color-fg-primary: var(--fg-primary);
+  --color-fg-strong: var(--fg-strong);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-fg-faint: var(--fg-faint);
+  --color-fg-inverted: var(--fg-inverted);
+  --color-fg-on-header: var(--fg-on-header);
+  --color-fg-on-header-muted: var(--fg-on-header-muted);
+
+  --color-border-faint: var(--border-faint);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-border-emphasis: var(--border-emphasis);
+  --color-border-header: var(--border-header);
+
+  --color-status-success-bg: var(--status-success-bg);
+  --color-status-success-bg-strong: var(--status-success-bg-strong);
+  --color-status-success-fg: var(--status-success-fg);
+  --color-status-success-border: var(--status-success-border);
+
+  --color-status-warning-bg: var(--status-warning-bg);
+  --color-status-warning-bg-strong: var(--status-warning-bg-strong);
+  --color-status-warning-fg: var(--status-warning-fg);
+  --color-status-warning-border: var(--status-warning-border);
+
+  --color-status-danger-bg: var(--status-danger-bg);
+  --color-status-danger-bg-strong: var(--status-danger-bg-strong);
+  --color-status-danger-fg: var(--status-danger-fg);
+  --color-status-danger-border: var(--status-danger-border);
+
+  --color-status-info-bg: var(--status-info-bg);
+  --color-status-info-bg-strong: var(--status-info-bg-strong);
+  --color-status-info-fg: var(--status-info-fg);
+  --color-status-info-border: var(--status-info-border);
+
+  --color-status-staged-bg: var(--status-staged-bg);
+  --color-status-staged-bg-strong: var(--status-staged-bg-strong);
+  --color-status-staged-fg: var(--status-staged-fg);
+  --color-status-staged-border: var(--status-staged-border);
+}
+
 html {
   scrollbar-gutter: stable;
   overflow-y: scroll;
@@ -22,15 +80,76 @@ h1, h2, h3, h4 {
   color: #1e3a8a;
 }
 
+.dark ::selection {
+  background-color: #1e3a8a;
+  color: #eff6ff;
+}
+
 :root {
   --color-primary: #2563eb;
   --color-primary-fg: #ffffff;
   --color-secondary: #0f172a;
   --brand-primary: var(--color-primary);
   --brand-secondary: var(--color-secondary);
+
+  /* Semantic Surface Tokens */
   --surface-page: #f8fafc;
+  --surface-canvas: #f1f5f9;
   --surface-card: #ffffff;
+  --surface-subtle: #f8fafc;
+  --surface-muted: #f1f5f9;
+  --surface-emphasis: #e2e8f0;
+  --surface-strong: #cbd5e1;
+  --surface-header: #0f172a;
+  --surface-header-elevated: #1e293b;
+  --surface-header-muted: #334155;
+  --surface-overlay: #020617;
+  --surface-inverted: #0f172a;
+
+  /* Semantic Foreground Tokens */
+  --fg-primary: #0f172a;
+  --fg-strong: #1e293b;
+  --fg-secondary: #334155;
+  --fg-muted: #64748b;
+  --fg-subtle: #94a3b8;
+  --fg-faint: #cbd5e1;
+  --fg-inverted: #ffffff;
+  --fg-on-header: #f8fafc;
+  --fg-on-header-muted: #94a3b8;
+
+  /* Semantic Border Tokens */
+  --border-faint: #f1f5f9;
   --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-emphasis: #94a3b8;
+  --border-header: #1e293b;
+
+  /* Semantic Status Tokens */
+  --status-success-bg: #ecfdf5;
+  --status-success-bg-strong: #d1fae5;
+  --status-success-fg: #065f46;
+  --status-success-border: #a7f3d0;
+
+  --status-warning-bg: #fffbeb;
+  --status-warning-bg-strong: #fef3c7;
+  --status-warning-fg: #92400e;
+  --status-warning-border: #fcd34d;
+
+  --status-danger-bg: #fff1f2;
+  --status-danger-bg-strong: #ffe4e6;
+  --status-danger-fg: #be123c;
+  --status-danger-border: #fecdd3;
+
+  --status-info-bg: #eff6ff;
+  --status-info-bg-strong: #dbeafe;
+  --status-info-fg: #1d4ed8;
+  --status-info-border: #bfdbfe;
+
+  --status-staged-bg: #eef2ff;
+  --status-staged-bg-strong: #e0e7ff;
+  --status-staged-fg: #3730a3;
+  --status-staged-border: #c7d2fe;
+
   --radius-card: 16px;
   --radius-control: 12px;
   --color-heading: #0f172a;
@@ -45,6 +164,66 @@ h1, h2, h3, h4 {
   --card-bg: #ffffff;
   --font-heading: 'Lexend', 'Inter', sans-serif;
   --font-body: 'Inter', sans-serif;
+}
+
+.dark {
+  /* Semantic Surface Tokens (Dark) */
+  --surface-page: #020617;
+  --surface-canvas: #090e1a;
+  --surface-card: #0f172a;
+  --surface-subtle: #162033;
+  --surface-muted: #1e293b;
+  --surface-emphasis: #334155;
+  --surface-strong: #475569;
+  --surface-header: #020617;
+  --surface-header-elevated: #1e293b;
+  --surface-header-muted: #334155;
+  --surface-overlay: #000000;
+  --surface-inverted: #f1f5f9;
+
+  /* Semantic Foreground Tokens (Dark) */
+  --fg-primary: #f8fafc;
+  --fg-strong: #f1f5f9;
+  --fg-secondary: #cbd5e1;
+  --fg-muted: #94a3b8;
+  --fg-subtle: #64748b;
+  --fg-faint: #475569;
+  --fg-inverted: #0f172a;
+  --fg-on-header: #f8fafc;
+  --fg-on-header-muted: #94a3b8;
+
+  /* Semantic Border Tokens (Dark) */
+  --border-faint: #172033;
+  --border-subtle: #1e293b;
+  --border-strong: #334155;
+  --border-emphasis: #475569;
+  --border-header: #1e293b;
+
+  /* Semantic Status Tokens (Dark-tuned for high contrast) */
+  --status-success-bg: #052e24;
+  --status-success-bg-strong: #064e3b;
+  --status-success-fg: #6ee7b7;
+  --status-success-border: #065f46;
+
+  --status-warning-bg: #322006;
+  --status-warning-bg-strong: #452a07;
+  --status-warning-fg: #fcd34d;
+  --status-warning-border: #78350f;
+
+  --status-danger-bg: #380d1a;
+  --status-danger-bg-strong: #4c1124;
+  --status-danger-fg: #fda4af;
+  --status-danger-border: #881337;
+
+  --status-info-bg: #0f2447;
+  --status-info-bg-strong: #173264;
+  --status-info-fg: #93c5fd;
+  --status-info-border: #1e40af;
+
+  --status-staged-bg: #1b1d47;
+  --status-staged-bg-strong: #262963;
+  --status-staged-fg: #a5b4fc;
+  --status-staged-border: #3730a3;
 }
 
 
@@ -198,9 +377,33 @@ h1, h2, h3, h4 {
 /* Guard against Google Maps error injection (e.g. RefererNotAllowedMapError) */
 input.gm-err-autocomplete {
   background-image: none !important;
-  background-color: #ffffff !important;
-  color: #0f172a !important;
+  background-color: var(--surface-card, #ffffff) !important;
+  color: var(--fg-primary, #0f172a) !important;
   cursor: text !important;
+}
+
+.dark .pac-container {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  box-shadow: 0 14px 30px -6px rgba(0, 0, 0, 0.55) !important;
+}
+
+.dark .pac-item {
+  color: #cbd5e1 !important;
+  border-top-color: #1e293b !important;
+}
+
+.dark .pac-item:hover,
+.dark .pac-item-selected {
+  background-color: #1e293b !important;
+}
+
+.dark .pac-item-query {
+  color: #f8fafc !important;
+}
+
+.dark .pac-matched {
+  color: #60a5fa !important;
 }
 
 .gm-err-icon,

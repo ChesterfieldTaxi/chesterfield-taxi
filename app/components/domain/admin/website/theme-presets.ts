@@ -8,6 +8,8 @@ export interface ThemePreset {
   description: string;
   previewColors: string[];
   tokens: BrandingConfig;
+  /** Optional dark-mode token overrides reserved for future live-site dark mode (Phase 96). */
+  darkTokens?: Partial<BrandingConfig>;
 }
 
 export const THEME_PRESETS: ThemePreset[] = [

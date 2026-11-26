@@ -6,12 +6,10 @@ import type {
 } from '../../../core/types/driver';
 import type { Trip } from '../../../core/types/trip';
 import type { DriverPayoutRecord } from '../../../core/types/payment';
-import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import { formatLocalDateStr } from '../../../core/services/pricing/vehicle-matching';
 import {
   CalendarIcon,
   DollarSignIcon,
-  PhoneIcon,
   SpinnerIcon,
   XIcon,
 } from '../../ui/Icons';
@@ -90,23 +88,14 @@ export const DriverEarningsHistoryPane = React.memo(function DriverEarningsHisto
 
     return (
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <DollarSignIcon className="w-5 h-5 text-emerald-400" />
-              Earnings &amp; Settlement History
-            </h2>
-            <p className="text-xs text-slate-400">
-              Split: {Math.round((driver?.commissionRate ?? globalCommissionRate) * 100)}% Fare + 100% Tolls &amp; Tips
-            </p>
-          </div>
-          <a
-            href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
-            className="px-3 py-2 min-h-[40px] bg-slate-800 hover:bg-slate-700 border border-slate-700 text-blue-300 font-bold text-xs rounded-xl flex items-center gap-1.5"
-          >
-            <PhoneIcon className="w-3.5 h-3.5" />
-            <span>Dispatch</span>
-          </a>
+        <div>
+          <h2 className="text-base font-bold text-white flex items-center gap-2">
+            <DollarSignIcon className="w-5 h-5 text-emerald-400" />
+            Earnings &amp; Settlement History
+          </h2>
+          <p className="text-xs text-slate-400">
+            Split: {Math.round((driver?.commissionRate ?? globalCommissionRate) * 100)}% Fare + 100% Tolls &amp; Tips
+          </p>
         </div>
 
         {/* KPI Summary Grid */}

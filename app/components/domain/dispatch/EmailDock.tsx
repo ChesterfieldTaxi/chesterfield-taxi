@@ -520,7 +520,7 @@ export function EmailDock({
   );
 
   return (
-    <div className="@container/emaildock relative flex flex-col h-full bg-white text-slate-800 overflow-hidden select-none">
+    <div className="@container/emaildock relative flex flex-col h-full bg-surface-card text-fg-strong overflow-hidden select-none">
       {/* ─── TOP HEADER, SEARCH, FOLDER PILLS & BATCH ACTION BAR ─── */}
       <EmailFolderToolbar
         isDocked={isDocked}
@@ -600,7 +600,7 @@ export function EmailDock({
           onQuickReply={(em) => handleStartReply('reply', em)}
           className={
             selectedEmail
-              ? 'hidden @2xl/emaildock:block @2xl/emaildock:w-72 @5xl/emaildock:w-80 border-r border-slate-200 shrink-0 h-full'
+              ? 'hidden @2xl/emaildock:block @2xl/emaildock:w-72 @5xl/emaildock:w-80 border-r border-border-subtle shrink-0 h-full'
               : 'flex-1 h-full'
           }
         />
@@ -649,15 +649,15 @@ export function EmailDock({
             }
           />
         ) : (
-          <div className="hidden @2xl/emaildock:flex flex-1 items-center justify-center p-8 text-center bg-slate-50/50">
+          <div className="hidden @2xl/emaildock:flex flex-1 items-center justify-center p-8 text-center bg-surface-subtle/50">
             <div className="max-w-xs space-y-2">
-              <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center mx-auto text-blue-600">
+              <div className="w-12 h-12 rounded-2xl bg-surface-card border border-border-subtle shadow-2xs flex items-center justify-center mx-auto text-blue-600">
                 <MailIcon className="w-6 h-6" />
               </div>
-              <p className="font-extrabold text-slate-800 text-xs sm:text-sm">
+              <p className="font-extrabold text-fg-strong text-xs sm:text-sm">
                 Select a conversation in {DISPATCH_MAILBOX_ADDRESS}
               </p>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
+              <p className="text-[11px] text-fg-muted leading-relaxed">
                 Convert ride requests into Dispatch bookings in 1 click, send canned STL/SUS
                 curbside instructions or Pay Links, and view the sender&apos;s live Call + SMS +
                 Voicemail timeline.
@@ -672,7 +672,7 @@ export function EmailDock({
             {/* Backdrop on compact containers (< @5xl) so slide-over rail closes cleanly on outside tap */}
             <div
               onClick={() => setIsRailOpen(false)}
-              className="@5xl/emaildock:hidden absolute inset-0 z-20 bg-slate-900/25 backdrop-blur-[1px]"
+              className="@5xl/emaildock:hidden absolute inset-0 z-20 bg-surface-overlay/25 backdrop-blur-[1px]"
             />
             <EmailCrossChannelRail
               context={senderContext}

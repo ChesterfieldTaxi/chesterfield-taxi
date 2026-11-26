@@ -107,7 +107,7 @@ export const FLEET_STATUS_COLORS: Record<
     darkHex: '#047857',
     ringHex: '#a7f3d0',
     label: 'Available',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    badgeClass: 'bg-status-success-bg text-status-success-fg border-status-success-border',
     dotClass: 'bg-emerald-500',
   },
   en_route: {
@@ -115,7 +115,7 @@ export const FLEET_STATUS_COLORS: Record<
     darkHex: '#1d4ed8',
     ringHex: '#bfdbfe',
     label: 'En Route',
-    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
+    badgeClass: 'bg-status-info-bg text-status-info-fg border-status-info-border',
     dotClass: 'bg-blue-600',
   },
   busy: {
@@ -123,7 +123,7 @@ export const FLEET_STATUS_COLORS: Record<
     darkHex: '#b91c1c',
     ringHex: '#fecaca',
     label: 'Arrived / In Progress',
-    badgeClass: 'bg-red-50 text-red-700 border-red-200',
+    badgeClass: 'bg-status-danger-bg text-status-danger-fg border-status-danger-border',
     dotClass: 'bg-red-500',
   },
   break: {
@@ -131,7 +131,7 @@ export const FLEET_STATUS_COLORS: Record<
     darkHex: '#a16207',
     ringHex: '#fef08a',
     label: 'On Break',
-    badgeClass: 'bg-amber-50 text-amber-800 border-amber-300',
+    badgeClass: 'bg-status-warning-bg text-status-warning-fg border-status-warning-border',
     dotClass: 'bg-amber-400',
   },
   offline: {
@@ -139,7 +139,7 @@ export const FLEET_STATUS_COLORS: Record<
     darkHex: '#334155',
     ringHex: '#cbd5e1',
     label: 'Offline',
-    badgeClass: 'bg-slate-100 text-slate-600 border-slate-200',
+    badgeClass: 'bg-surface-muted text-fg-muted border-border-subtle',
     dotClass: 'bg-slate-400',
   },
 };

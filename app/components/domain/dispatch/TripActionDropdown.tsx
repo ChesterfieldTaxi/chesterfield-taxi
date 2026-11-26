@@ -227,10 +227,10 @@ export function TripActionDropdown({
           variant === 'dark'
             ? isOpen
               ? 'bg-blue-600 border-blue-500 text-white ring-2 ring-blue-400/30'
-              : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700'
+              : 'bg-surface-header-elevated hover:bg-surface-header-muted text-fg-on-header border-border-header'
             : isOpen
-            ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-500/20'
-            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border-slate-300'
+            ? 'bg-status-info-bg border-blue-400 text-status-info-fg ring-2 ring-blue-500/20'
+            : 'bg-surface-muted hover:bg-surface-emphasis text-fg-secondary hover:text-fg-primary border-border-strong'
         }`}
         title="Trip Actions"
         aria-haspopup="true"
@@ -245,7 +245,7 @@ export function TripActionDropdown({
                 : 'rotate-180 text-blue-600'
               : variant === 'dark'
               ? 'text-slate-300'
-              : 'text-slate-500'
+              : 'text-fg-muted'
           }`}
         />
       </button>
@@ -261,19 +261,19 @@ export function TripActionDropdown({
             zIndex: 99999,
             transformOrigin: coords.openUpward ? 'bottom right' : 'top right',
           }}
-          className="bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none"
+          className="bg-surface-card rounded-xl shadow-xl border border-border-subtle/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-border-faint select-none"
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
         >
-          <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/60 rounded-t-xl">
-            <span className="font-mono text-slate-600">Trip #{trip.id.slice(0, 8)}</span>
+          <div className="px-3 py-1.5 text-[10px] font-extrabold text-fg-subtle uppercase tracking-wider flex items-center justify-between bg-surface-subtle/60 rounded-t-xl">
+            <span className="font-mono text-fg-secondary">Trip #{trip.id.slice(0, 8)}</span>
             <span className={`capitalize px-1.5 py-0.2 rounded-md font-bold text-[10px] ${
               isCompleted
-                ? 'bg-emerald-100 text-emerald-800'
+                ? 'bg-status-success-bg-strong text-status-success-fg'
                 : isCancelled
-                ? 'bg-rose-100 text-rose-800'
-                : 'bg-blue-100 text-blue-800'
+                ? 'bg-status-danger-bg-strong text-status-danger-fg'
+                : 'bg-status-info-bg-strong text-status-info-fg'
             }`}>
               {trip.status}
             </span>
@@ -287,7 +287,7 @@ export function TripActionDropdown({
                   handleClose();
                   onEdit();
                 }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg transition-colors cursor-pointer"
               >
                 <PencilIcon className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                 <span>Edit Trip</span>
@@ -301,7 +301,7 @@ export function TripActionDropdown({
                   handleClose();
                   onFocusMap();
                 }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50/80 hover:text-emerald-700 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-status-success-bg/80 hover:text-status-success-fg transition-colors cursor-pointer"
               >
                 <MapPinIcon className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                 <span>View on Map</span>
@@ -317,8 +317,8 @@ export function TripActionDropdown({
                 }}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer ${
                   isUnconfirmed
-                    ? 'font-bold text-amber-800 bg-amber-50/70 hover:bg-amber-100/80'
-                    : 'font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
+                    ? 'font-bold text-status-warning-fg bg-status-warning-bg/70 hover:bg-status-warning-bg-strong/80'
+                    : 'font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg'
                 }`}
               >
                 <DocumentTextIcon className={`w-3.5 h-3.5 shrink-0 ${isUnconfirmed ? 'text-amber-600' : 'text-blue-500'}`} />
@@ -333,7 +333,7 @@ export function TripActionDropdown({
                   handleClose();
                   onSendStagedToDriver();
                 }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-extrabold text-indigo-800 bg-indigo-50/80 hover:bg-indigo-100/90 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-extrabold text-status-staged-fg bg-status-staged-bg/80 hover:bg-status-staged-bg-strong/90 transition-colors cursor-pointer"
                 title="Send staged placeholder live to driver"
               >
                 <CarIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
@@ -350,7 +350,7 @@ export function TripActionDropdown({
                   handleClose();
                   onStageDriver();
                 }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50/80 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-status-staged-fg hover:bg-status-staged-bg/80 transition-colors cursor-pointer"
                 title="Stage a driver shift placeholder (held in Dispatch)"
               >
                 <CarIcon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
@@ -367,9 +367,9 @@ export function TripActionDropdown({
                   handleClose();
                   onClearStagedDriver();
                 }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-rose-50 hover:text-rose-700 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-status-danger-bg hover:text-status-danger-fg transition-colors cursor-pointer"
               >
-                <XIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <XIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
                 <span>Clear Staged Driver</span>
               </button>
             )}
@@ -381,7 +381,7 @@ export function TripActionDropdown({
                   handleClose();
                   onCancelAutoOffer();
                 }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-rose-700 bg-rose-50/60 hover:bg-rose-100/80 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-status-danger-fg bg-status-danger-bg/60 hover:bg-status-danger-bg-strong/80 transition-colors cursor-pointer"
               >
                 <XIcon className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                 <span>Cancel Cascade</span>
@@ -393,7 +393,7 @@ export function TripActionDropdown({
                   handleClose();
                   onStartAutoOffer();
                 }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50/90 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-status-staged-fg hover:bg-status-staged-bg/90 transition-colors cursor-pointer"
               >
                 <RadarBroadcastIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                 <span>
@@ -408,7 +408,7 @@ export function TripActionDropdown({
                 handleClose();
                 onFare();
               }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-amber-50/80 hover:text-amber-700 transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-status-warning-bg/80 hover:text-status-warning-fg transition-colors cursor-pointer"
             >
               <BoltIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <span>Fare &amp; Rules</span>
@@ -420,7 +420,7 @@ export function TripActionDropdown({
                 handleClose();
                 onClone();
               }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-cyan-50/80 hover:text-cyan-700 transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg transition-colors cursor-pointer"
             >
               <PlusIcon className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
               <span>Copy Booking</span>
@@ -434,7 +434,7 @@ export function TripActionDropdown({
                 handleClose();
                 onAudit();
               }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-purple-50/80 hover:text-purple-700 transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-status-staged-bg/80 hover:text-purple-700 transition-colors cursor-pointer"
             >
               <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-500 shrink-0" />
               <span>Audit Trail Log</span>
@@ -450,7 +450,7 @@ export function TripActionDropdown({
                     handleClose();
                     onCompleteTrip();
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-status-success-fg hover:bg-status-success-bg transition-colors cursor-pointer"
                 >
                   <CheckIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   <span>Complete Trip</span>
@@ -464,7 +464,7 @@ export function TripActionDropdown({
                       handleClose();
                       onReactivateTrip();
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-status-success-fg hover:bg-status-success-bg transition-colors cursor-pointer"
                   >
                     <RefreshCwIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     <span>Reactivate Trip</span>
@@ -478,7 +478,7 @@ export function TripActionDropdown({
                       handleClose();
                       onCancelTrip();
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-status-danger-fg hover:bg-status-danger-bg transition-colors cursor-pointer"
                   >
                     <BanIcon className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                     <span>Cancel Trip</span>

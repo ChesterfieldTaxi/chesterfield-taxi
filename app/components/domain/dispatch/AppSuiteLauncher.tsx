@@ -239,7 +239,7 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
         className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
           isOpen
             ? 'bg-blue-600 text-white shadow-md'
-            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200 shadow-2xs'
+            : 'text-fg-secondary hover:text-fg-primary hover:bg-surface-muted bg-surface-card border border-border-subtle shadow-2xs'
         }`}
         title="App Suite: Calendar, Documents, Notes, Reminders, Tasks, Help"
         aria-label="App Suite Launcher"
@@ -264,12 +264,12 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
 
       {/* Launcher Popover Modal */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-88 sm:w-104 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 mt-2 w-88 sm:w-104 bg-surface-card rounded-2xl shadow-2xl border border-border-subtle z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
           {/* Header */}
-          <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+          <div className="p-3 bg-surface-header text-white flex items-center justify-between border-b border-border-header">
             <div className="flex items-center gap-2">
               <span className="text-base text-blue-400">❖</span>
-              <span className="font-extrabold text-xs uppercase tracking-wider text-slate-200">
+              <span className="font-extrabold text-xs uppercase tracking-wider text-fg-on-header">
                 Dispatch App Suite
               </span>
               <span className="inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-emerald-500/30">
@@ -286,65 +286,65 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                 ← All Apps
               </button>
             ) : (
-              <span className="text-[10px] text-slate-400 font-medium">
-                Author: <strong className="text-slate-200">{currentAuthor.name}</strong>
+              <span className="text-[10px] text-fg-subtle font-medium">
+                Author: <strong className="text-fg-on-header">{currentAuthor.name}</strong>
               </span>
             )}
           </div>
 
           {/* ─── GRID OF APPS (when no active sub-module) ─── */}
           {!activeModule && (
-            <div className="p-4 grid grid-cols-3 gap-3 bg-slate-50/60">
+            <div className="p-4 grid grid-cols-3 gap-3 bg-surface-subtle/60">
               {/* Calendar */}
               <button
                 type="button"
                 onClick={() => setActiveModule('calendar')}
-                className="flex flex-col items-center justify-center p-3 rounded-xl bg-white hover:bg-blue-50/80 border border-slate-200 hover:border-blue-300 transition-all shadow-2xs group cursor-pointer"
+                className="flex flex-col items-center justify-center p-3 rounded-xl bg-surface-card hover:bg-status-info-bg/80 border border-border-subtle hover:border-status-info-border transition-all shadow-2xs group cursor-pointer"
               >
-                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
+                <div className="w-10 h-10 rounded-xl bg-status-info-bg-strong text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
                   <CalendarIcon className="w-5 h-5" />
                 </div>
-                <span className="font-extrabold text-xs text-slate-800 group-hover:text-blue-700">Calendar</span>
-                <span className="text-[10px] text-slate-400">{suiteState.calendar.length} Scheduled</span>
+                <span className="font-extrabold text-xs text-fg-strong group-hover:text-status-info-fg">Calendar</span>
+                <span className="text-[10px] text-fg-subtle">{suiteState.calendar.length} Scheduled</span>
               </button>
 
               {/* Documents */}
               <button
                 type="button"
                 onClick={() => setActiveModule('documents')}
-                className="flex flex-col items-center justify-center p-3 rounded-xl bg-white hover:bg-blue-50/80 border border-slate-200 hover:border-blue-300 transition-all shadow-2xs group cursor-pointer"
+                className="flex flex-col items-center justify-center p-3 rounded-xl bg-surface-card hover:bg-status-info-bg/80 border border-border-subtle hover:border-status-info-border transition-all shadow-2xs group cursor-pointer"
               >
-                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
+                <div className="w-10 h-10 rounded-xl bg-status-warning-bg-strong text-status-warning-fg flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
                   <DocumentTextIcon className="w-5 h-5" />
                 </div>
-                <span className="font-extrabold text-xs text-slate-800 group-hover:text-amber-800">Documents</span>
-                <span className="text-[10px] text-slate-400">{suiteState.documents.length} Shared</span>
+                <span className="font-extrabold text-xs text-fg-strong group-hover:text-status-warning-fg">Documents</span>
+                <span className="text-[10px] text-fg-subtle">{suiteState.documents.length} Shared</span>
               </button>
 
               {/* Notes */}
               <button
                 type="button"
                 onClick={() => setActiveModule('notes')}
-                className="flex flex-col items-center justify-center p-3 rounded-xl bg-white hover:bg-blue-50/80 border border-slate-200 hover:border-blue-300 transition-all shadow-2xs group cursor-pointer"
+                className="flex flex-col items-center justify-center p-3 rounded-xl bg-surface-card hover:bg-status-info-bg/80 border border-border-subtle hover:border-status-info-border transition-all shadow-2xs group cursor-pointer"
               >
-                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
+                <div className="w-10 h-10 rounded-xl bg-status-staged-bg-strong text-purple-700 flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
                   <span className="text-lg">📝</span>
                 </div>
-                <span className="font-extrabold text-xs text-slate-800 group-hover:text-purple-800">Notes</span>
-                <span className="text-[10px] text-slate-400">{suiteState.notes.length} Pads</span>
+                <span className="font-extrabold text-xs text-fg-strong group-hover:text-status-staged-fg">Notes</span>
+                <span className="text-[10px] text-fg-subtle">{suiteState.notes.length} Pads</span>
               </button>
 
               {/* Reminders */}
               <button
                 type="button"
                 onClick={() => setActiveModule('reminders')}
-                className="flex flex-col items-center justify-center p-3 rounded-xl bg-white hover:bg-blue-50/80 border border-slate-200 hover:border-blue-300 transition-all shadow-2xs group cursor-pointer"
+                className="flex flex-col items-center justify-center p-3 rounded-xl bg-surface-card hover:bg-status-info-bg/80 border border-border-subtle hover:border-status-info-border transition-all shadow-2xs group cursor-pointer"
               >
-                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
+                <div className="w-10 h-10 rounded-xl bg-status-danger-bg-strong text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
                   <ClockIcon className="w-5 h-5" />
                 </div>
-                <span className="font-extrabold text-xs text-slate-800 group-hover:text-rose-700">Reminders</span>
-                <span className="text-[10px] text-slate-400">
+                <span className="font-extrabold text-xs text-fg-strong group-hover:text-status-danger-fg">Reminders</span>
+                <span className="text-[10px] text-fg-subtle">
                   {pendingCalendarEvents.length + urgentOpenTasks.length} Active
                 </span>
               </button>
@@ -353,26 +353,26 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
               <button
                 type="button"
                 onClick={() => setActiveModule('tasks')}
-                className="flex flex-col items-center justify-center p-3 rounded-xl bg-white hover:bg-blue-50/80 border border-slate-200 hover:border-blue-300 transition-all shadow-2xs group cursor-pointer"
+                className="flex flex-col items-center justify-center p-3 rounded-xl bg-surface-card hover:bg-status-info-bg/80 border border-border-subtle hover:border-status-info-border transition-all shadow-2xs group cursor-pointer"
               >
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
+                <div className="w-10 h-10 rounded-xl bg-status-success-bg-strong text-status-success-fg flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
                   <CheckIcon className="w-5 h-5" />
                 </div>
-                <span className="font-extrabold text-xs text-slate-800 group-hover:text-emerald-800">Tasks</span>
-                <span className="text-[10px] text-slate-400">{completedTasksCount}/{suiteState.tasks.length} Done</span>
+                <span className="font-extrabold text-xs text-fg-strong group-hover:text-status-success-fg">Tasks</span>
+                <span className="text-[10px] text-fg-subtle">{completedTasksCount}/{suiteState.tasks.length} Done</span>
               </button>
 
               {/* Help & SOPs */}
               <button
                 type="button"
                 onClick={() => setActiveModule('help')}
-                className="flex flex-col items-center justify-center p-3 rounded-xl bg-white hover:bg-blue-50/80 border border-slate-200 hover:border-blue-300 transition-all shadow-2xs group cursor-pointer"
+                className="flex flex-col items-center justify-center p-3 rounded-xl bg-surface-card hover:bg-status-info-bg/80 border border-border-subtle hover:border-status-info-border transition-all shadow-2xs group cursor-pointer"
               >
-                <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
+                <div className="w-10 h-10 rounded-xl bg-status-info-bg-strong text-status-info-fg flex items-center justify-center group-hover:scale-110 transition-transform mb-1.5 shadow-2xs">
                   <span className="text-lg">❓</span>
                 </div>
-                <span className="font-extrabold text-xs text-slate-800 group-hover:text-cyan-800">Help & SOPs</span>
-                <span className="text-[10px] text-slate-400">Radio Codes</span>
+                <span className="font-extrabold text-xs text-fg-strong group-hover:text-status-info-fg">Help & SOPs</span>
+                <span className="text-[10px] text-fg-subtle">Radio Codes</span>
               </button>
             </div>
           )}
@@ -381,10 +381,10 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
           {activeModule === 'notes' && (
             <div className="p-3.5 space-y-2.5 max-h-[460px] overflow-y-auto">
               {/* Note Tabs & Add Button */}
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2 gap-2">
+              <div className="flex items-center justify-between border-b border-border-subtle pb-2 gap-2">
                 <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pr-1 min-w-0">
                   {suiteState.notes.length === 0 ? (
-                    <span className="text-xs font-semibold text-slate-400">Shared Notes</span>
+                    <span className="text-xs font-semibold text-fg-subtle">Shared Notes</span>
                   ) : (
                     suiteState.notes.map((note) => {
                       const isActive = activeNote?.id === note.id;
@@ -396,7 +396,7 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                           className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1 ${
                             isActive
                               ? 'bg-purple-600 text-white shadow-2xs'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                              : 'bg-surface-muted hover:bg-surface-emphasis text-fg-secondary'
                           }`}
                         >
                           <span>{note.title}</span>
@@ -408,7 +408,7 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                 <button
                   type="button"
                   onClick={handleCreateNewNote}
-                  className="px-2 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs shrink-0 cursor-pointer border border-purple-200"
+                  className="px-2 py-1 rounded-lg bg-status-staged-bg hover:bg-status-staged-bg-strong text-purple-700 font-bold text-xs shrink-0 cursor-pointer border border-status-staged-border"
                   title="Create new shared note pad"
                 >
                   + New Note
@@ -416,12 +416,12 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
               </div>
 
               {!activeNote ? (
-                <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 space-y-2">
-                  <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mx-auto text-lg">
+                <div className="py-8 px-4 text-center rounded-xl border border-dashed border-border-subtle bg-surface-subtle/70 space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-status-staged-bg-strong text-purple-700 flex items-center justify-center mx-auto text-lg">
                     📝
                   </div>
-                  <p className="text-xs font-bold text-slate-700">No shared dispatch notes yet</p>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                  <p className="text-xs font-bold text-fg-secondary">No shared dispatch notes yet</p>
+                  <p className="text-[11px] text-fg-muted leading-relaxed">
                     Create a shift handover pad, gate code list, or airport advisory synced live across all dispatchers.
                   </p>
                   <button
@@ -435,21 +435,21 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
               ) : (
                 <>
                   {/* Google Docs-Style Author Attribution Chip + Live Collaborator Avatars */}
-                  <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200 flex items-center justify-between gap-2 text-xs">
+                  <div className="bg-surface-subtle rounded-xl p-2.5 border border-border-subtle flex items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-7 h-7 rounded-full bg-purple-600 text-white font-extrabold text-[11px] flex items-center justify-center shrink-0 shadow-2xs">
                         {getInitials(activeNote.lastModifiedBy?.name)}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-extrabold text-slate-900 truncate">
+                          <span className="font-extrabold text-fg-primary truncate">
                             {activeNote.lastModifiedBy?.name || 'Dispatcher'}
                           </span>
-                          <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded font-semibold capitalize">
+                          <span className="text-[10px] bg-surface-emphasis text-fg-secondary px-1.5 py-0.2 rounded font-semibold capitalize">
                             {activeNote.lastModifiedBy?.role || 'staff'}
                           </span>
                         </div>
-                        <div className="text-[10px] text-slate-500">
+                        <div className="text-[10px] text-fg-muted">
                           Last edited {formatTimeAgo(activeNote.updatedAt)}
                         </div>
                       </div>
@@ -496,7 +496,7 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
 
                   {/* Teammate Live Viewing / Editing Banner */}
                   {peerPresences.length > 0 && (
-                    <div className="flex items-center justify-between px-2.5 py-1 rounded-lg bg-emerald-50/90 border border-emerald-200 text-[11px] text-emerald-800 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between px-2.5 py-1 rounded-lg bg-status-success-bg/90 border border-status-success-border text-[11px] text-status-success-fg animate-in fade-in duration-200">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
                         <span className="font-semibold truncate">
@@ -506,7 +506,7 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                             : 'is viewing this note'}
                         </span>
                       </div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-200/60 px-1.5 py-0.2 rounded text-emerald-900 shrink-0">
+                      <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-200/60 px-1.5 py-0.2 rounded text-status-success-fg shrink-0">
                         Live Sync
                       </span>
                     </div>
@@ -522,7 +522,7 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                       const newTitle = e.target.value;
                       void dispatchAppSuiteService.updateNote(activeNote.id, { title: newTitle });
                     }}
-                    className="w-full text-xs font-bold px-2 py-1 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-purple-500"
+                    className="w-full text-xs font-bold px-2 py-1 bg-surface-card border border-border-subtle rounded-lg text-fg-primary focus:outline-purple-500"
                     placeholder="Note Title..."
                   />
 
@@ -533,18 +533,18 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                     onBlur={() => setIsEditingNote(false)}
                     onChange={(e) => handleNoteContentChange(e.target.value)}
                     rows={8}
-                    className="w-full text-xs font-mono p-3 rounded-xl border border-slate-300 bg-amber-50/20 text-slate-900 placeholder-slate-400 focus:outline-purple-500 resize-none leading-relaxed"
+                    className="w-full text-xs font-mono p-3 rounded-xl border border-border-strong bg-status-warning-bg/20 text-fg-primary placeholder-slate-400 focus:outline-purple-500 resize-none leading-relaxed"
                     placeholder="Type shared shift handover notes, gate codes, airport advisories..."
                   />
 
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+                  <div className="flex items-center justify-between text-[10px] text-fg-subtle pt-1">
                     <span>
                       Created by {activeNote.createdBy?.name || 'Dispatcher'} • Synced live to all dispatchers
                     </span>
                     <button
                       type="button"
                       onClick={() => void dispatchAppSuiteService.deleteNote(activeNote.id)}
-                      className="text-rose-500 hover:text-rose-700 font-bold cursor-pointer"
+                      className="text-rose-500 hover:text-status-danger-fg font-bold cursor-pointer"
                     >
                       Delete Pad
                     </button>
@@ -559,29 +559,29 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
             <div className="p-3.5 space-y-3 max-h-[460px] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
+                  <h4 className="font-extrabold text-xs text-fg-primary flex items-center gap-1.5">
                     <DocumentTextIcon className="w-4 h-4 text-amber-600" />
                     <span>Shared Operating Documents</span>
                   </h4>
-                  <p className="text-[10px] text-slate-500">Official permits, franchise tariffs & SOPs</p>
+                  <p className="text-[10px] text-fg-muted">Official permits, franchise tariffs & SOPs</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowAddDocForm(!showAddDocForm)}
-                  className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs cursor-pointer"
+                  className="px-2 py-1 rounded-lg bg-status-warning-bg hover:bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border font-bold text-xs cursor-pointer"
                 >
                   {showAddDocForm ? 'Cancel' : '+ Add SOP'}
                 </button>
               </div>
 
               {showAddDocForm && (
-                <form onSubmit={handleAddDocument} className="p-2.5 bg-amber-50/50 rounded-xl border border-amber-200 space-y-2 text-xs animate-in fade-in duration-100">
+                <form onSubmit={handleAddDocument} className="p-2.5 bg-status-warning-bg/50 rounded-xl border border-status-warning-border space-y-2 text-xs animate-in fade-in duration-100">
                   <input
                     type="text"
                     value={newDocTitle}
                     onChange={(e) => setNewDocTitle(e.target.value)}
                     placeholder="Document Title (e.g. Airport Pickup Protocol)..."
-                    className="w-full text-xs px-2 py-1.5 rounded-lg border border-amber-300 bg-white"
+                    className="w-full text-xs px-2 py-1.5 rounded-lg border border-status-warning-border bg-surface-card"
                     required
                   />
                   <input
@@ -589,7 +589,7 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                     value={newDocSummary}
                     onChange={(e) => setNewDocSummary(e.target.value)}
                     placeholder="Summary / Instructions..."
-                    className="w-full text-xs px-2 py-1.5 rounded-lg border border-amber-300 bg-white"
+                    className="w-full text-xs px-2 py-1.5 rounded-lg border border-status-warning-border bg-surface-card"
                   />
                   <div className="flex items-center justify-between gap-2">
                     <Select
@@ -597,7 +597,7 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                       fullWidth={false}
                       value={newDocCategory}
                       onChange={(e) => setNewDocCategory(e.target.value as DispatchDocument['category'])}
-                      triggerClassName="border-amber-300"
+                      triggerClassName="border-status-warning-border"
                     >
                       <option value="sop">SOP Manual</option>
                       <option value="permit">Permit</option>
@@ -616,10 +616,10 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
               )}
 
               {suiteState.documents.length === 0 && !showAddDocForm ? (
-                <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 space-y-2">
+                <div className="py-8 px-4 text-center rounded-xl border border-dashed border-border-subtle bg-surface-subtle/70 space-y-2">
                   <DocumentTextIcon className="w-8 h-8 text-amber-500/70 mx-auto" />
-                  <p className="text-xs font-bold text-slate-700">No shared documents yet</p>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                  <p className="text-xs font-bold text-fg-secondary">No shared documents yet</p>
+                  <p className="text-[11px] text-fg-muted leading-relaxed">
                     Publish SOPs, airport permits, or tariff cards so all dispatchers reference the same live documentation.
                   </p>
                   <button
@@ -633,14 +633,14 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
               ) : (
                 <div className="space-y-2 text-xs">
                   {suiteState.documents.map((docItem) => (
-                    <div key={docItem.id} className="p-2.5 rounded-xl border border-slate-200 bg-white hover:border-amber-300 transition-colors space-y-1">
+                    <div key={docItem.id} className="p-2.5 rounded-xl border border-border-subtle bg-surface-card hover:border-status-warning-border transition-colors space-y-1">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <h5 className="font-bold text-slate-900">{docItem.title}</h5>
-                          <p className="text-[11px] text-slate-600 leading-tight mt-0.5">{docItem.summary}</p>
+                          <h5 className="font-bold text-fg-primary">{docItem.title}</h5>
+                          <p className="text-[11px] text-fg-secondary leading-tight mt-0.5">{docItem.summary}</p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          <span className="text-[10px] font-bold text-status-success-fg bg-status-success-bg px-2 py-0.5 rounded border border-status-success-border">
                             {docItem.status.toUpperCase()}
                           </span>
                           <button
@@ -654,9 +654,9 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-500">
-                        <span>Valid: <strong className="text-slate-700">{docItem.validThrough || 'Permanent'}</strong> • v{docItem.version}</span>
-                        <span className="text-slate-400">
+                      <div className="flex items-center justify-between pt-1 border-t border-border-faint text-[10px] text-fg-muted">
+                        <span>Valid: <strong className="text-fg-secondary">{docItem.validThrough || 'Permanent'}</strong> • v{docItem.version}</span>
+                        <span className="text-fg-subtle">
                           Author: {docItem.lastModifiedBy?.name || 'Dispatcher'}
                         </span>
                       </div>
@@ -672,29 +672,29 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
             <div className="p-3.5 space-y-3 max-h-[460px] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
+                  <h4 className="font-extrabold text-xs text-fg-primary flex items-center gap-1.5">
                     <CalendarIcon className="w-4 h-4 text-blue-600" />
                     <span>Scheduled Rides & Airport Shifts</span>
                   </h4>
-                  <p className="text-[10px] text-slate-500">Shared forward reservations</p>
+                  <p className="text-[10px] text-fg-muted">Shared forward reservations</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowAddCalForm(!showAddCalForm)}
-                  className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs cursor-pointer"
+                  className="px-2 py-1 rounded-lg bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg border border-status-info-border font-bold text-xs cursor-pointer"
                 >
                   {showAddCalForm ? 'Cancel' : '+ Add Event'}
                 </button>
               </div>
 
               {showAddCalForm && (
-                <form onSubmit={handleAddCalendarEvent} className="p-2.5 bg-blue-50/50 rounded-xl border border-blue-200 space-y-2 text-xs animate-in fade-in duration-100">
+                <form onSubmit={handleAddCalendarEvent} className="p-2.5 bg-status-info-bg/50 rounded-xl border border-status-info-border space-y-2 text-xs animate-in fade-in duration-100">
                   <input
                     type="text"
                     value={newCalTitle}
                     onChange={(e) => setNewCalTitle(e.target.value)}
                     placeholder="Passenger / Event Name (e.g. Flight Arrival DL881)..."
-                    className="w-full text-xs px-2 py-1.5 rounded-lg border border-blue-300 bg-white"
+                    className="w-full text-xs px-2 py-1.5 rounded-lg border border-status-info-border bg-surface-card"
                     required
                   />
                   <div className="flex items-center gap-2">
@@ -703,7 +703,7 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                       value={newCalTime}
                       onChange={(e) => setNewCalTime(e.target.value)}
                       placeholder="Time (e.g. Tomorrow 08:30 AM)..."
-                      className="flex-1 text-xs px-2 py-1.5 rounded-lg border border-blue-300 bg-white"
+                      className="flex-1 text-xs px-2 py-1.5 rounded-lg border border-status-info-border bg-surface-card"
                       required
                     />
                     <Select
@@ -711,7 +711,7 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                       fullWidth={false}
                       value={newCalCategory}
                       onChange={(e) => setNewCalCategory(e.target.value as DispatchCalendarEvent['category'])}
-                      triggerClassName="border-blue-300"
+                      triggerClassName="border-status-info-border"
                     >
                       <option value="airport">Airport</option>
                       <option value="flight">Flight</option>
@@ -729,10 +729,10 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
               )}
 
               {suiteState.calendar.length === 0 && !showAddCalForm ? (
-                <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 space-y-2">
+                <div className="py-8 px-4 text-center rounded-xl border border-dashed border-border-subtle bg-surface-subtle/70 space-y-2">
                   <CalendarIcon className="w-8 h-8 text-blue-500/70 mx-auto" />
-                  <p className="text-xs font-bold text-slate-700">No scheduled events yet</p>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                  <p className="text-xs font-bold text-fg-secondary">No scheduled events yet</p>
+                  <p className="text-[11px] text-fg-muted leading-relaxed">
                     Add forward airport pickups, shift handovers, or VIP coordination reminders for the dispatch desk.
                   </p>
                   <button
@@ -751,14 +751,14 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                       onClick={() => void dispatchAppSuiteService.toggleCalendarEvent(ev.id)}
                       className={`p-2.5 rounded-xl border transition-all cursor-pointer space-y-1 ${
                         ev.completed
-                          ? 'bg-slate-50 border-slate-200 opacity-60 line-through'
-                          : 'bg-white border-blue-100 shadow-2xs hover:border-blue-300'
+                          ? 'bg-surface-subtle border-border-subtle opacity-60 line-through'
+                          : 'bg-surface-card border-blue-100 shadow-2xs hover:border-status-info-border'
                       }`}
                     >
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-extrabold text-blue-900">{ev.time}</span>
+                        <span className="font-extrabold text-status-info-fg">{ev.time}</span>
                         <div className="flex items-center gap-1">
-                          <span className="font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded text-[10px]">
+                          <span className="font-bold text-status-info-fg bg-status-info-bg border border-status-info-border px-1.5 py-0.2 rounded text-[10px]">
                             {ev.tag}
                           </span>
                           <button
@@ -771,17 +771,17 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                           </button>
                         </div>
                       </div>
-                      <p className="font-bold text-slate-900">{ev.title}</p>
+                      <p className="font-bold text-fg-primary">{ev.title}</p>
                       {ev.routeSummary && (
-                        <p className="text-[11px] text-slate-600">{ev.routeSummary}</p>
+                        <p className="text-[11px] text-fg-secondary">{ev.routeSummary}</p>
                       )}
                       {ev.specialRequests && (
-                        <p className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
+                        <p className="text-[10px] text-status-warning-fg bg-status-warning-bg px-1.5 py-0.5 rounded font-medium">
                           Note: {ev.specialRequests}
                         </p>
                       )}
-                      <div className="pt-1 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-                        <span>Scheduled by: <strong className="text-slate-600">{ev.createdBy?.name || 'Dispatcher'}</strong></span>
+                      <div className="pt-1 border-t border-border-faint flex items-center justify-between text-[10px] text-fg-subtle">
+                        <span>Scheduled by: <strong className="text-fg-secondary">{ev.createdBy?.name || 'Dispatcher'}</strong></span>
                         <span>{ev.completed ? '✓ Completed' : 'Pending'}</span>
                       </div>
                     </div>
@@ -796,22 +796,22 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
             <div className="p-3.5 space-y-3 max-h-[460px] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
+                  <h4 className="font-extrabold text-xs text-fg-primary flex items-center gap-1.5">
                     <ClockIcon className="w-4 h-4 text-rose-600" />
                     <span>Time-Sensitive Dispatch Alarms</span>
                   </h4>
-                  <p className="text-[10px] text-slate-500">Live alarms shared across dispatch shift</p>
+                  <p className="text-[10px] text-fg-muted">Live alarms shared across dispatch shift</p>
                 </div>
-                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                <span className="text-[10px] font-bold text-status-danger-fg bg-status-danger-bg px-2 py-0.5 rounded-full border border-status-danger-border">
                   {pendingCalendarEvents.length + urgentOpenTasks.length} Active
                 </span>
               </div>
 
               {pendingCalendarEvents.length === 0 && urgentOpenTasks.length === 0 ? (
-                <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 space-y-1.5">
+                <div className="py-8 px-4 text-center rounded-xl border border-dashed border-border-subtle bg-surface-subtle/70 space-y-1.5">
                   <ClockIcon className="w-8 h-8 text-rose-400/80 mx-auto" />
-                  <p className="text-xs font-bold text-slate-700">No active operational alarms</p>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                  <p className="text-xs font-bold text-fg-secondary">No active operational alarms</p>
+                  <p className="text-[11px] text-fg-muted leading-relaxed">
                     Pending calendar events and high-priority shift tasks appear here automatically.
                   </p>
                 </div>
@@ -820,18 +820,18 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                   {pendingCalendarEvents.slice(0, 5).map((item) => (
                     <div
                       key={item.id}
-                      className="p-2.5 rounded-xl border border-rose-100 bg-white shadow-2xs flex items-center justify-between gap-2"
+                      className="p-2.5 rounded-xl border border-rose-100 bg-surface-card shadow-2xs flex items-center justify-between gap-2"
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-sm">⏰</span>
                         <div>
-                          <span className="font-bold text-xs text-slate-900 block">{item.title}</span>
+                          <span className="font-bold text-xs text-fg-primary block">{item.title}</span>
                           <span className="text-[10px] text-rose-600 font-mono font-medium">
                             {item.time} • {item.tag}
                           </span>
                         </div>
                       </div>
-                      <span className="text-[10px] text-slate-400">
+                      <span className="text-[10px] text-fg-subtle">
                         by {item.createdBy?.name || 'Staff'}
                       </span>
                     </div>
@@ -840,13 +840,13 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                   {urgentOpenTasks.map((task) => (
                     <div
                       key={task.id}
-                      className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/40 flex items-center justify-between gap-2"
+                      className="p-2.5 rounded-xl border border-status-warning-border bg-status-warning-bg/40 flex items-center justify-between gap-2"
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-sm">⚠️</span>
-                        <span className="font-bold text-xs text-slate-800">{task.text}</span>
+                        <span className="font-bold text-xs text-fg-strong">{task.text}</span>
                       </div>
-                      <span className="text-[9px] font-black uppercase text-rose-700 bg-rose-100 px-1.5 py-0.2 rounded">
+                      <span className="text-[9px] font-black uppercase text-status-danger-fg bg-status-danger-bg-strong px-1.5 py-0.2 rounded">
                         High Priority
                       </span>
                     </div>
@@ -861,15 +861,15 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
             <div className="p-3.5 space-y-3 max-h-[460px] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
+                  <h4 className="font-extrabold text-xs text-fg-primary flex items-center gap-1.5">
                     <CheckIcon className="w-4 h-4 text-emerald-600" />
                     <span>Shift Operations Checklist</span>
                   </h4>
-                  <p className="text-[10px] text-slate-500">
+                  <p className="text-[10px] text-fg-muted">
                     {completedTasksCount} of {suiteState.tasks.length} completed
                   </p>
                 </div>
-                <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div className="w-20 h-2 bg-surface-emphasis rounded-full overflow-hidden">
                   <div
                     className="h-full bg-emerald-500 transition-all duration-300"
                     style={{
@@ -880,10 +880,10 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
               </div>
 
               {suiteState.tasks.length === 0 ? (
-                <div className="py-6 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 space-y-1.5">
+                <div className="py-6 px-4 text-center rounded-xl border border-dashed border-border-subtle bg-surface-subtle/70 space-y-1.5">
                   <CheckIcon className="w-7 h-7 text-emerald-500/70 mx-auto" />
-                  <p className="text-xs font-bold text-slate-700">No shift tasks on the checklist</p>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-xs font-bold text-fg-secondary">No shift tasks on the checklist</p>
+                  <p className="text-[11px] text-fg-muted">
                     Add a shared task below to coordinate across dispatchers.
                   </p>
                 </div>
@@ -895,8 +895,8 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                       onClick={() => handleToggleTask(task.id)}
                       className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
                         task.completed
-                          ? 'bg-slate-50 border-slate-200 line-through text-slate-400'
-                          : 'bg-white border-slate-200 text-slate-800 hover:border-emerald-300 shadow-2xs'
+                          ? 'bg-surface-subtle border-border-subtle line-through text-fg-subtle'
+                          : 'bg-surface-card border-border-subtle text-fg-strong hover:border-status-success-border shadow-2xs'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -908,7 +908,7 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                         />
                         <div className="min-w-0 flex-1">
                           <span className="text-xs font-medium block truncate">{task.text}</span>
-                          <div className="text-[9px] text-slate-400 flex items-center gap-1">
+                          <div className="text-[9px] text-fg-subtle flex items-center gap-1">
                             <span>Added by {task.createdBy?.name || 'Staff'}</span>
                             {task.completedBy && (
                               <span>• ✓ Done by {task.completedBy.name}</span>
@@ -919,7 +919,7 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
 
                       <div className="flex items-center gap-1.5 shrink-0">
                         {task.priority === 'high' && (
-                          <span className="text-[9px] font-black uppercase text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
+                          <span className="text-[9px] font-black uppercase text-rose-600 bg-status-danger-bg px-1.5 py-0.2 rounded border border-status-danger-border">
                             High
                           </span>
                         )}
@@ -938,13 +938,13 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
               )}
 
               {/* Add Task Form */}
-              <form onSubmit={handleAddTask} className="pt-2 border-t border-slate-200 flex gap-1.5">
+              <form onSubmit={handleAddTask} className="pt-2 border-t border-border-subtle flex gap-1.5">
                 <input
                   type="text"
                   value={newTaskText}
                   onChange={(e) => setNewTaskText(e.target.value)}
                   placeholder="Add shared task..."
-                  className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white"
+                  className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-border-strong bg-surface-card"
                   required
                 />
                 <Select
@@ -952,7 +952,7 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
                   fullWidth={false}
                   value={newTaskPriority}
                   onChange={(e) => setNewTaskPriority(e.target.value as DispatchTaskItem['priority'])}
-                  triggerClassName="border-slate-300 bg-slate-50"
+                  triggerClassName="border-border-strong bg-surface-subtle"
                 >
                   <option value="high">High</option>
                   <option value="med">Med</option>
@@ -972,31 +972,31 @@ export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: Ap
           {activeModule === 'help' && (
             <div className="p-3.5 space-y-3 max-h-[460px] overflow-y-auto">
               <div className="flex items-center justify-between">
-                <h4 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
+                <h4 className="font-extrabold text-xs text-fg-primary flex items-center gap-1.5">
                   <span className="text-sm">❓</span>
                   <span>Dispatch Codes & Emergency SOPs</span>
                 </h4>
               </div>
 
               <div className="space-y-2 text-xs">
-                <div className="p-2.5 rounded-xl border border-slate-200 bg-white space-y-1">
-                  <h5 className="font-bold text-slate-900">Radio 10-Codes Reference</h5>
-                  <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-600">
-                    <div><span className="font-mono font-bold text-slate-900">10-4</span>: Acknowledged</div>
-                    <div><span className="font-mono font-bold text-slate-900">10-7</span>: Out of Service</div>
-                    <div><span className="font-mono font-bold text-slate-900">10-8</span>: In Service / Available</div>
-                    <div><span className="font-mono font-bold text-slate-900">10-20</span>: Current Location</div>
-                    <div><span className="font-mono font-bold text-slate-900">10-33</span>: Emergency Traffic</div>
-                    <div><span className="font-mono font-bold text-slate-900">10-76</span>: En Route</div>
+                <div className="p-2.5 rounded-xl border border-border-subtle bg-surface-card space-y-1">
+                  <h5 className="font-bold text-fg-primary">Radio 10-Codes Reference</h5>
+                  <div className="grid grid-cols-2 gap-1 text-[11px] text-fg-secondary">
+                    <div><span className="font-mono font-bold text-fg-primary">10-4</span>: Acknowledged</div>
+                    <div><span className="font-mono font-bold text-fg-primary">10-7</span>: Out of Service</div>
+                    <div><span className="font-mono font-bold text-fg-primary">10-8</span>: In Service / Available</div>
+                    <div><span className="font-mono font-bold text-fg-primary">10-20</span>: Current Location</div>
+                    <div><span className="font-mono font-bold text-fg-primary">10-33</span>: Emergency Traffic</div>
+                    <div><span className="font-mono font-bold text-fg-primary">10-76</span>: En Route</div>
                   </div>
                 </div>
 
-                <div className="p-2.5 rounded-xl border border-slate-200 bg-white space-y-1">
-                  <h5 className="font-bold text-slate-900">Keyboard Shortcuts</h5>
-                  <div className="space-y-0.5 text-[11px] text-slate-600">
-                    <div><kbd className="font-mono bg-slate-100 px-1 rounded border">/ or Ctrl+K</kbd> Search Trips Queue</div>
-                    <div><kbd className="font-mono bg-slate-100 px-1 rounded border">Alt + P</kbd> Toggle Phone Hub</div>
-                    <div><kbd className="font-mono bg-slate-100 px-1 rounded border">Alt + D</kbd> Toggle Drivers Console</div>
+                <div className="p-2.5 rounded-xl border border-border-subtle bg-surface-card space-y-1">
+                  <h5 className="font-bold text-fg-primary">Keyboard Shortcuts</h5>
+                  <div className="space-y-0.5 text-[11px] text-fg-secondary">
+                    <div><kbd className="font-mono bg-surface-muted px-1 rounded border">/ or Ctrl+K</kbd> Search Trips Queue</div>
+                    <div><kbd className="font-mono bg-surface-muted px-1 rounded border">Alt + P</kbd> Toggle Phone Hub</div>
+                    <div><kbd className="font-mono bg-surface-muted px-1 rounded border">Alt + D</kbd> Toggle Drivers Console</div>
                   </div>
                 </div>
               </div>

@@ -44,12 +44,12 @@ export interface EmailMessageListPaneProps {
 }
 
 const TONE_BADGE_CLASSES: Record<string, string> = {
-  emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  blue: 'bg-blue-50 text-blue-700 border-blue-200',
-  amber: 'bg-amber-50 text-amber-800 border-amber-200',
-  rose: 'bg-rose-50 text-rose-700 border-rose-200',
-  indigo: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  slate: 'bg-slate-100 text-slate-600 border-slate-200',
+  emerald: 'bg-status-success-bg text-status-success-fg border-status-success-border',
+  blue: 'bg-status-info-bg text-status-info-fg border-status-info-border',
+  amber: 'bg-status-warning-bg text-status-warning-fg border-status-warning-border',
+  rose: 'bg-status-danger-bg text-status-danger-fg border-status-danger-border',
+  indigo: 'bg-status-staged-bg text-status-staged-fg border-status-staged-border',
+  slate: 'bg-surface-muted text-fg-secondary border-border-subtle',
 };
 
 function PaperclipMiniIcon({ className = 'w-3 h-3' }: { className?: string }) {
@@ -150,12 +150,12 @@ export function EmailMessageListPane({
   // ─── DRAFTS FOLDER VIEW ───
   if (activeFolder === 'drafts') {
     return (
-      <div className={`divide-y divide-slate-100 overflow-y-auto pb-16 bg-white ${className}`}>
+      <div className={`divide-y divide-border-faint overflow-y-auto pb-16 bg-surface-card ${className}`}>
         {drafts.length === 0 ? (
           <div className="p-8 text-center space-y-1.5">
             <EditIcon className="w-8 h-8 text-slate-300 mx-auto" />
-            <p className="text-xs font-bold text-slate-700">{folderConfig.emptyTitle}</p>
-            <p className="text-[11px] text-slate-400">{folderConfig.emptyDescription}</p>
+            <p className="text-xs font-bold text-fg-secondary">{folderConfig.emptyTitle}</p>
+            <p className="text-[11px] text-fg-subtle">{folderConfig.emptyDescription}</p>
           </div>
         ) : (
           drafts.map((draft) => {
@@ -166,28 +166,28 @@ export function EmailMessageListPane({
                 onClick={() => onOpenDraft(draft)}
                 className={`group relative p-3 cursor-pointer border-l-4 transition-colors ${
                   isActive
-                    ? 'bg-amber-50/70 border-l-amber-500'
-                    : 'bg-white hover:bg-slate-50 border-l-transparent'
+                    ? 'bg-status-warning-bg/70 border-l-amber-500'
+                    : 'bg-surface-card hover:bg-surface-subtle border-l-transparent'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-[10px] font-black uppercase tracking-wide px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                    <span className="text-[10px] font-black uppercase tracking-wide px-1.5 py-0.2 rounded bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border shrink-0">
                       Draft
                     </span>
-                    <span className="text-xs font-bold text-slate-800 truncate">
+                    <span className="text-xs font-bold text-fg-strong truncate">
                       {draft.toName || draft.toEmail || '(No recipient yet)'}
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-400 shrink-0">
+                  <span className="text-[10px] text-fg-subtle shrink-0">
                     {formatDispatchEmailTimestamp(draft.updatedAtMs)}
                   </span>
                 </div>
 
-                <h4 className="text-xs font-bold text-slate-900 truncate mt-1">
+                <h4 className="text-xs font-bold text-fg-primary truncate mt-1">
                   {draft.subject || '(No subject)'}
                 </h4>
-                <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                <p className="text-[11px] text-fg-muted line-clamp-1 mt-0.5">
                   {draft.bodyText.trim() || 'Click to continue writing...'}
                 </p>
 
@@ -198,7 +198,7 @@ export function EmailMessageListPane({
                     onDiscardDraft(draft.id);
                   }}
                   title="Discard draft"
-                  className="absolute right-2.5 bottom-2.5 p-1 rounded-md bg-white/95 border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 shadow-2xs cursor-pointer"
+                  className="absolute right-2.5 bottom-2.5 p-1 rounded-md bg-surface-card/95 border border-border-subtle text-fg-subtle hover:text-rose-600 hover:border-status-danger-border shadow-2xs cursor-pointer"
                 >
                   <TrashIcon className="w-3.5 h-3.5" />
                 </button>
@@ -214,12 +214,12 @@ export function EmailMessageListPane({
 
   return (
     <>
-      <div className={`divide-y divide-slate-100 overflow-y-auto pb-16 bg-white ${className}`}>
+      <div className={`divide-y divide-border-faint overflow-y-auto pb-16 bg-surface-card ${className}`}>
         {emails.length === 0 ? (
           <div className="p-8 text-center space-y-1.5">
             <MailIcon className="w-8 h-8 text-slate-300 mx-auto" />
-            <p className="text-xs font-bold text-slate-700">{folderConfig.emptyTitle}</p>
-            <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+            <p className="text-xs font-bold text-fg-secondary">{folderConfig.emptyTitle}</p>
+            <p className="text-[11px] text-fg-subtle max-w-xs mx-auto">
               {folderConfig.emptyDescription}
             </p>
           </div>
@@ -277,15 +277,15 @@ export function EmailMessageListPane({
                   onSelectEmail(email);
                 }}
                 className={`group relative px-3 py-2.5 transition-all cursor-pointer border-l-4 select-none ${
-                  isPressing ? 'scale-[0.99] bg-blue-50/80' : ''
+                  isPressing ? 'scale-[0.99] bg-status-info-bg/80' : ''
                 } ${
                   isSelected
-                    ? 'bg-blue-50/90 border-l-blue-600'
+                    ? 'bg-status-info-bg/90 border-l-blue-600'
                     : isChecked
-                    ? 'bg-blue-50/50 border-l-blue-400'
+                    ? 'bg-status-info-bg/50 border-l-blue-400'
                     : email.isUnread
-                    ? 'bg-blue-50/35 hover:bg-blue-50/70 border-l-blue-600'
-                    : 'bg-white hover:bg-slate-50/90 border-l-transparent'
+                    ? 'bg-status-info-bg/35 hover:bg-status-info-bg/70 border-l-blue-600'
+                    : 'bg-surface-card hover:bg-surface-subtle/90 border-l-transparent'
                 }`}
               >
                 {/* Row 1: Checkbox + Star + Sender + Thread Count + Timestamp */}
@@ -296,7 +296,7 @@ export function EmailMessageListPane({
                       checked={isChecked}
                       onChange={() => onToggleSelectId(email.id)}
                       onClick={(e) => e.stopPropagation()}
-                      className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
+                      className="w-3.5 h-3.5 rounded border-border-strong text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
                       aria-label={`Select email ${email.subject}`}
                     />
 
@@ -327,8 +327,8 @@ export function EmailMessageListPane({
                     <span
                       className={`text-xs truncate ${
                         email.isUnread
-                          ? 'font-black text-slate-900'
-                          : 'font-semibold text-slate-700'
+                          ? 'font-black text-fg-primary'
+                          : 'font-semibold text-fg-secondary'
                       }`}
                     >
                       {displayCounterparty}
@@ -336,7 +336,7 @@ export function EmailMessageListPane({
 
                     {threadCount > 1 && (
                       <span
-                        className="text-[10px] font-extrabold px-1.5 py-0.2 rounded-md bg-slate-200/90 text-slate-700 shrink-0"
+                        className="text-[10px] font-extrabold px-1.5 py-0.2 rounded-md bg-surface-emphasis/90 text-fg-secondary shrink-0"
                         title={`${threadCount} messages in conversation`}
                       >
                         {threadCount}
@@ -344,7 +344,7 @@ export function EmailMessageListPane({
                     )}
                   </div>
 
-                  <span className="text-[10px] text-slate-400 shrink-0 font-medium">
+                  <span className="text-[10px] text-fg-subtle shrink-0 font-medium">
                     {formatDispatchEmailTimestamp(email.timestampMs, email.createdAt)}
                   </span>
                 </div>
@@ -352,21 +352,21 @@ export function EmailMessageListPane({
                 {/* Row 2: Subject */}
                 <h4
                   className={`text-xs mt-1 truncate pl-5 ${
-                    email.isUnread ? 'font-bold text-slate-900' : 'font-medium text-slate-700'
+                    email.isUnread ? 'font-bold text-fg-primary' : 'font-medium text-fg-secondary'
                   }`}
                 >
                   {email.subject || '(No Subject)'}
                 </h4>
 
                 {/* Row 3: Snippet */}
-                <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5 pl-5">
+                <p className="text-[11px] text-fg-muted line-clamp-1 mt-0.5 pl-5">
                   {email.snippet || email.textBody}
                 </p>
 
                 {/* Row 4: Operational Category, Delivery, VIP/Corporate & Attachment Chips */}
                 <div className="flex items-center gap-1 flex-wrap mt-1.5 pl-5">
                   {email.suggestedBooking && (
-                    <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                    <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full border bg-status-success-bg text-status-success-fg border-status-success-border">
                       <CarIcon className="w-2.5 h-2.5 shrink-0" />
                       <span>Booking Req</span>
                     </span>
@@ -383,13 +383,13 @@ export function EmailMessageListPane({
                   )}
 
                   {isVip && (
-                    <span className="inline-flex items-center text-[9.5px] font-black px-1.5 py-0.2 rounded-full border bg-amber-50 text-amber-800 border-amber-300">
+                    <span className="inline-flex items-center text-[9.5px] font-black px-1.5 py-0.2 rounded-full border bg-status-warning-bg text-status-warning-fg border-status-warning-border">
                       VIP
                     </span>
                   )}
 
                   {corporateLabel && (
-                    <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200 max-w-[140px] truncate">
+                    <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full border bg-status-staged-bg text-status-staged-fg border-status-staged-border max-w-[140px] truncate">
                       <BuildingIcon className="w-2.5 h-2.5 shrink-0" />
                       <span className="truncate">{corporateLabel}</span>
                     </span>
@@ -407,7 +407,7 @@ export function EmailMessageListPane({
 
                   {email.attachments && email.attachments.length > 0 && (
                     <span
-                      className="inline-flex items-center gap-0.5 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full border bg-slate-100 text-slate-600 border-slate-200"
+                      className="inline-flex items-center gap-0.5 text-[9.5px] font-bold px-1.5 py-0.2 rounded-full border bg-surface-muted text-fg-secondary border-border-subtle"
                       title={email.attachments.map((a) => a.filename).join(', ')}
                     >
                       <PaperclipMiniIcon className="w-2.5 h-2.5 shrink-0" />
@@ -416,14 +416,14 @@ export function EmailMessageListPane({
                   )}
 
                   {email.tripId && (
-                    <span className="text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded border bg-slate-50 text-slate-600 border-slate-200">
+                    <span className="text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded border bg-surface-subtle text-fg-secondary border-border-subtle">
                       {email.tripId}
                     </span>
                   )}
                 </div>
 
                 {/* Desktop Hover Quick Actions */}
-                <div className="absolute right-2 top-2 hidden sm:group-hover:flex items-center gap-0.5 bg-white/95 shadow-sm border border-slate-200 rounded-lg p-0.5">
+                <div className="absolute right-2 top-2 hidden sm:group-hover:flex items-center gap-0.5 bg-surface-card/95 shadow-sm border border-border-subtle rounded-lg p-0.5">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -431,7 +431,7 @@ export function EmailMessageListPane({
                       onToggleRead(email.id);
                     }}
                     title={email.isUnread ? 'Mark as read' : 'Mark as unread'}
-                    className="p-1 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded cursor-pointer"
+                    className="p-1 hover:bg-surface-muted text-fg-muted hover:text-blue-600 rounded cursor-pointer"
                   >
                     <MailIcon className="w-3 h-3" />
                   </button>
@@ -443,7 +443,7 @@ export function EmailMessageListPane({
                         onMoveToFolder(email.id, 'inbox');
                       }}
                       title="Move to Inbox"
-                      className="px-1.5 py-0.5 hover:bg-blue-50 text-[10px] font-bold text-blue-600 rounded cursor-pointer"
+                      className="px-1.5 py-0.5 hover:bg-status-info-bg text-[10px] font-bold text-blue-600 rounded cursor-pointer"
                     >
                       Restore
                     </button>
@@ -455,7 +455,7 @@ export function EmailMessageListPane({
                         onMoveToFolder(email.id, 'archive');
                       }}
                       title="Archive"
-                      className="px-1.5 py-0.5 hover:bg-slate-100 text-[10px] font-bold text-slate-600 rounded cursor-pointer"
+                      className="px-1.5 py-0.5 hover:bg-surface-muted text-[10px] font-bold text-fg-secondary rounded cursor-pointer"
                     >
                       Archive
                     </button>
@@ -468,7 +468,7 @@ export function EmailMessageListPane({
                         onMoveToFolder(email.id, 'trash');
                       }}
                       title="Move to Trash"
-                      className="p-1 hover:bg-rose-50 text-slate-500 hover:text-rose-600 rounded cursor-pointer"
+                      className="p-1 hover:bg-status-danger-bg text-fg-muted hover:text-rose-600 rounded cursor-pointer"
                     >
                       <TrashIcon className="w-3 h-3" />
                     </button>
@@ -520,7 +520,7 @@ export function EmailMessageListPane({
                   setActionSheetEmail(null);
                   onSelectEmail(target);
                 }}
-                className="py-2.5 px-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                className="py-2.5 px-3 rounded-xl bg-status-info-bg border border-status-info-border text-status-info-fg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <MailIcon className="w-4 h-4" />
                 <span>Open Thread</span>
@@ -532,7 +532,7 @@ export function EmailMessageListPane({
                   setActionSheetEmail(null);
                   onQuickReply(target);
                 }}
-                className="py-2.5 px-3 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                className="py-2.5 px-3 rounded-xl bg-status-staged-bg border border-status-staged-border text-status-staged-fg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <EditIcon className="w-4 h-4" />
                 <span>Reply</span>
@@ -547,7 +547,7 @@ export function EmailMessageListPane({
                   setActionSheetEmail(null);
                   onToggleRead(id);
                 }}
-                className="py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                className="py-2.5 px-3 rounded-xl bg-surface-subtle border border-border-subtle text-fg-secondary font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <CheckIcon className="w-4 h-4" />
                 <span>{actionSheetEmail.isUnread ? 'Mark Read' : 'Mark Unread'}</span>
@@ -559,7 +559,7 @@ export function EmailMessageListPane({
                   setActionSheetEmail(null);
                   onToggleStar(id);
                 }}
-                className="py-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                className="py-2.5 px-3 rounded-xl bg-status-warning-bg border border-status-warning-border text-status-warning-fg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <StarIcon className="w-4 h-4" />
                 <span>{actionSheetEmail.isStarred ? 'Unstar' : 'Star'}</span>
@@ -575,7 +575,7 @@ export function EmailMessageListPane({
                     setActionSheetEmail(null);
                     onMoveToFolder(id, 'inbox');
                   }}
-                  className="py-2.5 px-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="py-2.5 px-3 rounded-xl bg-status-info-bg border border-status-info-border text-status-info-fg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span>Move to Inbox</span>
                 </button>
@@ -587,7 +587,7 @@ export function EmailMessageListPane({
                     setActionSheetEmail(null);
                     onMoveToFolder(id, 'archive');
                   }}
-                  className="py-2.5 px-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="py-2.5 px-3 rounded-xl bg-surface-muted border border-border-subtle text-fg-secondary font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span>Archive</span>
                 </button>
@@ -600,7 +600,7 @@ export function EmailMessageListPane({
                   setActionSheetEmail(null);
                   onMoveToFolder(id, 'trash');
                 }}
-                className="py-2.5 px-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                className="py-2.5 px-3 rounded-xl bg-status-danger-bg border border-status-danger-border text-status-danger-fg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <TrashIcon className="w-4 h-4" />
                 <span>Trash</span>

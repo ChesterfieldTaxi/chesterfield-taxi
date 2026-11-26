@@ -113,23 +113,23 @@ export function DispatchRoutingTimingSection({
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-800 text-xs">Pickup Time</span>
+            <span className="font-bold text-fg-strong text-xs">Pickup Time</span>
             {(isCompleted || isCancelled) && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-muted text-fg-secondary border border-border-subtle">
                 <LockIcon className="w-2.5 h-2.5 shrink-0" />
                 <span>Locked</span>
               </span>
             )}
             {draftSavedAt && (
               <span
-                className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200"
+                className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-status-success-bg text-status-success-fg border border-status-success-border"
                 title="Form data is auto-saved locally so you won't lose work on reload"
               >
                 {isEditMode ? 'Edits cached' : 'Draft saved'}
               </span>
             )}
           </div>
-          <span className="text-[10px] text-slate-400 font-medium">
+          <span className="text-[10px] text-fg-subtle font-medium">
             {timingType === 'later' ? 'Scheduled reservation' : 'On-demand dispatch'}
           </span>
         </div>
@@ -139,7 +139,7 @@ export function DispatchRoutingTimingSection({
             isCompleted || isCancelled ? 'opacity-60 pointer-events-none select-none' : ''
           }`}
         >
-          <label className="flex items-center gap-1.5 cursor-pointer shrink-0 select-none font-semibold text-slate-700 text-xs">
+          <label className="flex items-center gap-1.5 cursor-pointer shrink-0 select-none font-semibold text-fg-secondary text-xs">
             <input
               type="checkbox"
               checked={timingType === 'later'}
@@ -149,11 +149,11 @@ export function DispatchRoutingTimingSection({
             />
             <div
               className={`w-9 h-5 rounded-full transition-colors relative flex items-center px-0.5 ${
-                timingType === 'later' ? 'bg-blue-600' : 'bg-slate-300'
+                timingType === 'later' ? 'bg-blue-600' : 'bg-surface-strong'
               }`}
             >
               <div
-                className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+                className={`w-4 h-4 rounded-full bg-surface-card shadow-sm transition-transform ${
                   timingType === 'later' ? 'translate-x-4' : 'translate-x-0'
                 }`}
               />
@@ -167,7 +167,7 @@ export function DispatchRoutingTimingSection({
               <ModernTimePicker size="sm" value={scheduledTime} onChange={setScheduledTime} />
             </div>
           ) : (
-            <div className="flex-1 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded text-slate-500 text-xs font-medium">
+            <div className="flex-1 px-3 py-1.5 bg-surface-muted border border-border-subtle rounded text-fg-muted text-xs font-medium">
               ASAP (Live / Immediate)
             </div>
           )}
@@ -176,17 +176,17 @@ export function DispatchRoutingTimingSection({
 
       {/* Routing Section (Outbound) */}
       <div>
-        <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">
+        <label className="block text-[11px] font-bold text-fg-secondary uppercase tracking-wide mb-1">
           Route
         </label>
 
-        <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm space-y-2">
+        <div className="p-2 bg-surface-card border border-border-subtle rounded-lg shadow-sm space-y-2">
           <div className="relative flex items-center gap-2">
             <button
               type="button"
               title="Swap Pickup and Dropoff"
               onClick={onSwapRoute}
-              className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors self-center text-sm font-bold"
+              className="p-1 text-fg-subtle hover:text-blue-600 hover:bg-surface-muted rounded transition-colors self-center text-sm font-bold"
             >
               ↕
             </button>
@@ -230,7 +230,7 @@ export function DispatchRoutingTimingSection({
                     type="button"
                     disabled={isCancelled}
                     onClick={() => outboundWaypoints.removeStopAt(idx)}
-                    className="text-slate-400 hover:text-red-500 px-1 disabled:opacity-30"
+                    className="text-fg-subtle hover:text-red-500 px-1 disabled:opacity-30"
                   >
                     ✕
                   </button>
@@ -257,18 +257,18 @@ export function DispatchRoutingTimingSection({
           </div>
 
           {/* Route Stats & Add Stop */}
-          <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
+          <div className="flex items-center justify-between pt-1 border-t border-border-faint text-[11px] text-fg-muted font-medium">
             <div>
               Estimate:{' '}
-              <span className="font-bold text-slate-700">{estimatedDurationMinutes} min</span>,{' '}
-              <span className="font-bold text-slate-700">{estimatedDistanceMiles} mi</span>
+              <span className="font-bold text-fg-secondary">{estimatedDurationMinutes} min</span>,{' '}
+              <span className="font-bold text-fg-secondary">{estimatedDistanceMiles} mi</span>
             </div>
             <div className="flex items-center gap-2">
               {!airportDetection.isAirportTrip && !provideFlightInfo && (
                 <button
                   type="button"
                   onClick={() => setProvideFlightInfo(true)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs border border-sky-200 transition-all shadow-2xs active:scale-95"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-status-info-bg hover:bg-status-info-bg-strong text-sky-700 font-bold text-xs border border-status-info-border transition-all shadow-2xs active:scale-95"
                 >
                   <PlaneIcon className="w-3.5 h-3.5 text-sky-600" />
                   <span>+ Flight Info</span>
@@ -277,7 +277,7 @@ export function DispatchRoutingTimingSection({
               <button
                 type="button"
                 onClick={outboundWaypoints.addStop}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 transition-all shadow-2xs active:scale-95"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg font-bold text-xs border border-status-info-border transition-all shadow-2xs active:scale-95"
               >
                 <PlusIcon className="w-3.5 h-3.5 text-blue-600" />
                 <span>Add stop</span>
@@ -287,9 +287,9 @@ export function DispatchRoutingTimingSection({
 
           {/* Outbound Flight / Aviation Details Box */}
           <CollapsibleSection isOpen={airportDetection.isAirportTrip || provideFlightInfo}>
-            <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-lg space-y-2.5">
+            <div className="p-3 bg-status-info-bg/70 border border-status-info-border rounded-lg space-y-2.5">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-blue-900 font-bold text-xs">
+                <div className="flex items-center gap-1.5 text-status-info-fg font-bold text-xs">
                   <PlaneLandingIcon
                     className={`w-4 h-4 text-blue-600 ${
                       airportDetection.isDropoffAirport ? 'rotate-45' : ''
@@ -310,12 +310,12 @@ export function DispatchRoutingTimingSection({
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1.5 cursor-pointer select-none text-[10px] font-semibold text-blue-900 bg-white/90 px-2 py-0.5 rounded border border-blue-200 shadow-2xs">
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none text-[10px] font-semibold text-status-info-fg bg-surface-card/90 px-2 py-0.5 rounded border border-status-info-border shadow-2xs">
                     <input
                       type="checkbox"
                       checked={provideFlightInfo}
                       onChange={(e) => setProvideFlightInfo(e.target.checked)}
-                      className="rounded border-blue-300 text-blue-600 focus:ring-blue-500 w-3 h-3"
+                      className="rounded border-status-info-border text-blue-600 focus:ring-blue-500 w-3 h-3"
                     />
                     <span>
                       {airportDetection.isPickupAirport
@@ -325,7 +325,7 @@ export function DispatchRoutingTimingSection({
                         : 'Provide Airline'}
                     </span>
                   </label>
-                  <span className="text-[10px] bg-blue-200/80 text-blue-900 px-2 py-0.5 rounded font-bold inline-flex items-center gap-1">
+                  <span className="text-[10px] bg-blue-200/80 text-status-info-fg px-2 py-0.5 rounded font-bold inline-flex items-center gap-1">
                     {airportDetection.isPrivateAviation ? (
                       <>
                         <PlaneIcon className="w-3 h-3 shrink-0" />
@@ -345,7 +345,7 @@ export function DispatchRoutingTimingSection({
                   {airportDetection.isPrivateAviation ? (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <div>
-                        <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        <span className="block text-[10px] text-fg-secondary font-semibold mb-0.5">
                           FBO Facility
                         </span>
                         <input
@@ -354,7 +354,7 @@ export function DispatchRoutingTimingSection({
                           placeholder="e.g. Signature Flight Support"
                           value={fboFacility}
                           onChange={(e) => setFboFacility(e.target.value)}
-                          className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs text-slate-800"
+                          className="w-full px-2 py-1 bg-surface-card border border-status-info-border rounded text-xs text-fg-strong"
                         />
                         <datalist id="dispatch-outbound-fbo-list">
                           {COMMON_FBO_FACILITIES.map((fbo) => (
@@ -363,7 +363,7 @@ export function DispatchRoutingTimingSection({
                         </datalist>
                       </div>
                       <div>
-                        <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        <span className="block text-[10px] text-fg-secondary font-semibold mb-0.5">
                           Tail #
                         </span>
                         <input
@@ -371,11 +371,11 @@ export function DispatchRoutingTimingSection({
                           placeholder="e.g. N12345"
                           value={tailNumber}
                           onChange={(e) => setTailNumber(e.target.value.toUpperCase())}
-                          className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs uppercase font-mono font-bold"
+                          className="w-full px-2 py-1 bg-surface-card border border-status-info-border rounded text-xs uppercase font-mono font-bold"
                         />
                       </div>
                       <div>
-                        <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        <span className="block text-[10px] text-fg-secondary font-semibold mb-0.5">
                           {airportDetection.isPickupAirport ? 'Origin' : 'Destination'}
                         </span>
                         <AirportCityCombobox
@@ -384,7 +384,7 @@ export function DispatchRoutingTimingSection({
                           value={flightOrigin}
                           onChange={setFlightOrigin}
                           placeholder="e.g. TEB Teterboro"
-                          borderClassName="border-blue-200"
+                          borderClassName="border-status-info-border"
                         />
                       </div>
                     </div>
@@ -392,7 +392,7 @@ export function DispatchRoutingTimingSection({
                     <>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <div>
-                          <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                          <span className="block text-[10px] text-fg-secondary font-semibold mb-0.5">
                             Airline
                           </span>
                           <Select
@@ -419,11 +419,11 @@ export function DispatchRoutingTimingSection({
                                 setOutboundFlightTelemetry(null);
                               }
                             }}
-                            triggerClassName="border-blue-200"
+                            triggerClassName="border-status-info-border"
                           />
                         </div>
                         <div>
-                          <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                          <span className="block text-[10px] text-fg-secondary font-semibold mb-0.5">
                             Flight #
                           </span>
                           <input
@@ -444,11 +444,11 @@ export function DispatchRoutingTimingSection({
                                 setOutboundFlightTelemetry(null);
                               }
                             }}
-                            className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs font-mono font-bold"
+                            className="w-full px-2 py-1 bg-surface-card border border-status-info-border rounded text-xs font-mono font-bold"
                           />
                         </div>
                         <div>
-                          <span className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                          <span className="block text-[10px] text-fg-secondary font-semibold mb-0.5">
                             {airportDetection.isPickupAirport ? 'Origin' : 'Destination'}
                           </span>
                           <AirportCityCombobox
@@ -456,7 +456,7 @@ export function DispatchRoutingTimingSection({
                             value={flightOrigin}
                             onChange={setFlightOrigin}
                             placeholder="e.g. YYZ Toronto"
-                            borderClassName="border-blue-200"
+                            borderClassName="border-status-info-border"
                           />
                         </div>
                       </div>
@@ -502,13 +502,13 @@ export function DispatchRoutingTimingSection({
                     </>
                   )}
 
-                  <div className="flex items-center justify-between pt-1 border-t border-blue-200/60 text-[11px] text-blue-950">
+                  <div className="flex items-center justify-between pt-1 border-t border-status-info-border/60 text-[11px] text-status-info-fg">
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={hasCheckedLuggage}
                         onChange={(e) => setHasCheckedLuggage(e.target.checked)}
-                        className="rounded border-blue-300 text-blue-600"
+                        className="rounded border-status-info-border text-blue-600"
                       />
                       <span>Checked Baggage</span>
                     </label>

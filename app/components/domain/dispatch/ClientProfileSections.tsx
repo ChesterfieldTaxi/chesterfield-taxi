@@ -53,16 +53,16 @@ export function ClientUpcomingRidesStrip({
 }: ClientUpcomingRidesStripProps) {
   if (trips.length === 0) return null;
   return (
-    <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 overflow-hidden shadow-2xs">
+    <div className="rounded-xl border border-status-staged-border bg-status-staged-bg/60 overflow-hidden shadow-2xs">
       <div className="px-2.5 py-1.5 bg-indigo-600 text-white text-[10.5px] font-extrabold uppercase tracking-wider">
         Active &amp; Upcoming Rides ({trips.length})
       </div>
-      <div className="divide-y divide-indigo-100 bg-white">
+      <div className="divide-y divide-indigo-100 bg-surface-card">
         {trips.map((trip) => {
           const shortId = trip.id.slice(-6).toUpperCase();
           const driverLabel = resolveDriverBadgeLabel(trip, drivers);
           return (
-            <div key={trip.id} className="p-2 flex items-center justify-between gap-2 hover:bg-indigo-50/50">
+            <div key={trip.id} className="p-2 flex items-center justify-between gap-2 hover:bg-status-staged-bg/50">
               <div className="min-w-0 flex-1 space-y-0.5">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <DispatchStatusBadge compact status={trip.status} trip={trip} nowMs={nowMs} />
@@ -73,19 +73,19 @@ export function ClientUpcomingRidesStrip({
                       getWorkspaceBus().publish('OPEN_TRIP_DETAILS', { tripId: trip.id, initialTab: 'details' });
                       onOpenTripDetails?.(trip);
                     }}
-                    className="font-mono font-bold text-[10.5px] text-blue-700 hover:underline cursor-pointer"
+                    className="font-mono font-bold text-[10.5px] text-status-info-fg hover:underline cursor-pointer"
                     title="Open Trip Details & Audit"
                   >
                     #{shortId}
                   </button>
-                  <span className="font-bold text-slate-800 text-[11px]">{formatUpcomingPickupLabel(trip)}</span>
+                  <span className="font-bold text-fg-strong text-[11px]">{formatUpcomingPickupLabel(trip)}</span>
                   {driverLabel && (
-                    <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                    <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-surface-muted text-fg-secondary border border-border-subtle">
                       {driverLabel}
                     </span>
                   )}
                 </div>
-                <div className="text-[11px] text-slate-600 truncate">
+                <div className="text-[11px] text-fg-secondary truncate">
                   {trip.pickupLocation?.address || 'Pickup'} &rarr; {trip.dropoffLocation?.address || 'Dropoff'}
                 </div>
               </div>
@@ -104,7 +104,7 @@ export function ClientUpcomingRidesStrip({
                   <button
                     type="button"
                     onClick={() => onFocusTripOnMap(trip)}
-                    className="px-2 py-1 rounded-md bg-white hover:bg-indigo-50 text-indigo-700 font-bold text-[10.5px] border border-indigo-200 cursor-pointer active:scale-95"
+                    className="px-2 py-1 rounded-md bg-surface-card hover:bg-status-staged-bg text-status-staged-fg font-bold text-[10.5px] border border-status-staged-border cursor-pointer active:scale-95"
                     title="Focus this ride on the Dispatch map"
                   >
                     Map
@@ -120,11 +120,11 @@ export function ClientUpcomingRidesStrip({
 }
 
 function placeBadge(place: ClientQuickPlaceItem): { text: string; cls: string } {
-  if (place.source === 'frequent') return { text: `Frequent ×${place.tripCount || 1}`, cls: 'bg-violet-100 text-violet-800 border-violet-200' };
-  if (place.source === 'corporate') return { text: 'Company', cls: 'bg-indigo-100 text-indigo-800 border-indigo-200' };
-  if (place.category === 'work') return { text: 'Work', cls: 'bg-sky-100 text-sky-800 border-sky-200' };
-  if (place.category === 'home') return { text: 'Home', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
-  return { text: place.category.charAt(0).toUpperCase() + place.category.slice(1), cls: 'bg-amber-100 text-amber-900 border-amber-200' };
+  if (place.source === 'frequent') return { text: `Frequent ×${place.tripCount || 1}`, cls: 'bg-status-staged-bg-strong text-status-staged-fg border-status-staged-border' };
+  if (place.source === 'corporate') return { text: 'Company', cls: 'bg-status-staged-bg-strong text-status-staged-fg border-status-staged-border' };
+  if (place.category === 'work') return { text: 'Work', cls: 'bg-status-info-bg-strong text-status-info-fg border-status-info-border' };
+  if (place.category === 'home') return { text: 'Home', cls: 'bg-status-success-bg-strong text-status-success-fg border-status-success-border' };
+  return { text: place.category.charAt(0).toUpperCase() + place.category.slice(1), cls: 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border' };
 }
 
 export interface ClientSavedPlacesSectionProps {
@@ -175,7 +175,7 @@ export function ClientSavedPlacesSection({ places, contactId, identity, onSetEnd
         type="button"
         onClick={() => apply(place, endpoint)}
         className={`px-1.5 py-1 rounded-md font-bold text-[10px] border cursor-pointer active:scale-95 transition-colors ${
-          done ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white hover:bg-blue-50 text-blue-700 border-blue-200'
+          done ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-surface-card hover:bg-status-info-bg text-status-info-fg border-status-info-border'
         }`}
       >
         {done ? `✓ ${title}` : `Set ${title}`}
@@ -186,18 +186,18 @@ export function ClientSavedPlacesSection({ places, contactId, identity, onSetEnd
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between px-0.5">
-        <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">Saved &amp; Frequent Places</span>
+        <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-fg-muted">Saved &amp; Frequent Places</span>
         <button
           type="button"
           onClick={() => setIsFormOpen((v) => !v)}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white hover:bg-blue-50 text-blue-700 font-bold text-[10.5px] border border-blue-200 cursor-pointer"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-card hover:bg-status-info-bg text-status-info-fg font-bold text-[10.5px] border border-status-info-border cursor-pointer"
         >
           <span>+ Save Place</span>
         </button>
       </div>
 
       {isFormOpen && (
-        <div className="p-2 rounded-xl bg-white border border-blue-200 space-y-1.5 shadow-2xs">
+        <div className="p-2 rounded-xl bg-surface-card border border-status-info-border space-y-1.5 shadow-2xs">
           <div className="flex items-center gap-1.5">
             <div className="w-28 shrink-0">
               <Select size="xs" value={category} options={SAVE_PLACE_CATEGORY_OPTIONS} onValueChange={(v) => setCategory(v as SavePlaceCategory)} />
@@ -207,7 +207,7 @@ export function ClientSavedPlacesSection({ places, contactId, identity, onSetEnd
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Custom label (optional)"
-              className="flex-1 min-w-0 px-2 py-1 rounded-md border border-slate-200 text-[11px]"
+              className="flex-1 min-w-0 px-2 py-1 rounded-md border border-border-subtle text-[11px]"
             />
           </div>
           <LocationAutocomplete
@@ -217,7 +217,7 @@ export function ClientSavedPlacesSection({ places, contactId, identity, onSetEnd
             placeholder="Search address, venue, or airport..."
           />
           <div className="flex justify-end gap-1.5">
-            <button type="button" onClick={() => setIsFormOpen(false)} className="px-2 py-1 rounded-md text-slate-600 hover:bg-slate-100 font-bold text-[10.5px] cursor-pointer">Cancel</button>
+            <button type="button" onClick={() => setIsFormOpen(false)} className="px-2 py-1 rounded-md text-fg-secondary hover:bg-surface-muted font-bold text-[10.5px] cursor-pointer">Cancel</button>
             <button
               type="button"
               disabled={!canSave}
@@ -231,25 +231,25 @@ export function ClientSavedPlacesSection({ places, contactId, identity, onSetEnd
       )}
 
       {places.length === 0 ? (
-        <div className="p-3 text-center bg-white rounded-xl border border-slate-200 text-slate-400 font-medium">
+        <div className="p-3 text-center bg-surface-card rounded-xl border border-border-subtle text-fg-subtle font-medium">
           No saved or frequent places yet.
         </div>
       ) : (
-        <div className="divide-y divide-slate-100 bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-2xs">
+        <div className="divide-y divide-border-faint bg-surface-card rounded-xl border border-border-subtle/90 overflow-hidden shadow-2xs">
           {places.map((place) => {
             const badge = placeBadge(place);
             return (
-              <div key={place.id} className="p-2 flex items-center justify-between gap-2 hover:bg-slate-50/90">
+              <div key={place.id} className="p-2 flex items-center justify-between gap-2 hover:bg-surface-subtle/90">
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className={`px-1.5 py-0.5 rounded-full text-[9.5px] font-extrabold border ${badge.cls}`}>{badge.text}</span>
-                    <span className="font-bold text-slate-800 text-[11px] truncate">{place.label}</span>
+                    <span className="font-bold text-fg-strong text-[11px] truncate">{place.label}</span>
                   </div>
-                  <div className="flex items-center gap-1 text-[11px] text-slate-600 truncate">
+                  <div className="flex items-center gap-1 text-[11px] text-fg-secondary truncate">
                     <MapPinIcon className="w-3 h-3 text-emerald-600 shrink-0" />
                     <span className="truncate">{place.address}</span>
                   </div>
-                  {place.notes && <div className="text-[10.5px] text-amber-800 truncate">{place.notes}</div>}
+                  {place.notes && <div className="text-[10.5px] text-status-warning-fg truncate">{place.notes}</div>}
                 </div>
                 <div className="shrink-0 flex items-center gap-1">
                   {onSetEndpoint && actionBtn(place, 'pickup')}
@@ -258,7 +258,7 @@ export function ClientSavedPlacesSection({ places, contactId, identity, onSetEnd
                     <button
                       type="button"
                       onClick={() => getContactService().removeContactPlace(contactId, place.id)}
-                      className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                      className="p-1 rounded-md text-fg-subtle hover:text-rose-600 hover:bg-status-danger-bg cursor-pointer"
                       title="Remove saved place"
                       aria-label="Remove saved place"
                     >

@@ -107,12 +107,12 @@ export function DispatchNavigationShell({
       {isMobileDrawerOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div
-            className="fixed inset-0 bg-slate-950/60"
+            className="fixed inset-0 bg-surface-overlay/60"
             onClick={onCloseMobileDrawer}
           />
-          <div className="relative w-80 max-w-[85vw] bg-slate-900 border-r border-slate-800 text-slate-300 h-full shadow-2xl flex flex-col p-4 z-10 overflow-y-auto">
+          <div className="relative w-80 max-w-[85vw] bg-surface-header border-r border-border-header text-slate-300 h-full shadow-2xl flex flex-col p-4 z-10 overflow-y-auto">
             {/* Drawer Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+            <div className="flex items-center justify-between pb-3 border-b border-border-header/80">
               <div className="flex items-center gap-3 overflow-hidden min-w-0">
                 <div
                   style={{
@@ -137,13 +137,13 @@ export function DispatchNavigationShell({
                       {settings.company?.name || COMPANY_CONFIG.name}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <div className="flex items-center gap-1.5 text-[11px] text-fg-subtle">
                     <span className="font-bold uppercase tracking-wider text-[10px] text-emerald-400 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
                       Operational
                     </span>
                     <span>•</span>
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                    <span className="text-[10px] text-fg-subtle font-semibold uppercase tracking-wider">
                       Dispatch
                     </span>
                   </div>
@@ -152,7 +152,7 @@ export function DispatchNavigationShell({
               <button
                 type="button"
                 onClick={onCloseMobileDrawer}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
+                className="p-1.5 rounded-lg text-fg-subtle hover:text-white hover:bg-surface-header-elevated cursor-pointer transition-colors"
                 title="Close drawer"
                 aria-label="Close navigation drawer"
               >
@@ -161,9 +161,9 @@ export function DispatchNavigationShell({
             </div>
 
             {/* Quick Operations Triggers */}
-            <div className="py-3 border-b border-slate-800/80 space-y-2">
+            <div className="py-3 border-b border-border-header/80 space-y-2">
               <div className="flex items-center justify-between px-1">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                <span className="text-[10px] font-black uppercase tracking-wider text-fg-subtle block">
                   Operations
                 </span>
                 <span className="hidden lg:inline text-[10px] text-blue-400 font-bold">Detachable</span>
@@ -183,7 +183,7 @@ export function DispatchNavigationShell({
                       activeMobileTab === 'booking' ||
                       activeMobileTab === 'map')
                     ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
+                    : 'bg-surface-header-elevated/50 hover:bg-surface-header-elevated text-slate-300 hover:text-white border border-border-header/40'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -210,7 +210,7 @@ export function DispatchNavigationShell({
                         activeMobileTab === 'phone' ||
                         activeMobileTab === 'messages')
                       ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
+                      : 'bg-surface-header-elevated/50 hover:bg-surface-header-elevated text-slate-300 hover:text-white border border-border-header/40'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
@@ -225,7 +225,7 @@ export function DispatchNavigationShell({
                           activeMobileTab === 'phone' ||
                           activeMobileTab === 'messages')
                         ? 'bg-white/20 text-white'
-                        : 'bg-slate-800 text-slate-300 border border-slate-700'
+                        : 'bg-surface-header-elevated text-slate-300 border border-border-header'
                     }`}
                   >
                     Calls &amp; SMS
@@ -235,7 +235,7 @@ export function DispatchNavigationShell({
                   type="button"
                   onClick={() => getWorkspaceBus().popOutModule('comms')}
                   title="Pop out Phone Hub to detached window"
-                  className="hidden lg:inline-flex items-center justify-center p-2.5 rounded-xl bg-slate-800/60 hover:bg-blue-600 text-slate-400 hover:text-white border border-slate-700/60 transition-colors cursor-pointer"
+                  className="hidden lg:inline-flex items-center justify-center p-2.5 rounded-xl bg-surface-header-elevated/60 hover:bg-blue-600 text-fg-subtle hover:text-white border border-border-header/60 transition-colors cursor-pointer"
                 >
                   ↗
                 </button>
@@ -252,7 +252,7 @@ export function DispatchNavigationShell({
                   className={`flex-1 flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     (isDesktop ? activeDockTab === 'email' : activeMobileTab === 'email')
                       ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
+                      : 'bg-surface-header-elevated/50 hover:bg-surface-header-elevated text-slate-300 hover:text-white border border-border-header/40'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
@@ -265,7 +265,7 @@ export function DispatchNavigationShell({
                         ? 'bg-white/20 text-white'
                         : unreadEmailCount > 0
                         ? 'bg-blue-600 text-white'
-                        : 'bg-slate-800 text-slate-300 border border-slate-700'
+                        : 'bg-surface-header-elevated text-slate-300 border border-border-header'
                     }`}
                   >
                     {unreadEmailCount > 0 ? `${unreadEmailCount} unread` : 'Inquiries'}
@@ -275,7 +275,7 @@ export function DispatchNavigationShell({
                   type="button"
                   onClick={() => getWorkspaceBus().popOutModule('email')}
                   title="Pop out Email Console to detached window"
-                  className="hidden lg:inline-flex items-center justify-center p-2.5 rounded-xl bg-slate-800/60 hover:bg-blue-600 text-slate-400 hover:text-white border border-slate-700/60 transition-colors cursor-pointer"
+                  className="hidden lg:inline-flex items-center justify-center p-2.5 rounded-xl bg-surface-header-elevated/60 hover:bg-blue-600 text-fg-subtle hover:text-white border border-border-header/60 transition-colors cursor-pointer"
                 >
                   ↗
                 </button>
@@ -292,7 +292,7 @@ export function DispatchNavigationShell({
                   className={`flex-1 flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     (isDesktop ? activeDockTab === 'drivers' : activeMobileTab === 'drivers')
                       ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
+                      : 'bg-surface-header-elevated/50 hover:bg-surface-header-elevated text-slate-300 hover:text-white border border-border-header/40'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
@@ -313,7 +313,7 @@ export function DispatchNavigationShell({
                   type="button"
                   onClick={() => getWorkspaceBus().popOutModule('drivers')}
                   title="Pop out Drivers to detached window"
-                  className="hidden lg:inline-flex items-center justify-center p-2.5 rounded-xl bg-slate-800/60 hover:bg-blue-600 text-slate-400 hover:text-white border border-slate-700/60 transition-colors cursor-pointer"
+                  className="hidden lg:inline-flex items-center justify-center p-2.5 rounded-xl bg-surface-header-elevated/60 hover:bg-blue-600 text-fg-subtle hover:text-white border border-border-header/60 transition-colors cursor-pointer"
                 >
                   ↗
                 </button>
@@ -332,7 +332,7 @@ export function DispatchNavigationShell({
                 className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeDockTab === 'alerts'
                     ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/40'
+                    : 'bg-surface-header-elevated/50 hover:bg-surface-header-elevated text-slate-300 hover:text-white border border-border-header/40'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -348,11 +348,11 @@ export function DispatchNavigationShell({
             </div>
 
             {/* Workspace Layout Preferences (Desktop Only) */}
-            <div className="hidden lg:block py-3 border-b border-slate-800/80 space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
+            <div className="hidden lg:block py-3 border-b border-border-header/80 space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-fg-subtle block px-1">
                 Workspace Workflow Layout
               </span>
-              <div className="grid grid-cols-3 gap-1 bg-slate-950/80 p-1 rounded-xl text-center text-[10px] font-bold border border-slate-800">
+              <div className="grid grid-cols-3 gap-1 bg-surface-overlay/80 p-1 rounded-xl text-center text-[10px] font-bold border border-border-header">
                 <button
                   type="button"
                   onClick={() => {
@@ -362,7 +362,7 @@ export function DispatchNavigationShell({
                   className={`py-1.5 rounded-lg transition-all cursor-pointer ${
                     workspaceLayout === 'compact'
                       ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-fg-subtle hover:text-white'
                   }`}
                 >
                   Compact HUD
@@ -376,7 +376,7 @@ export function DispatchNavigationShell({
                   className={`py-1.5 rounded-lg transition-all cursor-pointer ${
                     workspaceLayout === 'split'
                       ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-fg-subtle hover:text-white'
                   }`}
                 >
                   Split Dock
@@ -390,13 +390,13 @@ export function DispatchNavigationShell({
                   className={`py-1.5 rounded-lg transition-all cursor-pointer ${
                     workspaceLayout === 'popout'
                       ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-fg-subtle hover:text-white'
                   }`}
                 >
                   Pop-Out ↗
                 </button>
               </div>
-              <p className="text-[10px] text-slate-400 px-1 leading-tight">
+              <p className="text-[10px] text-fg-subtle px-1 leading-tight">
                 {workspaceLayout === 'compact' &&
                   'Minimal desktop: floating caller HUD + full queue space.'}
                 {workspaceLayout === 'split' &&
@@ -407,20 +407,20 @@ export function DispatchNavigationShell({
             </div>
 
             {/* Mobile Card Gesture Preferences (Mobile Only) */}
-            <div className="lg:hidden py-3 border-b border-slate-800/80 space-y-2">
+            <div className="lg:hidden py-3 border-b border-border-header/80 space-y-2">
               <div className="flex items-center justify-between px-1">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                <span className="text-[10px] font-black uppercase tracking-wider text-fg-subtle">
                   Preferences · Trip Card Gesture
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-1 bg-slate-950/80 p-1 rounded-xl text-center text-[11px] font-bold border border-slate-800">
+              <div className="grid grid-cols-2 gap-1 bg-surface-overlay/80 p-1 rounded-xl text-center text-[11px] font-bold border border-border-header">
                 <button
                   type="button"
                   onClick={() => onMobileCardGestureModeChange('action_sheet')}
                   className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer ${
                     mobileCardGestureMode === 'action_sheet'
                       ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-fg-subtle hover:text-white'
                   }`}
                 >
                   Hold → Actions
@@ -431,13 +431,13 @@ export function DispatchNavigationShell({
                   className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer ${
                     mobileCardGestureMode === 'multi_select'
                       ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-fg-subtle hover:text-white'
                   }`}
                 >
                   Hold → Select
                 </button>
               </div>
-              <p className="text-[10px] text-slate-400 px-1 leading-snug">
+              <p className="text-[10px] text-fg-subtle px-1 leading-snug">
                 {mobileCardGestureMode === 'action_sheet'
                   ? 'Tap a trip card for Trip Details & context actions. Touch & hold for Quick Actions.'
                   : 'Tap a trip card for Trip Details & context actions. Touch & hold to multi-select.'}
@@ -445,21 +445,21 @@ export function DispatchNavigationShell({
             </div>
 
             {/* Workstation Screen Awake & Browser Push Alerts */}
-            <div className="py-3 border-b border-slate-800/80 space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
+            <div className="py-3 border-b border-border-header/80 space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-fg-subtle block px-1">
                 Device &amp; Push Alerts
               </span>
 
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs gap-2">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-overlay/70 border border-border-header text-xs gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <SunIcon
                     className={`w-4 h-4 shrink-0 ${
                       keepScreenAwake && dispatchWakeLock.isActive
                         ? 'text-emerald-400'
-                        : 'text-slate-400'
+                        : 'text-fg-subtle'
                     }`}
                   />
-                  <span className="font-semibold text-slate-200 truncate">Keep Screen Awake</span>
+                  <span className="font-semibold text-fg-on-header truncate">Keep Screen Awake</span>
                 </div>
                 <button
                   type="button"
@@ -467,10 +467,10 @@ export function DispatchNavigationShell({
                   onClick={onToggleKeepScreenAwake}
                   className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shrink-0 transition-colors ${
                     !dispatchWakeLock.isSupported
-                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      ? 'bg-surface-header-elevated text-fg-muted cursor-not-allowed'
                       : keepScreenAwake
                       ? 'bg-emerald-600 text-white cursor-pointer'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer'
+                      : 'bg-surface-header-elevated text-slate-300 hover:bg-surface-header-muted cursor-pointer'
                   }`}
                 >
                   {!dispatchWakeLock.isSupported ? 'N/A' : keepScreenAwake ? 'Active' : 'Off'}
@@ -478,16 +478,16 @@ export function DispatchNavigationShell({
               </div>
 
               {dispatchPush.isSupported && (
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs gap-2">
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-overlay/70 border border-border-header text-xs gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <BellIcon
                       className={`w-4 h-4 shrink-0 ${
                         dispatchPush.permission === 'granted' && dispatchPush.alertsEnabled
                           ? 'text-blue-400'
-                          : 'text-slate-400'
+                          : 'text-fg-subtle'
                       }`}
                     />
-                    <span className="font-semibold text-slate-200 truncate">Browser Push Alerts</span>
+                    <span className="font-semibold text-fg-on-header truncate">Browser Push Alerts</span>
                   </div>
                   {dispatchPush.permission === 'denied' ? (
                     <span className="px-2 py-0.5 rounded-lg bg-rose-950 text-rose-300 border border-rose-800 text-[10px] font-bold shrink-0">
@@ -510,7 +510,7 @@ export function DispatchNavigationShell({
                       className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shrink-0 cursor-pointer ${
                         dispatchPush.alertsEnabled
                           ? 'bg-blue-600 text-white'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                          : 'bg-surface-header-elevated text-slate-300 hover:bg-surface-header-muted'
                       }`}
                     >
                       {dispatchPush.alertsEnabled ? 'On' : 'Off'}
@@ -521,8 +521,8 @@ export function DispatchNavigationShell({
             </div>
 
             {/* Map & Route Display Preferences */}
-            <div className="py-3 border-b border-slate-800/80 space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
+            <div className="py-3 border-b border-border-header/80 space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-fg-subtle block px-1">
                 Map &amp; Route Display
               </span>
 
@@ -549,13 +549,13 @@ export function DispatchNavigationShell({
                 return (
                   <div
                     key={opt.key}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs gap-2"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-surface-overlay/70 border border-border-header text-xs gap-2"
                   >
                     <div className="min-w-0">
-                      <span className="font-semibold text-slate-200 block leading-tight">
+                      <span className="font-semibold text-fg-on-header block leading-tight">
                         {opt.label}
                       </span>
-                      <span className="text-[10px] text-slate-400 block leading-snug">
+                      <span className="text-[10px] text-fg-subtle block leading-snug">
                         {opt.subtitle}
                       </span>
                     </div>
@@ -567,7 +567,7 @@ export function DispatchNavigationShell({
                       className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase shrink-0 transition-colors cursor-pointer ${
                         active
                           ? 'bg-blue-600 text-white hover:bg-blue-500'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                          : 'bg-surface-header-elevated text-slate-300 hover:bg-surface-header-muted'
                       }`}
                     >
                       {active ? 'On' : 'Off'}
@@ -578,38 +578,38 @@ export function DispatchNavigationShell({
             </div>
 
             {/* Quick Links */}
-            <div className="py-3 border-b border-slate-800/80 space-y-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1 mb-1">
+            <div className="py-3 border-b border-border-header/80 space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-fg-subtle block px-1 mb-1">
                 System &amp; Platform
               </span>
               <Link
                 to="/app/admin"
-                className="flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+                className="flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-surface-header-elevated hover:text-white transition-colors"
                 onClick={onCloseMobileDrawer}
               >
                 <span className="flex items-center gap-2">
                   <ShieldCheckIcon className="w-4 h-4 text-amber-400 shrink-0" />
                   <span>Admin Console</span>
                 </span>
-                <span className="text-slate-500">→</span>
+                <span className="text-fg-muted">→</span>
               </Link>
               <a
                 href="/"
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+                className="flex items-center justify-between p-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-surface-header-elevated hover:text-white transition-colors"
                 onClick={onCloseMobileDrawer}
               >
                 <span className="flex items-center gap-2">
                   <GlobeIcon className="w-4 h-4 text-blue-400 shrink-0" />
                   <span>Public Live Site</span>
                 </span>
-                <span className="text-slate-500">↗</span>
+                <span className="text-fg-muted">↗</span>
               </a>
             </div>
 
             {/* Account and Profile Menu */}
-            <div className="mt-auto pt-3 border-t border-slate-800 shrink-0">
+            <div className="mt-auto pt-3 border-t border-border-header shrink-0">
               <UserDropdown
                 email={user?.email}
                 onSignOut={onSignOut}
@@ -626,7 +626,7 @@ export function DispatchNavigationShell({
       {/* ─── MOBILE BOTTOM DOCK NAVIGATION (5 CONSOLIDATED TABS: Trips · Booking · Comms · Email · Fleet) ─── */}
       <nav
         aria-label="Mobile Dispatch Navigation"
-        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-1 py-1 flex items-center justify-around select-none print:hidden"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface-card/95 backdrop-blur-md border-t border-border-subtle/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-1 py-1 flex items-center justify-around select-none print:hidden"
       >
         {/* Tab 1: Trips */}
         <button
@@ -635,12 +635,12 @@ export function DispatchNavigationShell({
           className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
             activeMobileTab === 'queue'
               ? 'text-blue-600 font-extrabold'
-              : 'text-slate-500 hover:text-slate-800 font-medium'
+              : 'text-fg-muted hover:text-fg-strong font-medium'
           }`}
         >
           <div
             className={`p-1 rounded-xl transition-colors relative ${
-              activeMobileTab === 'queue' ? 'bg-blue-50 text-blue-600' : ''
+              activeMobileTab === 'queue' ? 'bg-status-info-bg text-blue-600' : ''
             }`}
           >
             <CarIcon className="w-5 h-5" />
@@ -649,7 +649,7 @@ export function DispatchNavigationShell({
                 {unconfirmedCount}
               </span>
             ) : filteredTripsCount > 0 ? (
-              <span className="absolute -top-1 -right-1 px-1 min-w-[16px] h-4 rounded-full bg-slate-200 text-slate-800 text-[9px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 px-1 min-w-[16px] h-4 rounded-full bg-surface-emphasis text-fg-strong text-[9px] font-bold flex items-center justify-center">
                 {filteredTripsCount}
               </span>
             ) : null}
@@ -664,12 +664,12 @@ export function DispatchNavigationShell({
           className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
             activeMobileTab === 'booking'
               ? 'text-blue-600 font-extrabold'
-              : 'text-slate-500 hover:text-slate-800 font-medium'
+              : 'text-fg-muted hover:text-fg-strong font-medium'
           }`}
         >
           <div
             className={`p-1 rounded-xl transition-colors relative ${
-              activeMobileTab === 'booking' ? 'bg-blue-50 text-blue-600' : ''
+              activeMobileTab === 'booking' ? 'bg-status-info-bg text-blue-600' : ''
             }`}
           >
             <DocumentTextIcon className="w-5 h-5" />
@@ -706,7 +706,7 @@ export function DispatchNavigationShell({
             activeMobileTab === 'messages' ||
             activeMobileTab === 'phone'
               ? 'text-emerald-600 font-extrabold'
-              : 'text-slate-500 hover:text-slate-800 font-medium'
+              : 'text-fg-muted hover:text-fg-strong font-medium'
           }`}
         >
           <div
@@ -714,7 +714,7 @@ export function DispatchNavigationShell({
               activeMobileTab === 'comms' ||
               activeMobileTab === 'messages' ||
               activeMobileTab === 'phone'
-                ? 'bg-emerald-50 text-emerald-600'
+                ? 'bg-status-success-bg text-emerald-600'
                 : ''
             }`}
           >
@@ -737,12 +737,12 @@ export function DispatchNavigationShell({
           className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
             activeMobileTab === 'email'
               ? 'text-blue-600 font-extrabold'
-              : 'text-slate-500 hover:text-slate-800 font-medium'
+              : 'text-fg-muted hover:text-fg-strong font-medium'
           }`}
         >
           <div
             className={`p-1 rounded-xl transition-colors relative ${
-              activeMobileTab === 'email' ? 'bg-blue-50 text-blue-600' : ''
+              activeMobileTab === 'email' ? 'bg-status-info-bg text-blue-600' : ''
             }`}
           >
             <MailIcon className="w-5 h-5" />
@@ -762,13 +762,13 @@ export function DispatchNavigationShell({
           className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
             activeMobileTab === 'drivers' || activeMobileTab === 'map'
               ? 'text-blue-600 font-extrabold'
-              : 'text-slate-500 hover:text-slate-800 font-medium'
+              : 'text-fg-muted hover:text-fg-strong font-medium'
           }`}
         >
           <div
             className={`p-1 rounded-xl transition-colors relative ${
               activeMobileTab === 'drivers' || activeMobileTab === 'map'
-                ? 'bg-blue-50 text-blue-600'
+                ? 'bg-status-info-bg text-blue-600'
                 : ''
             }`}
           >
@@ -778,7 +778,7 @@ export function DispatchNavigationShell({
             ) : (
               <UsersIcon className="w-5 h-5" />
             )}
-            <span className="absolute -top-1 -right-1 px-1 min-w-[16px] h-4 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 px-1 min-w-[16px] h-4 rounded-full bg-status-success-bg-strong text-status-success-fg text-[9px] font-bold flex items-center justify-center">
               {drivers.filter((d) => d.mapStatus === 'available').length}
             </span>
           </div>

@@ -137,7 +137,7 @@ export function TripQueueTableView({
         style={{ minWidth: `${activeMinWidthPx}px` }}
         className="w-full text-left border-collapse"
       >
-        <thead className="bg-slate-100/90 sticky top-0 border-b border-slate-200 text-slate-600 font-semibold text-[11px] z-10">
+        <thead className="bg-surface-muted/90 sticky top-0 border-b border-border-subtle text-fg-secondary font-semibold text-[11px] z-10">
           <tr>
             <th className="py-2 px-2 w-8 text-center">
               <input
@@ -147,7 +147,7 @@ export function TripQueueTableView({
                   if (el) el.indeterminate = someFilteredSelected;
                 }}
                 onChange={onToggleSelectAll}
-                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                className="rounded border-border-strong text-blue-600 focus:ring-blue-500 cursor-pointer"
                 title="Select/Deselect All Filtered Trips"
               />
             </th>
@@ -167,14 +167,14 @@ export function TripQueueTableView({
                     <button
                       type="button"
                       onClick={() => setColumnSort((prev) => cycleQueueColumnSort(prev, sortCol))}
-                      className={`inline-flex items-center gap-1 hover:text-blue-700 cursor-pointer transition-colors ${
-                        isActiveSort ? 'text-blue-700 font-extrabold' : ''
+                      className={`inline-flex items-center gap-1 hover:text-status-info-fg cursor-pointer transition-colors ${
+                        isActiveSort ? 'text-status-info-fg font-extrabold' : ''
                       }`}
                       title={getColumnSortTooltip(colDef.headerLabel, sortCol, columnSort)}
                     >
                       <span>{colDef.headerLabel}</span>
                       {colDef.key === 'date_time' && columnSort.column === 'smart' && (
-                        <span className="px-1 py-0.1 rounded bg-blue-100 text-blue-700 text-[9.5px] font-extrabold">
+                        <span className="px-1 py-0.1 rounded bg-status-info-bg-strong text-status-info-fg text-[9.5px] font-extrabold">
                           Live
                         </span>
                       )}
@@ -188,7 +188,7 @@ export function TripQueueTableView({
                       <button
                         type="button"
                         onClick={() => setColumnSort(DEFAULT_QUEUE_COLUMN_SORT)}
-                        className="px-1.5 py-0.1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[9.5px] font-extrabold cursor-pointer transition-colors"
+                        className="px-1.5 py-0.1 rounded bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg border border-status-info-border text-[9.5px] font-extrabold cursor-pointer transition-colors"
                         title="Reset sorting to Live Smart Operational Order"
                       >
                         Live ↺
@@ -196,7 +196,7 @@ export function TripQueueTableView({
                     )}
                     {colDef.key === 'driver' && stagedPlanner && (
                       <span
-                        className="inline-flex items-center rounded-md border border-slate-300 bg-white p-0.5 text-[9.5px] font-extrabold shadow-2xs"
+                        className="inline-flex items-center rounded-md border border-border-strong bg-surface-card p-0.5 text-[9.5px] font-extrabold shadow-2xs"
                         onClick={(e) => e.stopPropagation()}
                         title="Toggle whether unassigned driver dropdowns Send immediately or Stage (Hold in Dispatch)"
                       >
@@ -206,8 +206,8 @@ export function TripQueueTableView({
                           title="Send to Driver"
                           className={`px-1.5 py-0.2 rounded cursor-pointer transition-colors ${
                             stagedPlanner.queueAssignMode === 'send_to_driver'
-                              ? 'bg-slate-900 text-white'
-                              : 'text-slate-600 hover:text-slate-900'
+                              ? 'bg-surface-header text-white'
+                              : 'text-fg-secondary hover:text-fg-primary'
                           }`}
                         >
                           Send
@@ -218,7 +218,7 @@ export function TripQueueTableView({
                           className={`px-1.5 py-0.2 rounded cursor-pointer transition-colors ${
                             stagedPlanner.queueAssignMode === 'stage_hold'
                               ? 'bg-indigo-600 text-white'
-                              : 'text-slate-600 hover:text-indigo-700'
+                              : 'text-fg-secondary hover:text-status-staged-fg'
                           }`}
                         >
                           📌 Hold
@@ -231,7 +231,7 @@ export function TripQueueTableView({
             })}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 text-slate-800">
+        <tbody className="divide-y divide-border-faint text-fg-strong">
           {displayedTrips.map((trip) => {
             const isSelected = selectedQueueTripId === trip.id;
             const isChecked = selectedTripIds.includes(trip.id);
@@ -271,12 +271,12 @@ export function TripQueueTableView({
                 onDoubleClick={() => onEditTripFromQueue(trip)}
                 className={`cursor-pointer transition-colors ${
                   isUnconfirmedTrip
-                    ? 'bg-amber-50/70 border-l-4 border-l-amber-500 hover:bg-amber-100/70'
+                    ? 'bg-status-warning-bg/70 border-l-4 border-l-amber-500 hover:bg-status-warning-bg-strong/70'
                     : isSelected
-                    ? 'bg-blue-50 font-medium hover:bg-blue-50/70'
+                    ? 'bg-status-info-bg font-medium hover:bg-status-info-bg/70'
                     : isChecked
-                    ? 'bg-blue-50/40 hover:bg-blue-50/70'
-                    : 'hover:bg-blue-50/70'
+                    ? 'bg-status-info-bg/40 hover:bg-status-info-bg/70'
+                    : 'hover:bg-status-info-bg/70'
                 }`}
                 title="Click to view route on map. Double-click to edit trip & zoom in."
               >
@@ -285,7 +285,7 @@ export function TripQueueTableView({
                     type="checkbox"
                     checked={isChecked}
                     onChange={() => onToggleSelectTrip(trip.id)}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    className="rounded border-border-strong text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                 </td>
                 {visibleColSet.has('trip_id') && (
@@ -296,7 +296,7 @@ export function TripQueueTableView({
                         e.stopPropagation();
                         onOpenReviewModal(trip, 'details');
                       }}
-                      className="font-mono font-extrabold text-[11px] text-blue-700 hover:text-blue-600 hover:underline cursor-pointer"
+                      className="font-mono font-extrabold text-[11px] text-status-info-fg hover:text-blue-600 hover:underline cursor-pointer"
                       title="Open Trip Details & Audit"
                     >
                       #{trip.id.slice(-6).toUpperCase()}
@@ -304,9 +304,9 @@ export function TripQueueTableView({
                   </td>
                 )}
                 {visibleColSet.has('date_time') && (
-                  <td className="py-2 px-2 font-semibold text-slate-700 whitespace-nowrap">
+                  <td className="py-2 px-2 font-semibold text-fg-secondary whitespace-nowrap">
                     <div className="flex flex-col items-start gap-0.5">
-                      <span className={`whitespace-nowrap ${isAsapRow ? 'font-extrabold text-slate-900' : ''}`}>
+                      <span className={`whitespace-nowrap ${isAsapRow ? 'font-extrabold text-fg-primary' : ''}`}>
                         {pickupTimeStr}
                       </span>
                       {(hasSlaBadge || hasFlightBadge) && (
@@ -335,7 +335,7 @@ export function TripQueueTableView({
                             onSearchTermChange(trip.multiCarGroupId!);
                             onSearchExpandedChange(true);
                           }}
-                          className="px-1.5 py-0.2 rounded bg-violet-100 hover:bg-violet-200 text-violet-800 border border-violet-300 text-[10px] font-black cursor-pointer whitespace-nowrap shrink-0"
+                          className="px-1.5 py-0.2 rounded bg-status-staged-bg-strong hover:bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border text-[10px] font-black cursor-pointer whitespace-nowrap shrink-0"
                           title={`Multi-car order ${trip.multiCarGroupId} (${
                             (trip.multiCarAssociates || []).filter((a) => Boolean(a.driverId)).length
                           }/${trip.multiCarTotal} assigned) — click to filter convoy`}
@@ -344,7 +344,7 @@ export function TripQueueTableView({
                         </button>
                       )}
                     </div>
-                    <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1 whitespace-nowrap">
+                    <div className="text-[10px] text-fg-subtle font-mono flex items-center gap-1 whitespace-nowrap">
                       <span>{trip.passenger.phone}</span>
                       {trip.passenger.phone && (
                         <button
@@ -356,7 +356,7 @@ export function TripQueueTableView({
                               `${trip.passenger.firstName} ${trip.passenger.lastName}`
                             );
                           }}
-                          className="text-emerald-600 hover:text-emerald-700 p-0.5 rounded hover:bg-emerald-50 transition-colors cursor-pointer"
+                          className="text-emerald-600 hover:text-status-success-fg p-0.5 rounded hover:bg-status-success-bg transition-colors cursor-pointer"
                           title="Click-to-Call Passenger via WebRTC Softphone"
                         >
                           <PhoneIcon className="w-2.5 h-2.5" />
@@ -369,11 +369,11 @@ export function TripQueueTableView({
                   <td className="py-2 px-2 max-w-[185px] xl:max-w-[240px]">
                     {stopCount > 0 ? (
                       <>
-                        <div className="truncate font-medium text-slate-800" title={trip.pickupLocation.address}>
+                        <div className="truncate font-medium text-fg-strong" title={trip.pickupLocation.address}>
                           {pickupTwoLine.primary}
                         </div>
                         <div
-                          className="max-w-full bg-amber-50 text-amber-900 border border-amber-300/90 rounded-full px-1.5 py-0.2 text-[10px] font-bold inline-flex items-center gap-1 mt-0.5 whitespace-nowrap"
+                          className="max-w-full bg-status-warning-bg text-status-warning-fg border border-status-warning-border/90 rounded-full px-1.5 py-0.2 text-[10px] font-bold inline-flex items-center gap-1 mt-0.5 whitespace-nowrap"
                           title={itineraryTooltip}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
@@ -386,11 +386,11 @@ export function TripQueueTableView({
                       </>
                     ) : pickupTwoLine.secondary ? (
                       <div className="leading-tight" title={trip.pickupLocation.address}>
-                        <div className="truncate font-medium text-slate-800">{pickupTwoLine.primary}</div>
-                        <div className="truncate text-[10.5px] text-slate-500">{pickupTwoLine.secondary}</div>
+                        <div className="truncate font-medium text-fg-strong">{pickupTwoLine.primary}</div>
+                        <div className="truncate text-[10.5px] text-fg-muted">{pickupTwoLine.secondary}</div>
                       </div>
                     ) : (
-                      <div className="truncate font-medium text-slate-800" title={trip.pickupLocation.address}>
+                      <div className="truncate font-medium text-fg-strong" title={trip.pickupLocation.address}>
                         {pickupTwoLine.primary}
                       </div>
                     )}
@@ -399,14 +399,14 @@ export function TripQueueTableView({
                 {visibleColSet.has('dropoff') && (
                   <td className="py-2 px-2 max-w-[185px] xl:max-w-[240px]" title={trip.dropoffLocation.address}>
                     {stopCount > 0 ? (
-                      <div className="truncate font-medium text-slate-800">{dropoffTwoLine.primary}</div>
+                      <div className="truncate font-medium text-fg-strong">{dropoffTwoLine.primary}</div>
                     ) : dropoffTwoLine.secondary ? (
                       <div className="leading-tight">
-                        <div className="truncate font-medium text-slate-800">{dropoffTwoLine.primary}</div>
-                        <div className="truncate text-[10.5px] text-slate-500">{dropoffTwoLine.secondary}</div>
+                        <div className="truncate font-medium text-fg-strong">{dropoffTwoLine.primary}</div>
+                        <div className="truncate text-[10.5px] text-fg-muted">{dropoffTwoLine.secondary}</div>
                       </div>
                     ) : (
-                      <div className="truncate font-medium text-slate-800">{dropoffTwoLine.primary}</div>
+                      <div className="truncate font-medium text-fg-strong">{dropoffTwoLine.primary}</div>
                     )}
                   </td>
                 )}
@@ -473,13 +473,13 @@ export function TripQueueTableView({
                 )}
                 {visibleColSet.has('vehicle') && (
                   <td className="py-2 px-2 whitespace-nowrap">
-                    <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                    <span className="px-1.5 py-0.5 rounded bg-surface-muted text-fg-secondary font-semibold text-[11px]">
                       {formatTripVehicleColumnDisplay(trip, settings.vehicles, drivers, settings.fleet)}
                     </span>
                   </td>
                 )}
                 {visibleColSet.has('price') && (
-                  <td className="py-2 px-2 font-bold text-slate-900 whitespace-nowrap">
+                  <td className="py-2 px-2 font-bold text-fg-primary whitespace-nowrap">
                     ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                   </td>
                 )}
@@ -501,7 +501,7 @@ export function TripQueueTableView({
                             e.stopPropagation();
                             onOpenReviewModal(trip, 'details');
                           }}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-100 hover:bg-violet-200 text-violet-950 border border-violet-400 text-[10px] font-extrabold animate-pulse whitespace-nowrap cursor-pointer"
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-status-staged-bg-strong hover:bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border text-[10px] font-extrabold animate-pulse whitespace-nowrap cursor-pointer"
                           title={
                             guestReq?.customerReason
                               ? `Passenger requested itinerary change (${guestReq.customerReason}) — click to Approve or Decline`
@@ -513,7 +513,7 @@ export function TripQueueTableView({
                       )}
                       {hasPendingAck && (
                         <span
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-400 text-[10px] font-extrabold animate-pulse whitespace-nowrap"
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border text-[10px] font-extrabold animate-pulse whitespace-nowrap"
                           title={
                             pendingAck
                               ? `Trip updated — awaiting driver acknowledgement:\n• ${pendingAck.changesSummary.join('\n• ')}`
@@ -583,7 +583,7 @@ export function TripQueueTableView({
           })}
           {displayedTrips.length === 0 && (
             <tr>
-              <td colSpan={1 + visibleDefs.length} className="py-12 text-center text-slate-500 font-semibold text-xs">
+              <td colSpan={1 + visibleDefs.length} className="py-12 text-center text-fg-muted font-semibold text-xs">
                 No trips found.
               </td>
             </tr>

@@ -121,11 +121,11 @@ export function DispatchTripQueueSheets({
           minHeight={240}
           zIndex={225}
           footer={
-            <div className="px-4 sm:px-5 py-3 bg-slate-50 flex items-center justify-end gap-2">
+            <div className="px-4 sm:px-5 py-3 bg-surface-subtle flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={onCloseBatchAssign}
-                className="px-4 py-1.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
+                className="px-4 py-1.5 rounded-xl border border-border-strong text-xs font-bold text-fg-secondary hover:bg-surface-muted cursor-pointer"
               >
                 Cancel
               </button>
@@ -153,17 +153,17 @@ export function DispatchTripQueueSheets({
           <div className="p-4 sm:p-5 space-y-3">
             {stagedPlanner && (
               <div>
-                <span className="block text-[10.5px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                <span className="block text-[10.5px] font-bold uppercase tracking-wider text-fg-muted mb-1">
                   Placement Mode
                 </span>
-                <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200">
+                <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-surface-muted border border-border-subtle">
                   <button
                     type="button"
                     onClick={() => stagedPlanner.setBatchAssignMode('send_to_driver')}
                     className={`py-1.5 px-2.5 rounded-lg text-xs font-extrabold transition-colors cursor-pointer ${
                       !isStageBatchMode
                         ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
+                        : 'text-fg-secondary hover:text-fg-primary'
                     }`}
                   >
                     Send to Driver
@@ -174,7 +174,7 @@ export function DispatchTripQueueSheets({
                     className={`py-1.5 px-2.5 rounded-lg text-xs font-extrabold transition-colors cursor-pointer ${
                       isStageBatchMode
                         ? 'bg-indigo-600 text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
+                        : 'text-fg-secondary hover:text-fg-primary'
                     }`}
                   >
                     📌 Stage (Hold)
@@ -184,7 +184,7 @@ export function DispatchTripQueueSheets({
             )}
 
             <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-fg-secondary">
                 Driver Operator
               </label>
               <Select
@@ -252,18 +252,18 @@ export function DispatchTripQueueSheets({
             >
               <div className="p-4 space-y-3">
                 {assignedDrv && (
-                  <div className="text-[11px] font-bold text-blue-800 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl truncate">
+                  <div className="text-[11px] font-bold text-status-info-fg bg-status-info-bg border border-status-info-border px-3 py-1.5 rounded-xl truncate">
                     Assigned: {assignedDrv.formattedLabel || formatDriverAssignmentLabel(assignedDrv)}
                   </div>
                 )}
                   {/* Staged Driver Banner + 1-Tap Send to Driver */}
                   {tripHasStaged && stagedPlanner && (
-                    <div className="p-3 rounded-2xl border-2 border-dashed border-indigo-400 bg-indigo-50/80 flex items-center justify-between gap-2">
+                    <div className="p-3 rounded-2xl border-2 border-dashed border-indigo-400 bg-status-staged-bg/80 flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <span className="text-[10.5px] font-black uppercase tracking-wider text-indigo-800 block">
+                        <span className="text-[10.5px] font-black uppercase tracking-wider text-status-staged-fg block">
                           📌 Staged (Held in Dispatch)
                         </span>
-                        <span className="text-xs font-extrabold text-slate-900 truncate block">
+                        <span className="text-xs font-extrabold text-fg-primary truncate block">
                           {sheetTrip.plannedDriverLabel || sheetTrip.plannedDriverId}
                         </span>
                       </div>
@@ -284,7 +284,7 @@ export function DispatchTripQueueSheets({
                             onCloseMobileActionSheetTrip();
                             void stagedPlanner.clearTripStage(sheetTrip);
                           }}
-                          className="px-2.5 py-1.5 rounded-xl bg-white border border-indigo-200 text-slate-600 hover:text-rose-600 text-xs font-bold cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-xl bg-surface-card border border-status-staged-border text-fg-secondary hover:text-rose-600 text-xs font-bold cursor-pointer"
                         >
                           Unstage
                         </button>
@@ -301,7 +301,7 @@ export function DispatchTripQueueSheets({
                           onCloseMobileActionSheetTrip();
                           onSendReceiptForTrip(sheetTrip);
                         }}
-                        className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                        className="p-3 rounded-2xl bg-status-info-bg hover:bg-status-info-bg-strong border border-status-info-border text-status-info-fg flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
                       >
                         <MailIcon className="w-4 h-4 text-blue-600" />
                         <span className="text-xs font-extrabold">Send Receipt</span>
@@ -313,7 +313,7 @@ export function DispatchTripQueueSheets({
                           onCloseMobileActionSheetTrip();
                           onReactivateTrip(sheetTrip);
                         }}
-                        className="p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                        className="p-3 rounded-2xl bg-status-success-bg hover:bg-status-success-bg-strong border border-status-success-border text-status-success-fg flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
                       >
                         <RefreshCwIcon className="w-4 h-4 text-emerald-600" />
                         <span className="text-xs font-extrabold">Reactivate Trip</span>
@@ -326,7 +326,7 @@ export function DispatchTripQueueSheets({
                           stagedPlanner?.setDriverPickerMode('send_to_driver');
                           onOpenDriverPickerForTrip(sheetTrip);
                         }}
-                        className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                        className="p-3 rounded-2xl bg-status-info-bg hover:bg-status-info-bg-strong border border-status-info-border text-status-info-fg flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
                       >
                         <CarIcon className="w-4 h-4 text-blue-600" />
                         <span className="text-xs font-extrabold">Send to Driver</span>
@@ -339,9 +339,9 @@ export function DispatchTripQueueSheets({
                         onCloseMobileActionSheetTrip();
                         onEditTripFromQueue(sheetTrip);
                       }}
-                      className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                      className="p-3 rounded-2xl bg-surface-subtle hover:bg-surface-muted border border-border-subtle text-fg-primary flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
                     >
-                      <PencilIcon className="w-4 h-4 text-slate-600" />
+                      <PencilIcon className="w-4 h-4 text-fg-secondary" />
                       <span className="text-xs font-extrabold">
                         {isCompleted ? 'Edit Details' : isCancelled ? 'Edit Notes' : 'Edit Trip'}
                       </span>
@@ -353,9 +353,9 @@ export function DispatchTripQueueSheets({
                         onCloseMobileActionSheetTrip();
                         onCloneBookingFromQueue(sheetTrip);
                       }}
-                      className="p-3 rounded-2xl bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 text-cyan-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                      className="p-3 rounded-2xl bg-status-info-bg hover:bg-status-info-bg-strong border border-status-info-border text-status-info-fg flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
                     >
-                      <CopyIcon className="w-4 h-4 text-cyan-700" />
+                      <CopyIcon className="w-4 h-4 text-status-info-fg" />
                       <span className="text-xs font-extrabold">Copy Booking</span>
                     </button>
 
@@ -366,7 +366,7 @@ export function DispatchTripQueueSheets({
                           onCloseMobileActionSheetTrip();
                           onOpenCompleteTripModal(sheetTrip);
                         }}
-                        className="p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                        className="p-3 rounded-2xl bg-status-success-bg hover:bg-status-success-bg-strong border border-status-success-border text-status-success-fg flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
                       >
                         <CheckIcon className="w-4 h-4 text-emerald-600" />
                         <span className="text-xs font-extrabold">Complete Trip</span>
@@ -378,7 +378,7 @@ export function DispatchTripQueueSheets({
                           onCloseMobileActionSheetTrip();
                           onOpenReviewModal(sheetTrip, 'audit');
                         }}
-                        className="p-3 rounded-2xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-900 flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
+                        className="p-3 rounded-2xl bg-status-staged-bg hover:bg-status-staged-bg-strong border border-status-staged-border text-status-staged-fg flex flex-col items-start gap-1.5 transition-all active:scale-98 cursor-pointer"
                       >
                         <ShieldCheckIcon className="w-4 h-4 text-purple-600" />
                         <span className="text-xs font-extrabold">Audit Trail</span>
@@ -387,7 +387,7 @@ export function DispatchTripQueueSheets({
                   </div>
 
                   {/* Secondary Action List */}
-                  <div className="rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden bg-white">
+                  <div className="rounded-2xl border border-border-subtle divide-y divide-border-faint overflow-hidden bg-surface-card">
                     {stagedPlanner && isTripEligibleForStaging(sheetTrip) && (
                       <button
                         type="button"
@@ -396,7 +396,7 @@ export function DispatchTripQueueSheets({
                           stagedPlanner.setDriverPickerMode('stage_hold');
                           onOpenDriverPickerForTrip(sheetTrip);
                         }}
-                        className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-indigo-900 bg-indigo-50/50 hover:bg-indigo-100/70 cursor-pointer"
+                        className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-status-staged-fg bg-status-staged-bg/50 hover:bg-status-staged-bg-strong/70 cursor-pointer"
                       >
                         <span className="flex items-center gap-2.5">
                           <CarIcon className="w-4 h-4 text-indigo-600" />
@@ -404,7 +404,7 @@ export function DispatchTripQueueSheets({
                             {tripHasStaged ? 'Change Staged Driver (Hold)' : 'Stage Driver (Hold)'}
                           </span>
                         </span>
-                        <span className="text-[10.5px] font-bold text-indigo-700">📌 Hold</span>
+                        <span className="text-[10.5px] font-bold text-status-staged-fg">📌 Hold</span>
                       </button>
                     )}
 
@@ -418,13 +418,13 @@ export function DispatchTripQueueSheets({
                             `${sheetTrip.passenger.firstName} ${sheetTrip.passenger.lastName}`
                           );
                         }}
-                        className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-slate-800 hover:bg-emerald-50 cursor-pointer"
+                        className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-fg-strong hover:bg-status-success-bg cursor-pointer"
                       >
                         <span className="flex items-center gap-2.5">
                           <PhoneIcon className="w-4 h-4 text-emerald-600" />
                           <span>Call Passenger</span>
                         </span>
-                        <span className="font-mono text-[11px] text-slate-500">
+                        <span className="font-mono text-[11px] text-fg-muted">
                           {sheetTrip.passenger.phone}
                         </span>
                       </button>
@@ -437,7 +437,7 @@ export function DispatchTripQueueSheets({
                           onCloseMobileActionSheetTrip();
                           onCancelAutoOffer(sheetTrip);
                         }}
-                        className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-rose-700 bg-rose-50/70 hover:bg-rose-100 cursor-pointer"
+                        className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-status-danger-fg bg-status-danger-bg/70 hover:bg-status-danger-bg-strong cursor-pointer"
                       >
                         <span className="flex items-center gap-2.5">
                           <XIcon className="w-4 h-4 text-rose-600" />
@@ -455,7 +455,7 @@ export function DispatchTripQueueSheets({
                           onCloseMobileActionSheetTrip();
                           onStartAutoOffer(sheetTrip);
                         }}
-                        className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 cursor-pointer"
+                        className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-status-staged-fg bg-status-staged-bg/70 hover:bg-status-staged-bg-strong cursor-pointer"
                       >
                         <span className="flex items-center gap-2.5">
                           <RadarBroadcastIcon className="w-4 h-4 text-indigo-600" />
@@ -476,8 +476,8 @@ export function DispatchTripQueueSheets({
                       }}
                       className={`w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold cursor-pointer ${
                         isUnconfirmed
-                          ? 'bg-amber-50/80 text-amber-900 hover:bg-amber-100'
-                          : 'text-slate-800 hover:bg-slate-50'
+                          ? 'bg-status-warning-bg/80 text-status-warning-fg hover:bg-status-warning-bg-strong'
+                          : 'text-fg-strong hover:bg-surface-subtle'
                       }`}
                     >
                       <span className="flex items-center gap-2.5">
@@ -498,7 +498,7 @@ export function DispatchTripQueueSheets({
                         onCloseMobileActionSheetTrip();
                         onOpenDriverModal(sheetTrip);
                       }}
-                      className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-slate-800 hover:bg-slate-50 cursor-pointer"
+                      className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-fg-strong hover:bg-surface-subtle cursor-pointer"
                     >
                       <span className="flex items-center gap-2.5">
                         <BoltIcon className="w-4 h-4 text-amber-500" />
@@ -512,7 +512,7 @@ export function DispatchTripQueueSheets({
                         onCloseMobileActionSheetTrip();
                         onFocusTripOnMapFromQueue(sheetTrip);
                       }}
-                      className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-slate-800 hover:bg-slate-50 cursor-pointer"
+                      className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-fg-strong hover:bg-surface-subtle cursor-pointer"
                     >
                       <span className="flex items-center gap-2.5">
                         <MapPinIcon className="w-4 h-4 text-emerald-600" />
@@ -527,7 +527,7 @@ export function DispatchTripQueueSheets({
                           onCloseMobileActionSheetTrip();
                           onOpenReviewModal(sheetTrip, 'audit');
                         }}
-                        className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-slate-800 hover:bg-slate-50 cursor-pointer"
+                        className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-fg-strong hover:bg-surface-subtle cursor-pointer"
                       >
                         <span className="flex items-center gap-2.5">
                           <ShieldCheckIcon className="w-4 h-4 text-purple-600" />
@@ -542,7 +542,7 @@ export function DispatchTripQueueSheets({
                         onCloseMobileActionSheetTrip();
                         onAddTripToMultiSelect(sheetTrip.id);
                       }}
-                      className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-slate-800 hover:bg-slate-50 cursor-pointer"
+                      className="w-full px-3.5 py-3 flex items-center justify-between text-xs font-bold text-fg-strong hover:bg-surface-subtle cursor-pointer"
                     >
                       <span className="flex items-center gap-2.5">
                         <CheckIcon className="w-4 h-4 text-blue-600" />
@@ -559,7 +559,7 @@ export function DispatchTripQueueSheets({
                         onCloseMobileActionSheetTrip();
                         onPromptCancelTrip(sheetTrip);
                       }}
-                      className="w-full py-3 rounded-2xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full py-3 rounded-2xl bg-status-danger-bg hover:bg-status-danger-bg-strong border border-status-danger-border text-status-danger-fg font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <BanIcon className="w-4 h-4" />
                       <span>Cancel Trip</span>

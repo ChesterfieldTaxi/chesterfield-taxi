@@ -50,7 +50,7 @@ const DRIVER_STATUS_VISUALS: Record<LiveDriverMapStatus, DriverStatusVisualMeta>
     key: 'available',
     label: 'Available',
     dotClass: 'w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20',
-    pillClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    pillClass: 'bg-status-success-bg text-status-success-fg border-status-success-border',
     sortOrder: 0,
     hex: FLEET_STATUS_COLORS.available.hex,
   },
@@ -58,7 +58,7 @@ const DRIVER_STATUS_VISUALS: Record<LiveDriverMapStatus, DriverStatusVisualMeta>
     key: 'en_route',
     label: 'En Route',
     dotClass: 'w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-blue-500/20',
-    pillClass: 'bg-blue-50 text-blue-700 border-blue-200',
+    pillClass: 'bg-status-info-bg text-status-info-fg border-status-info-border',
     sortOrder: 1,
     hex: FLEET_STATUS_COLORS.en_route.hex,
   },
@@ -66,7 +66,7 @@ const DRIVER_STATUS_VISUALS: Record<LiveDriverMapStatus, DriverStatusVisualMeta>
     key: 'busy',
     label: 'Busy',
     dotClass: 'w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-500/20',
-    pillClass: 'bg-rose-50 text-rose-700 border-rose-200',
+    pillClass: 'bg-status-danger-bg text-status-danger-fg border-status-danger-border',
     sortOrder: 2,
     hex: FLEET_STATUS_COLORS.busy.hex,
   },
@@ -74,15 +74,15 @@ const DRIVER_STATUS_VISUALS: Record<LiveDriverMapStatus, DriverStatusVisualMeta>
     key: 'break',
     label: 'Break',
     dotClass: 'w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-amber-500/20',
-    pillClass: 'bg-amber-50 text-amber-800 border-amber-300',
+    pillClass: 'bg-status-warning-bg text-status-warning-fg border-status-warning-border',
     sortOrder: 3,
     hex: FLEET_STATUS_COLORS.break.hex,
   },
   offline: {
     key: 'offline',
     label: 'Offline',
-    dotClass: 'w-2.5 h-2.5 rounded-full bg-slate-400 ring-2 ring-slate-400/20',
-    pillClass: 'bg-slate-100 text-slate-600 border-slate-200',
+    dotClass: 'w-2.5 h-2.5 rounded-full bg-fg-subtle ring-2 ring-border-emphasis/20',
+    pillClass: 'bg-surface-muted text-fg-secondary border-border-subtle',
     sortOrder: 4,
     hex: FLEET_STATUS_COLORS.offline.hex,
   },
@@ -174,13 +174,13 @@ export function extractDriverCabAndName(driver: DriverDropdownOptionItem): {
 }
 
 const ASSIGNMENT_TONE_CLASSES: Record<AssignmentDropdownTone, string> = {
-  staged_white: 'bg-white text-slate-900 border-slate-900 font-bold hover:bg-slate-50',
-  offered_purple: 'bg-purple-50 text-purple-900 border-purple-400 font-bold hover:bg-purple-100/80',
+  staged_white: 'bg-surface-card text-fg-primary border-slate-900 font-bold hover:bg-surface-subtle',
+  offered_purple: 'bg-status-staged-bg text-status-staged-fg border-purple-400 font-bold hover:bg-status-staged-bg-strong/80',
   assigned_green:
-    'bg-emerald-50 text-emerald-900 border-emerald-400 font-semibold hover:bg-emerald-100/80',
-  unassigned_blue: 'bg-blue-50/90 text-blue-800 border-blue-300 font-bold hover:bg-blue-100/80',
-  warning_orange: 'bg-amber-50 text-amber-900 border-amber-400 font-bold hover:bg-amber-100/80',
-  critical_red: 'bg-rose-50 text-rose-800 border-rose-400 font-bold hover:bg-rose-100/80',
+    'bg-status-success-bg text-status-success-fg border-emerald-400 font-semibold hover:bg-status-success-bg-strong/80',
+  unassigned_blue: 'bg-status-info-bg/90 text-status-info-fg border-status-info-border font-bold hover:bg-status-info-bg-strong/80',
+  warning_orange: 'bg-status-warning-bg text-status-warning-fg border-status-warning-border font-bold hover:bg-status-warning-bg-strong/80',
+  critical_red: 'bg-status-danger-bg text-status-danger-fg border-rose-400 font-bold hover:bg-status-danger-bg-strong/80',
 };
 
 export interface DriverAssignDropdownProps {
@@ -547,29 +547,29 @@ export function DriverAssignDropdown({
               zIndex: 99999,
               transformOrigin: coords.openUpward ? 'bottom left' : 'top left',
             }}
-            className="bg-white rounded-xl shadow-2xl border border-slate-200/95 overflow-hidden text-xs animate-in fade-in zoom-in-95 duration-100 select-none"
+            className="bg-surface-card rounded-xl shadow-2xl border border-border-subtle/95 overflow-hidden text-xs animate-in fade-in zoom-in-95 duration-100 select-none"
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
           >
             {/* Header & Instant Search (when > 4 drivers) */}
             {visibleDrivers.length > 4 && (
-              <div className="p-2 bg-slate-50/90 border-b border-slate-100">
+              <div className="p-2 bg-surface-subtle/90 border-b border-border-faint">
                 <div className="relative flex items-center">
-                  <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+                  <SearchIcon className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 pointer-events-none" />
                   <input
                     ref={searchInputRef}
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search driver, cab #, vehicle, zone..."
-                    className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    className="w-full pl-8 pr-7 py-1.5 bg-surface-card border border-border-subtle rounded-lg text-xs text-fg-strong placeholder:text-fg-subtle outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      className="absolute right-2 text-fg-subtle hover:text-fg-secondary cursor-pointer"
                       aria-label="Clear driver search"
                     >
                       <XIcon className="w-3 h-3" />
@@ -584,8 +584,8 @@ export function DriverAssignDropdown({
               <div
                 className={`px-3 py-1.5 border-b text-[10.5px] font-bold flex items-center justify-between gap-2 ${
                   showExhaustedAlert
-                    ? 'bg-rose-50 text-rose-800 border-rose-200'
-                    : 'bg-indigo-50/80 text-indigo-900 border-indigo-200'
+                    ? 'bg-status-danger-bg text-status-danger-fg border-status-danger-border'
+                    : 'bg-status-staged-bg/80 text-status-staged-fg border-status-staged-border'
                 }`}
               >
                 <span className="truncate">
@@ -596,7 +596,7 @@ export function DriverAssignDropdown({
                     : '📌 Hold Mode: Selecting stages driver'}
                 </span>
                 {hasStaged && (
-                  <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-white border border-indigo-200 text-indigo-700 shrink-0">
+                  <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-surface-card border border-status-staged-border text-status-staged-fg shrink-0">
                     {isStageMode ? 'Pick = Swap Hold' : 'Pick = Send Live'}
                   </span>
                 )}
@@ -604,7 +604,7 @@ export function DriverAssignDropdown({
             )}
 
             {/* Top Action Row: Staged Quick Actions or Unassigned */}
-            <div className="p-1 border-b border-slate-100 space-y-0.5">
+            <div className="p-1 border-b border-border-faint space-y-0.5">
               {hasStaged && onSendStaged && (
                 <button
                   type="button"
@@ -635,7 +635,7 @@ export function DriverAssignDropdown({
                     }
                     closeDropdown();
                   }}
-                  className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left text-rose-700 hover:bg-rose-50 font-bold transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left text-status-danger-fg hover:bg-status-danger-bg font-bold transition-colors cursor-pointer"
                 >
                   <span className="inline-flex items-center gap-2">
                     <XIcon className="w-3.5 h-3.5 text-rose-600 shrink-0" />
@@ -654,17 +654,17 @@ export function DriverAssignDropdown({
                   className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
                     !isSelected
                       ? showExhaustedAlert
-                        ? 'bg-rose-50 text-rose-900 font-bold'
-                        : 'bg-blue-50/90 text-blue-900 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50 font-semibold'
+                        ? 'bg-status-danger-bg text-status-danger-fg font-bold'
+                        : 'bg-status-info-bg/90 text-status-info-fg font-bold'
+                      : 'text-fg-secondary hover:bg-surface-subtle font-semibold'
                   }`}
                 >
                   <span className="inline-flex items-center gap-2">
                     <span
                       className={`w-2.5 h-2.5 rounded-full border-2 shrink-0 ${
                         showExhaustedAlert
-                          ? 'border-rose-400 bg-rose-100'
-                          : 'border-blue-400 bg-blue-100'
+                          ? 'border-rose-400 bg-status-danger-bg-strong'
+                          : 'border-blue-400 bg-status-info-bg-strong'
                       }`}
                     />
                     <span>{unassignedLabel || 'Unassigned'}</span>
@@ -672,7 +672,7 @@ export function DriverAssignDropdown({
                   {!isSelected && (
                     <CheckIcon
                       className={`w-3.5 h-3.5 shrink-0 ${
-                        showExhaustedAlert ? 'text-rose-700' : 'text-blue-700'
+                        showExhaustedAlert ? 'text-status-danger-fg' : 'text-status-info-fg'
                       }`}
                     />
                   )}
@@ -683,7 +683,7 @@ export function DriverAssignDropdown({
             {/* Scrollable Colored-Dot Driver Roster */}
             <div className="max-h-64 overflow-y-auto divide-y divide-slate-50 p-1">
               {filteredDrivers.length === 0 ? (
-                <div className="py-6 px-3 text-center text-slate-400 text-[11px] font-medium">
+                <div className="py-6 px-3 text-center text-fg-subtle text-[11px] font-medium">
                   No matching drivers found.
                 </div>
               ) : (
@@ -703,27 +703,27 @@ export function DriverAssignDropdown({
                       }}
                       className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left transition-colors ${
                         isDisabled
-                          ? 'opacity-45 cursor-not-allowed bg-slate-50/50'
+                          ? 'opacity-45 cursor-not-allowed bg-surface-subtle/50'
                           : isRowSelected
-                          ? 'bg-blue-50/90 text-blue-950 cursor-pointer'
-                          : 'hover:bg-slate-50 text-slate-800 cursor-pointer'
+                          ? 'bg-status-info-bg/90 text-status-info-fg cursor-pointer'
+                          : 'hover:bg-surface-subtle text-fg-strong cursor-pointer'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <span className={`shrink-0 ${visual.dotClass}`} aria-hidden="true" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="font-bold text-xs text-slate-900 truncate">
+                            <span className="font-bold text-xs text-fg-primary truncate">
                               {parsed.displayName}
                             </span>
                             {parsed.cabBadge && (
-                              <span className="px-1.5 py-0.2 rounded bg-slate-100 border border-slate-200 font-mono font-bold text-[10px] text-slate-700 shrink-0">
+                              <span className="px-1.5 py-0.2 rounded bg-surface-muted border border-border-subtle font-mono font-bold text-[10px] text-fg-secondary shrink-0">
                                 {parsed.cabBadge}
                               </span>
                             )}
                           </div>
                           {parsed.vehicleOrZoneMeta && (
-                            <div className="text-[10.5px] text-slate-500 truncate">
+                            <div className="text-[10.5px] text-fg-muted truncate">
                               {parsed.vehicleOrZoneMeta}
                             </div>
                           )}
@@ -734,7 +734,7 @@ export function DriverAssignDropdown({
                         <span
                           className={`px-1.5 py-0.5 rounded-full border text-[10px] font-bold ${
                             isDisabled
-                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              ? 'bg-status-danger-bg text-status-danger-fg border-status-danger-border'
                               : visual.pillClass
                           }`}
                         >

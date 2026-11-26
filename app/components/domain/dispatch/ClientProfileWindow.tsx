@@ -150,7 +150,7 @@ export function ClientProfileWindow({
       <div className="p-3 space-y-2.5 text-xs">
         <ClientProfileHeaderCard profile={profile} onCallClient={onCallClient} />
 
-        <div data-client-profile-tabs="v2.1" className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-slate-200/75 border border-slate-200">
+        <div data-client-profile-tabs="v2.1" className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-surface-emphasis/75 border border-border-subtle">
           {([
             { id: 'trips' as const, label: 'Trips', count: profile.sortedTrips.length, icon: <CarIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" /> },
             { id: 'places' as const, label: 'Places', count: places.length, icon: <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> },
@@ -161,13 +161,13 @@ export function ClientProfileWindow({
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={`py-1.5 px-2 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === tab.id ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80' : 'text-slate-600 hover:text-slate-900'
+                activeTab === tab.id ? 'bg-surface-card text-fg-primary shadow-2xs ring-1 ring-border-subtle/80' : 'text-fg-secondary hover:text-fg-primary'
               }`}
             >
               {tab.icon}
               <span>{tab.label}</span>
               {tab.count !== null && tab.count > 0 && (
-                <span className="px-1.5 rounded-full bg-slate-100 text-slate-600 text-[9.5px] font-bold">{tab.count}</span>
+                <span className="px-1.5 rounded-full bg-surface-muted text-fg-secondary text-[9.5px] font-bold">{tab.count}</span>
               )}
             </button>
           ))}
@@ -203,24 +203,24 @@ export function ClientProfileWindow({
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between px-0.5">
-                <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+                <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-fg-muted">
                   Recent Trips ({page.visibleTrips.length} of {pastTrips.length})
                 </span>
               </div>
 
               {page.visibleTrips.length === 0 ? (
-                <div className="p-6 text-center bg-white rounded-xl border border-slate-200 text-slate-400 font-medium">
+                <div className="p-6 text-center bg-surface-card rounded-xl border border-border-subtle text-fg-subtle font-medium">
                   No historical trips recorded for this client yet.
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100 bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-2xs">
+                <div className="divide-y divide-border-faint bg-surface-card rounded-xl border border-border-subtle/90 overflow-hidden shadow-2xs">
                   {page.visibleTrips.map((trip) => {
                     const vehicleLabel = formatTripVehicleColumnDisplay(trip, vehicles, drivers, fleetCars);
                     const fare = Number(trip.pricing?.totalFare || 0).toFixed(2);
                     const shortId = trip.id.slice(-6).toUpperCase();
 
                     return (
-                      <div key={trip.id} className="p-2.5 hover:bg-slate-50/90 transition-colors flex items-center justify-between gap-2.5">
+                      <div key={trip.id} className="p-2.5 hover:bg-surface-subtle/90 transition-colors flex items-center justify-between gap-2.5">
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <DispatchStatusBadge status={trip.status} trip={trip} nowMs={nowMs} compact />
@@ -228,17 +228,17 @@ export function ClientProfileWindow({
                               type="button"
                               data-open-trip-details={trip.id}
                               onClick={() => openTripDetails(trip)}
-                              className="font-mono font-bold text-[10.5px] text-blue-700 hover:underline cursor-pointer"
+                              className="font-mono font-bold text-[10.5px] text-status-info-fg hover:underline cursor-pointer"
                               title="Open Trip Details & Audit"
                             >
                               #{shortId}
                             </button>
-                            <span className="font-bold text-slate-800 text-[11px]">{formatCompactTripDate(trip)}</span>
-                            <span className="text-[10.5px] font-semibold text-slate-500">· {vehicleLabel}</span>
-                            <span className="font-mono font-extrabold text-slate-900 text-[11px]">· ${fare}</span>
+                            <span className="font-bold text-fg-strong text-[11px]">{formatCompactTripDate(trip)}</span>
+                            <span className="text-[10.5px] font-semibold text-fg-muted">· {vehicleLabel}</span>
+                            <span className="font-mono font-extrabold text-fg-primary text-[11px]">· ${fare}</span>
                           </div>
 
-                          <div className="flex items-center gap-1 text-[11px] text-slate-600 truncate">
+                          <div className="flex items-center gap-1 text-[11px] text-fg-secondary truncate">
                             <MapPinIcon className="w-3 h-3 text-emerald-600 shrink-0" />
                             <span className="truncate">
                               {trip.pickupLocation?.address || 'Pickup'} &rarr; {trip.dropoffLocation?.address || 'Dropoff'}
@@ -259,7 +259,7 @@ export function ClientProfileWindow({
                           <button
                             type="button"
                             onClick={() => onLoadTripIntoNewTab(buildReturnTabValuesFromClientTrip(trip, nowMs), trip)}
-                            className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-blue-50 text-blue-700 font-bold text-[10.5px] border border-blue-200 transition-colors cursor-pointer active:scale-95"
+                            className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card hover:bg-status-info-bg text-status-info-fg font-bold text-[10.5px] border border-status-info-border transition-colors cursor-pointer active:scale-95"
                             title="Open a new draft with the route reversed (pickup ⇄ dropoff)"
                           >
                             <span>⇄ Book Return</span>
@@ -275,7 +275,7 @@ export function ClientProfileWindow({
                 <button
                   type="button"
                   onClick={() => setVisibleCount(page.nextVisibleCount)}
-                  className="w-full py-2 rounded-xl bg-white hover:bg-blue-50 text-blue-700 font-extrabold text-xs border border-blue-200 shadow-2xs transition-colors cursor-pointer"
+                  className="w-full py-2 rounded-xl bg-surface-card hover:bg-status-info-bg text-status-info-fg font-extrabold text-xs border border-status-info-border shadow-2xs transition-colors cursor-pointer"
                 >
                   Load More Trips (+{Math.min(CLIENT_TRIPS_PAGE_SIZE, page.remainingCount)})
                 </button>

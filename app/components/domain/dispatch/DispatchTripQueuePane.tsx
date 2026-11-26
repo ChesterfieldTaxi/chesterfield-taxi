@@ -239,7 +239,7 @@ export function DispatchTripQueuePane({
       style={{
         height: isDesktop ? `${queueHeight}px` : undefined,
       }}
-      className={`w-full bg-white border-t border-slate-200 flex flex-col z-10 shadow-md ${
+      className={`w-full bg-surface-card border-t border-border-subtle flex flex-col z-10 shadow-md ${
         activeMobileTab === 'queue'
           ? 'flex-1 h-full lg:flex-none lg:h-auto lg:shrink-0'
           : 'hidden lg:flex lg:flex-none lg:h-auto lg:shrink-0'

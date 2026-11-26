@@ -1276,7 +1276,7 @@ function DispatchBookingEngineComponent({
           handleSwapRoute();
         }
       }}
-      className="flex flex-col h-full bg-slate-50 select-none text-xs"
+      className="flex flex-col h-full bg-surface-subtle select-none text-xs"
     >
       {/* Scrollable Form Body */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3.5">

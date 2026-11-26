@@ -35,8 +35,8 @@ export const DispatchSlaBadge = React.memo(function DispatchSlaBadge({
     sla.level === 'overdue'
       ? 'bg-rose-600 text-white border-rose-700 animate-pulse shadow-2xs'
       : sla.level === 'critical'
-      ? 'bg-rose-100 text-rose-900 border-rose-300'
-      : 'bg-amber-100 text-amber-900 border-amber-300';
+      ? 'bg-status-danger-bg-strong text-status-danger-fg border-status-danger-border'
+      : 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border';
 
   const tooltip = sla.isAirportTrip
     ? `Scheduled SLA (${sla.level.toUpperCase()}) — includes +${sla.airportExtraLeadMinutes}m ${sla.airportCode || 'Airport'} lead buffer`
@@ -115,7 +115,7 @@ export const DispatchCascadePill = React.memo(function DispatchCascadePill({
 
     return (
       <span
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-300 text-[10.5px] font-extrabold shrink-0"
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-status-staged-bg text-status-staged-fg border border-status-staged-border text-[10.5px] font-extrabold shrink-0"
         title={
           isBroadcastPool
             ? `Top-K Broadcast Pool (${cascade.strategy}): ${poolCarCount} car(s) offered · Batch ${cascade.cascadeAttempt}/${cascade.maxAttempts}`
@@ -137,7 +137,7 @@ export const DispatchCascadePill = React.memo(function DispatchCascadePill({
               e.stopPropagation();
               onCancel();
             }}
-            className="ml-0.5 p-0.5 rounded-full hover:bg-indigo-200/80 text-indigo-700 hover:text-rose-700 cursor-pointer transition-colors"
+            className="ml-0.5 p-0.5 rounded-full hover:bg-indigo-200/80 text-status-staged-fg hover:text-status-danger-fg cursor-pointer transition-colors"
             title="Cancel Offer Cascade"
             aria-label="Cancel Offer Cascade"
           >
@@ -152,7 +152,7 @@ export const DispatchCascadePill = React.memo(function DispatchCascadePill({
     const attemptedCount = cascade.attemptedDriverIds?.length || cascade.cascadeAttempt || 0;
     return (
       <span
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-800 border border-rose-300 text-[10.5px] font-extrabold shrink-0"
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-status-danger-bg text-status-danger-fg border border-status-danger-border text-[10.5px] font-extrabold shrink-0"
         title={`Auto-Offer Cascade exhausted (${attemptedCount}/${cascade.maxAttempts} attempts). Assign a driver manually or retry Auto-Offer.`}
       >
         <AlertTriangleIcon className="w-3 h-3 text-rose-600 shrink-0" />
@@ -183,11 +183,11 @@ export const DispatchFlightTelemetryPill = React.memo(function DispatchFlightTel
   }
 
   const toneClasses: Record<typeof badge.tone, string> = {
-    emerald: 'bg-emerald-50 text-emerald-800 border-emerald-300',
-    amber: 'bg-amber-100 text-amber-950 border-amber-300',
-    rose: 'bg-rose-100 text-rose-900 border-rose-300',
-    blue: 'bg-sky-50 text-sky-900 border-sky-300',
-    slate: 'bg-slate-100 text-slate-800 border-slate-300',
+    emerald: 'bg-status-success-bg text-status-success-fg border-status-success-border',
+    amber: 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border',
+    rose: 'bg-status-danger-bg-strong text-status-danger-fg border-status-danger-border',
+    blue: 'bg-status-info-bg text-status-info-fg border-status-info-border',
+    slate: 'bg-surface-muted text-fg-strong border-border-strong',
   };
 
   const tooltipParts = [

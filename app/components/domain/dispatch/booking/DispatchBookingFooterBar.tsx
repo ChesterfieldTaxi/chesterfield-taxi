@@ -92,15 +92,15 @@ export function DispatchBookingFooterBar({
     <>
       {/* Expandable Canonical Price Breakdown Drawer */}
       {showPriceBreakdown && (
-        <div className="border-t border-slate-200 bg-white shrink-0 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] flex flex-col max-h-64">
-          <div className="px-3 py-1.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+        <div className="border-t border-border-subtle bg-surface-card shrink-0 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] flex flex-col max-h-64">
+          <div className="px-3 py-1.5 border-b border-border-faint flex items-center justify-between bg-surface-subtle/80 shrink-0">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-fg-muted">
               Itemized Fare Breakdown
             </span>
             <button
               type="button"
               onClick={() => setShowPriceBreakdown(false)}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 cursor-pointer"
+              className="p-1 rounded-lg text-fg-subtle hover:text-fg-secondary hover:bg-surface-emphasis/60 cursor-pointer"
               aria-label="Close fare breakdown"
             >
               <XIcon className="w-3.5 h-3.5" />
@@ -129,14 +129,14 @@ export function DispatchBookingFooterBar({
         <div
           role="alertdialog"
           aria-label="Clear Booking Form"
-          className="w-full z-30 border-t border-rose-200 bg-rose-50/95 backdrop-blur-md px-3 py-2.5 shrink-0 shadow-[0_-6px_16px_rgba(15,23,42,0.08)] space-y-2 animate-in fade-in slide-in-from-bottom-1 duration-150"
+          className="w-full z-30 border-t border-status-danger-border bg-status-danger-bg/95 backdrop-blur-md px-3 py-2.5 shrink-0 shadow-[0_-6px_16px_rgba(15,23,42,0.08)] space-y-2 animate-in fade-in slide-in-from-bottom-1 duration-150"
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-start gap-2 min-w-0">
               <AlertTriangleIcon className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <div className="min-w-0">
-                <div className="text-xs font-extrabold text-rose-950">Clear Booking Form?</div>
-                <p className="text-[11px] text-rose-800 leading-snug">
+                <div className="text-xs font-extrabold text-status-danger-fg">Clear Booking Form?</div>
+                <p className="text-[11px] text-status-danger-fg leading-snug">
                   All unsaved inputs in this booking tab will be reset to default values.
                 </p>
               </div>
@@ -144,7 +144,7 @@ export function DispatchBookingFooterBar({
             <button
               type="button"
               onClick={() => setIsClearModalOpen(false)}
-              className="p-0.5 rounded text-rose-400 hover:text-rose-700 cursor-pointer shrink-0"
+              className="p-0.5 rounded text-rose-400 hover:text-status-danger-fg cursor-pointer shrink-0"
               aria-label="Cancel clear form"
             >
               <XIcon className="w-3.5 h-3.5" />
@@ -154,7 +154,7 @@ export function DispatchBookingFooterBar({
             <button
               type="button"
               onClick={() => setIsClearModalOpen(false)}
-              className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold text-[11px] cursor-pointer"
+              className="px-2.5 py-1 rounded-lg bg-surface-card hover:bg-surface-subtle border border-border-strong text-fg-secondary font-bold text-[11px] cursor-pointer"
             >
               Cancel
             </button>
@@ -173,7 +173,7 @@ export function DispatchBookingFooterBar({
       )}
 
       {/* Sticky Action Bar (Pinned Bottom) */}
-      <div className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 py-2.5 lg:py-2 flex items-center justify-between shrink-0 shadow-[0_-4px_12px_rgba(15,23,42,0.06)] z-20 gap-2">
+      <div className="sticky bottom-0 bg-surface-card/95 backdrop-blur-md border-t border-border-subtle px-3 py-2.5 lg:py-2 flex items-center justify-between shrink-0 shadow-[0_-4px_12px_rgba(15,23,42,0.06)] z-20 gap-2">
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             {isFareOverridden ? (
@@ -185,13 +185,13 @@ export function DispatchBookingFooterBar({
                   placeholder="0.00"
                   value={manualFare}
                   onChange={(e) => setManualFare(e.target.value)}
-                  className="w-20 px-2 py-1 bg-white border border-blue-400 rounded-lg font-mono font-bold text-sm text-blue-700"
+                  className="w-20 px-2 py-1 bg-surface-card border border-blue-400 rounded-lg font-mono font-bold text-sm text-status-info-fg"
                   title={returnTrip ? 'Combined Round-Trip Override Total' : 'Manual Fare Override'}
                 />
                 <button
                   type="button"
                   onClick={() => setIsFareOverridden(false)}
-                  className="text-[10px] text-slate-400 hover:text-slate-600 underline cursor-pointer"
+                  className="text-[10px] text-fg-subtle hover:text-fg-secondary underline cursor-pointer"
                 >
                   Reset
                 </button>
@@ -206,7 +206,7 @@ export function DispatchBookingFooterBar({
                 className="cursor-pointer group flex items-center gap-1 text-left"
                 title="Tap to manually override fare"
               >
-                <span className="text-lg font-mono font-black text-slate-900 group-hover:text-blue-600 transition-colors leading-none">
+                <span className="text-lg font-mono font-black text-fg-primary group-hover:text-blue-600 transition-colors leading-none">
                   ${displayTotal.toFixed(2)}
                 </span>
                 {isQuoting && <SpinnerIcon className="w-3.5 h-3.5 animate-spin text-blue-500" />}
@@ -223,7 +223,7 @@ export function DispatchBookingFooterBar({
                       : '/ trip'}
                   </span>
                 )}
-                <PencilIcon className="w-3 h-3 text-slate-400 group-hover:text-blue-500 shrink-0" />
+                <PencilIcon className="w-3 h-3 text-fg-subtle group-hover:text-blue-500 shrink-0" />
               </button>
             )}
 
@@ -232,8 +232,8 @@ export function DispatchBookingFooterBar({
               onClick={() => setShowPriceBreakdown((v) => !v)}
               className={`px-2 py-1 lg:px-1.5 lg:py-0.5 rounded-lg lg:rounded border text-[10px] font-bold transition-colors cursor-pointer inline-flex items-center gap-1 ${
                 showPriceBreakdown
-                  ? 'bg-blue-50 border-blue-300 text-blue-700'
-                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  ? 'bg-status-info-bg border-status-info-border text-status-info-fg'
+                  : 'bg-surface-subtle border-border-subtle text-fg-secondary hover:bg-surface-muted'
               }`}
               title="Toggle itemized Admin Tariff fare breakdown"
             >
@@ -247,7 +247,7 @@ export function DispatchBookingFooterBar({
           </div>
 
           {returnTrip && (
-            <div className="text-[10px] text-slate-500 font-medium truncate">
+            <div className="text-[10px] text-fg-muted font-medium truncate">
               Leg 1: ${displayLeg1.toFixed(2)} | Return: ${displayLeg2.toFixed(2)}
               {isFareOverridden && ' (Custom)'}
             </div>
@@ -262,8 +262,8 @@ export function DispatchBookingFooterBar({
                 onClick={() => setSendEmailConfirmation((v) => !v)}
                 className={`sm:hidden w-9 h-9 rounded-xl border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
                   sendEmailConfirmation
-                    ? 'bg-blue-50 border-blue-300 text-blue-600'
-                    : 'bg-slate-50 border-slate-200 text-slate-400'
+                    ? 'bg-status-info-bg border-status-info-border text-blue-600'
+                    : 'bg-surface-subtle border-border-subtle text-fg-subtle'
                 }`}
                 title={
                   sendEmailConfirmation
@@ -276,7 +276,7 @@ export function DispatchBookingFooterBar({
               </button>
 
               <label
-                className="hidden sm:flex items-center gap-1 text-[10.5px] font-semibold text-slate-600 cursor-pointer select-none px-1.5 py-1 rounded-lg hover:bg-slate-100"
+                className="hidden sm:flex items-center gap-1 text-[10.5px] font-semibold text-fg-secondary cursor-pointer select-none px-1.5 py-1 rounded-lg hover:bg-surface-muted"
                 title={
                   effectiveTargetEmail
                     ? `Send confirmation email to ${effectiveTargetEmail}`
@@ -287,13 +287,13 @@ export function DispatchBookingFooterBar({
                   type="checkbox"
                   checked={sendEmailConfirmation}
                   onChange={(e) => setSendEmailConfirmation(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                  className="rounded border-border-strong text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
                 />
                 <span>Email Confirm</span>
                 {sendEmailConfirmation && !hasRecipientEmail && (
                   <span
                     data-email-confirm-no-email="true"
-                    className="text-[9.5px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1 rounded"
+                    className="text-[9.5px] font-bold text-status-warning-fg bg-status-warning-bg border border-status-warning-border px-1 rounded"
                   >
                     (no email)
                   </span>
@@ -306,10 +306,10 @@ export function DispatchBookingFooterBar({
             <button
               type="button"
               onClick={onCopyBooking}
-              className="px-2.5 sm:px-3 py-2 lg:py-1.5 rounded-xl lg:rounded-lg border border-slate-300 hover:border-blue-400 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              className="px-2.5 sm:px-3 py-2 lg:py-1.5 rounded-xl lg:rounded-lg border border-border-strong hover:border-blue-400 hover:bg-status-info-bg text-fg-secondary hover:text-status-info-fg font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
               title="Create a new draft tab pre-populated with these trip details"
             >
-              <CopyIcon className="w-3.5 h-3.5 text-slate-500" />
+              <CopyIcon className="w-3.5 h-3.5 text-fg-muted" />
               <span className="hidden sm:inline">Copy Booking</span>
               <span className="sm:hidden">Copy</span>
             </button>
@@ -317,7 +317,7 @@ export function DispatchBookingFooterBar({
             <button
               type="button"
               onClick={onConfirmClear}
-              className="px-2.5 sm:px-3 py-2 lg:py-1.5 rounded-xl lg:rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-colors cursor-pointer"
+              className="px-2.5 sm:px-3 py-2 lg:py-1.5 rounded-xl lg:rounded-lg border border-status-danger-border bg-status-danger-bg hover:bg-status-danger-bg-strong text-status-danger-fg font-bold text-xs transition-colors cursor-pointer"
               title="Clear all booking inputs"
             >
               Clear

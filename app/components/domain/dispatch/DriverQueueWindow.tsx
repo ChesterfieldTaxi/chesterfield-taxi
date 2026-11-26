@@ -216,8 +216,8 @@ export function DriverQueueWindow({
         )
       }
       footer={
-        <div className="p-3 bg-white flex flex-wrap items-center justify-between gap-2.5 text-xs">
-          <div className="flex items-center gap-2 text-slate-500 font-medium">
+        <div className="p-3 bg-surface-card flex flex-wrap items-center justify-between gap-2.5 text-xs">
+          <div className="flex items-center gap-2 text-fg-muted font-medium">
             <span>
               Total Schedule: <strong>${timeline.totalFare.toFixed(2)}</strong>
             </span>
@@ -254,7 +254,7 @@ export function DriverQueueWindow({
                   onAssignActiveDraft(driver);
                   setFeedbackToast(`Assigned active draft to ${driver.name}`);
                 }}
-                className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200 transition-colors cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg font-bold border border-status-info-border transition-colors cursor-pointer"
                 title="Assign the currently open booking draft to this driver"
               >
                 + Assign Active Draft
@@ -263,7 +263,7 @@ export function DriverQueueWindow({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-lg bg-surface-header hover:bg-surface-header-elevated text-white font-bold transition-colors cursor-pointer"
             >
               Done
             </button>
@@ -273,17 +273,17 @@ export function DriverQueueWindow({
     >
       <div className="p-4 space-y-4">
         {/* DRIVER SUMMARY BANNER + STAGED / OVERLAP PILLS */}
-        <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-2xs space-y-2.5">
+        <div className="bg-surface-card rounded-xl p-3.5 border border-border-subtle shadow-2xs space-y-2.5">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-black text-sm border border-blue-100">
+              <div className="w-10 h-10 rounded-xl bg-status-info-bg text-status-info-fg flex items-center justify-center font-black text-sm border border-blue-100">
                 {driver.name.slice(0, 2).toUpperCase()}
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-black text-slate-900 text-sm">{driver.name}</span>
+                  <span className="font-black text-fg-primary text-sm">{driver.name}</span>
                   {driver.driverScore !== undefined && (
-                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.2 rounded bg-status-warning-bg text-status-warning-fg border border-status-warning-border">
                       <StarIcon className="w-2.5 h-2.5 text-amber-500 shrink-0" />
                       <span>{driver.driverScore}</span>
                     </span>
@@ -293,7 +293,7 @@ export function DriverQueueWindow({
                     const activeTripStatus = (driver as any).activeTripStatus as string | undefined;
                     if (mapStatus === 'busy') {
                       return (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-danger-bg text-status-danger-fg border border-status-danger-border">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                           {activeTripStatus === 'arrived' ? 'Arrived' : 'In Progress'}
                         </span>
@@ -304,7 +304,7 @@ export function DriverQueueWindow({
                     }
                     if (mapStatus === 'break' || driver.status === 'break') {
                       return (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-warning-bg text-status-warning-fg border border-status-warning-border">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                           On Break
                         </span>
@@ -316,13 +316,13 @@ export function DriverQueueWindow({
                     return <Badge variant="neutral">Offline</Badge>;
                   })()}
                 </div>
-                <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
+                <div className="text-[11px] text-fg-muted flex items-center gap-2 mt-0.5 flex-wrap">
                   <span>
                     {driver.vehicle} ({driver.tier})
                   </span>
                   <span>•</span>
                   <span className="inline-flex items-center gap-1">
-                    <MapPinIcon className="w-3 h-3 text-slate-400 shrink-0" />
+                    <MapPinIcon className="w-3 h-3 text-fg-subtle shrink-0" />
                     <span>{driver.zone}</span>
                   </span>
                 </div>
@@ -333,7 +333,7 @@ export function DriverQueueWindow({
               <button
                 type="button"
                 onClick={() => onCallPassenger?.(driver.phone, driver.name)}
-                className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                className="px-2.5 py-1 rounded-lg bg-status-success-bg hover:bg-status-success-bg-strong text-status-success-fg border border-status-success-border font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <PhoneIcon className="w-3 h-3 text-emerald-600" />
                 <span>{driver.phone}</span>
@@ -342,21 +342,21 @@ export function DriverQueueWindow({
           </div>
 
           {/* Summary & Sanity Check Pills Bar */}
-          <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+          <div className="pt-2 border-t border-border-faint flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 font-extrabold">
+              <span className="px-2.5 py-0.5 rounded-full bg-status-info-bg text-status-info-fg border border-status-info-border font-extrabold">
                 Assigned ({timeline.assignedCount})
               </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-dashed border-indigo-400 font-extrabold">
+              <span className="px-2.5 py-0.5 rounded-full bg-status-staged-bg text-status-staged-fg border border-dashed border-indigo-400 font-extrabold">
                 📌 Staged ({timeline.stagedCount})
               </span>
               {timeline.overlapCount > 0 && (
-                <span className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300 font-extrabold">
+                <span className="px-2.5 py-0.5 rounded-full bg-status-danger-bg-strong text-status-danger-fg border border-status-danger-border font-extrabold">
                   ❌ {timeline.overlapCount} Overlap
                 </span>
               )}
               {timeline.tightTurnaroundCount > 0 && (
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-extrabold">
+                <span className="px-2.5 py-0.5 rounded-full bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border font-extrabold">
                   ⚠️ {timeline.tightTurnaroundCount} Tight (&lt;15m)
                 </span>
               )}
@@ -387,21 +387,21 @@ export function DriverQueueWindow({
         {/* 1. ACTIVE TRIP CARD (IF ANY) */}
         {activeItem && (
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] font-black text-emerald-800 uppercase tracking-wide px-1">
+            <div className="flex items-center justify-between text-[11px] font-black text-status-success-fg uppercase tracking-wide px-1">
               <span className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span>Current Active Trip</span>
               </span>
-              <span className="text-slate-500 font-mono text-[10px]">
+              <span className="text-fg-muted font-mono text-[10px]">
                 ID: {activeItem.trip.id}
               </span>
             </div>
 
-            <div className="bg-emerald-50/70 border-2 border-emerald-500/80 rounded-xl p-3.5 shadow-xs space-y-3">
+            <div className="bg-status-success-bg/70 border-2 border-emerald-500/80 rounded-xl p-3.5 shadow-xs space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-extrabold text-slate-900">
+                    <span className="text-xs font-extrabold text-fg-primary">
                       {getPassengerDisplayName(activeItem.trip.passenger)}
                     </span>
                     <button
@@ -412,7 +412,7 @@ export function DriverQueueWindow({
                           getPassengerDisplayName(activeItem.trip.passenger)
                         )
                       }
-                      className="font-mono text-[11px] text-emerald-800 hover:underline font-bold"
+                      className="font-mono text-[11px] text-status-success-fg hover:underline font-bold"
                     >
                       {activeItem.trip.passenger.phone}
                     </button>
@@ -423,25 +423,25 @@ export function DriverQueueWindow({
                 </div>
 
                 <div className="text-right shrink-0">
-                  <span className="text-sm font-black text-emerald-900 block">
+                  <span className="text-sm font-black text-status-success-fg block">
                     ${getTripTotalFare(activeItem.trip).toFixed(2)}
                   </span>
-                  <span className="text-[10px] text-emerald-700 font-medium">
+                  <span className="text-[10px] text-status-success-fg font-medium">
                     ~{activeItem.durationMinutes} min trip
                   </span>
                 </div>
               </div>
 
-              <div className="bg-white/80 rounded-lg p-2.5 space-y-1.5 border border-emerald-200 text-xs">
+              <div className="bg-surface-card/80 rounded-lg p-2.5 space-y-1.5 border border-status-success-border text-xs">
                 <div className="flex items-start gap-2">
                   <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
-                  <span className="text-slate-700 line-clamp-1">
+                  <span className="text-fg-secondary line-clamp-1">
                     {activeItem.trip.pickupLocation.address}
                   </span>
                 </div>
                 <div className="flex items-start gap-2">
                   <FlagIcon className="w-3.5 h-3.5 text-rose-500 mt-0.5 shrink-0" />
-                  <span className="text-slate-700 line-clamp-1">
+                  <span className="text-fg-secondary line-clamp-1">
                     {activeItem.trip.dropoffLocation.address}
                   </span>
                 </div>
@@ -457,25 +457,25 @@ export function DriverQueueWindow({
                 return (
                   <div className="flex flex-wrap items-center gap-1 text-[10px]">
                     {vehLabel && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-emerald-200 font-bold text-slate-700">
-                        <CarIcon className="w-3 h-3 text-slate-500 shrink-0" />
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-card border border-status-success-border font-bold text-fg-secondary">
+                        <CarIcon className="w-3 h-3 text-fg-muted shrink-0" />
                         <span>{String(vehLabel)}</span>
                       </span>
                     )}
                     {oversized && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 border border-rose-200 font-bold text-rose-700">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-status-danger-bg border border-status-danger-border font-bold text-status-danger-fg">
                         <LuggageIcon className="w-3 h-3 text-rose-500 shrink-0" />
                         <span>{oversized}</span>
                       </span>
                     )}
                     {customExtras && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 font-bold text-indigo-700">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-status-staged-bg border border-status-staged-border font-bold text-status-staged-fg">
                         <SparklesIcon className="w-3 h-3 text-indigo-500 shrink-0" />
                         <span>{customExtras}</span>
                       </span>
                     )}
                     {specialReq && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 font-semibold text-amber-800">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-status-warning-bg border border-status-warning-border font-semibold text-status-warning-fg">
                         <DocumentTextIcon className="w-3 h-3 text-amber-600 shrink-0" />
                         <span>{specialReq}</span>
                       </span>
@@ -484,15 +484,15 @@ export function DriverQueueWindow({
                 );
               })()}
 
-              <div className="flex items-center justify-between text-xs pt-1 border-t border-emerald-200/80">
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-status-success-border/80">
                 <div className="flex items-center gap-1.5">
-                  <ClockIcon className="w-3.5 h-3.5 text-emerald-700" />
-                  <span className="text-slate-600 font-medium">Status / Arrival:</span>
-                  <span className="font-black text-emerald-900">{activeArrivalLabel}</span>
+                  <ClockIcon className="w-3.5 h-3.5 text-status-success-fg" />
+                  <span className="text-fg-secondary font-medium">Status / Arrival:</span>
+                  <span className="font-black text-status-success-fg">{activeArrivalLabel}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-slate-600 font-medium">Est. Dropoff:</span>
-                  <span className="font-black text-emerald-900">
+                  <span className="text-fg-secondary font-medium">Est. Dropoff:</span>
+                  <span className="font-black text-status-success-fg">
                     ~{formatTimeStr(activeItem.projectedDropoffMs)}
                   </span>
                 </div>
@@ -513,7 +513,7 @@ export function DriverQueueWindow({
                   <button
                     type="button"
                     onClick={() => tripActions.onReview(activeItem.trip, 'details')}
-                    className="px-2.5 py-1 rounded bg-white hover:bg-emerald-100 text-emerald-900 font-bold text-[11px] border border-emerald-300 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 rounded bg-surface-card hover:bg-status-success-bg-strong text-status-success-fg font-bold text-[11px] border border-status-success-border transition-colors cursor-pointer"
                   >
                     Details &amp; Audit
                   </button>
@@ -532,7 +532,7 @@ export function DriverQueueWindow({
                   <button
                     type="button"
                     onClick={() => onFocusTripOnMap(activeItem.trip.id)}
-                    className="px-2.5 py-1 rounded bg-white hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] border border-emerald-300 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 rounded bg-surface-card hover:bg-status-success-bg-strong text-status-success-fg font-bold text-[11px] border border-status-success-border transition-colors cursor-pointer"
                   >
                     Map
                   </button>
@@ -576,18 +576,18 @@ export function DriverQueueWindow({
 
         {/* 2. INTERLEAVED UPCOMING ASSIGNED + STAGED QUEUE */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-[11px] font-black text-slate-700 uppercase tracking-wide px-1">
+          <div className="flex items-center justify-between text-[11px] font-black text-fg-secondary uppercase tracking-wide px-1">
             <span>Upcoming Schedule ({upcomingItems.length})</span>
-            <span className="text-[10px] text-slate-400 normal-case font-normal">
+            <span className="text-[10px] text-fg-subtle normal-case font-normal">
               Assigned &amp; 📌 Staged interleaved chronologically
             </span>
           </div>
 
           {upcomingItems.length === 0 ? (
-            <div className="text-center py-8 bg-white rounded-xl border border-dashed border-slate-300 p-6 space-y-2">
+            <div className="text-center py-8 bg-surface-card rounded-xl border border-dashed border-border-strong p-6 space-y-2">
               <CalendarIcon className="w-8 h-8 text-slate-300 mx-auto" />
-              <p className="text-xs font-bold text-slate-700">No Upcoming Trips Scheduled</p>
-              <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+              <p className="text-xs font-bold text-fg-secondary">No Upcoming Trips Scheduled</p>
+              <p className="text-[11px] text-fg-subtle max-w-sm mx-auto">
                 Stage shift placeholders ahead of time or send live bookings from the Dispatch
                 queue.
               </p>
@@ -606,8 +606,8 @@ export function DriverQueueWindow({
                       <div
                         className={`px-3 py-1.5 rounded-lg border text-[11px] font-extrabold flex items-center justify-between gap-2 ${
                           item.conflictStatus === 'overlap'
-                            ? 'bg-rose-50 border-rose-300 text-rose-900'
-                            : 'bg-amber-50 border-amber-300 text-amber-900'
+                            ? 'bg-status-danger-bg border-status-danger-border text-status-danger-fg'
+                            : 'bg-status-warning-bg border-status-warning-border text-status-warning-fg'
                         }`}
                       >
                         <span>
@@ -628,16 +628,16 @@ export function DriverQueueWindow({
                     <div
                       className={`rounded-xl shadow-2xs transition-all overflow-hidden ${
                         isStaged
-                          ? 'bg-indigo-50/35 border-2 border-dashed border-indigo-400 hover:border-indigo-500'
-                          : 'bg-white border border-slate-200/90 hover:border-blue-300'
+                          ? 'bg-status-staged-bg/35 border-2 border-dashed border-indigo-400 hover:border-indigo-500'
+                          : 'bg-surface-card border border-border-subtle/90 hover:border-status-info-border'
                       }`}
                     >
                       {/* Header bar of trip card */}
                       <div
                         className={`px-3.5 py-2 border-b flex items-center justify-between gap-2 flex-wrap ${
                           isStaged
-                            ? 'bg-indigo-50/80 border-indigo-200/90'
-                            : 'bg-slate-50 border-slate-200'
+                            ? 'bg-status-staged-bg/80 border-status-staged-border/90'
+                            : 'bg-surface-subtle border-border-subtle'
                         }`}
                       >
                         <div className="flex items-center gap-2 flex-wrap">
@@ -648,18 +648,18 @@ export function DriverQueueWindow({
                           >
                             #{idx + 1}
                           </span>
-                          <span className="text-xs font-bold text-slate-800">
+                          <span className="text-xs font-bold text-fg-strong">
                             {getPassengerDisplayName(item.trip.passenger)}
                           </span>
-                          <span className="text-[11px] font-mono text-slate-500">
+                          <span className="text-[11px] font-mono text-fg-muted">
                             ID: {item.trip.id.slice(-6)}
                           </span>
                           {isStaged ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-white border border-dashed border-indigo-400 text-indigo-800">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-surface-card border border-dashed border-indigo-400 text-status-staged-fg">
                               📌 Staged (Held in Dispatch)
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-info-bg-strong text-status-info-fg">
                               Assigned
                             </span>
                           )}
@@ -674,7 +674,7 @@ export function DriverQueueWindow({
                             className={`p-1 rounded text-xs font-bold transition-all cursor-pointer ${
                               isFirst
                                 ? 'text-slate-300 cursor-not-allowed'
-                                : 'text-slate-600 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 bg-white'
+                                : 'text-fg-secondary hover:text-status-info-fg hover:bg-status-info-bg border border-border-subtle bg-surface-card'
                             }`}
                             title="Move earlier in queue"
                           >
@@ -687,7 +687,7 @@ export function DriverQueueWindow({
                             className={`p-1 rounded text-xs font-bold transition-all cursor-pointer ${
                               isLast
                                 ? 'text-slate-300 cursor-not-allowed'
-                                : 'text-slate-600 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 bg-white'
+                                : 'text-fg-secondary hover:text-status-info-fg hover:bg-status-info-bg border border-border-subtle bg-surface-card'
                             }`}
                             title="Move later in queue"
                           >
@@ -697,16 +697,16 @@ export function DriverQueueWindow({
                       </div>
 
                       {/* Card Body */}
-                      <div className="p-3.5 space-y-2.5 bg-white/85">
+                      <div className="p-3.5 space-y-2.5 bg-surface-card/85">
                         <div className="flex items-start justify-between gap-2 text-xs">
                           <div className="space-y-1 min-w-0">
-                            <div className="flex items-start gap-1.5 text-slate-800">
+                            <div className="flex items-start gap-1.5 text-fg-strong">
                               <MapPinIcon className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
                               <span className="line-clamp-1">
                                 {item.trip.pickupLocation.address}
                               </span>
                             </div>
-                            <div className="flex items-start gap-1.5 text-slate-800">
+                            <div className="flex items-start gap-1.5 text-fg-strong">
                               <FlagIcon className="w-3.5 h-3.5 text-rose-500 mt-0.5 shrink-0" />
                               <span className="line-clamp-1">
                                 {item.trip.dropoffLocation.address}
@@ -715,28 +715,28 @@ export function DriverQueueWindow({
                           </div>
 
                           <div className="text-right shrink-0">
-                            <span className="font-extrabold text-slate-900 text-xs block">
+                            <span className="font-extrabold text-fg-primary text-xs block">
                               ${getTripTotalFare(item.trip).toFixed(2)}
                             </span>
-                            <span className="text-[10px] text-slate-500">
+                            <span className="text-[10px] text-fg-muted">
                               ~{item.durationMinutes} mins
                             </span>
                           </div>
                         </div>
 
                         {/* Timelines: Pickup, Dropoff & Buffer */}
-                        <div className="bg-slate-50 rounded-lg p-2 flex flex-wrap items-center justify-between gap-2 text-xs border border-slate-100">
+                        <div className="bg-surface-subtle rounded-lg p-2 flex flex-wrap items-center justify-between gap-2 text-xs border border-border-faint">
                           <div className="flex items-center gap-1.5">
                             <ClockIcon className="w-3.5 h-3.5 text-blue-600" />
-                            <span className="text-slate-500 font-medium">Pickup:</span>
-                            <span className="font-black text-slate-900">
+                            <span className="text-fg-muted font-medium">Pickup:</span>
+                            <span className="font-black text-fg-primary">
                               {formatDateAndTimeStr(item.projectedPickupMs)}
                             </span>
                           </div>
 
                           <div className="flex items-center gap-1.5">
-                            <span className="text-slate-500 font-medium">Est. Dropoff:</span>
-                            <span className="font-black text-slate-900">
+                            <span className="text-fg-muted font-medium">Est. Dropoff:</span>
+                            <span className="font-black text-fg-primary">
                               ~{formatTimeStr(item.projectedDropoffMs)}
                             </span>
                           </div>
@@ -745,10 +745,10 @@ export function DriverQueueWindow({
                             <span
                               className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-1.5 py-0.2 rounded ${
                                 item.conflictStatus === 'overlap'
-                                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                  ? 'bg-status-danger-bg-strong text-status-danger-fg border border-status-danger-border'
                                   : item.conflictStatus === 'tight_turnaround'
-                                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                  ? 'bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border'
+                                  : 'bg-status-success-bg text-status-success-fg border border-status-success-border'
                               }`}
                               title="Transit buffer between prior dropoff and this pickup"
                             >
@@ -797,7 +797,7 @@ export function DriverQueueWindow({
                                   <button
                                     type="button"
                                     onClick={() => void onUnstageTrip(item.trip)}
-                                    className="px-2 py-0.5 rounded text-[10px] text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold transition-colors cursor-pointer"
+                                    className="px-2 py-0.5 rounded text-[10px] text-rose-600 hover:bg-status-danger-bg border border-status-danger-border font-bold transition-colors cursor-pointer"
                                     title="Clear staged driver placeholder"
                                   >
                                     Unstage
@@ -809,7 +809,7 @@ export function DriverQueueWindow({
                                 <button
                                   type="button"
                                   onClick={() => void onUnassignTrip(item.trip.id)}
-                                  className="px-2 py-0.5 rounded text-[10px] text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold transition-colors cursor-pointer"
+                                  className="px-2 py-0.5 rounded text-[10px] text-rose-600 hover:bg-status-danger-bg border border-status-danger-border font-bold transition-colors cursor-pointer"
                                   title="Unassign this trip from driver"
                                 >
                                   Unassign
@@ -820,7 +820,7 @@ export function DriverQueueWindow({
                               <button
                                 type="button"
                                 onClick={() => tripActions.onReview(item.trip, 'details')}
-                                className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 font-bold transition-colors cursor-pointer"
+                                className="px-2 py-0.5 rounded text-[10px] bg-surface-muted text-fg-secondary hover:bg-surface-emphasis border border-border-subtle font-bold transition-colors cursor-pointer"
                               >
                                 Details
                               </button>
@@ -830,7 +830,7 @@ export function DriverQueueWindow({
                                   <button
                                     type="button"
                                     onClick={() => onFocusTripOnMap(item.trip.id)}
-                                    className="px-2 py-0.5 rounded text-[10px] text-slate-600 hover:bg-slate-100 border border-slate-200 font-bold transition-colors cursor-pointer"
+                                    className="px-2 py-0.5 rounded text-[10px] text-fg-secondary hover:bg-surface-muted border border-border-subtle font-bold transition-colors cursor-pointer"
                                   >
                                     Map
                                   </button>
@@ -839,7 +839,7 @@ export function DriverQueueWindow({
                                   <button
                                     type="button"
                                     onClick={() => onOpenEditTrip(item.trip.id)}
-                                    className="px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-bold transition-colors cursor-pointer"
+                                    className="px-2 py-0.5 rounded text-[10px] bg-status-info-bg text-status-info-fg hover:bg-status-info-bg-strong border border-status-info-border font-bold transition-colors cursor-pointer"
                                   >
                                     Edit Trip
                                   </button>

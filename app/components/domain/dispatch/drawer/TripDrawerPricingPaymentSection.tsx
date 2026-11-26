@@ -65,15 +65,15 @@ export function TripDrawerPricingPaymentSection({
   return (
     <>
       {/* Manual Trip Status Override (Dispatch Recovery Controls) */}
-      <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+      <div className="p-3.5 bg-surface-subtle rounded-xl border border-border-subtle space-y-2.5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-            <ShieldCheckIcon className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+          <div className="font-bold text-fg-strong uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+            <ShieldCheckIcon className="w-3.5 h-3.5 text-fg-secondary shrink-0" />
             <span>Manual Status Override</span>
           </div>
-          <span className="text-[11px] text-slate-500 font-medium">
+          <span className="text-[11px] text-fg-muted font-medium">
             Current:{' '}
-            <strong className="text-slate-900 capitalize">
+            <strong className="text-fg-primary capitalize">
               {reviewTrip.status.toLowerCase() === 'pending'
                 ? 'Confirmed'
                 : reviewTrip.status.replace(/_/g, ' ')}
@@ -102,7 +102,7 @@ export function TripDrawerPricingPaymentSection({
                 className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
                   isCurrent
                     ? 'bg-blue-600 text-white border-blue-600 cursor-default shadow-2xs'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 cursor-pointer disabled:opacity-50'
+                    : 'bg-surface-card text-fg-secondary border-border-strong hover:bg-status-info-bg hover:border-status-info-border hover:text-status-info-fg cursor-pointer disabled:opacity-50'
                 }`}
               >
                 {step.label}
@@ -125,7 +125,7 @@ export function TripDrawerPricingPaymentSection({
               type="button"
               disabled={isOverridingStatus}
               onClick={() => onPromptCancelTrip(reviewTrip)}
-              className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold border bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
+              className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold border bg-status-danger-bg hover:bg-status-danger-bg-strong text-status-danger-fg border-status-danger-border transition-colors cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
             >
               <BanIcon className="w-3 h-3 shrink-0" />
               <span>Cancel Trip</span>
@@ -136,17 +136,17 @@ export function TripDrawerPricingPaymentSection({
 
       {/* Round-Trip Scope Option when Confirming */}
       {hasLinkedLeg && (
-        <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-200 space-y-2">
-          <div className="font-bold text-indigo-950 text-xs flex items-center justify-between">
+        <div className="p-3 bg-status-staged-bg/60 rounded-xl border border-status-staged-border space-y-2">
+          <div className="font-bold text-status-staged-fg text-xs flex items-center justify-between">
             <span>Round-Trip Confirmation Scope:</span>
-            <span className="text-[10px] text-indigo-700">Choose which legs to confirm</span>
+            <span className="text-[10px] text-status-staged-fg">Choose which legs to confirm</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <label
               className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer text-xs transition-colors ${
                 confirmScope === 'both'
-                  ? 'bg-white border-indigo-500 font-bold text-indigo-950 shadow-2xs'
-                  : 'bg-white/50 border-indigo-100 text-indigo-800 hover:bg-white'
+                  ? 'bg-surface-card border-indigo-500 font-bold text-status-staged-fg shadow-2xs'
+                  : 'bg-surface-card/50 border-indigo-100 text-status-staged-fg hover:bg-surface-card'
               }`}
             >
               <input
@@ -162,8 +162,8 @@ export function TripDrawerPricingPaymentSection({
             <label
               className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer text-xs transition-colors ${
                 confirmScope === 'leg'
-                  ? 'bg-white border-indigo-500 font-bold text-indigo-950 shadow-2xs'
-                  : 'bg-white/50 border-indigo-100 text-indigo-800 hover:bg-white'
+                  ? 'bg-surface-card border-indigo-500 font-bold text-status-staged-fg shadow-2xs'
+                  : 'bg-surface-card/50 border-indigo-100 text-status-staged-fg hover:bg-surface-card'
               }`}
             >
               <input
@@ -194,10 +194,10 @@ export function TripDrawerPricingPaymentSection({
             (cachedToken ? getPayLinkService().buildPayUrl(cachedToken) : '');
 
           return (
-            <div className="p-3.5 bg-emerald-50/50 rounded-xl border border-emerald-200/80 space-y-2.5">
+            <div className="p-3.5 bg-status-success-bg/50 rounded-xl border border-status-success-border/80 space-y-2.5">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="font-bold text-emerald-950 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-                  <CreditCardIcon className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                <div className="font-bold text-status-success-fg uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                  <CreditCardIcon className="w-3.5 h-3.5 text-status-success-fg shrink-0" />
                   <span>1-Tap Passenger Pay Link (Apple Pay / Google Pay / Card)</span>
                 </div>
                 <span
@@ -205,10 +205,10 @@ export function TripDrawerPricingPaymentSection({
                     isTripPaid
                       ? 'bg-emerald-600 text-white'
                       : payLinkState === 'open'
-                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                      ? 'bg-status-info-bg-strong text-status-info-fg border border-status-info-border'
                       : payLinkState === 'refunded'
-                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                      : 'bg-slate-200/80 text-slate-700'
+                      ? 'bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border'
+                      : 'bg-surface-emphasis/80 text-fg-secondary'
                   }`}
                 >
                   {isTripPaid
@@ -224,7 +224,7 @@ export function TripDrawerPricingPaymentSection({
               </div>
 
               {displayPayUrl && (
-                <div className="px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg font-mono text-[11px] text-slate-700 truncate select-all">
+                <div className="px-2.5 py-1.5 bg-surface-card border border-status-success-border rounded-lg font-mono text-[11px] text-fg-secondary truncate select-all">
                   {displayPayUrl}
                 </div>
               )}
@@ -235,12 +235,12 @@ export function TripDrawerPricingPaymentSection({
                     type="button"
                     disabled={payLinkBusyAction !== null}
                     onClick={() => onTripPayLinkAction('copy')}
-                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-lg bg-surface-card hover:bg-status-success-bg border border-status-success-border text-status-success-fg font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
                   >
                     {payLinkBusyAction === 'copy' ? (
-                      <SpinnerIcon className="w-3.5 h-3.5 animate-spin text-emerald-700" />
+                      <SpinnerIcon className="w-3.5 h-3.5 animate-spin text-status-success-fg" />
                     ) : (
-                      <CopyIcon className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <CopyIcon className="w-3.5 h-3.5 text-status-success-fg shrink-0" />
                     )}
                     <span>Copy Pay Link</span>
                   </button>
@@ -277,7 +277,7 @@ export function TripDrawerPricingPaymentSection({
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center justify-between text-xs text-emerald-800">
+                <div className="flex items-center justify-between text-xs text-status-success-fg">
                   <span className="font-semibold">
                     Settled ($
                     {(reviewTrip.payment?.amount ?? reviewTrip.pricing?.totalFare ?? 0).toFixed(2)})
@@ -289,7 +289,7 @@ export function TripDrawerPricingPaymentSection({
                     <button
                       type="button"
                       onClick={() => onTripPayLinkAction('copy')}
-                      className="px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-emerald-800 font-bold text-[11px] cursor-pointer inline-flex items-center gap-1"
+                      className="px-2.5 py-1 rounded-lg bg-surface-card border border-status-success-border text-status-success-fg font-bold text-[11px] cursor-pointer inline-flex items-center gap-1"
                     >
                       <CopyIcon className="w-3 h-3" />
                       <span>Copy Receipt Link</span>
@@ -302,20 +302,20 @@ export function TripDrawerPricingPaymentSection({
         })()}
 
       {/* Email Delivery & Recipient Override Options */}
-      <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-2.5">
+      <div className="p-3.5 bg-status-info-bg/60 rounded-xl border border-status-info-border/80 space-y-2.5">
         <div className="flex items-center justify-between">
-          <div className="font-bold text-blue-900 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+          <div className="font-bold text-status-info-fg uppercase tracking-wider text-[10px] flex items-center gap-1.5">
             <MailIcon className="w-3.5 h-3.5 shrink-0" />
             <span>Email Delivery &amp; Confirmation</span>
           </div>
-          <span className="text-[11px] text-slate-600 font-medium truncate max-w-[280px]">
+          <span className="text-[11px] text-fg-secondary font-medium truncate max-w-[280px]">
             Booking Email:{' '}
-            <strong className="text-slate-900 font-mono">{reviewTrip.passenger.email}</strong>
+            <strong className="text-fg-primary font-mono">{reviewTrip.passenger.email}</strong>
           </span>
         </div>
 
         <div className="pt-0.5">
-          <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700">
+          <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-fg-secondary">
             <input
               type="checkbox"
               checked={isOverrideEmailEnabled}
@@ -326,16 +326,16 @@ export function TripDrawerPricingPaymentSection({
                   onShouldUpdatePassengerEmailChange(false);
                 }
               }}
-              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              className="rounded border-border-strong text-blue-600 focus:ring-blue-500 cursor-pointer"
             />
             <span>Send confirmation to alternate / additional email address</span>
           </label>
         </div>
 
         {isOverrideEmailEnabled && (
-          <div className="p-3 bg-white border border-blue-300 rounded-lg space-y-2.5 animate-in fade-in duration-100">
+          <div className="p-3 bg-surface-card border border-status-info-border rounded-lg space-y-2.5 animate-in fade-in duration-100">
             <div>
-              <label className="block text-[11px] font-bold text-slate-700 mb-1">
+              <label className="block text-[11px] font-bold text-fg-secondary mb-1">
                 Alternate Recipient Email Address:
               </label>
               <input
@@ -343,15 +343,15 @@ export function TripDrawerPricingPaymentSection({
                 value={overrideRecipientEmail}
                 onChange={(e) => onOverrideRecipientEmailChange(e.target.value)}
                 placeholder="e.g. assistant@company.com or travel@firm.com"
-                className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 text-xs focus:ring-1 focus:ring-blue-500 focus:bg-white focus:outline-hidden font-mono"
+                className="w-full px-3 py-1.5 bg-surface-subtle border border-border-strong rounded-lg text-fg-primary text-xs focus:ring-1 focus:ring-blue-500 focus:bg-surface-card focus:outline-hidden font-mono"
               />
             </div>
-            <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600">
+            <label className="flex items-center gap-2 cursor-pointer text-[11px] text-fg-secondary">
               <input
                 type="checkbox"
                 checked={shouldUpdatePassengerEmail}
                 onChange={(e) => onShouldUpdatePassengerEmailChange(e.target.checked)}
-                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                className="rounded border-border-strong text-blue-600 focus:ring-blue-500 cursor-pointer"
               />
               <span>Permanently update passenger's profile email in booking record</span>
             </label>

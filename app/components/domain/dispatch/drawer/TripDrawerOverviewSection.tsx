@@ -190,17 +190,17 @@ export function TripDrawerOverviewSection({
     <>
       {/* Pending Passenger Self-Service Change Request Card (Phase 56 — 1-Tap Approve / Decline) */}
       {pendingGuestReq && pendingGuestReq.status === 'pending' && (
-        <div className="bg-violet-50 border-2 border-violet-400 rounded-xl p-4 space-y-3 text-violet-950 shadow-sm">
+        <div className="bg-status-staged-bg border-2 border-status-staged-border rounded-xl p-4 space-y-3 text-status-staged-fg shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-violet-600 animate-ping shrink-0" />
-              <span className="font-black text-xs uppercase tracking-wider text-violet-900">
+              <span className="font-black text-xs uppercase tracking-wider text-status-staged-fg">
                 📝 Rider Edit Request — Pending Dispatch Confirmation
               </span>
             </div>
             {pendingGuestReq.requestedAt &&
               Number.isFinite(Date.parse(pendingGuestReq.requestedAt)) && (
-                <span className="font-mono text-[10.5px] font-bold bg-white px-2 py-0.5 rounded border border-violet-200 text-violet-800">
+                <span className="font-mono text-[10.5px] font-bold bg-surface-card px-2 py-0.5 rounded border border-status-staged-border text-status-staged-fg">
                   Requested{' '}
                   {new Date(pendingGuestReq.requestedAt).toLocaleTimeString([], {
                     hour: 'numeric',
@@ -210,12 +210,12 @@ export function TripDrawerOverviewSection({
               )}
           </div>
 
-          <div className="bg-white/90 rounded-lg border border-violet-200 p-3 space-y-1.5 text-xs">
+          <div className="bg-surface-card/90 rounded-lg border border-status-staged-border p-3 space-y-1.5 text-xs">
             {pendingGuestReq.requestedScheduledPickupTime &&
               pendingGuestReq.requestedScheduledPickupTime !== reviewTrip.scheduledPickupTime && (
                 <div className="flex flex-wrap items-baseline gap-1.5">
-                  <span className="font-bold text-slate-600">Pickup Time:</span>
-                  <span className="line-through text-slate-400">
+                  <span className="font-bold text-fg-secondary">Pickup Time:</span>
+                  <span className="line-through text-fg-subtle">
                     {reviewTrip.scheduledPickupTime
                       ? new Date(reviewTrip.scheduledPickupTime).toLocaleString([], {
                           month: 'short',
@@ -225,8 +225,8 @@ export function TripDrawerOverviewSection({
                         })
                       : 'ASAP'}
                   </span>
-                  <span className="text-violet-700 font-black">→</span>
-                  <span className="font-extrabold text-violet-950">
+                  <span className="text-status-staged-fg font-black">→</span>
+                  <span className="font-extrabold text-status-staged-fg">
                     {new Date(pendingGuestReq.requestedScheduledPickupTime).toLocaleString([], {
                       month: 'short',
                       day: 'numeric',
@@ -240,12 +240,12 @@ export function TripDrawerOverviewSection({
             {pendingGuestReq.requestedPickupAddress &&
               pendingGuestReq.requestedPickupAddress !== reviewTrip.pickupLocation.address && (
                 <div className="flex flex-wrap items-baseline gap-1.5">
-                  <span className="font-bold text-slate-600">Pickup:</span>
-                  <span className="line-through text-slate-400">
+                  <span className="font-bold text-fg-secondary">Pickup:</span>
+                  <span className="line-through text-fg-subtle">
                     {reviewTrip.pickupLocation.address}
                   </span>
-                  <span className="text-violet-700 font-black">→</span>
-                  <span className="font-extrabold text-violet-950">
+                  <span className="text-status-staged-fg font-black">→</span>
+                  <span className="font-extrabold text-status-staged-fg">
                     {pendingGuestReq.requestedPickupAddress}
                   </span>
                 </div>
@@ -254,12 +254,12 @@ export function TripDrawerOverviewSection({
             {pendingGuestReq.requestedDropoffAddress &&
               pendingGuestReq.requestedDropoffAddress !== reviewTrip.dropoffLocation.address && (
                 <div className="flex flex-wrap items-baseline gap-1.5">
-                  <span className="font-bold text-slate-600">Dropoff:</span>
-                  <span className="line-through text-slate-400">
+                  <span className="font-bold text-fg-secondary">Dropoff:</span>
+                  <span className="line-through text-fg-subtle">
                     {reviewTrip.dropoffLocation.address}
                   </span>
-                  <span className="text-violet-700 font-black">→</span>
-                  <span className="font-extrabold text-violet-950">
+                  <span className="text-status-staged-fg font-black">→</span>
+                  <span className="font-extrabold text-status-staged-fg">
                     {pendingGuestReq.requestedDropoffAddress}
                   </span>
                 </div>
@@ -267,17 +267,17 @@ export function TripDrawerOverviewSection({
 
             {typeof pendingGuestReq.estimatedNewFare === 'number' && (
               <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                <span className="font-bold text-slate-600">Estimated Fare:</span>
-                <span className="font-mono font-bold text-slate-700">
+                <span className="font-bold text-fg-secondary">Estimated Fare:</span>
+                <span className="font-mono font-bold text-fg-secondary">
                   ${(reviewTrip.pricing?.totalFare || 0).toFixed(2)}
                 </span>
-                <span className="text-violet-700 font-black">→</span>
-                <span className="font-mono font-extrabold text-emerald-700">
+                <span className="text-status-staged-fg font-black">→</span>
+                <span className="font-mono font-extrabold text-status-success-fg">
                   ${pendingGuestReq.estimatedNewFare.toFixed(2)}
                 </span>
                 {typeof pendingGuestReq.fareDelta === 'number' &&
                   Math.abs(pendingGuestReq.fareDelta) >= 0.01 && (
-                    <span className="text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-900">
+                    <span className="text-[10.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-status-staged-bg-strong text-status-staged-fg">
                       {pendingGuestReq.fareDelta > 0 ? '+' : ''}
                       ${pendingGuestReq.fareDelta.toFixed(2)}
                     </span>
@@ -286,7 +286,7 @@ export function TripDrawerOverviewSection({
             )}
 
             {pendingGuestReq.customerReason && (
-              <div className="pt-1 border-t border-violet-100 text-[11.5px] text-violet-900">
+              <div className="pt-1 border-t border-status-staged-border text-[11.5px] text-status-staged-fg">
                 <span className="font-bold">Rider Note:</span> &ldquo;
                 {pendingGuestReq.customerReason}&rdquo;
               </div>
@@ -298,7 +298,7 @@ export function TripDrawerOverviewSection({
             value={guestResolutionNote}
             onChange={(e) => setGuestResolutionNote(e.target.value)}
             placeholder="Optional note to passenger (shown on /track if declined or approved)..."
-            className="w-full px-3 py-1.5 text-xs bg-white border border-violet-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            className="w-full px-3 py-1.5 text-xs bg-surface-card border border-status-staged-border rounded-lg text-fg-primary focus:outline-none focus:ring-2 focus:ring-violet-500"
           />
 
           <div className="flex flex-wrap items-center gap-2">
@@ -325,7 +325,7 @@ export function TripDrawerOverviewSection({
               type="button"
               disabled={guestDecisionBusy !== null}
               onClick={() => void handleResolveGuestChange('decline')}
-              className="py-2 px-3.5 rounded-lg bg-white hover:bg-rose-50 border border-rose-300 text-rose-700 font-extrabold text-xs cursor-pointer transition-colors inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+              className="py-2 px-3.5 rounded-lg bg-surface-card hover:bg-status-danger-bg border border-status-danger-border text-status-danger-fg font-extrabold text-xs cursor-pointer transition-colors inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               {guestDecisionBusy === 'decline' ? (
                 <>
@@ -369,19 +369,19 @@ export function TripDrawerOverviewSection({
           typeof mMeta.multiCarOrderTotalFare === 'number' ? mMeta.multiCarOrderTotalFare : undefined;
 
         return (
-          <div className="bg-violet-50/90 border border-violet-200 rounded-xl p-3.5 space-y-2.5 text-violet-950 shadow-2xs">
+          <div className="bg-status-staged-bg/90 border border-status-staged-border rounded-xl p-3.5 space-y-2.5 text-status-staged-fg shadow-2xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-violet-600 text-white">
                   Multi-Car · Car {mcIndex} of {mcTotal}
                 </span>
                 {mcGroupId && (
-                  <span className="font-mono text-[11px] font-bold bg-white px-2 py-0.5 rounded border border-violet-200 text-violet-900">
+                  <span className="font-mono text-[11px] font-bold bg-surface-card px-2 py-0.5 rounded border border-status-staged-border text-status-staged-fg">
                     {mcGroupId}
                   </span>
                 )}
                 {(totalPax > 0 || totalBags > 0) && (
-                  <span className="text-[11px] font-semibold text-violet-800">
+                  <span className="text-[11px] font-semibold text-status-staged-fg">
                     Combined Party: {totalPax || reviewTrip.passenger?.passengerCount || 1}{' '}
                     {(totalPax || reviewTrip.passenger?.passengerCount || 1) === 1
                       ? 'Passenger'
@@ -391,7 +391,7 @@ export function TripDrawerOverviewSection({
                 )}
               </div>
               {typeof orderTotalFare === 'number' && (
-                <span className="text-xs font-mono font-extrabold text-violet-900">
+                <span className="text-xs font-mono font-extrabold text-status-staged-fg">
                   Order Total: ${orderTotalFare.toFixed(2)}
                 </span>
               )}
@@ -442,36 +442,36 @@ export function TripDrawerOverviewSection({
                       key={car.tripId}
                       className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border text-[11px] ${
                         isCurrent
-                          ? 'bg-violet-100/80 border-violet-300'
-                          : 'bg-white border-violet-200/80'
+                          ? 'bg-status-staged-bg-strong/80 border-status-staged-border'
+                          : 'bg-surface-card border-status-staged-border/80'
                       }`}
                     >
                       <div className="min-w-0 flex items-center gap-2 flex-wrap">
-                        <span className="font-black text-violet-700">
+                        <span className="font-black text-status-staged-fg">
                           Car {car.carIndex}/{mcTotal}
                         </span>
-                        <span className="font-bold text-slate-900">{car.driverName}</span>
+                        <span className="font-bold text-fg-primary">{car.driverName}</span>
                         {car.vehicleUnit && car.vehicleUnit.toLowerCase() !== 'unassigned' && (
-                          <span className="font-mono text-[10px] text-slate-500">
+                          <span className="font-mono text-[10px] text-fg-muted">
                             ({car.vehicleUnit})
                           </span>
                         )}
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-muted text-fg-secondary font-semibold">
                           {car.vehicleLabel}
                         </span>
                         {typeof car.fare === 'number' && (
-                          <span className="font-mono font-bold text-emerald-700">
+                          <span className="font-mono font-bold text-status-success-fg">
                             ${car.fare.toFixed(2)}
                           </span>
                         )}
                         {isCurrent && (
-                          <span className="text-[9px] font-black uppercase text-violet-700">
+                          <span className="text-[9px] font-black uppercase text-status-staged-fg">
                             (Viewing)
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                        <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-surface-muted text-fg-secondary border border-border-subtle">
                           {car.status}
                         </span>
                         {!isCurrent && car.tripObj && (
@@ -495,19 +495,19 @@ export function TripDrawerOverviewSection({
 
       {/* Linked Round-Trip Banner Card */}
       {hasLinkedLeg && (
-        <div className="bg-indigo-50/90 border border-indigo-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-indigo-950 shadow-2xs">
+        <div className="bg-status-staged-bg/90 border border-status-staged-border rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-status-staged-fg shadow-2xs">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
               <RepeatIcon className="w-4 h-4" />
             </div>
             <div>
-              <div className="font-extrabold text-xs text-indigo-900 flex items-center gap-1.5">
+              <div className="font-extrabold text-xs text-status-staged-fg flex items-center gap-1.5">
                 <span>{isReturnRide ? 'Round-Trip Return Leg' : 'Round-Trip Outbound Leg'}</span>
-                <span className="bg-indigo-200/80 text-indigo-800 text-[10px] px-1.5 py-0.2 rounded font-mono font-bold">
+                <span className="bg-indigo-200/80 text-status-staged-fg text-[10px] px-1.5 py-0.2 rounded font-mono font-bold">
                   Linked Leg #{linkedLegId}
                 </span>
               </div>
-              <div className="text-[11px] text-indigo-700">
+              <div className="text-[11px] text-status-staged-fg">
                 {isReturnRide
                   ? 'This ride was booked together with an outbound leg.'
                   : 'This ride has a linked return leg booked in the same reservation.'}
@@ -533,27 +533,27 @@ export function TripDrawerOverviewSection({
 
       {/* Linked Standing Order Series Banner Card */}
       {standingOrderId && (
-        <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-emerald-950 shadow-2xs">
+        <div className="bg-status-success-bg/90 border border-status-success-border rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-status-success-fg shadow-2xs">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
               <span>🔁</span>
             </div>
             <div className="min-w-0">
-              <div className="font-extrabold text-xs text-emerald-950 flex items-center gap-1.5 flex-wrap">
+              <div className="font-extrabold text-xs text-status-success-fg flex items-center gap-1.5 flex-wrap">
                 <span>🔁 Standing Order Series</span>
                 <span
-                  className="bg-emerald-200/80 text-emerald-900 text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
+                  className="bg-emerald-200/80 text-status-success-fg text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
                   title={standingOrderId}
                 >
                   Series #{standingOrderId.slice(-8).toUpperCase()}
                 </span>
                 {standingOrderOccurrence !== null && (
-                  <span className="bg-white border border-emerald-300 text-emerald-800 text-[10px] px-1.5 py-0.5 rounded font-bold">
+                  <span className="bg-surface-card border border-status-success-border text-status-success-fg text-[10px] px-1.5 py-0.5 rounded font-bold">
                     Occurrence #{standingOrderOccurrence}
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-emerald-800 truncate">
+              <div className="text-[11px] text-status-success-fg truncate">
                 {standingOrderLabel ||
                   'Managed recurring ride series — supports pause/resume, skip dates, and horizon extension.'}
               </div>
@@ -580,16 +580,16 @@ export function TripDrawerOverviewSection({
       {/* Customer & Route Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Passenger Card */}
-        <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
-          <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
+        <div className="bg-surface-subtle p-3.5 rounded-xl border border-border-subtle space-y-2">
+          <div className="font-bold text-fg-secondary uppercase tracking-wider text-[10px]">
             Customer Details
           </div>
-          <div className="text-sm font-extrabold text-slate-900">
+          <div className="text-sm font-extrabold text-fg-primary">
             {reviewTrip.passenger.firstName} {reviewTrip.passenger.lastName}
           </div>
-          <div className="space-y-1 text-slate-600">
+          <div className="space-y-1 text-fg-secondary">
             <div className="flex items-center gap-1.5">
-              <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <PhoneIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
               <a
                 href={`tel:${reviewTrip.passenger.phone}`}
                 className="hover:underline font-mono text-blue-600"
@@ -598,7 +598,7 @@ export function TripDrawerOverviewSection({
               </a>
             </div>
             <div className="flex items-center gap-1.5">
-              <MailIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <MailIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
               <a
                 href={`mailto:${reviewTrip.passenger.email}`}
                 className="hover:underline font-mono text-blue-600"
@@ -607,12 +607,12 @@ export function TripDrawerOverviewSection({
               </a>
             </div>
             {bookerName && (
-              <div className="pt-1 text-[11px] text-slate-500">
+              <div className="pt-1 text-[11px] text-fg-muted">
                 <span className="font-semibold">Booker:</span> {bookerName} ({bookerPhone || 'No phone'})
               </div>
             )}
             {corporateOrgName && (
-              <div className="pt-1 text-[11px] text-slate-500">
+              <div className="pt-1 text-[11px] text-fg-muted">
                 <span className="font-semibold">Corporate:</span> {corporateOrgName}
               </div>
             )}
@@ -620,19 +620,19 @@ export function TripDrawerOverviewSection({
         </div>
 
         {/* Timing & Vehicle */}
-        <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
-          <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
+        <div className="bg-surface-subtle p-3.5 rounded-xl border border-border-subtle space-y-2">
+          <div className="font-bold text-fg-secondary uppercase tracking-wider text-[10px]">
             Schedule &amp; Vehicle
           </div>
-          <div className="text-sm font-extrabold text-slate-900">
+          <div className="text-sm font-extrabold text-fg-primary">
             {reviewTrip.bookingType === 'scheduled' && reviewTrip.scheduledPickupTime
               ? new Date(reviewTrip.scheduledPickupTime).toLocaleString()
               : 'Immediate Dispatch (ASAP)'}
           </div>
-          <div className="space-y-1 text-slate-600">
+          <div className="space-y-1 text-fg-secondary">
             <div>
               <span className="font-semibold">Vehicle Class: </span>
-              <span className="font-bold text-slate-800">
+              <span className="font-bold text-fg-strong">
                 {formatVehicleTier(
                   (reviewTrip.metadata as any)?.vehicleTypeId ||
                     reviewTrip.vehicleTier ||
@@ -645,10 +645,10 @@ export function TripDrawerOverviewSection({
             </div>
             <div>
               <span className="font-semibold">Estimated Fare: </span>
-              <span className="font-mono font-extrabold text-emerald-700 text-sm">
+              <span className="font-mono font-extrabold text-status-success-fg text-sm">
                 ${reviewTrip.pricing?.totalFare?.toFixed(2) || '0.00'}
               </span>{' '}
-              <span className="text-[10px] text-slate-500 uppercase">
+              <span className="text-[10px] text-fg-muted uppercase">
                 ({reviewTrip.payment?.method || 'Cash'})
               </span>
             </div>
@@ -723,41 +723,41 @@ export function TripDrawerOverviewSection({
                 );
 
                 return (
-                  <div className="p-2.5 bg-blue-50/90 rounded-lg border border-blue-200 text-[11px] text-blue-950 space-y-2">
+                  <div className="p-2.5 bg-status-info-bg/90 rounded-lg border border-status-info-border text-[11px] text-status-info-fg space-y-2">
                     {isPrivateAviation ? (
                       <>
-                        <div className="font-bold flex items-center justify-between gap-1.5 text-blue-900 flex-wrap">
+                        <div className="font-bold flex items-center justify-between gap-1.5 text-status-info-fg flex-wrap">
                           <div className="flex items-center gap-1.5">
-                            <PlaneIcon className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                            <PlaneIcon className="w-3.5 h-3.5 text-status-info-fg shrink-0" />
                             <span>Private Aviation / FBO:</span>
-                            <span className="font-extrabold text-blue-950">
+                            <span className="font-extrabold text-status-info-fg">
                               {fboFacility || 'Private Aviation'}
                             </span>
                           </div>
                           <DispatchFlightTelemetryPill trip={reviewTrip} />
                         </div>
                         {tailNumber && (
-                          <div className="text-blue-800">
+                          <div className="text-status-info-fg">
                             Tail Number:{' '}
-                            <span className="font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-blue-200">
+                            <span className="font-mono font-bold bg-surface-card px-1.5 py-0.5 rounded border border-status-info-border">
                               {tailNumber}
                             </span>
                           </div>
                         )}
                         {flightOrigin && (
-                          <div className="text-blue-800">
+                          <div className="text-status-info-fg">
                             Origin / FBO Base: <span className="font-semibold">{flightOrigin}</span>
                           </div>
                         )}
-                        <div className="text-blue-900 font-semibold">
+                        <div className="text-status-info-fg font-semibold">
                           Ramp / Lobby Guidance: {termInfo.pickupDoorGuidance}
                         </div>
                       </>
                     ) : (
                       <>
                         <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <div className="font-bold flex items-center gap-1.5 text-blue-900 flex-wrap">
-                            <PlaneIcon className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                          <div className="font-bold flex items-center gap-1.5 text-status-info-fg flex-wrap">
+                            <PlaneIcon className="w-3.5 h-3.5 text-status-info-fg shrink-0" />
                             <span>
                               Flight: {snap?.airlineName || airline || creds.airline || 'Airline'}{' '}
                               #{snap?.flightNumber || flightNumber || creds.flightNumber || 'N/A'}
@@ -771,8 +771,8 @@ export function TripDrawerOverviewSection({
                                 <span
                                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                                     flightEligibility.reason === 'unconfirmed'
-                                      ? 'bg-amber-100 text-amber-900 border-amber-300'
-                                      : 'bg-slate-100 text-slate-700 border-slate-300'
+                                      ? 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border'
+                                      : 'bg-surface-muted text-fg-secondary border-border-strong'
                                   }`}
                                 >
                                   {flightEligibility.reason === 'outside_24h_window' ? (
@@ -804,7 +804,7 @@ export function TripDrawerOverviewSection({
                                     ? flightEligibility.message || 'Live flight lookup locked'
                                     : 'Force-refresh live flight status'
                                 }
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-blue-100 border border-blue-300 text-blue-800 font-bold text-[10.5px] shadow-2xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-card hover:bg-status-info-bg-strong border border-status-info-border text-status-info-fg font-bold text-[10.5px] shadow-2xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 {isRefreshingFlight ? (
                                   <>
@@ -822,7 +822,7 @@ export function TripDrawerOverviewSection({
                           )}
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-blue-900">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-status-info-fg">
                           {(snap?.originIata || flightOrigin) && (
                             <span>
                               Departing From:{' '}
@@ -854,7 +854,7 @@ export function TripDrawerOverviewSection({
                         </div>
 
                         {(snap?.estimatedArrivalIso || snap?.scheduledArrivalIso) && (
-                          <div className="text-blue-900">
+                          <div className="text-status-info-fg">
                             Estimated Landing:{' '}
                             <strong className="font-mono">
                               {new Date(
@@ -869,21 +869,21 @@ export function TripDrawerOverviewSection({
                           </div>
                         )}
 
-                        <div className="text-blue-950 font-semibold bg-white/80 px-2 py-1 rounded border border-blue-200/80">
+                        <div className="text-status-info-fg font-semibold bg-surface-card/80 px-2 py-1 rounded border border-status-info-border/80">
                           Curbside Pickup: {snap?.pickupDoorGuidance || termInfo.pickupDoorGuidance}
                         </div>
 
                         {alignment?.conflict === 'flight_cancelled' && (
-                          <div className="p-2 rounded-lg bg-rose-50 border border-rose-300 text-rose-900 font-semibold">
+                          <div className="p-2 rounded-lg bg-status-danger-bg border border-status-danger-border text-status-danger-fg font-semibold">
                             {alignment.message}
                           </div>
                         )}
 
                         {showEtaSyncBtn && etaPlan && (
-                          <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="p-2.5 rounded-lg bg-status-warning-bg border border-status-warning-border text-status-warning-fg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div className="space-y-0.5">
-                              <div className="font-extrabold flex items-center gap-1 text-amber-900">
-                                <AlertTriangleIcon className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                              <div className="font-extrabold flex items-center gap-1 text-status-warning-fg">
+                                <AlertTriangleIcon className="w-3.5 h-3.5 text-status-warning-fg shrink-0" />
                                 <span>
                                   Flight Delay / Arrival Drift (
                                   {etaPlan.driftMinutes > 0
@@ -892,7 +892,7 @@ export function TripDrawerOverviewSection({
                                   )
                                 </span>
                               </div>
-                              <div className="text-[10.5px] text-amber-900">
+                              <div className="text-[10.5px] text-status-warning-fg">
                                 Sync scheduled pickup to{' '}
                                 <strong className="font-mono">
                                   {new Date(etaPlan.newScheduledPickupIso).toLocaleTimeString([], {
@@ -928,7 +928,7 @@ export function TripDrawerOverviewSection({
       </div>
 
       {/* Route */}
-      <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+      <div className="bg-surface-subtle p-3.5 rounded-xl border border-border-subtle space-y-2">
         {(() => {
           const hasSavedStopProgress =
             Array.isArray(tripMeta.stopProgress) && tripMeta.stopProgress.length > 0;
@@ -940,15 +940,15 @@ export function TripDrawerOverviewSection({
           return (
             <>
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
+                <div className="font-bold text-fg-secondary uppercase tracking-wider text-[10px]">
                   Route
                 </div>
                 {stopSummary && stopSummary.totalStops > 0 && (
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                       stopSummary.allStopsCompleted
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                        : 'bg-amber-50 text-amber-800 border-amber-200'
+                        ? 'bg-status-success-bg text-status-success-fg border-status-success-border'
+                        : 'bg-status-warning-bg text-status-warning-fg border-status-warning-border'
                     }`}
                   >
                     Stops: {stopSummary.completedCount}/{stopSummary.totalStops} Completed
@@ -959,29 +959,29 @@ export function TripDrawerOverviewSection({
                 <div className="flex items-start gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
                   <div>
-                    <span className="font-bold text-slate-800">Pickup: </span>
-                    <span className="text-slate-700">{reviewTrip.pickupLocation.address}</span>
+                    <span className="font-bold text-fg-strong">Pickup: </span>
+                    <span className="text-fg-secondary">{reviewTrip.pickupLocation.address}</span>
                   </div>
                 </div>
                 {reviewTrip.intermediateStops && reviewTrip.intermediateStops.length > 0 && (
-                  <div className="pl-4 space-y-1.5 text-[11px] text-slate-600 border-l-2 border-amber-300/80 ml-1">
+                  <div className="pl-4 space-y-1.5 text-[11px] text-fg-secondary border-l-2 border-status-warning-border/80 ml-1">
                     {reviewTrip.intermediateStops.map((stop, i) => {
                       const entry = progressByIndex.get(i);
                       return (
                         <div key={i} className="flex items-center justify-between gap-2 flex-wrap">
                           <span>
-                            <strong className="text-amber-800">Stop {i + 1}:</strong> {stop.address}
+                            <strong className="text-status-warning-fg">Stop {i + 1}:</strong> {stop.address}
                           </span>
                           {entry && (
                             <span
                               className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${
                                 entry.status === 'arrived'
-                                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                  ? 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border'
                                   : entry.status === 'completed'
-                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                  ? 'bg-status-success-bg-strong text-status-success-fg border-status-success-border'
                                   : entry.status === 'skipped'
-                                  ? 'bg-slate-200 text-slate-700 border-slate-300'
-                                  : 'bg-slate-100 text-slate-500 border-slate-200'
+                                  ? 'bg-surface-emphasis text-fg-secondary border-border-strong'
+                                  : 'bg-surface-muted text-fg-muted border-border-subtle'
                               }`}
                             >
                               {entry.status === 'arrived'
@@ -1005,8 +1005,8 @@ export function TripDrawerOverviewSection({
                 <div className="flex items-start gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mt-1 shrink-0" />
                   <div>
-                    <span className="font-bold text-slate-800">Dropoff: </span>
-                    <span className="text-slate-700">{reviewTrip.dropoffLocation.address}</span>
+                    <span className="font-bold text-fg-strong">Dropoff: </span>
+                    <span className="text-fg-secondary">{reviewTrip.dropoffLocation.address}</span>
                   </div>
                 </div>
               </div>
@@ -1016,68 +1016,68 @@ export function TripDrawerOverviewSection({
       </div>
 
       {/* Equipment & Child Seats Breakdown */}
-      <div className="p-3.5 bg-amber-50/50 rounded-xl border border-amber-200/80 space-y-2">
-        <div className="font-bold text-amber-900 uppercase tracking-wider text-[10px] flex items-center justify-between">
+      <div className="p-3.5 bg-status-warning-bg/50 rounded-xl border border-status-warning-border/80 space-y-2">
+        <div className="font-bold text-status-warning-fg uppercase tracking-wider text-[10px] flex items-center justify-between">
           <span>Safety Equipment &amp; Luggage Specification</span>
-          <span className="font-mono text-amber-700">
+          <span className="font-mono text-status-warning-fg">
             Passengers: {reviewTrip.passenger.passengerCount} • Luggage:{' '}
             {reviewTrip.passenger.luggageCount}
           </span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-          <div className="bg-white p-2 rounded-lg border border-amber-100 text-center">
-            <div className="text-[10px] text-slate-500">Infant (Rear)</div>
-            <div className="font-mono font-bold text-sm text-slate-900">
+          <div className="bg-surface-card p-2 rounded-lg border border-amber-100 text-center">
+            <div className="text-[10px] text-fg-muted">Infant (Rear)</div>
+            <div className="font-mono font-bold text-sm text-fg-primary">
               {carSeatsBreakdown.rearFacing ?? 0}
             </div>
           </div>
-          <div className="bg-white p-2 rounded-lg border border-amber-100 text-center">
-            <div className="text-[10px] text-slate-500">Toddler (Front)</div>
-            <div className="font-mono font-bold text-sm text-slate-900">
+          <div className="bg-surface-card p-2 rounded-lg border border-amber-100 text-center">
+            <div className="text-[10px] text-fg-muted">Toddler (Front)</div>
+            <div className="font-mono font-bold text-sm text-fg-primary">
               {carSeatsBreakdown.frontFacing ?? 0}
             </div>
           </div>
-          <div className="bg-white p-2 rounded-lg border border-amber-100 text-center">
-            <div className="text-[10px] text-slate-500">Youth Booster</div>
-            <div className="font-mono font-bold text-sm text-slate-900">
+          <div className="bg-surface-card p-2 rounded-lg border border-amber-100 text-center">
+            <div className="text-[10px] text-fg-muted">Youth Booster</div>
+            <div className="font-mono font-bold text-sm text-fg-primary">
               {carSeatsBreakdown.booster ?? 0}
             </div>
           </div>
-          <div className="bg-white p-2 rounded-lg border border-amber-100 text-center">
-            <div className="text-[10px] text-slate-500">Luggage Type</div>
-            <div className="font-bold text-xs capitalize text-slate-900 truncate">
+          <div className="bg-surface-card p-2 rounded-lg border border-amber-100 text-center">
+            <div className="text-[10px] text-fg-muted">Luggage Type</div>
+            <div className="font-bold text-xs capitalize text-fg-primary truncate">
               {luggageType}
             </div>
           </div>
         </div>
         {(hasOversizedLuggage || tripMeta.oversizedItemsSummary) && (
-          <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-300 text-xs text-amber-950 space-y-1">
+          <div className="p-2.5 bg-status-warning-bg rounded-lg border border-status-warning-border text-xs text-status-warning-fg space-y-1">
             <div className="flex items-center justify-between">
               <span className="font-bold flex items-center gap-1.5">
-                <LuggageIcon className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                <LuggageIcon className="w-3.5 h-3.5 text-status-warning-fg shrink-0" />
                 <span>Oversized Cargo Breakdown:</span>
               </span>
-              <span className="text-[10px] bg-amber-200 font-bold px-1.5 py-0.5 rounded text-amber-900 uppercase">
+              <span className="text-[10px] bg-status-warning-bg-strong font-bold px-1.5 py-0.5 rounded text-status-warning-fg uppercase">
                 Special Cargo
               </span>
             </div>
-            <div className="font-semibold text-amber-900">
+            <div className="font-semibold text-status-warning-fg">
               {tripMeta.oversizedItemsSummary || 'Special Oversized Cargo Declared'}
             </div>
             {oversizedLuggageNotes && (
-              <div className="text-[11px] text-amber-800 italic">
+              <div className="text-[11px] text-status-warning-fg italic">
                 Notes: {oversizedLuggageNotes}
               </div>
             )}
           </div>
         )}
         {tripMeta.customExtrasSummary && (
-          <div className="p-2.5 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-950 space-y-0.5">
-            <div className="font-bold text-emerald-900 flex items-center gap-1.5">
+          <div className="p-2.5 bg-status-success-bg rounded-lg border border-status-success-border text-xs text-status-success-fg space-y-0.5">
+            <div className="font-bold text-status-success-fg flex items-center gap-1.5">
               <SparklesIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span>Selected Extras &amp; Add-Ons</span>
             </div>
-            <div className="font-semibold text-emerald-800">
+            <div className="font-semibold text-status-success-fg">
               {String(tripMeta.customExtrasSummary)}
             </div>
           </div>
@@ -1098,7 +1098,7 @@ export function TripDrawerOverviewSection({
           />
         )}
         {reviewTrip.passenger.specialRequests && (
-          <div className="p-2 bg-white rounded-lg border border-amber-200 text-[11px] text-slate-700">
+          <div className="p-2 bg-surface-card rounded-lg border border-status-warning-border text-[11px] text-fg-secondary">
             <span className="font-bold">Special Requests: </span>
             {reviewTrip.passenger.specialRequests}
           </div>
@@ -1106,10 +1106,10 @@ export function TripDrawerOverviewSection({
       </div>
 
       {/* Driver Operator Assignment & Staged Shift Planner */}
-      <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+      <div className="p-3.5 bg-surface-subtle rounded-xl border border-border-subtle space-y-2.5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-            <CarIcon className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+          <div className="font-bold text-fg-strong uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+            <CarIcon className="w-3.5 h-3.5 text-fg-secondary shrink-0" />
             <span>Driver Assignment &amp; Shift Staging</span>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -1122,23 +1122,23 @@ export function TripDrawerOverviewSection({
               onCancel={onCancelAutoOffer ? () => onCancelAutoOffer(reviewTrip) : undefined}
             />
             {reviewTrip.assignedDriverId ? (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-info-bg-strong text-status-info-fg">
                 Assigned
               </span>
             ) : hasStagedDriver(reviewTrip) ? (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-800 border border-dashed border-indigo-400">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-status-staged-bg text-status-staged-fg border border-dashed border-indigo-400">
                 📌 Staged: {reviewTrip.plannedDriverLabel || reviewTrip.plannedDriverId}
               </span>
             ) : reviewTrip.offerCascade?.state === 'exhausted' ? (
               <span
-                className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-300 inline-flex items-center gap-1"
+                className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-danger-bg text-status-danger-fg border border-status-danger-border inline-flex items-center gap-1"
                 title={getTripCascadeExhaustedTooltip(reviewTrip) || undefined}
               >
                 <AlertTriangleIcon className="w-3 h-3 text-rose-600 shrink-0" />
                 <span>Unassigned</span>
               </span>
             ) : (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200 inline-flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-info-bg text-status-info-fg border border-status-info-border inline-flex items-center gap-1">
                 <span>Unassigned</span>
               </span>
             )}
@@ -1147,7 +1147,7 @@ export function TripDrawerOverviewSection({
                 const pendingAck = getPendingDriverUpdateAck(reviewTrip);
                 return (
                   <span
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-950 border border-amber-400 animate-pulse"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border animate-pulse"
                     title={
                       pendingAck
                         ? `Awaiting driver acknowledgement:\n• ${pendingAck.changesSummary.join('\n• ')}`
@@ -1170,7 +1170,7 @@ export function TripDrawerOverviewSection({
                     : null;
                 return (
                   <span
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-300"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-status-success-bg text-status-success-fg border border-status-success-border"
                     title={
                       ack
                         ? `Driver acknowledged trip update${ackTime ? ` at ${ackTime}` : ''}:\n• ${ack.changesSummary.join('\n• ')}`
@@ -1190,11 +1190,11 @@ export function TripDrawerOverviewSection({
             const pendingAck = getPendingDriverUpdateAck(reviewTrip);
             if (!pendingAck) return null;
             return (
-              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-950 space-y-1">
+              <div className="p-2.5 rounded-xl bg-status-warning-bg border border-status-warning-border text-xs text-status-warning-fg space-y-1">
                 <div className="font-extrabold text-[11px] flex items-center justify-between gap-2">
                   <span>⏳ Trip Update Sent — Awaiting Driver Acknowledgement</span>
                   {pendingAck.updatedAt && Number.isFinite(Date.parse(pendingAck.updatedAt)) && (
-                    <span className="font-mono text-[10px] text-amber-800">
+                    <span className="font-mono text-[10px] text-status-warning-fg">
                       {new Date(pendingAck.updatedAt).toLocaleTimeString([], {
                         hour: 'numeric',
                         minute: '2-digit',
@@ -1202,7 +1202,7 @@ export function TripDrawerOverviewSection({
                     </span>
                   )}
                 </div>
-                <ul className="space-y-0.5 text-[11px] text-amber-900">
+                <ul className="space-y-0.5 text-[11px] text-status-warning-fg">
                   {pendingAck.changesSummary.map((item, idx) => (
                     <li key={idx}>• {item}</li>
                   ))}
@@ -1213,13 +1213,13 @@ export function TripDrawerOverviewSection({
 
         {/* Staged Driver Status Callout + Send to Driver / Clear Stage */}
         {hasStagedDriver(reviewTrip) && (
-          <div className="p-3 rounded-xl border-2 border-dashed border-indigo-400 bg-indigo-50/75 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="p-3 rounded-xl border-2 border-dashed border-indigo-400 bg-status-staged-bg/75 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div className="space-y-0.5 min-w-0">
-              <div className="text-xs font-extrabold text-indigo-950 truncate">
+              <div className="text-xs font-extrabold text-status-staged-fg truncate">
                 📌 Staged: {reviewTrip.plannedDriverLabel || reviewTrip.plannedDriverId} — Not yet
                 sent to driver
               </div>
-              <div className="text-[11px] text-indigo-700">
+              <div className="text-[11px] text-status-staged-fg">
                 Held privately in Dispatch (zero driver visibility or push alerts until sent).
                 {reviewTrip.plannedBy ? ` Staged by ${reviewTrip.plannedBy}.` : ''}
               </div>
@@ -1238,7 +1238,7 @@ export function TripDrawerOverviewSection({
                   type="button"
                   disabled={stagedPlanner.busyTripIds.has(reviewTrip.id)}
                   onClick={() => void stagedPlanner.clearTripStage(reviewTrip)}
-                  className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-rose-50 border border-indigo-200 text-slate-700 hover:text-rose-700 font-bold text-xs cursor-pointer transition-colors"
+                  className="px-2.5 py-1.5 rounded-lg bg-surface-card hover:bg-status-danger-bg border border-status-staged-border text-fg-secondary hover:text-status-danger-fg font-bold text-xs cursor-pointer transition-colors"
                 >
                   Clear Stage
                 </button>
@@ -1249,14 +1249,14 @@ export function TripDrawerOverviewSection({
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           {!reviewTrip.assignedDriverId && stagedPlanner && isTripEligibleForStaging(reviewTrip) && (
-            <div className="inline-flex rounded-lg bg-slate-200/80 p-0.5 border border-slate-300 shrink-0 self-start sm:self-auto">
+            <div className="inline-flex rounded-lg bg-surface-emphasis/80 p-0.5 border border-border-strong shrink-0 self-start sm:self-auto">
               <button
                 type="button"
                 onClick={() => stagedPlanner.setQueueAssignMode('send_to_driver')}
                 className={`px-2.5 py-1.5 rounded-md text-[11px] font-extrabold transition-colors cursor-pointer ${
                   stagedPlanner.queueAssignMode !== 'stage_hold'
                     ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'text-slate-700 hover:text-slate-900'
+                    : 'text-fg-secondary hover:text-fg-primary'
                 }`}
               >
                 Send to Driver
@@ -1267,7 +1267,7 @@ export function TripDrawerOverviewSection({
                 className={`px-2.5 py-1.5 rounded-md text-[11px] font-extrabold transition-colors cursor-pointer ${
                   stagedPlanner.queueAssignMode === 'stage_hold'
                     ? 'bg-indigo-600 text-white shadow-2xs'
-                    : 'text-slate-700 hover:text-slate-900'
+                    : 'text-fg-secondary hover:text-fg-primary'
                 }`}
               >
                 📌 Stage Driver
@@ -1352,7 +1352,7 @@ export function TripDrawerOverviewSection({
             <button
               type="button"
               onClick={() => onCancelAutoOffer(reviewTrip)}
-              className="px-3.5 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 font-bold text-xs cursor-pointer inline-flex items-center justify-center gap-1.5 shrink-0 transition-colors"
+              className="px-3.5 py-2 rounded-lg bg-status-danger-bg hover:bg-status-danger-bg-strong border border-status-danger-border text-status-danger-fg font-bold text-xs cursor-pointer inline-flex items-center justify-center gap-1.5 shrink-0 transition-colors"
             >
               <XIcon className="w-3.5 h-3.5 shrink-0" />
               <span>Cancel Cascade</span>

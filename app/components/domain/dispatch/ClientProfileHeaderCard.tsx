@@ -23,32 +23,32 @@ export function ClientProfileHeaderCard({ profile, onCallClient, onOpenThread }:
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/90 p-2.5 shadow-2xs space-y-2">
+    <div className="bg-surface-card rounded-xl border border-border-subtle/90 p-2.5 shadow-2xs space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           {profile.isVip && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border">
               ★ VIP Client
             </span>
           )}
           {profile.isBlacklisted && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-status-danger-bg-strong text-status-danger-fg border border-status-danger-border">
               DO NOT DISPATCH
             </span>
           )}
           {profile.corporateAccountName && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-staged-bg text-status-staged-fg border border-status-staged-border">
               <BuildingIcon className="w-3 h-3 shrink-0" />
               <span>{profile.corporateAccountName}</span>
             </span>
           )}
           {profile.customerScore !== null && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-success-bg text-status-success-fg border border-status-success-border">
               <ShieldCheckIcon className="w-3 h-3 shrink-0" />
               <span>Score {profile.customerScore}</span>
             </span>
           )}
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-800 border border-slate-200">
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-surface-muted text-fg-strong border border-border-subtle">
             {profile.totalTrips} {profile.totalTrips === 1 ? 'Trip' : 'Trips'} · ${profile.totalSpend.toFixed(2)} Spend
           </span>
         </div>
@@ -58,7 +58,7 @@ export function ClientProfileHeaderCard({ profile, onCallClient, onOpenThread }:
             <button
               type="button"
               onClick={() => onCallClient(profile.rawPhone, profile.displayName)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] border border-emerald-200 cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-status-success-bg hover:bg-status-success-bg-strong text-status-success-fg font-bold text-[11px] border border-status-success-border cursor-pointer"
             >
               <PhoneIcon className="w-3 h-3" />
               <span>Call</span>
@@ -70,7 +70,7 @@ export function ClientProfileHeaderCard({ profile, onCallClient, onOpenThread }:
               data-client-profile-thread-btn="true"
               onClick={handleJumpToThread}
               title="Open unified Comms thread"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] border border-blue-200 cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg font-bold text-[11px] border border-status-info-border cursor-pointer"
             >
               <ChatBubbleLeftRightIcon className="w-3 h-3" />
               <span>Thread</span>
@@ -80,16 +80,16 @@ export function ClientProfileHeaderCard({ profile, onCallClient, onOpenThread }:
       </div>
 
       {(profile.displayPhone || profile.displayEmail) && (
-        <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-600">
+        <div className="flex flex-wrap items-center gap-3 text-[11px] text-fg-secondary">
           {profile.displayPhone && (
             <span className="inline-flex items-center gap-1 font-mono">
-              <PhoneIcon className="w-3 h-3 text-slate-400" />
+              <PhoneIcon className="w-3 h-3 text-fg-subtle" />
               {profile.displayPhone}
             </span>
           )}
           {profile.displayEmail && (
             <span className="inline-flex items-center gap-1">
-              <MailIcon className="w-3 h-3 text-slate-400" />
+              <MailIcon className="w-3 h-3 text-fg-subtle" />
               {profile.displayEmail}
             </span>
           )}
@@ -97,8 +97,8 @@ export function ClientProfileHeaderCard({ profile, onCallClient, onOpenThread }:
       )}
 
       {profile.dispatcherNotes && (
-        <div className="p-2 rounded-lg bg-amber-50/80 border border-amber-200 text-[11px] text-amber-950">
-          <strong className="font-extrabold uppercase text-[9.5px] tracking-wider text-amber-800 block mb-0.5">
+        <div className="p-2 rounded-lg bg-status-warning-bg/80 border border-status-warning-border text-[11px] text-status-warning-fg">
+          <strong className="font-extrabold uppercase text-[9.5px] tracking-wider text-status-warning-fg block mb-0.5">
             Dispatcher Notes
           </strong>
           <span>{profile.dispatcherNotes}</span>

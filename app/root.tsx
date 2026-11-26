@@ -10,6 +10,8 @@ import {
   useRouteLoaderData,
 } from "react-router";
 import { COMPANY_CONFIG, DEFAULT_GOOGLE_MAPS_KEY } from "./config/companyConfig";
+import { buildPreHydrationThemeScript, isDarkModeRoutePath } from "./config/theme-tokens";
+import { applyResolvedTheme, initTheme } from "./services/theme.service";
 import { getAdminConfigService } from "./core/services/config/admin-config.service";
 import { useRootPwaServiceWorker } from "./core/hooks/usePushNotifications";
 import type { BrandingConfig } from "./core/types/config";
@@ -108,7 +110,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         )}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}else{document.documentElement.classList.remove('dark');}}catch(e){}})();`,
+            __html: buildPreHydrationThemeScript(),
           }}
         />
       </head>
@@ -202,8 +204,18 @@ function useDynamicBrandingSync() {
 
 export default function App() {
   const navigate = useNavigate();
+  const location = useLocation();
   useDynamicBrandingSync();
   useRootPwaServiceWorker(navigate);
+
+  useEffect(() => {
+    if (isDarkModeRoutePath(location.pathname)) {
+      initTheme();
+    } else {
+      applyResolvedTheme('light');
+    }
+  }, [location.pathname]);
+
   return <Outlet />;
 }
 

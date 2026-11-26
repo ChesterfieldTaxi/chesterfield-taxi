@@ -216,7 +216,7 @@ export function DispatchPassengerCrmSection({
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5 gap-1.5">
-        <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+        <label className="block text-[11px] font-bold text-fg-secondary uppercase tracking-wide">
           Passengers
         </label>
         <div className="flex items-center gap-1.5">
@@ -231,7 +231,7 @@ export function DispatchPassengerCrmSection({
                 source: 'passenger_crm',
               })
             }
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 font-bold text-xs border border-slate-200 hover:border-indigo-200 transition-all shadow-2xs disabled:opacity-45 disabled:pointer-events-none cursor-pointer"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-muted hover:bg-status-staged-bg text-fg-secondary hover:text-status-staged-fg font-bold text-xs border border-border-subtle hover:border-status-staged-border transition-all shadow-2xs disabled:opacity-45 disabled:pointer-events-none cursor-pointer"
             title="Open Client Profile & Past Trips window"
           >
             <UserIcon className="w-3.5 h-3.5" />
@@ -240,7 +240,7 @@ export function DispatchPassengerCrmSection({
           <button
             type="button"
             onClick={onAddPassenger}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 transition-all shadow-2xs active:scale-95"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg font-bold text-xs border border-status-info-border transition-all shadow-2xs active:scale-95"
           >
             <PlusIcon className="w-3.5 h-3.5 text-blue-600" />
             <span>Add passenger</span>
@@ -248,10 +248,10 @@ export function DispatchPassengerCrmSection({
         </div>
       </div>
 
-      <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm space-y-2 relative">
+      <div className="p-2 bg-surface-card border border-border-subtle rounded-lg shadow-sm space-y-2 relative">
         {/* Primary Passenger with Instant Inline Caller Lookup */}
         <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+          <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-fg-subtle">
             <UserIcon className="w-3.5 h-3.5" />
           </div>
           <input
@@ -265,13 +265,13 @@ export function DispatchPassengerCrmSection({
               setShowCallerSuggestions(true);
             }}
             required
-            className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+            className="w-full pl-8 pr-2.5 py-1.5 bg-surface-card border border-border-strong rounded text-fg-strong text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-fg-subtle">
               <PhoneIcon className="w-3.5 h-3.5" />
             </div>
             <input
@@ -285,11 +285,11 @@ export function DispatchPassengerCrmSection({
                 setShowCallerSuggestions(true);
               }}
               required
-              className="w-full pl-8 pr-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+              className="w-full pl-8 pr-2 py-1.5 bg-surface-card border border-border-strong rounded text-fg-strong text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
             />
           </div>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-fg-subtle">
               <MailIcon className="w-3.5 h-3.5" />
             </div>
             <input
@@ -297,15 +297,15 @@ export function DispatchPassengerCrmSection({
               placeholder="Email (optional)"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-8 pr-2 py-1.5 bg-white border border-slate-300 rounded text-slate-800 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+              className="w-full pl-8 pr-2 py-1.5 bg-surface-card border border-border-strong rounded text-fg-strong text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
             />
           </div>
         </div>
 
         {/* Instant Caller Autocomplete Dropdown */}
         {showCallerSuggestions && callerSuggestions.length > 0 && (
-          <div className="absolute left-2 right-2 top-[72px] z-40 bg-white border border-blue-200 rounded-xl shadow-xl divide-y divide-slate-100 max-h-52 overflow-y-auto">
-            <div className="px-2.5 py-1 bg-blue-50/70 text-[10px] font-extrabold uppercase tracking-wider text-blue-800">
+          <div className="absolute left-2 right-2 top-[72px] z-40 bg-surface-card border border-status-info-border rounded-xl shadow-xl divide-y divide-border-faint max-h-52 overflow-y-auto">
+            <div className="px-2.5 py-1 bg-status-info-bg/70 text-[10px] font-extrabold uppercase tracking-wider text-status-info-fg">
               Matching Returning Callers / CRM Contacts
             </div>
             {callerSuggestions.map((cand) => (
@@ -316,33 +316,33 @@ export function DispatchPassengerCrmSection({
                   e.preventDefault();
                   handleApplyCallerCandidate(cand);
                 }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-blue-50 transition-colors cursor-pointer flex items-center justify-between gap-2"
+                className="w-full text-left px-2.5 py-1.5 hover:bg-status-info-bg transition-colors cursor-pointer flex items-center justify-between gap-2"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-slate-900 truncate">{cand.name}</span>
+                    <span className="font-bold text-fg-primary truncate">{cand.name}</span>
                     {cand.isVip && (
-                      <span className="px-1 py-0.2 rounded text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-300">
+                      <span className="px-1 py-0.2 rounded text-[9px] font-black bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border">
                         VIP
                       </span>
                     )}
                     {cand.isBlacklisted && (
-                      <span className="px-1 py-0.2 rounded text-[9px] font-black bg-rose-100 text-rose-700 border border-rose-300">
+                      <span className="px-1 py-0.2 rounded text-[9px] font-black bg-status-danger-bg-strong text-status-danger-fg border border-status-danger-border">
                         BLOCKED
                       </span>
                     )}
                     {cand.corporateAccount && (
-                      <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 truncate max-w-[110px]">
+                      <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-status-staged-bg text-status-staged-fg border border-status-staged-border truncate max-w-[110px]">
                         {cand.corporateAccount}
                       </span>
                     )}
                   </div>
-                  <div className="text-[10.5px] font-mono text-slate-500 truncate">
+                  <div className="text-[10.5px] font-mono text-fg-muted truncate">
                     {cand.phone}
                     {cand.email ? ` • ${cand.email}` : ''}
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-slate-400 shrink-0">
+                <span className="text-[10px] font-bold text-fg-subtle shrink-0">
                   {cand.tripCount} {cand.tripCount === 1 ? 'ride' : 'rides'}
                 </span>
               </button>
@@ -352,13 +352,13 @@ export function DispatchPassengerCrmSection({
 
         {/* Quick-Fill Recent Addresses for Selected Caller */}
         {callerQuickAddresses.length > 0 && (
-          <div className="pt-1 border-t border-slate-100 space-y-1">
-            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+          <div className="pt-1 border-t border-border-faint space-y-1">
+            <div className="flex items-center justify-between text-[10px] font-bold text-fg-muted">
               <span>Recent Addresses (click to fill Pickup / Shift+click Dropoff)</span>
               <button
                 type="button"
                 onClick={() => setCallerQuickAddresses([])}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="text-fg-subtle hover:text-fg-secondary cursor-pointer"
               >
                 ✕
               </button>
@@ -377,10 +377,10 @@ export function DispatchPassengerCrmSection({
                       setPickupCoordinates(undefined);
                     }
                   }}
-                  className="max-w-full inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-800 text-[10px] font-semibold border border-slate-200 transition-colors cursor-pointer"
+                  className="max-w-full inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-muted hover:bg-status-info-bg-strong text-fg-secondary hover:text-status-info-fg text-[10px] font-semibold border border-border-subtle transition-colors cursor-pointer"
                   title={addr}
                 >
-                  <MapPinIcon className="w-3 h-3 text-slate-500 shrink-0" />
+                  <MapPinIcon className="w-3 h-3 text-fg-muted shrink-0" />
                   <span className="truncate">{addr}</span>
                 </button>
               ))}
@@ -390,8 +390,8 @@ export function DispatchPassengerCrmSection({
 
         {/* Additional Passengers List */}
         {additionalPassengers.map((ap, idx) => (
-          <div key={idx} className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
-            <span className="text-slate-400 text-xs">#{idx + 2}</span>
+          <div key={idx} className="flex items-center gap-1.5 pt-1 border-t border-border-faint">
+            <span className="text-fg-subtle text-xs">#{idx + 2}</span>
             <input
               type="text"
               placeholder={`Passenger #${idx + 2} Name`}
@@ -401,7 +401,7 @@ export function DispatchPassengerCrmSection({
                 updated[idx] = { ...updated[idx], name: e.target.value };
                 setAdditionalPassengers(updated);
               }}
-              className="flex-1 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="flex-1 px-2 py-1 bg-surface-card border border-border-strong rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <input
               type="tel"
@@ -412,12 +412,12 @@ export function DispatchPassengerCrmSection({
                 updated[idx] = { ...updated[idx], phone: e.target.value };
                 setAdditionalPassengers(updated);
               }}
-              className="w-28 px-2 py-1 bg-white border border-slate-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-28 px-2 py-1 bg-surface-card border border-border-strong rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             <button
               type="button"
               onClick={() => onRemovePassenger(idx)}
-              className="text-slate-400 hover:text-red-500 px-1"
+              className="text-fg-subtle hover:text-red-500 px-1"
               title="Remove passenger"
             >
               ✕
@@ -426,22 +426,22 @@ export function DispatchPassengerCrmSection({
         ))}
 
         {/* Contact Person / Booker Checkbox & Expansion */}
-        <div className="pt-2 border-t border-slate-100">
-          <label className="flex items-center gap-2 cursor-pointer select-none text-slate-700">
+        <div className="pt-2 border-t border-border-faint">
+          <label className="flex items-center gap-2 cursor-pointer select-none text-fg-secondary">
             <input
               type="checkbox"
               checked={isBookerDifferent}
               onChange={(e) => setIsBookerDifferent(e.target.checked)}
-              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-border-strong text-blue-600 focus:ring-blue-500"
             />
-            <span className="font-semibold text-slate-700">
+            <span className="font-semibold text-fg-secondary">
               Booker is different from Passenger (Contact Person)
             </span>
           </label>
 
           {isBookerDifferent && (
-            <div className="mt-2 p-2 bg-blue-50/60 border border-blue-200/80 rounded-md space-y-1.5">
-              <div className="text-[10px] uppercase font-bold text-blue-800 tracking-wide">
+            <div className="mt-2 p-2 bg-status-info-bg/60 border border-status-info-border/80 rounded-md space-y-1.5">
+              <div className="text-[10px] uppercase font-bold text-status-info-fg tracking-wide">
                 Contact Person / Booker Details
               </div>
               <input
@@ -449,7 +449,7 @@ export function DispatchPassengerCrmSection({
                 placeholder="Contact Name (e.g., Hotel Concierge, Assistant)"
                 value={contactName}
                 onChange={(e) => setContactName(e.target.value)}
-                className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs focus:ring-1 focus:ring-blue-500"
+                className="w-full px-2 py-1 bg-surface-card border border-status-info-border rounded text-xs focus:ring-1 focus:ring-blue-500"
               />
               <div className="grid grid-cols-2 gap-1.5">
                 <input
@@ -457,21 +457,21 @@ export function DispatchPassengerCrmSection({
                   placeholder="Contact Phone"
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
-                  className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs focus:ring-1 focus:ring-blue-500"
+                  className="w-full px-2 py-1 bg-surface-card border border-status-info-border rounded text-xs focus:ring-1 focus:ring-blue-500"
                 />
                 <input
                   type="email"
                   placeholder="Contact Email"
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
-                  className="w-full px-2 py-1 bg-white border border-blue-200 rounded text-xs focus:ring-1 focus:ring-blue-500"
+                  className="w-full px-2 py-1 bg-surface-card border border-status-info-border rounded text-xs focus:ring-1 focus:ring-blue-500"
                 />
               </div>
               <Select
                 size="xs"
                 value={contactRole}
                 onChange={(e) => setContactRole(e.target.value)}
-                triggerClassName="border-blue-200 text-slate-700"
+                triggerClassName="border-status-info-border text-fg-secondary"
               >
                 <option value="Hotel Front Desk / Concierge">Hotel Front Desk / Concierge</option>
                 <option value="Medical Facility / Patient Coordinator">Medical Coordinator</option>

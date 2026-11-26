@@ -149,47 +149,6 @@ export const DriverShiftControls = React.memo(function DriverShiftControls({
             </div>
           </button>
 
-          {/* Compact Header Status Pills: Screen Awake (when on duty) & 1-Tap Push Opt-In */}
-          <div className="shrink-0 flex items-center gap-1.5">
-            {driver?.dutyStatus === 'on_duty' && (
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold ${
-                  wakeLockActive
-                    ? 'bg-emerald-950/80 border-emerald-500/35 text-emerald-300'
-                    : 'bg-slate-800/80 border-slate-700 text-slate-400'
-                }`}
-                title={
-                  wakeLockActive
-                    ? 'Screen Awake: Active while On-Duty'
-                    : wakeLockSupported
-                    ? 'Screen Awake: Re-acquiring on foreground'
-                    : 'Screen Wake Lock not supported by this browser'
-                }
-              >
-                <SunIcon
-                  className={`w-3 h-3 shrink-0 ${
-                    wakeLockActive ? 'text-emerald-400' : 'text-slate-400'
-                  }`}
-                />
-                <span className="hidden sm:inline">Screen Awake</span>
-                <span className="sm:hidden">{wakeLockActive ? 'Awake' : 'Shift'}</span>
-              </span>
-            )}
-
-            {pushSupported && pushPermission === 'default' && (
-              <button
-                type="button"
-                disabled={isRequestingPush}
-                onClick={onEnablePushAlerts}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-[34px] rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/50 text-blue-300 text-[10px] font-bold cursor-pointer transition-colors"
-                title="Enable background push notifications for incoming trip offers"
-              >
-                <BellIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span>{isRequestingPush ? 'Enabling...' : 'Enable Push Alerts'}</span>
-              </button>
-            )}
-          </div>
-
           {/* Profile Dropdown Menu */}
           {showProfileMenu && (
             <div className="absolute top-full left-0 right-0 mt-3 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-50 min-w-[280px]">

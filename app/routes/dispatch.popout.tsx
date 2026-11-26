@@ -9,7 +9,8 @@ import {
 import { getBookingService } from '../core/services/booking';
 import type { Trip } from '../core/types/trip';
 import { getTripIntermediateStopCount } from '../core/utils/route-markers.util';
-import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
+import { getAdminAuthService, type AdminUser } from '../core/services/auth/admin-auth.service';
+import { useTheme } from '../hooks/useTheme';
 import { SpinnerIcon } from '../components/ui/Icons';
 
 const CommsHub = React.lazy(() =>
@@ -36,10 +37,13 @@ export default function DispatchPopoutRoute() {
   const navigate = useNavigate();
   const moduleKey = (searchParams.get('module') || 'comms') as WorkspaceModuleKey;
 
+  const [popoutUser, setPopoutUser] = useState<AdminUser | null>(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedMapTrip, setSelectedMapTrip] = useState<Trip | null>(null);
+
+  useTheme({ uid: popoutUser?.uid, profilePreference: popoutUser?.themePreference });
 
   const workspaceBus = getWorkspaceBus();
   const { fleet, setDriverDutyStatus } = useDispatchFleet(trips);
@@ -50,10 +54,12 @@ export default function DispatchPopoutRoute() {
       const roles = user?.roles || (user?.role ? [user.role] : []);
       const hasAccess = roles.includes('admin') || roles.includes('dispatcher');
       if (!user || !hasAccess) {
+        setPopoutUser(null);
         setIsAuthorized(false);
         setIsCheckingAuth(false);
         navigate('/app/login?redirect=/app/dispatch', { replace: true });
       } else {
+        setPopoutUser(user);
         setIsAuthorized(true);
         setIsCheckingAuth(false);
       }
@@ -99,9 +105,9 @@ export default function DispatchPopoutRoute() {
 
   if (isCheckingAuth || !isAuthorized) {
     return (
-      <div className="flex flex-col h-screen w-screen items-center justify-center bg-slate-950 text-white gap-3">
+      <div className="flex flex-col h-screen w-screen items-center justify-center bg-surface-header text-fg-on-header gap-3">
         <SpinnerIcon className="w-8 h-8 animate-spin text-blue-500" />
-        <p className="text-xs font-semibold text-slate-400">Verifying dispatcher authorization...</p>
+        <p className="text-xs font-semibold text-fg-on-header-muted">Verifying dispatcher authorization...</p>
       </div>
     );
   }
@@ -126,15 +132,15 @@ export default function DispatchPopoutRoute() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-slate-900 text-slate-100 overflow-hidden font-sans">
+    <div className="flex flex-col h-screen w-screen bg-surface-page text-fg-primary overflow-hidden font-sans">
       {/* Compact Detached Window Header */}
-      <div className="h-10 bg-slate-950 border-b border-slate-800 px-3 flex items-center justify-between shrink-0 select-none">
+      <div className="h-10 bg-surface-header border-b border-border-header px-3 flex items-center justify-between shrink-0 select-none">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-black tracking-wide text-white">
+          <span className="text-xs font-black tracking-wide text-fg-on-header">
             {getModuleTitle(moduleKey)}
           </span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-header-elevated text-fg-on-header-muted font-mono">
             Detached Window • Live Synced
           </span>
         </div>
@@ -143,7 +149,7 @@ export default function DispatchPopoutRoute() {
           <button
             type="button"
             onClick={() => window.close()}
-            className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+            className="px-2 py-0.5 rounded-lg bg-surface-header-elevated hover:bg-surface-header-muted text-[11px] font-bold text-fg-on-header-muted hover:text-fg-on-header transition-colors cursor-pointer flex items-center gap-1"
           >
             <span>↙ Dock Back / Close</span>
           </button>
@@ -151,10 +157,10 @@ export default function DispatchPopoutRoute() {
       </div>
 
       {/* Detached Content Body */}
-      <div className="flex-1 min-h-0 bg-white text-slate-900 overflow-hidden">
+      <div className="flex-1 min-h-0 bg-surface-card text-fg-primary overflow-hidden">
         <Suspense
           fallback={
-            <div className="flex flex-col h-full w-full items-center justify-center bg-slate-50 text-slate-500 gap-2.5">
+            <div className="flex flex-col h-full w-full items-center justify-center bg-surface-subtle text-fg-muted gap-2.5">
               <SpinnerIcon className="w-6 h-6 animate-spin text-blue-600" />
               <span className="text-xs font-semibold">Loading {getModuleTitle(moduleKey)}...</span>
             </div>
@@ -187,7 +193,7 @@ export default function DispatchPopoutRoute() {
           )}
 
           {moduleKey === 'booking' && (
-            <div className="h-full overflow-hidden max-w-2xl mx-auto border-x border-slate-200">
+            <div className="h-full overflow-hidden max-w-2xl mx-auto border-x border-border-subtle">
               <DispatchBookingEngine
                 draftId="popout-booking"
                 isActive={true}
@@ -199,15 +205,15 @@ export default function DispatchPopoutRoute() {
 
           {moduleKey === 'drivers' && (
             <div className="h-full overflow-y-auto p-4 space-y-4">
-              <h2 className="text-base font-extrabold text-slate-900">Live Drivers Roster (Detached)</h2>
+              <h2 className="text-base font-extrabold text-fg-primary">Live Drivers Roster (Detached)</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {fleet.map((drv) => {
                   const palette = FLEET_STATUS_COLORS[drv.mapStatus];
                   const label = getMapStatusLabel(drv.mapStatus, drv.activeTripStatus);
                   return (
-                    <div key={drv.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-2">
+                    <div key={drv.id} className="p-4 rounded-2xl border border-border-subtle bg-surface-subtle space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-extrabold text-sm text-slate-900 truncate">
+                        <span className="font-extrabold text-sm text-fg-primary truncate">
                           {drv.formattedLabel || (drv.cabNumber ? `#${drv.cabNumber}, ${drv.firstName || drv.name}` : drv.name)}
                         </span>
                         <span
@@ -217,15 +223,15 @@ export default function DispatchPopoutRoute() {
                           {label}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-xs text-slate-600">
+                      <div className="flex items-center justify-between text-xs text-fg-secondary">
                         <span>{drv.vehicle}</span>
                         {drv.queuedTripsCount > 0 && (
-                          <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] font-bold text-status-staged-fg bg-status-staged-bg border border-status-staged-border px-1.5 py-0.5 rounded">
                             {drv.queuedTripsCount} Queued
                           </span>
                         )}
                       </div>
-                      <p className="text-xs font-mono text-slate-500">{drv.phone}</p>
+                      <p className="text-xs font-mono text-fg-muted">{drv.phone}</p>
                     </div>
                   );
                 })}
@@ -235,20 +241,20 @@ export default function DispatchPopoutRoute() {
 
           {moduleKey === 'trips' && (
             <div className="h-full overflow-y-auto p-4 space-y-4">
-              <h2 className="text-base font-extrabold text-slate-900">Active Trips Queue (Detached)</h2>
+              <h2 className="text-base font-extrabold text-fg-primary">Active Trips Queue (Detached)</h2>
               <div className="space-y-2">
                 {trips.map((tr) => {
                   const stopCount = getTripIntermediateStopCount(tr);
                   return (
-                    <div key={tr.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-2">
+                    <div key={tr.id} className="p-3 rounded-xl border border-border-subtle bg-surface-subtle flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <span className="font-mono font-bold text-xs text-slate-900 block">{tr.id}</span>
-                        <span className="text-xs text-slate-600 inline-flex items-center gap-1 flex-wrap">
+                        <span className="font-mono font-bold text-xs text-fg-primary block">{tr.id}</span>
+                        <span className="text-xs text-fg-secondary inline-flex items-center gap-1 flex-wrap">
                           <span>{tr.pickupLocation?.address}</span>
                           <span>→</span>
                           {stopCount > 0 && (
                             <>
-                              <span className="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold">
+                              <span className="px-1.5 py-0.2 rounded-full bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border text-[10px] font-extrabold">
                                 +{stopCount} stop{stopCount === 1 ? '' : 's'}
                               </span>
                               <span>→</span>
@@ -257,7 +263,7 @@ export default function DispatchPopoutRoute() {
                           <span>{tr.dropoffLocation?.address}</span>
                         </span>
                       </div>
-                      <span className="font-bold text-xs text-emerald-700 shrink-0">${tr.pricing?.totalFare?.toFixed(2)}</span>
+                      <span className="font-bold text-xs text-status-success-fg shrink-0">${tr.pricing?.totalFare?.toFixed(2)}</span>
                     </div>
                   );
                 })}

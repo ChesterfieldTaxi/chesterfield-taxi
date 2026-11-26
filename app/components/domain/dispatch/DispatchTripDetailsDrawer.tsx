@@ -255,15 +255,15 @@ export function DispatchTripDetailsDrawer({
               zIndex={120}
             >
               {/* Navigation Tabs Header + Full Actions Suite */}
-              <div className="bg-slate-900/95 px-4 sm:px-6 border-b border-slate-800 flex items-center justify-between gap-2 shrink-0 sticky top-0 z-10">
+              <div className="bg-surface-header/95 px-4 sm:px-6 border-b border-border-header flex items-center justify-between gap-2 shrink-0 sticky top-0 z-10">
                 <div className="flex items-center gap-2 overflow-x-auto min-w-0">
                   <button
                     type="button"
                     onClick={() => onReviewModalTabChange('details')}
                     className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer shrink-0 ${
                       reviewModalTab === 'details'
-                        ? 'border-blue-500 text-white bg-slate-800/60'
-                        : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                        ? 'border-blue-500 text-white bg-surface-header-elevated/60'
+                        : 'border-transparent text-fg-subtle hover:text-fg-on-header hover:bg-surface-header-elevated/30'
                     }`}
                   >
                     <DocumentTextIcon className="w-3.5 h-3.5 text-blue-400" />
@@ -274,13 +274,13 @@ export function DispatchTripDetailsDrawer({
                     onClick={() => onReviewModalTabChange('audit')}
                     className={`px-4 py-2.5 text-xs font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer shrink-0 ${
                       reviewModalTab === 'audit'
-                        ? 'border-purple-500 text-white bg-slate-800/60'
-                        : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                        ? 'border-purple-500 text-white bg-surface-header-elevated/60'
+                        : 'border-transparent text-fg-subtle hover:text-fg-on-header hover:bg-surface-header-elevated/30'
                     }`}
                   >
                     <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-400" />
                     <span>Audit Trail</span>
-                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono">
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-surface-header-elevated text-slate-300 font-mono">
                       {reviewTrip.auditLog?.length || 0}
                     </span>
                   </button>
@@ -346,8 +346,8 @@ export function DispatchTripDetailsDrawer({
                 <div
                   className={`px-5 py-3 text-xs font-bold flex items-center gap-2 shrink-0 ${
                     reviewAlert.type === 'success'
-                      ? 'bg-emerald-50 text-emerald-800 border-b border-emerald-200'
-                      : 'bg-red-50 text-red-800 border-b border-red-200'
+                      ? 'bg-status-success-bg text-status-success-fg border-b border-status-success-border'
+                      : 'bg-status-danger-bg text-status-danger-fg border-b border-status-danger-border'
                   }`}
                 >
                   {reviewAlert.type === 'success' ? (
@@ -411,10 +411,10 @@ export function DispatchTripDetailsDrawer({
 
                   {/* Decline View (if toggled) */}
                   {reviewDeclineMode && (
-                    <div className="p-4 bg-red-50 rounded-xl border border-red-200 space-y-3 animate-in fade-in duration-100">
-                      <div className="font-bold text-red-900 flex items-center justify-between">
+                    <div className="p-4 bg-status-danger-bg rounded-xl border border-status-danger-border space-y-3 animate-in fade-in duration-100">
+                      <div className="font-bold text-status-danger-fg flex items-center justify-between">
                         <span>Select Reason for Declining Booking</span>
-                        <span className="text-[10px] text-red-700">
+                        <span className="text-[10px] text-status-danger-fg">
                           Passenger will receive rejection notification
                         </span>
                       </div>
@@ -432,8 +432,8 @@ export function DispatchTripDetailsDrawer({
                             key={reason}
                             className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-xs transition-colors ${
                               selectedDeclineReason === reason
-                                ? 'bg-white border-red-400 font-bold text-red-950 shadow-2xs'
-                                : 'bg-red-50/50 border-red-100 text-red-800 hover:bg-white'
+                                ? 'bg-surface-card border-red-400 font-bold text-red-950 shadow-2xs'
+                                : 'bg-status-danger-bg/50 border-red-100 text-status-danger-fg hover:bg-surface-card'
                             }`}
                           >
                             <input
@@ -450,16 +450,16 @@ export function DispatchTripDetailsDrawer({
                       </div>
 
                       {hasLinkedLeg && (
-                        <div className="pt-2 border-t border-red-200">
-                          <label className="block text-red-900 font-bold mb-1.5 text-xs">
+                        <div className="pt-2 border-t border-status-danger-border">
+                          <label className="block text-status-danger-fg font-bold mb-1.5 text-xs">
                             Round-Trip Decline Scope:
                           </label>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <label
                               className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-xs transition-colors ${
                                 declineScope === 'leg'
-                                  ? 'bg-white border-red-400 font-bold text-red-950 shadow-2xs'
-                                  : 'bg-red-50/40 border-red-100 text-red-800 hover:bg-white'
+                                  ? 'bg-surface-card border-red-400 font-bold text-red-950 shadow-2xs'
+                                  : 'bg-status-danger-bg/40 border-red-100 text-status-danger-fg hover:bg-surface-card'
                               }`}
                             >
                               <input
@@ -475,8 +475,8 @@ export function DispatchTripDetailsDrawer({
                             <label
                               className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-xs transition-colors ${
                                 declineScope === 'both'
-                                  ? 'bg-white border-red-400 font-bold text-red-950 shadow-2xs'
-                                  : 'bg-red-50/40 border-red-100 text-red-800 hover:bg-white'
+                                  ? 'bg-surface-card border-red-400 font-bold text-red-950 shadow-2xs'
+                                  : 'bg-status-danger-bg/40 border-red-100 text-status-danger-fg hover:bg-surface-card'
                               }`}
                             >
                               <input
@@ -494,7 +494,7 @@ export function DispatchTripDetailsDrawer({
                       )}
 
                       <div>
-                        <label className="block text-slate-700 font-semibold mb-1">
+                        <label className="block text-fg-secondary font-semibold mb-1">
                           {selectedDeclineReason === 'Custom reason'
                             ? 'Custom Explanation (Required for passenger email):'
                             : 'Additional Notes / Guidance (Optional):'}
@@ -508,7 +508,7 @@ export function DispatchTripDetailsDrawer({
                               ? 'Explain why this ride request cannot be serviced...'
                               : 'Optional note to customer...'
                           }
-                          className="w-full px-3 py-2 bg-white border border-red-300 rounded-lg text-slate-900 text-xs focus:ring-1 focus:ring-red-500 focus:outline-hidden"
+                          className="w-full px-3 py-2 bg-surface-card border border-status-danger-border rounded-lg text-fg-primary text-xs focus:ring-1 focus:ring-red-500 focus:outline-hidden"
                         />
                       </div>
                     </div>
@@ -516,19 +516,19 @@ export function DispatchTripDetailsDrawer({
 
                   {/* Clarification Request View (if toggled) */}
                   {reviewClarifyMode && (
-                    <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 space-y-3 animate-in fade-in duration-100">
-                      <div className="font-bold text-amber-900 flex items-center justify-between">
+                    <div className="p-4 bg-status-warning-bg rounded-xl border border-status-warning-border space-y-3 animate-in fade-in duration-100">
+                      <div className="font-bold text-status-warning-fg flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
-                          <AlertCircleIcon className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                          <AlertCircleIcon className="w-3.5 h-3.5 text-status-warning-fg shrink-0" />
                           <span>Request More Information / Clarification</span>
                         </span>
-                        <span className="text-[10px] text-amber-700">
+                        <span className="text-[10px] text-status-warning-fg">
                           Passenger will receive action-required email
                         </span>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="block text-slate-700 font-semibold text-xs">
+                        <label className="block text-fg-secondary font-semibold text-xs">
                           Select Inquiry Topic:
                         </label>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
@@ -544,8 +544,8 @@ export function DispatchTripDetailsDrawer({
                               key={topic}
                               className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer text-xs transition-colors ${
                                 clarifyTopic === topic
-                                  ? 'bg-white border-amber-400 font-bold text-amber-950 shadow-2xs'
-                                  : 'bg-amber-50/50 border-amber-100 text-amber-800 hover:bg-white'
+                                  ? 'bg-surface-card border-status-warning-border font-bold text-status-warning-fg shadow-2xs'
+                                  : 'bg-status-warning-bg/50 border-amber-100 text-status-warning-fg hover:bg-surface-card'
                               }`}
                             >
                               <input
@@ -563,7 +563,7 @@ export function DispatchTripDetailsDrawer({
                       </div>
 
                       <div>
-                        <label className="block text-slate-700 font-semibold mb-1">
+                        <label className="block text-fg-secondary font-semibold mb-1">
                           Message to Passenger (Required):
                         </label>
                         <textarea
@@ -571,9 +571,9 @@ export function DispatchTripDetailsDrawer({
                           value={clarifyMessage}
                           onChange={(e) => setClarifyMessage(e.target.value)}
                           placeholder={`Please specify what details are needed from ${reviewTrip.passenger.firstName}...`}
-                          className="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-slate-900 text-xs focus:ring-1 focus:ring-amber-500 focus:outline-hidden"
+                          className="w-full px-3 py-2 bg-surface-card border border-status-warning-border rounded-lg text-fg-primary text-xs focus:ring-1 focus:ring-amber-500 focus:outline-hidden"
                         />
-                        <div className="text-[11px] text-amber-700 mt-1">
+                        <div className="text-[11px] text-status-warning-fg mt-1">
                           The passenger will receive an email prompting them to reply or call
                           dispatch directly.
                         </div>
@@ -584,12 +584,12 @@ export function DispatchTripDetailsDrawer({
               )}
 
               {/* Modal Actions Footer */}
-              <div className="bg-slate-50 border-t border-slate-200 px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-2 shrink-0 sticky bottom-0 z-10">
+              <div className="bg-surface-subtle border-t border-border-subtle px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-2 shrink-0 sticky bottom-0 z-10">
                 <button
                   type="button"
                   onClick={() => onReviewTripChange(null)}
                   disabled={isProcessingReview}
-                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl border border-border-strong text-fg-secondary hover:bg-surface-muted font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
                 >
                   Close
                 </button>
@@ -599,7 +599,7 @@ export function DispatchTripDetailsDrawer({
                     <button
                       type="button"
                       onClick={() => onReviewModalTabChange('details')}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs transition-colors cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-surface-header-elevated hover:bg-surface-header text-white font-bold text-xs transition-colors cursor-pointer"
                     >
                       View Booking Details
                     </button>
@@ -641,7 +641,7 @@ export function DispatchTripDetailsDrawer({
                                 setReviewDeclineMode(true);
                                 setReviewClarifyMode(false);
                               }}
-                              className="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 border border-red-300 text-red-700 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                              className="px-4 py-2 rounded-xl bg-status-danger-bg hover:bg-status-danger-bg-strong border border-status-danger-border text-status-danger-fg font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
                             >
                               Decline...
                             </button>
@@ -652,7 +652,7 @@ export function DispatchTripDetailsDrawer({
                                 setReviewClarifyMode(true);
                                 setReviewDeclineMode(false);
                               }}
-                              className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                              className="px-4 py-2 rounded-xl bg-status-warning-bg hover:bg-status-warning-bg-strong border border-status-warning-border text-status-warning-fg font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
                             >
                               <AlertCircleIcon className="w-3.5 h-3.5 shrink-0" />
                               <span>Request Info...</span>
@@ -695,7 +695,7 @@ export function DispatchTripDetailsDrawer({
                                       type="button"
                                       disabled={isProcessingReview}
                                       onClick={() => onReactivateTrip(reviewTrip)}
-                                      className="px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                      className="px-4 py-2 rounded-xl bg-status-success-bg hover:bg-status-success-bg-strong border border-status-success-border text-status-success-fg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                                     >
                                       <RefreshCwIcon className="w-3.5 h-3.5 shrink-0" />
                                       <span>Reactivate Trip</span>
@@ -708,7 +708,7 @@ export function DispatchTripDetailsDrawer({
                                         onReviewTripChange(null);
                                         onCloneBookingFromReview(target);
                                       }}
-                                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                      className="px-4 py-2 rounded-xl bg-surface-header-elevated hover:bg-surface-header text-white font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                                     >
                                       <CopyIcon className="w-3.5 h-3.5 shrink-0" />
                                       <span>Copy Booking</span>
@@ -724,9 +724,9 @@ export function DispatchTripDetailsDrawer({
                                         onReviewTripChange(null);
                                         onEditTripFromReview(target);
                                       }}
-                                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                      className="px-3.5 py-2 rounded-xl bg-surface-card hover:bg-surface-muted border border-border-strong text-fg-strong font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                                     >
-                                      <PencilIcon className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                                      <PencilIcon className="w-3.5 h-3.5 text-fg-secondary shrink-0" />
                                       <span>
                                         {isCompletedStatus ? 'Edit Details' : 'Edit Trip'}
                                       </span>
@@ -738,7 +738,7 @@ export function DispatchTripDetailsDrawer({
                                           type="button"
                                           disabled={isProcessingReview}
                                           onClick={() => onPromptCancelTrip(reviewTrip)}
-                                          className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                          className="px-3.5 py-2 rounded-xl bg-status-danger-bg hover:bg-status-danger-bg-strong border border-status-danger-border text-status-danger-fg font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                                         >
                                           <BanIcon className="w-3.5 h-3.5 shrink-0" />
                                           <span>Cancel Trip</span>
@@ -792,7 +792,7 @@ export function DispatchTripDetailsDrawer({
                           type="button"
                           disabled={isProcessingReview}
                           onClick={() => setReviewDeclineMode(false)}
-                          className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+                          className="px-3.5 py-2 rounded-xl border border-border-strong text-fg-secondary hover:bg-surface-muted font-bold text-xs transition-colors cursor-pointer"
                         >
                           Back
                         </button>
@@ -822,7 +822,7 @@ export function DispatchTripDetailsDrawer({
                           type="button"
                           disabled={isProcessingReview}
                           onClick={() => setReviewClarifyMode(false)}
-                          className="px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+                          className="px-3.5 py-2 rounded-xl border border-border-strong text-fg-secondary hover:bg-surface-muted font-bold text-xs transition-colors cursor-pointer"
                         >
                           Back
                         </button>

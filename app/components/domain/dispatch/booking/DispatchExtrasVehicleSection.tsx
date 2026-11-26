@@ -140,24 +140,24 @@ export function DispatchExtrasVehicleSection({
       {/* Trip Details (Pax, Bags, Car Seats with 3-tier counters) */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+          <label className="block text-[11px] font-bold text-fg-secondary uppercase tracking-wide">
             Trip Details
           </label>
-          <span className="text-[10px] text-slate-500 font-medium">
+          <span className="text-[10px] text-fg-muted font-medium">
             Capacity: Max {totalMaxPassengers}{' '}
             {totalMaxPassengers === 1 ? 'Passenger' : 'Passengers'} • {totalMaxBags}{' '}
             {totalMaxBags === 1 ? 'Bag' : 'Bags'}
           </span>
         </div>
 
-        <div className="p-2.5 bg-white border border-slate-200 rounded-xl shadow-xs space-y-2.5">
+        <div className="p-2.5 bg-surface-card border border-border-subtle rounded-xl shadow-xs space-y-2.5">
           {/* Compact 3-Column Steppers: Passengers, Carry-on & Checked */}
           <div className="grid grid-cols-3 gap-1.5">
             {/* Passengers */}
-            <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between gap-1.5 min-w-0">
-              <div className="flex items-center justify-center gap-1 text-slate-700 text-[11px] min-w-0">
-                <UserIcon className="w-3 h-3 text-slate-500 shrink-0" />
-                <span className="font-bold text-slate-800 truncate">Passengers</span>
+            <div className="p-2 bg-surface-subtle border border-border-subtle rounded-xl flex flex-col justify-between gap-1.5 min-w-0">
+              <div className="flex items-center justify-center gap-1 text-fg-secondary text-[11px] min-w-0">
+                <UserIcon className="w-3 h-3 text-fg-muted shrink-0" />
+                <span className="font-bold text-fg-strong truncate">Passengers</span>
               </div>
               <div className="flex items-center justify-between gap-1">
                 <button
@@ -165,11 +165,11 @@ export function DispatchExtrasVehicleSection({
                   aria-label="Decrease passengers"
                   disabled={passengers <= 1}
                   onClick={onDecrementPassengers}
-                  className="w-6 h-6 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                  className="w-6 h-6 rounded-lg bg-surface-card hover:bg-surface-emphasis border border-border-strong font-bold flex items-center justify-center text-fg-secondary text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
                 >
                   &minus;
                 </button>
-                <span className="min-w-[1.25rem] text-center font-extrabold text-xs text-slate-900">
+                <span className="min-w-[1.25rem] text-center font-extrabold text-xs text-fg-primary">
                   {passengers}
                 </span>
                 <button
@@ -177,7 +177,7 @@ export function DispatchExtrasVehicleSection({
                   aria-label="Increase passengers"
                   onClick={onIncrementPassengers}
                   title="Increments passengers. Auto-upgrades vehicles if capacity exceeded."
-                  className="w-6 h-6 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 text-xs leading-none cursor-pointer shrink-0"
+                  className="w-6 h-6 rounded-lg bg-status-info-bg hover:bg-status-info-bg-strong border border-status-info-border font-bold flex items-center justify-center text-status-info-fg text-xs leading-none cursor-pointer shrink-0"
                 >
                   +
                 </button>
@@ -185,10 +185,10 @@ export function DispatchExtrasVehicleSection({
             </div>
 
             {/* Carry-on Bags */}
-            <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between gap-1.5 min-w-0">
-              <div className="flex items-center justify-center gap-1 text-slate-700 text-[11px] min-w-0">
-                <LuggageIcon className="w-3 h-3 text-slate-500 shrink-0" />
-                <span className="font-bold text-slate-800 truncate">Carry-on</span>
+            <div className="p-2 bg-surface-subtle border border-border-subtle rounded-xl flex flex-col justify-between gap-1.5 min-w-0">
+              <div className="flex items-center justify-center gap-1 text-fg-secondary text-[11px] min-w-0">
+                <LuggageIcon className="w-3 h-3 text-fg-muted shrink-0" />
+                <span className="font-bold text-fg-strong truncate">Carry-on</span>
               </div>
               <div className="flex items-center justify-between gap-1">
                 <button
@@ -206,11 +206,11 @@ export function DispatchExtrasVehicleSection({
                     setCarryOnBags(stepped.carryOnBags);
                     setBags(stepped.bags);
                   }}
-                  className="w-6 h-6 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                  className="w-6 h-6 rounded-lg bg-surface-card hover:bg-surface-emphasis border border-border-strong font-bold flex items-center justify-center text-fg-secondary text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
                 >
                   &minus;
                 </button>
-                <span className="min-w-[1.25rem] text-center font-extrabold text-xs text-slate-900">
+                <span className="min-w-[1.25rem] text-center font-extrabold text-xs text-fg-primary">
                   {carryOnBags}
                 </span>
                 <button
@@ -228,7 +228,7 @@ export function DispatchExtrasVehicleSection({
                     setCarryOnBags(stepped.carryOnBags);
                     setBags(stepped.bags);
                   }}
-                  className="w-6 h-6 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                  className="w-6 h-6 rounded-lg bg-status-info-bg hover:bg-status-info-bg-strong border border-status-info-border font-bold flex items-center justify-center text-status-info-fg text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
                 >
                   +
                 </button>
@@ -236,10 +236,10 @@ export function DispatchExtrasVehicleSection({
             </div>
 
             {/* Checked Bags */}
-            <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl flex flex-col justify-between gap-1.5 min-w-0">
-              <div className="flex items-center justify-center gap-1 text-slate-700 text-[11px] min-w-0">
-                <LuggageIcon className="w-3 h-3 text-slate-500 shrink-0" />
-                <span className="font-bold text-slate-800 truncate">Checked</span>
+            <div className="p-2 bg-surface-subtle border border-border-subtle rounded-xl flex flex-col justify-between gap-1.5 min-w-0">
+              <div className="flex items-center justify-center gap-1 text-fg-secondary text-[11px] min-w-0">
+                <LuggageIcon className="w-3 h-3 text-fg-muted shrink-0" />
+                <span className="font-bold text-fg-strong truncate">Checked</span>
               </div>
               <div className="flex items-center justify-between gap-1">
                 <button
@@ -257,11 +257,11 @@ export function DispatchExtrasVehicleSection({
                     setCheckedBags(stepped.checkedBags);
                     setBags(stepped.bags);
                   }}
-                  className="w-6 h-6 rounded-lg bg-white hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                  className="w-6 h-6 rounded-lg bg-surface-card hover:bg-surface-emphasis border border-border-strong font-bold flex items-center justify-center text-fg-secondary text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
                 >
                   &minus;
                 </button>
-                <span className="min-w-[1.25rem] text-center font-extrabold text-xs text-slate-900">
+                <span className="min-w-[1.25rem] text-center font-extrabold text-xs text-fg-primary">
                   {checkedBags}
                 </span>
                 <button
@@ -279,7 +279,7 @@ export function DispatchExtrasVehicleSection({
                     setCheckedBags(stepped.checkedBags);
                     setBags(stepped.bags);
                   }}
-                  className="w-6 h-6 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
+                  className="w-6 h-6 rounded-lg bg-status-info-bg hover:bg-status-info-bg-strong border border-status-info-border font-bold flex items-center justify-center text-status-info-fg text-xs leading-none disabled:opacity-40 cursor-pointer shrink-0"
                 >
                   +
                 </button>
@@ -288,16 +288,16 @@ export function DispatchExtrasVehicleSection({
           </div>
 
           {/* Collapsible Extras Row (Oversized Cargo + Car Seats) */}
-          <div className="pt-2 border-t border-slate-100 space-y-2">
+          <div className="pt-2 border-t border-border-faint space-y-2">
             <div className="grid grid-cols-1 gap-1.5">
               <label
                 className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border cursor-pointer select-none transition-colors ${
                   hasOversizedLuggage
-                    ? 'bg-blue-50/70 border-blue-300'
-                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'
+                    ? 'bg-status-info-bg/70 border-status-info-border'
+                    : 'bg-surface-subtle border-border-subtle hover:bg-surface-muted/70'
                 }`}
               >
-                <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-800">
+                <span className="flex items-center gap-2 text-[11px] font-semibold text-fg-strong">
                   <input
                     type="checkbox"
                     checked={hasOversizedLuggage}
@@ -309,12 +309,12 @@ export function DispatchExtrasVehicleSection({
                         setOversizedLuggageNotes('');
                       }
                     }}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-border-strong text-blue-600 focus:ring-blue-500"
                   />
                   <span>Oversized Cargo (Golf / Skis)</span>
                 </span>
                 {hasOversizedLuggage && totalOversizedCount > 0 && (
-                  <span className="text-[10px] font-bold text-blue-700 bg-white px-1.5 py-0.5 rounded border border-blue-200">
+                  <span className="text-[10px] font-bold text-status-info-fg bg-surface-card px-1.5 py-0.5 rounded border border-status-info-border">
                     {totalOversizedCount} item{totalOversizedCount > 1 ? 's' : ''}
                   </span>
                 )}
@@ -322,8 +322,8 @@ export function DispatchExtrasVehicleSection({
 
               {/* Expanded Oversized Cargo Panel */}
               <CollapsibleSection isOpen={hasOversizedLuggage}>
-                <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1.5">
-                  <div className="text-[10px] text-slate-500 font-medium">
+                <div className="p-2 bg-surface-subtle border border-border-subtle rounded-lg space-y-1.5">
+                  <div className="text-[10px] text-fg-muted font-medium">
                     Select oversized equipment so the right cargo space is dispatched:
                   </div>
                   <div className="space-y-1">
@@ -332,17 +332,17 @@ export function DispatchExtrasVehicleSection({
                       return (
                         <div
                           key={cat.id}
-                          className="flex items-center justify-between gap-2 text-[11px] bg-white px-2 py-1.5 rounded border border-slate-200"
+                          className="flex items-center justify-between gap-2 text-[11px] bg-surface-card px-2 py-1.5 rounded border border-border-subtle"
                         >
                           <div className="flex items-center gap-1 flex-wrap min-w-0">
-                            <span className="font-semibold text-slate-800">{cat.label}</span>
+                            <span className="font-semibold text-fg-strong">{cat.label}</span>
                             {cat.requiresUpgrade && (
-                              <span className="text-[9px] font-bold text-amber-800 bg-amber-50 px-1 py-0.5 rounded border border-amber-200">
+                              <span className="text-[9px] font-bold text-status-warning-fg bg-status-warning-bg px-1 py-0.5 rounded border border-status-warning-border">
                                 SUV/Van
                               </span>
                             )}
                             {cat.fee > 0 && (
-                              <span className="text-[10px] font-bold font-mono text-emerald-700">
+                              <span className="text-[10px] font-bold font-mono text-status-success-fg">
                                 +${cat.fee.toFixed(2)}
                               </span>
                             )}
@@ -358,11 +358,11 @@ export function DispatchExtrasVehicleSection({
                                   [cat.id]: Math.max(0, (prev[cat.id] || 0) - 1),
                                 }))
                               }
-                              className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 disabled:opacity-40"
+                              className="w-5 h-5 rounded bg-surface-muted hover:bg-surface-emphasis border border-border-strong font-bold flex items-center justify-center text-fg-secondary disabled:opacity-40"
                             >
                               &minus;
                             </button>
-                            <span className="w-4 text-center font-bold text-slate-800">{count}</span>
+                            <span className="w-4 text-center font-bold text-fg-strong">{count}</span>
                             <button
                               type="button"
                               aria-label={`Increase ${cat.label}`}
@@ -373,7 +373,7 @@ export function DispatchExtrasVehicleSection({
                                   [cat.id]: Math.min(cat.maxCount || 4, (prev[cat.id] || 0) + 1),
                                 }))
                               }
-                              className="w-5 h-5 rounded bg-blue-50 hover:bg-blue-100 border border-blue-300 font-bold flex items-center justify-center text-blue-700 disabled:opacity-40"
+                              className="w-5 h-5 rounded bg-status-info-bg hover:bg-status-info-bg-strong border border-status-info-border font-bold flex items-center justify-center text-status-info-fg disabled:opacity-40"
                             >
                               +
                             </button>
@@ -387,7 +387,7 @@ export function DispatchExtrasVehicleSection({
                     placeholder="Additional cargo notes (e.g. dimensions, fragile instruments)"
                     value={oversizedLuggageNotes}
                     onChange={(e) => setOversizedLuggageNotes(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-[11px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-2 py-1.5 bg-surface-card border border-border-strong rounded text-[11px] text-fg-strong placeholder:text-fg-subtle focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
               </CollapsibleSection>
@@ -395,21 +395,21 @@ export function DispatchExtrasVehicleSection({
               <label
                 className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border cursor-pointer select-none transition-colors ${
                   carSeats
-                    ? 'bg-amber-50/80 border-amber-300'
-                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'
+                    ? 'bg-status-warning-bg/80 border-status-warning-border'
+                    : 'bg-surface-subtle border-border-subtle hover:bg-surface-muted/70'
                 }`}
               >
-                <span className="flex items-center gap-2 text-[11px] font-semibold text-slate-800">
+                <span className="flex items-center gap-2 text-[11px] font-semibold text-fg-strong">
                   <input
                     type="checkbox"
                     checked={carSeats}
                     onChange={(e) => onToggleCarSeats(e.target.checked)}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-border-strong text-blue-600 focus:ring-blue-500"
                   />
                   <span>Child Safety Seats</span>
                 </span>
                 {carSeats && (
-                  <span className="text-[10px] font-bold text-amber-900 bg-white px-1.5 py-0.5 rounded border border-amber-200">
+                  <span className="text-[10px] font-bold text-status-warning-fg bg-surface-card px-1.5 py-0.5 rounded border border-status-warning-border">
                     {totalCarSeats} / {carSeatLimits.maxTotalCarSeats} max
                   </span>
                 )}
@@ -418,11 +418,11 @@ export function DispatchExtrasVehicleSection({
 
             {/* 3 Car Seat Counters: Rear-Facing, Front-Facing, Booster */}
             <CollapsibleSection isOpen={carSeats}>
-              <div className="p-2 bg-amber-50/60 border border-amber-200 rounded-lg space-y-1.5">
+              <div className="p-2 bg-status-warning-bg/60 border border-status-warning-border rounded-lg space-y-1.5">
                 <div className="flex items-center justify-between text-[11px]">
-                  <div className="text-slate-700">
+                  <div className="text-fg-secondary">
                     <span className="font-semibold">Rear-Facing</span> (Infant)
-                    <span className="text-[10px] text-slate-400 ml-1">
+                    <span className="text-[10px] text-fg-subtle ml-1">
                       max {carSeatLimits.maxRearFacing}
                     </span>
                   </div>
@@ -430,11 +430,11 @@ export function DispatchExtrasVehicleSection({
                     <button
                       type="button"
                       onClick={() => setRearFacingCount((c) => Math.max(0, c - 1))}
-                      className="w-5 h-5 rounded bg-white border border-amber-300 font-bold flex items-center justify-center text-slate-700"
+                      className="w-5 h-5 rounded bg-surface-card border border-status-warning-border font-bold flex items-center justify-center text-fg-secondary"
                     >
                       -
                     </button>
-                    <span className="w-4 text-center font-bold text-slate-800">
+                    <span className="w-4 text-center font-bold text-fg-strong">
                       {rearFacingCount}
                     </span>
                     <button
@@ -446,7 +446,7 @@ export function DispatchExtrasVehicleSection({
                       onClick={() =>
                         setRearFacingCount((c) => Math.min(carSeatLimits.maxRearFacing, c + 1))
                       }
-                      className="w-5 h-5 rounded bg-white border border-amber-300 font-bold flex items-center justify-center text-slate-700 disabled:opacity-40"
+                      className="w-5 h-5 rounded bg-surface-card border border-status-warning-border font-bold flex items-center justify-center text-fg-secondary disabled:opacity-40"
                     >
                       +
                     </button>
@@ -454,9 +454,9 @@ export function DispatchExtrasVehicleSection({
                 </div>
 
                 <div className="flex items-center justify-between text-[11px]">
-                  <div className="text-slate-700">
+                  <div className="text-fg-secondary">
                     <span className="font-semibold">Front-Facing</span> (Toddler)
-                    <span className="text-[10px] text-slate-400 ml-1">
+                    <span className="text-[10px] text-fg-subtle ml-1">
                       max {carSeatLimits.maxFrontFacing}
                     </span>
                   </div>
@@ -464,11 +464,11 @@ export function DispatchExtrasVehicleSection({
                     <button
                       type="button"
                       onClick={() => setFrontFacingCount((c) => Math.max(0, c - 1))}
-                      className="w-5 h-5 rounded bg-white border border-amber-300 font-bold flex items-center justify-center text-slate-700"
+                      className="w-5 h-5 rounded bg-surface-card border border-status-warning-border font-bold flex items-center justify-center text-fg-secondary"
                     >
                       -
                     </button>
-                    <span className="w-4 text-center font-bold text-slate-800">
+                    <span className="w-4 text-center font-bold text-fg-strong">
                       {frontFacingCount}
                     </span>
                     <button
@@ -480,7 +480,7 @@ export function DispatchExtrasVehicleSection({
                       onClick={() =>
                         setFrontFacingCount((c) => Math.min(carSeatLimits.maxFrontFacing, c + 1))
                       }
-                      className="w-5 h-5 rounded bg-white border border-amber-300 font-bold flex items-center justify-center text-slate-700 disabled:opacity-40"
+                      className="w-5 h-5 rounded bg-surface-card border border-status-warning-border font-bold flex items-center justify-center text-fg-secondary disabled:opacity-40"
                     >
                       +
                     </button>
@@ -488,9 +488,9 @@ export function DispatchExtrasVehicleSection({
                 </div>
 
                 <div className="flex items-center justify-between text-[11px]">
-                  <div className="text-slate-700">
+                  <div className="text-fg-secondary">
                     <span className="font-semibold">Booster</span> (Youth)
-                    <span className="text-[10px] text-slate-400 ml-1">
+                    <span className="text-[10px] text-fg-subtle ml-1">
                       max {carSeatLimits.maxBooster}
                     </span>
                   </div>
@@ -498,11 +498,11 @@ export function DispatchExtrasVehicleSection({
                     <button
                       type="button"
                       onClick={() => setBoosterCount((c) => Math.max(0, c - 1))}
-                      className="w-5 h-5 rounded bg-white border border-amber-300 font-bold flex items-center justify-center text-slate-700"
+                      className="w-5 h-5 rounded bg-surface-card border border-status-warning-border font-bold flex items-center justify-center text-fg-secondary"
                     >
                       -
                     </button>
-                    <span className="w-4 text-center font-bold text-slate-800">{boosterCount}</span>
+                    <span className="w-4 text-center font-bold text-fg-strong">{boosterCount}</span>
                     <button
                       type="button"
                       disabled={
@@ -512,7 +512,7 @@ export function DispatchExtrasVehicleSection({
                       onClick={() =>
                         setBoosterCount((c) => Math.min(carSeatLimits.maxBooster, c + 1))
                       }
-                      className="w-5 h-5 rounded bg-white border border-amber-300 font-bold flex items-center justify-center text-slate-700 disabled:opacity-40"
+                      className="w-5 h-5 rounded bg-surface-card border border-status-warning-border font-bold flex items-center justify-center text-fg-secondary disabled:opacity-40"
                     >
                       +
                     </button>
@@ -524,8 +524,8 @@ export function DispatchExtrasVehicleSection({
             {/* Admin Custom Bookable Extras */}
             {universalExtrasConfig?.customExtras &&
               universalExtrasConfig.customExtras.filter((e) => e.isActive).length > 0 && (
-                <div className="space-y-1 pt-1.5 border-t border-slate-100">
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <div className="space-y-1 pt-1.5 border-t border-border-faint">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
                     Extras &amp; Add-Ons
                   </span>
                   {universalExtrasConfig.customExtras
@@ -536,8 +536,8 @@ export function DispatchExtrasVehicleSection({
                       return (
                         <div key={extra.id} className="flex items-center justify-between text-[11px]">
                           <div className="min-w-0 pr-2">
-                            <span className="font-semibold text-slate-700">{extra.name}</span>
-                            <span className="text-[10px] font-mono text-slate-500 ml-1">
+                            <span className="font-semibold text-fg-secondary">{extra.name}</span>
+                            <span className="text-[10px] font-mono text-fg-muted ml-1">
                               (+${extra.fee.toFixed(2)})
                             </span>
                           </div>
@@ -553,11 +553,11 @@ export function DispatchExtrasVehicleSection({
                                   return next;
                                 })
                               }
-                              className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700"
+                              className="w-5 h-5 rounded bg-surface-muted hover:bg-surface-emphasis border border-border-strong font-bold flex items-center justify-center text-fg-secondary"
                             >
                               -
                             </button>
-                            <span className="w-4 text-center font-bold text-slate-800">{qty}</span>
+                            <span className="w-4 text-center font-bold text-fg-strong">{qty}</span>
                             <button
                               type="button"
                               disabled={qty >= maxQty}
@@ -567,7 +567,7 @@ export function DispatchExtrasVehicleSection({
                                   [extra.id]: Math.min(maxQty, (prev[extra.id] || 0) + 1),
                                 }))
                               }
-                              className="w-5 h-5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 font-bold flex items-center justify-center text-slate-700 disabled:opacity-40"
+                              className="w-5 h-5 rounded bg-surface-muted hover:bg-surface-emphasis border border-border-strong font-bold flex items-center justify-center text-fg-secondary disabled:opacity-40"
                             >
                               +
                             </button>
@@ -579,18 +579,18 @@ export function DispatchExtrasVehicleSection({
               )}
 
             {/* Collapsible Special Requests & Gate Code Toggle */}
-            <div className="pt-1.5 border-t border-slate-100 space-y-2">
+            <div className="pt-1.5 border-t border-border-faint space-y-2">
               <button
                 type="button"
                 onClick={() => setShowSpecialRequests((prev) => !prev)}
-                className="w-full flex items-center justify-between text-[11px] font-bold text-slate-700 hover:text-blue-700 cursor-pointer"
+                className="w-full flex items-center justify-between text-[11px] font-bold text-fg-secondary hover:text-status-info-fg cursor-pointer"
               >
                 <span className="flex items-center gap-1.5">
                   <span>Special Requests &amp; Gate Code</span>
-                  <span className="font-normal text-slate-400">(Optional)</span>
+                  <span className="font-normal text-fg-subtle">(Optional)</span>
                   {(Object.values(specialRequestFlags).some(Boolean) ||
                     Boolean(gateCode.trim())) && (
-                    <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                    <span className="text-[9px] font-bold text-status-info-fg bg-status-info-bg px-1.5 py-0.5 rounded border border-status-info-border">
                       {Object.values(specialRequestFlags).filter(Boolean).length +
                         (gateCode.trim() ? 1 : 0)}{' '}
                       active
@@ -603,7 +603,7 @@ export function DispatchExtrasVehicleSection({
               </button>
 
               {showSpecialRequests && (
-                <div className="space-y-2 p-2 bg-slate-50 border border-slate-200 rounded-lg animate-in fade-in duration-150">
+                <div className="space-y-2 p-2 bg-surface-subtle border border-border-subtle rounded-lg animate-in fade-in duration-150">
                   <div className="grid grid-cols-3 gap-1.5">
                     {(
                       [
@@ -626,7 +626,7 @@ export function DispatchExtrasVehicleSection({
                           className={`py-1.5 px-1.5 rounded-lg text-[10px] font-semibold border flex items-center justify-center gap-1 transition-all cursor-pointer ${
                             active
                               ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                              : 'bg-surface-card text-fg-secondary border-border-subtle hover:bg-surface-muted'
                           }`}
                         >
                           <item.Icon className="w-3 h-3 shrink-0" />
@@ -637,7 +637,7 @@ export function DispatchExtrasVehicleSection({
                   </div>
 
                   <div>
-                    <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                    <label className="block text-[10px] text-fg-secondary font-semibold mb-0.5">
                       Subdivision / Gate Code
                     </label>
                     <input
@@ -645,7 +645,7 @@ export function DispatchExtrasVehicleSection({
                       placeholder="e.g. #1234 or Call box"
                       value={gateCode}
                       onChange={(e) => setGateCode(e.target.value)}
-                      className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-[11px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full px-2 py-1.5 bg-surface-card border border-border-strong rounded text-[11px] text-fg-strong placeholder:text-fg-subtle focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
                 </div>
@@ -658,13 +658,13 @@ export function DispatchExtrasVehicleSection({
       {/* Vehicles (Multi-Vehicle Selector with Inline Choices & Add/Remove) */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+          <label className="block text-[11px] font-bold text-fg-secondary uppercase tracking-wide">
             Vehicles ({selectedVehicles.length})
           </label>
           <button
             type="button"
             onClick={onAddVehicle}
-            className="text-[11px] text-blue-600 hover:text-blue-800 font-bold"
+            className="text-[11px] text-blue-600 hover:text-status-info-fg font-bold"
           >
             + Add Vehicle
           </button>
@@ -674,10 +674,10 @@ export function DispatchExtrasVehicleSection({
           {selectedVehicles.map((vChoice, idx) => (
             <div
               key={idx}
-              className="p-1.5 bg-white border border-slate-300 rounded-lg shadow-2xs flex items-center gap-2"
+              className="p-1.5 bg-surface-card border border-border-strong rounded-lg shadow-2xs flex items-center gap-2"
             >
-              <span className="text-[10px] font-bold text-slate-400 w-5">#{idx + 1}</span>
-              <div className="flex-1 flex flex-wrap gap-1 p-0.5 bg-slate-100 rounded">
+              <span className="text-[10px] font-bold text-fg-subtle w-5">#{idx + 1}</span>
+              <div className="flex-1 flex flex-wrap gap-1 p-0.5 bg-surface-muted rounded">
                 {dispatchVehicleOptions.map((opt) => {
                   const isSelected = isVehicleChoiceSelected(vChoice, opt.key, 'wheelchair');
                   const simulatedVehicles = [...selectedVehicles];
@@ -706,10 +706,10 @@ export function DispatchExtrasVehicleSection({
                       }
                       className={`flex-1 min-w-[64px] py-1 text-center rounded text-[11px] font-bold transition-all truncate px-1.5 ${
                         isCapacityInsufficient
-                          ? 'opacity-35 cursor-not-allowed bg-slate-100 text-slate-400'
+                          ? 'opacity-35 cursor-not-allowed bg-surface-muted text-fg-subtle'
                           : isSelected
                           ? 'bg-blue-600 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                          : 'text-fg-secondary hover:text-fg-primary hover:bg-surface-emphasis'
                       }`}
                     >
                       <span>{opt.label}</span>{' '}
@@ -717,7 +717,7 @@ export function DispatchExtrasVehicleSection({
                       {typeof livePrice === 'number' && livePrice > 0 && (
                         <span
                           className={`block text-[10px] font-mono font-extrabold leading-tight ${
-                            isSelected ? 'text-blue-100' : 'text-emerald-700'
+                            isSelected ? 'text-blue-100' : 'text-status-success-fg'
                           }`}
                         >
                           ${Math.ceil(livePrice)}
@@ -731,7 +731,7 @@ export function DispatchExtrasVehicleSection({
                 <button
                   type="button"
                   onClick={() => onRemoveVehicle(idx)}
-                  className="p-1 text-slate-400 hover:text-red-500 rounded"
+                  className="p-1 text-fg-subtle hover:text-red-500 rounded"
                   title="Remove vehicle"
                 >
                   ✕

@@ -191,7 +191,7 @@ export function TripQueueCardsGrid({
     : undefined;
 
   return (
-    <div className="@container/tripqueue flex-1 overflow-y-auto overflow-x-hidden bg-slate-50/50">
+    <div className="@container/tripqueue flex-1 overflow-y-auto overflow-x-hidden bg-surface-subtle/50">
       <div
         style={gridStyle}
         data-queue-card-columns={measuredColumns ?? 'auto'}
@@ -260,16 +260,16 @@ export function TripQueueCardsGrid({
                   onEditTripFromQueue(trip);
                 }
               }}
-              className={`p-3.5 rounded-2xl border transition-all cursor-pointer bg-white flex flex-col justify-between shadow-2xs min-w-0 select-none ${
+              className={`p-3.5 rounded-2xl border transition-all cursor-pointer bg-surface-card flex flex-col justify-between shadow-2xs min-w-0 select-none ${
                 isLongPressing ? 'scale-[0.985] ring-2 ring-blue-500/40' : ''
               } ${
                 isChecked
-                  ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-400'
+                  ? 'border-blue-500 bg-status-info-bg/50 ring-2 ring-blue-400'
                   : isUnconfirmedTrip
-                  ? 'border-amber-400 bg-amber-50/50 hover:bg-amber-50 ring-1 ring-amber-300'
+                  ? 'border-status-warning-border bg-status-warning-bg/50 hover:bg-status-warning-bg ring-1 ring-status-warning-border'
                   : isSelected
-                  ? 'border-blue-500 bg-blue-50/40 ring-2 ring-blue-400'
-                  : 'border-slate-200 hover:border-slate-300 hover:shadow-xs'
+                  ? 'border-blue-500 bg-status-info-bg/40 ring-2 ring-blue-400'
+                  : 'border-border-subtle hover:border-border-strong hover:shadow-xs'
               }`}
             >
               <div>
@@ -284,15 +284,15 @@ export function TripQueueCardsGrid({
                           e.stopPropagation();
                           onToggleSelectTrip(trip.id);
                         }}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
+                        className="rounded border-border-strong text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
                       />
                     )}
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="inline-flex items-center gap-1 text-xs font-extrabold text-slate-900 truncate">
+                      <span className="inline-flex items-center gap-1 text-xs font-extrabold text-fg-primary truncate">
                         <ClockIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                         <span className="truncate">{pickupTimeStr}</span>
                       </span>
-                      <span className="font-mono font-semibold text-[10.5px] text-slate-400 shrink-0">
+                      <span className="font-mono font-semibold text-[10.5px] text-fg-subtle shrink-0">
                         #{trip.id.slice(-6).toUpperCase()}
                       </span>
                     </div>
@@ -309,7 +309,7 @@ export function TripQueueCardsGrid({
                               e.stopPropagation();
                               onOpenReviewModal(trip, 'details');
                             }}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-100 hover:bg-violet-200 text-violet-950 border border-violet-400 text-[10px] font-extrabold animate-pulse whitespace-nowrap cursor-pointer"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-status-staged-bg-strong hover:bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border text-[10px] font-extrabold animate-pulse whitespace-nowrap cursor-pointer"
                             title={
                               guestReq?.customerReason
                                 ? `Passenger requested itinerary change (${guestReq.customerReason}) — click to Approve or Decline`
@@ -325,7 +325,7 @@ export function TripQueueCardsGrid({
                         const pendingAck = getPendingDriverUpdateAck(trip);
                         return (
                           <span
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-400 text-[10px] font-extrabold animate-pulse whitespace-nowrap"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border text-[10px] font-extrabold animate-pulse whitespace-nowrap"
                             title={
                               pendingAck
                                 ? `Trip updated — awaiting driver acknowledgement:\n• ${pendingAck.changesSummary.join('\n• ')}`
@@ -343,7 +343,7 @@ export function TripQueueCardsGrid({
                           e.stopPropagation();
                           onOpenMobileActionSheetTrip(trip);
                         }}
-                        className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                        className="w-7 h-7 rounded-lg text-fg-subtle hover:text-fg-secondary hover:bg-surface-muted flex items-center justify-center transition-colors cursor-pointer"
                         title="Trip actions"
                         aria-label="Open trip actions"
                       >
@@ -359,7 +359,7 @@ export function TripQueueCardsGrid({
 
                 <div className="mb-2.5">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-bold text-xs text-slate-900">
+                    <span className="font-bold text-xs text-fg-primary">
                       {trip.passenger.firstName} {trip.passenger.lastName}
                     </span>
                     <DispatchSlaBadge sla={slaSummary.byTripId[trip.id]} />
@@ -377,14 +377,14 @@ export function TripQueueCardsGrid({
                           onSearchTermChange(trip.multiCarGroupId!);
                           onSearchExpandedChange(true);
                         }}
-                        className="px-1.5 py-0.5 rounded bg-violet-100 hover:bg-violet-200 text-violet-800 border border-violet-300 text-[10px] font-black cursor-pointer"
+                        className="px-1.5 py-0.5 rounded bg-status-staged-bg-strong hover:bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border text-[10px] font-black cursor-pointer"
                         title={`Multi-car order ${trip.multiCarGroupId} — click to filter all ${trip.multiCarTotal} cars`}
                       >
                         Car {trip.multiCarIndex || 1}/{trip.multiCarTotal}
                       </button>
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-mono">
+                  <div className="flex items-center gap-1.5 text-[11px] text-fg-subtle font-mono">
                     <span>{trip.passenger.phone}</span>
                     {trip.passenger.phone && (
                       <button
@@ -396,7 +396,7 @@ export function TripQueueCardsGrid({
                             `${trip.passenger.firstName} ${trip.passenger.lastName}`
                           );
                         }}
-                        className="text-emerald-600 hover:text-emerald-700 p-0.5 rounded hover:bg-emerald-50 transition-colors cursor-pointer"
+                        className="text-emerald-600 hover:text-status-success-fg p-0.5 rounded hover:bg-status-success-bg transition-colors cursor-pointer"
                         title="Click-to-Call Passenger via WebRTC Softphone"
                       >
                         <PhoneIcon className="w-3 h-3" />
@@ -405,7 +405,7 @@ export function TripQueueCardsGrid({
                   </div>
                 </div>
 
-                <div className="space-y-1.5 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl mb-3">
+                <div className="space-y-1.5 text-xs text-fg-secondary bg-surface-subtle p-2.5 rounded-xl mb-3">
                   <div className="flex items-start gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
                     <span className="truncate font-medium" title={trip.pickupLocation.address}>
@@ -424,7 +424,7 @@ export function TripQueueCardsGrid({
                           }
                         }}
                         title={itineraryTooltip}
-                        className={`w-full text-left flex items-center justify-between gap-1.5 px-1.5 py-0.5 rounded-lg bg-amber-50 hover:bg-amber-100/90 border border-amber-300/90 text-amber-900 text-[11px] font-bold transition-colors ${
+                        className={`w-full text-left flex items-center justify-between gap-1.5 px-1.5 py-0.5 rounded-lg bg-status-warning-bg hover:bg-status-warning-bg-strong/90 border border-status-warning-border/90 text-status-warning-fg text-[11px] font-bold transition-colors ${
                           stops.length > 0 ? 'cursor-pointer' : 'cursor-default'
                         }`}
                       >
@@ -439,7 +439,7 @@ export function TripQueueCardsGrid({
                           </span>
                         </span>
                         {stops.length > 0 && (
-                          <span className="text-[10px] text-amber-700 shrink-0 leading-none">
+                          <span className="text-[10px] text-status-warning-fg shrink-0 leading-none">
                             {isStopsExpanded ? '▴' : '▾'}
                           </span>
                         )}
@@ -450,7 +450,7 @@ export function TripQueueCardsGrid({
                           {stops.map((stop, idx) => (
                             <div
                               key={`${trip.id}-stop-${idx}`}
-                              className="flex items-start gap-1.5 text-[11px] text-amber-950"
+                              className="flex items-start gap-1.5 text-[11px] text-status-warning-fg"
                             >
                               <span className="w-3.5 h-3.5 rounded-full bg-amber-500 text-white text-[9px] font-black flex items-center justify-center mt-0.5 shrink-0">
                                 {idx + 1}
@@ -476,13 +476,13 @@ export function TripQueueCardsGrid({
 
               {!isDesktop ? (
                 /* Mobile-Native Card Footer */
-                <div className="pt-2.5 border-t border-slate-100 space-y-1.5 text-xs">
+                <div className="pt-2.5 border-t border-border-faint space-y-1.5 text-xs">
                   <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="font-black text-slate-900 text-sm tabular-nums shrink-0">
+                    <span className="font-black text-fg-primary text-sm tabular-nums shrink-0">
                       ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                     </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 whitespace-nowrap truncate max-w-[105px]">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-muted text-fg-secondary whitespace-nowrap truncate max-w-[105px]">
                       {formatVehicleTierDisplay(
                         (trip.metadata as any)?.vehicleTypeId || trip.vehicleTier,
                         settings.vehicles,
@@ -499,7 +499,7 @@ export function TripQueueCardsGrid({
                           e.stopPropagation();
                           onCancelAutoOffer(trip);
                         }}
-                        className="px-2 py-1 rounded-full bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 font-bold text-[10.5px] cursor-pointer shrink-0"
+                        className="px-2 py-1 rounded-full bg-status-danger-bg hover:bg-status-danger-bg-strong border border-status-danger-border text-status-danger-fg font-bold text-[10.5px] cursor-pointer shrink-0"
                         title="Cancel active Offer Cascade"
                       >
                         Cancel Cascade
@@ -515,7 +515,7 @@ export function TripQueueCardsGrid({
                             stagedPlanner?.setDriverPickerMode('stage_hold');
                             onOpenDriverPickerForTrip(trip);
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-l-full border border-r-0 border-dashed border-indigo-400 bg-indigo-50 text-indigo-950 text-[11px] font-bold transition-all active:scale-95 cursor-pointer min-w-0"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-l-full border border-r-0 border-dashed border-indigo-400 bg-status-staged-bg text-status-staged-fg text-[11px] font-bold transition-all active:scale-95 cursor-pointer min-w-0"
                           title={`Staged hold: ${trip.plannedDriverLabel || trip.plannedDriverId}`}
                         >
                           <span className="shrink-0">📌</span>
@@ -549,10 +549,10 @@ export function TripQueueCardsGrid({
                         }}
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold transition-all active:scale-95 cursor-pointer max-w-[145px] ${
                           assignedDriverLabel
-                            ? 'bg-white text-slate-900 border-slate-300 shadow-2xs hover:bg-slate-50'
+                            ? 'bg-surface-card text-fg-primary border-border-strong shadow-2xs hover:bg-surface-subtle'
                             : !trip.assignedDriverId && trip.offerCascade?.state === 'exhausted'
-                            ? 'bg-rose-50 text-rose-800 border-rose-400 hover:bg-rose-100'
-                            : 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100'
+                            ? 'bg-status-danger-bg text-status-danger-fg border-rose-400 hover:bg-status-danger-bg-strong'
+                            : 'bg-status-info-bg text-status-info-fg border-status-info-border hover:bg-status-info-bg-strong'
                         }`}
                         title={
                           getTripCascadeExhaustedTooltip(trip) || 'Tap to assign or stage driver'
@@ -590,14 +590,14 @@ export function TripQueueCardsGrid({
                 </div>
               ) : (
                 /* Desktop Card Footer */
-                <div className="pt-2.5 border-t border-slate-100 space-y-2 text-xs">
+                <div className="pt-2.5 border-t border-border-faint space-y-2 text-xs">
 
                   <div className="flex items-center justify-between gap-2 min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="font-black text-slate-900 text-sm tabular-nums shrink-0">
+                      <span className="font-black text-fg-primary text-sm tabular-nums shrink-0">
                         ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                       </span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 whitespace-nowrap truncate max-w-[125px]">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-muted text-fg-secondary whitespace-nowrap truncate max-w-[125px]">
                         {formatVehicleTierDisplay(
                           (trip.metadata as any)?.vehicleTypeId || trip.vehicleTier,
                           settings.vehicles,
@@ -730,7 +730,7 @@ export function TripQueueCardsGrid({
                           e.stopPropagation();
                           onCancelAutoOffer(trip);
                         }}
-                        className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 font-bold text-[11px] cursor-pointer shrink-0 transition-colors"
+                        className="px-2.5 py-1.5 rounded-lg bg-status-danger-bg hover:bg-status-danger-bg-strong border border-status-danger-border text-status-danger-fg font-bold text-[11px] cursor-pointer shrink-0 transition-colors"
                         title="Cancel active Offer Cascade"
                       >
                         Cancel
@@ -743,7 +743,7 @@ export function TripQueueCardsGrid({
           );
         })}
         {filteredTrips.length === 0 && (
-          <div className="col-span-full py-12 text-center text-slate-500 font-semibold text-xs">
+          <div className="col-span-full py-12 text-center text-fg-muted font-semibold text-xs">
             No trips found.
           </div>
         )}

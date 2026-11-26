@@ -9,6 +9,7 @@ import {
   DriverEarningsHistoryPane,
   type DriverEarningsHistoryPaneProps,
 } from './DriverEarningsHistoryPane';
+import { COMPANY_CONFIG } from '../../../config/companyConfig';
 import {
   CarIcon,
   CompassIcon,
@@ -193,15 +194,25 @@ export const DriverProfilePane = React.memo(function DriverProfilePane({
             </div>
           </div>
 
-          {/* Sign Out */}
-          <button
-            type="button"
-            onClick={onSignOut}
-            className="w-full py-3.5 min-h-[48px] rounded-2xl bg-rose-600/15 hover:bg-rose-600/25 border border-rose-500/40 text-rose-300 font-black text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors"
-          >
-            <LogOutIcon className="w-4 h-4" />
-            <span>Sign Out</span>
-          </button>
+          {/* Call Dispatch & Sign Out */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <a
+              href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
+              className="py-3.5 min-h-[48px] rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-blue-300 font-black text-sm flex items-center justify-center gap-2 transition-colors"
+            >
+              <PhoneIcon className="w-4 h-4" />
+              <span>Call Dispatch</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="py-3.5 min-h-[48px] rounded-2xl bg-rose-600/15 hover:bg-rose-600/25 border border-rose-500/40 text-rose-300 font-black text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors"
+            >
+              <LogOutIcon className="w-4 h-4" />
+              <span>Sign Out</span>
+            </button>
+          </div>
         </section>
       )}
     </div>

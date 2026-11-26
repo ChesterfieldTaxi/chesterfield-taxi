@@ -167,53 +167,53 @@ export function ClientProfileEditTab({
   return (
     <form onSubmit={handleSave} className="space-y-2.5 text-xs">
       {savedNotice && (
-        <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold flex items-center gap-1.5">
+        <div className="p-2 rounded-xl bg-status-success-bg border border-status-success-border text-status-success-fg font-bold flex items-center gap-1.5">
           <CheckIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" /><span>{savedNotice}</span>
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-slate-200/90 p-3 space-y-2 shadow-2xs">
+      <div className="bg-surface-card rounded-xl border border-border-subtle/90 p-3 space-y-2 shadow-2xs">
         <div className="flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+          <span className="inline-flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-fg-muted">
             <UserIcon className="w-3.5 h-3.5 text-indigo-600" /><span>Contact Info</span>
           </span>
           <Switch size="sm" tone="amber" label="VIP Priority Client" checked={Boolean(form.isVip)} onChange={(c) => setForm((p) => ({ ...p, isVip: c }))} className="py-0" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
-            <label className="block text-[10.5px] font-bold text-slate-600 mb-0.5">Full Name *</label>
-            <input type="text" value={form.name || ''} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Eleanor Vance" className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-blue-500 font-semibold" />
+            <label className="block text-[10.5px] font-bold text-fg-secondary mb-0.5">Full Name *</label>
+            <input type="text" value={form.name || ''} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Eleanor Vance" className="w-full px-2.5 py-1.5 rounded-lg border border-border-subtle bg-surface-card focus:outline-blue-500 font-semibold" />
           </div>
           <div>
-            <label className="block text-[10.5px] font-bold text-slate-600 mb-0.5">VIP Reason</label>
-            <input type="text" disabled={!form.isVip} value={form.vipReason || ''} onChange={(e) => setForm((p) => ({ ...p, vipReason: e.target.value }))} placeholder={form.isVip ? 'Executive / Medical Priority' : 'Enable VIP above'} className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white disabled:bg-slate-100 disabled:text-slate-400 focus:outline-blue-500" />
+            <label className="block text-[10.5px] font-bold text-fg-secondary mb-0.5">VIP Reason</label>
+            <input type="text" disabled={!form.isVip} value={form.vipReason || ''} onChange={(e) => setForm((p) => ({ ...p, vipReason: e.target.value }))} placeholder={form.isVip ? 'Executive / Medical Priority' : 'Enable VIP above'} className="w-full px-2.5 py-1.5 rounded-lg border border-border-subtle bg-surface-card disabled:bg-surface-muted disabled:text-fg-subtle focus:outline-blue-500" />
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200/90 p-3 space-y-2 shadow-2xs">
+      <div className="bg-surface-card rounded-xl border border-border-subtle/90 p-3 space-y-2 shadow-2xs">
         <div className="flex items-center justify-between">
-          <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">Phones &amp; Digital Contact</span>
-          <button type="button" onClick={addPhone} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10.5px] border border-blue-200 cursor-pointer">
+          <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-fg-muted">Phones &amp; Digital Contact</span>
+          <button type="button" onClick={addPhone} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg font-bold text-[10.5px] border border-status-info-border cursor-pointer">
             <PlusIcon className="w-3 h-3" /><span>Add Phone</span>
           </button>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-32 shrink-0"><Select size="xs" options={PHONE_TYPE_OPTIONS} value={form.primaryPhoneType || 'mobile'} onValueChange={(v) => setForm((p) => ({ ...p, primaryPhoneType: v as PhoneType }))} /></div>
-          <input type="tel" value={form.phone || ''} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} placeholder="Primary phone (+1 314-555-0199)" className="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg border border-slate-200 font-mono font-semibold focus:outline-blue-500" />
+          <input type="tel" value={form.phone || ''} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} placeholder="Primary phone (+1 314-555-0199)" className="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg border border-border-subtle font-mono font-semibold focus:outline-blue-500" />
         </div>
         {(form.additionalPhones || []).map((ph, idx) => (
           <div key={ph.id || idx} className="flex items-center gap-1.5">
             <div className="w-28 shrink-0"><Select size="xs" options={PHONE_TYPE_OPTIONS} value={ph.type || 'mobile'} onValueChange={(v) => updatePhone(idx, { type: v as PhoneType })} /></div>
-            <input type="tel" value={ph.number || ''} onChange={(e) => updatePhone(idx, { number: e.target.value })} placeholder="Additional phone..." className="flex-1 min-w-0 px-2 py-1 rounded-lg border border-slate-200 font-mono" />
-            {ph.type === 'work' && <input type="text" value={ph.extension || ''} onChange={(e) => updatePhone(idx, { extension: e.target.value })} placeholder="Ext" className="w-14 px-2 py-1 rounded-lg border border-slate-200" />}
-            <input type="text" value={ph.label || ''} onChange={(e) => updatePhone(idx, { label: e.target.value })} placeholder="Label" className="w-24 px-2 py-1 rounded-lg border border-slate-200" />
-            <button type="button" onClick={() => removePhone(idx)} className="p-1 text-slate-400 hover:text-rose-600 rounded-md cursor-pointer" title="Remove phone"><TrashIcon className="w-3.5 h-3.5" /></button>
+            <input type="tel" value={ph.number || ''} onChange={(e) => updatePhone(idx, { number: e.target.value })} placeholder="Additional phone..." className="flex-1 min-w-0 px-2 py-1 rounded-lg border border-border-subtle font-mono" />
+            {ph.type === 'work' && <input type="text" value={ph.extension || ''} onChange={(e) => updatePhone(idx, { extension: e.target.value })} placeholder="Ext" className="w-14 px-2 py-1 rounded-lg border border-border-subtle" />}
+            <input type="text" value={ph.label || ''} onChange={(e) => updatePhone(idx, { label: e.target.value })} placeholder="Label" className="w-24 px-2 py-1 rounded-lg border border-border-subtle" />
+            <button type="button" onClick={() => removePhone(idx)} className="p-1 text-fg-subtle hover:text-rose-600 rounded-md cursor-pointer" title="Remove phone"><TrashIcon className="w-3.5 h-3.5" /></button>
           </div>
         ))}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-          <input type="email" value={form.email || ''} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} placeholder="Primary email" className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 focus:outline-blue-500" />
-          <input type="email" value={form.secondaryEmail || ''} onChange={(e) => setForm((p) => ({ ...p, secondaryEmail: e.target.value }))} placeholder="Secondary / billing email" className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 focus:outline-blue-500" />
+          <input type="email" value={form.email || ''} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} placeholder="Primary email" className="w-full px-2.5 py-1.5 rounded-lg border border-border-subtle focus:outline-blue-500" />
+          <input type="email" value={form.secondaryEmail || ''} onChange={(e) => setForm((p) => ({ ...p, secondaryEmail: e.target.value }))} placeholder="Secondary / billing email" className="w-full px-2.5 py-1.5 rounded-lg border border-border-subtle focus:outline-blue-500" />
         </div>
         <Checkbox size="sm" label="Send automated SMS dispatch & arrival updates" checked={form.smsNotifications !== false} onChange={(c) => setForm((p) => ({ ...p, smsNotifications: c }))} />
       </div>
@@ -231,19 +231,19 @@ export function ClientProfileEditTab({
         onMethodsChange={(methods, u) => setForm((p) => ({ ...p, id: u?.id || p.id, stripeCustomerId: u?.stripeCustomerId || p.stripeCustomerId, savedPaymentMethods: methods }))}
       />
 
-      <div className="bg-white rounded-xl border border-slate-200/90 p-3 space-y-2 shadow-2xs">
-        <div className="flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+      <div className="bg-surface-card rounded-xl border border-border-subtle/90 p-3 space-y-2 shadow-2xs">
+        <div className="flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-fg-muted">
           <BuildingIcon className="w-3.5 h-3.5 text-indigo-600" /><span>Corporate Account &amp; Billing</span>
         </div>
         <Select size="sm" searchable searchPlaceholder="Search company name or account #..." options={corpOptions} value={selectedCorpValue} onValueChange={handleCorpSelect} />
         <div className="grid grid-cols-2 gap-2">
-          <input type="text" value={form.billingDepartment || ''} onChange={(e) => setForm((p) => ({ ...p, billingDepartment: e.target.value }))} placeholder="Department / Cost Center" className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 focus:outline-blue-500" />
-          <input type="text" value={form.defaultPoNumber || ''} onChange={(e) => setForm((p) => ({ ...p, defaultPoNumber: e.target.value }))} placeholder="Default PO #" className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-mono focus:outline-blue-500" />
+          <input type="text" value={form.billingDepartment || ''} onChange={(e) => setForm((p) => ({ ...p, billingDepartment: e.target.value }))} placeholder="Department / Cost Center" className="w-full px-2.5 py-1.5 rounded-lg border border-border-subtle focus:outline-blue-500" />
+          <input type="text" value={form.defaultPoNumber || ''} onChange={(e) => setForm((p) => ({ ...p, defaultPoNumber: e.target.value }))} placeholder="Default PO #" className="w-full px-2.5 py-1.5 rounded-lg border border-border-subtle font-mono focus:outline-blue-500" />
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200/90 p-3 space-y-2 shadow-2xs">
-        <div className="flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+      <div className="bg-surface-card rounded-xl border border-border-subtle/90 p-3 space-y-2 shadow-2xs">
+        <div className="flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-fg-muted">
           <MapPinIcon className="w-3.5 h-3.5 text-emerald-600" /><span>Home &amp; Work Addresses</span>
         </div>
         <div className="space-y-1.5">
@@ -252,8 +252,8 @@ export function ClientProfileEditTab({
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200/90 p-3 space-y-2 shadow-2xs">
-        <div className="flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+      <div className="bg-surface-card rounded-xl border border-border-subtle/90 p-3 space-y-2 shadow-2xs">
+        <div className="flex items-center gap-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-fg-muted">
           <WheelchairIcon className="w-3.5 h-3.5 text-blue-600" /><span>Preferred Vehicle, Mobility &amp; Notes</span>
         </div>
         <Select size="sm" options={vehicleOptions} value={form.preferredVehicleTier || 'standard'} onValueChange={(v) => setForm((p) => ({ ...p, preferredVehicleTier: v as any }))} />
@@ -263,11 +263,11 @@ export function ClientProfileEditTab({
           <Checkbox size="sm" label="Service Animal" checked={Boolean(form.accessibilityNeeds?.serviceAnimal)} onChange={(c) => setMobility('serviceAnimal', c)} />
           <Checkbox size="sm" label="Door-to-Door Assist" checked={Boolean(form.accessibilityNeeds?.extraAssistance)} onChange={(c) => setMobility('extraAssistance', c)} />
         </div>
-        <textarea rows={2} value={form.notes || ''} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Dispatcher & driver notes (gate code, pickup instructions)..." className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-blue-500" />
+        <textarea rows={2} value={form.notes || ''} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Dispatcher & driver notes (gate code, pickup instructions)..." className="w-full px-2.5 py-1.5 rounded-lg border border-border-subtle bg-surface-card focus:outline-blue-500" />
       </div>
 
-      <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 py-2.5 px-1 -mx-1 bg-slate-50/95 backdrop-blur-xs border-t border-slate-200">
-        {onCancel && <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold cursor-pointer">Cancel</button>}
+      <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 py-2.5 px-1 -mx-1 bg-surface-subtle/95 backdrop-blur-xs border-t border-border-subtle">
+        {onCancel && <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded-lg border border-border-subtle bg-surface-card hover:bg-surface-muted text-fg-secondary font-bold cursor-pointer">Cancel</button>}
         <button type="submit" disabled={!canSave} className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-45 text-white font-extrabold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer">
           <CheckIcon className="w-3.5 h-3.5" /><span>Save Profile</span>
         </button>

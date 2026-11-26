@@ -16,7 +16,7 @@ function MenuCheckIndicator({ checked }: { checked: boolean }) {
     <span
       aria-hidden="true"
       className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
-        checked ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-300'
+        checked ? 'bg-blue-600 border-blue-600 text-white' : 'bg-surface-card border-border-strong'
       }`}
     >
       {checked && <CheckIcon className="w-2.5 h-2.5 stroke-[3]" />}
@@ -154,7 +154,7 @@ export function DispatchWaiveFeesDropdown({
   const renderGroup = (title: string, items: WaivableFeeOption[]) =>
     items.length > 0 && (
       <div className="py-1">
-        <div className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">{title}</div>
+        <div className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-fg-subtle">{title}</div>
         {items.map((opt) => {
           const checked = opt.kind === 'surcharge' ? activeSurchargeSet.has(opt.key) : activeExtraSet.has(opt.key);
           return (
@@ -163,7 +163,7 @@ export function DispatchWaiveFeesDropdown({
               type="button"
               onClick={() => toggleOption(opt)}
               className={`w-full px-3 py-1.5 flex items-center justify-between gap-2 text-left transition-colors cursor-pointer ${
-                checked ? 'bg-blue-50/80 text-blue-700 font-bold' : 'text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
+                checked ? 'bg-status-info-bg/80 text-status-info-fg font-bold' : 'text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg'
               }`}
             >
               <span className="flex items-center gap-2 min-w-0">
@@ -171,11 +171,11 @@ export function DispatchWaiveFeesDropdown({
                 <span className="truncate">{opt.label}</span>
               </span>
               {opt.liveAppliedAmount > 0 ? (
-                <span className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-bold shrink-0 ${checked ? 'bg-emerald-100 text-emerald-800 line-through' : 'bg-amber-100 text-amber-900'}`}>
+                <span className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-bold shrink-0 ${checked ? 'bg-status-success-bg-strong text-status-success-fg line-through' : 'bg-status-warning-bg-strong text-status-warning-fg'}`}>
                   ${opt.liveAppliedAmount.toFixed(2)}
                 </span>
               ) : (
-                <span className="font-mono text-[10px] text-slate-400 shrink-0">{opt.rateBadge}</span>
+                <span className="font-mono text-[10px] text-fg-subtle shrink-0">{opt.rateBadge}</span>
               )}
             </button>
           );
@@ -197,7 +197,7 @@ export function DispatchWaiveFeesDropdown({
         className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border inline-flex items-center gap-1 transition-colors cursor-pointer shadow-2xs ${
           activeCount > 0
             ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
-            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+            : 'bg-surface-card text-fg-secondary border-border-strong hover:bg-surface-subtle'
         }`}
       >
         <span>{activeCount > 0 ? `Waive Fees (${activeCount})` : 'Waive Fees'}</span>
@@ -207,7 +207,7 @@ export function DispatchWaiveFeesDropdown({
       {selectedChips.map((chip) => (
         <span
           key={`${chip.kind}:${chip.key}`}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 text-[10px] font-bold"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-status-success-bg text-status-success-fg border border-status-success-border text-[10px] font-bold"
         >
           <span className="truncate max-w-[140px]">✓ {chip.label}</span>
           <button
@@ -227,9 +227,9 @@ export function DispatchWaiveFeesDropdown({
             ref={popoverRef}
             data-ui-select-portal="true"
             style={{ position: 'fixed', top: coords.top, left: coords.left, width: coords.width, transformOrigin: coords.openUpward ? 'bottom left' : 'top left' }}
-            className="bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none z-[99999]"
+            className="bg-surface-card rounded-xl shadow-xl border border-border-subtle/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-border-faint select-none z-[99999]"
           >
-            <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center justify-between bg-slate-50/60 rounded-t-xl min-h-[28px]">
+            <div className="px-3 py-1.5 text-[10px] font-extrabold text-fg-subtle uppercase tracking-wider flex items-center justify-between bg-surface-subtle/60 rounded-t-xl min-h-[28px]">
               <span>Waive Active Fees</span>
               <button
                 type="button"
@@ -240,11 +240,11 @@ export function DispatchWaiveFeesDropdown({
                 Clear
               </button>
             </div>
-            <div className="max-h-64 overflow-y-auto custom-scrollbar divide-y divide-slate-100">
+            <div className="max-h-64 overflow-y-auto custom-scrollbar divide-y divide-border-faint">
               {renderGroup('Active Surcharges', catalog.surcharges)}
               {renderGroup('Active Extras', catalog.extras)}
               {catalog.all.length === 0 && (
-                <div className="px-3 py-3 text-center text-[11px] text-slate-400">No active fees enabled in Admin</div>
+                <div className="px-3 py-3 text-center text-[11px] text-fg-subtle">No active fees enabled in Admin</div>
               )}
             </div>
           </div>,

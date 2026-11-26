@@ -373,7 +373,7 @@ export function FloatingWindow({
   if (isMobileViewport) {
     return portalIfClient(
       <div
-        className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-end justify-center p-0 pointer-events-auto select-none animate-in fade-in duration-150"
+        className="fixed inset-0 bg-surface-overlay/60 backdrop-blur-xs flex items-end justify-center p-0 pointer-events-auto select-none animate-in fade-in duration-150"
         style={{ zIndex: effectiveZ }}
         onClick={onClose}
       >
@@ -381,26 +381,26 @@ export function FloatingWindow({
           ref={windowRef}
           onClick={(e) => e.stopPropagation()}
           style={mobileSheetDrag.sheetStyle}
-          className={`w-full max-h-[92dvh] flex flex-col bg-white rounded-t-3xl shadow-2xl border-t border-slate-200/90 overflow-hidden select-text animate-in slide-in-from-bottom duration-200 ${className}`}
+          className={`w-full max-h-[92dvh] flex flex-col bg-surface-card rounded-t-3xl shadow-2xl border-t border-border-subtle/90 overflow-hidden select-text animate-in slide-in-from-bottom duration-200 ${className}`}
         >
-          <div {...mobileSheetDrag.dragHandlers} className="bg-slate-900 text-white px-4 pt-2 pb-3 shrink-0 select-none touch-none">
-            <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5" aria-hidden="true" />
+          <div {...mobileSheetDrag.dragHandlers} className="bg-surface-header text-white px-4 pt-2 pb-3 shrink-0 select-none touch-none">
+            <div className="w-10 h-1 rounded-full bg-surface-strong/80 mx-auto mb-2.5" aria-hidden="true" />
             <div className="flex items-start justify-between gap-2.5">
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 {icon && <span className="text-blue-400 shrink-0">{icon}</span>}
                 <div className="min-w-0 flex-1">
                   <div className="font-extrabold text-sm text-white truncate flex items-center gap-2"><span className="truncate">{title}</span></div>
-                  {subtitle && <div className="text-[11px] text-slate-400 truncate mt-0.5">{subtitle}</div>}
+                  {subtitle && <div className="text-[11px] text-fg-subtle truncate mt-0.5">{subtitle}</div>}
                 </div>
               </div>
-              <button type="button" onClick={onClose} className="w-9 h-9 rounded-full bg-slate-800/90 text-slate-300 hover:text-white active:scale-95 flex items-center justify-center transition-all cursor-pointer shrink-0" title="Close" aria-label="Close modal">
+              <button type="button" onClick={onClose} className="w-9 h-9 rounded-full bg-surface-header-elevated/90 text-slate-300 hover:text-white active:scale-95 flex items-center justify-center transition-all cursor-pointer shrink-0" title="Close" aria-label="Close modal">
                 <XIcon className="w-4 h-4" />
               </button>
             </div>
-            {headerExtra && <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center flex-wrap gap-1.5">{headerExtra}</div>}
+            {headerExtra && <div className="mt-2 pt-2 border-t border-border-header/80 flex items-center flex-wrap gap-1.5">{headerExtra}</div>}
           </div>
-          <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-slate-50/50 flex flex-col">{children}</div>
-          {footer && <div className="shrink-0 bg-white border-t border-slate-200 pb-[env(safe-area-inset-bottom)]">{footer}</div>}
+          <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-surface-subtle/50 flex flex-col">{children}</div>
+          {footer && <div className="shrink-0 bg-surface-card border-t border-border-subtle pb-[env(safe-area-inset-bottom)]">{footer}</div>}
         </div>
       </div>
     );
@@ -410,12 +410,12 @@ export function FloatingWindow({
   if (isMinimized) {
     return portalIfClient(
       <div className="fixed bottom-4 right-4 z-50 pointer-events-auto animate-in slide-in-from-bottom-2 duration-150" style={{ zIndex: effectiveZ }}>
-        <div onClick={() => setIsMinimized(false)} className="flex items-center gap-2.5 px-3.5 py-2 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700 cursor-pointer hover:bg-slate-800 transition-all select-none">
+        <div onClick={() => setIsMinimized(false)} className="flex items-center gap-2.5 px-3.5 py-2 bg-surface-header text-white rounded-xl shadow-2xl border border-border-header cursor-pointer hover:bg-surface-header-elevated transition-all select-none">
           {icon && <span className="text-blue-400">{icon}</span>}
           <span className="font-extrabold text-xs max-w-[200px] truncate">{title}</span>
-          <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-slate-700">
-            <button type="button" onClick={(e) => { e.stopPropagation(); setIsMinimized(false); }} title="Expand Window" className="text-slate-400 hover:text-white p-0.5 rounded cursor-pointer">⤢</button>
-            <button type="button" onClick={(e) => { e.stopPropagation(); onClose(); }} title="Close" className="text-slate-400 hover:text-rose-400 p-0.5 rounded cursor-pointer"><XIcon className="w-3.5 h-3.5" /></button>
+          <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-border-header">
+            <button type="button" onClick={(e) => { e.stopPropagation(); setIsMinimized(false); }} title="Expand Window" className="text-fg-subtle hover:text-white p-0.5 rounded cursor-pointer">⤢</button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onClose(); }} title="Close" className="text-fg-subtle hover:text-rose-400 p-0.5 rounded cursor-pointer"><XIcon className="w-3.5 h-3.5" /></button>
           </div>
         </div>
       </div>
@@ -429,7 +429,7 @@ export function FloatingWindow({
 
   return portalIfClient(
     <div
-      className={`fixed inset-0 select-none ${hasBackdrop ? 'z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 pointer-events-auto' : 'pointer-events-none'}`}
+      className={`fixed inset-0 select-none ${hasBackdrop ? 'z-50 bg-surface-overlay/60 backdrop-blur-xs flex items-center justify-center p-4 pointer-events-auto' : 'pointer-events-none'}`}
       style={{ zIndex: effectiveZ }}
     >
       <div
@@ -440,38 +440,38 @@ export function FloatingWindow({
             ? { width: clampedWidth, maxHeight: autoHeight && !isMaximized ? '85vh' : undefined }
             : { position: 'fixed', left: `${clampedX}px`, top: `${clampedY}px`, width: `${clampedWidth}px`, height: autoHeight && !isMaximized ? 'auto' : `${clampedHeight}px`, maxHeight: autoHeight && !isMaximized ? '85vh' : undefined }
         }
-        className={`pointer-events-auto flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden transform transition-[box-shadow] select-text duration-100 ${className}`}
+        className={`pointer-events-auto flex flex-col bg-surface-card rounded-2xl shadow-2xl border border-border-subtle/90 overflow-hidden transform transition-[box-shadow] select-text duration-100 ${className}`}
       >
         <div
           onMouseDown={handleMouseDownHeader}
-          className={`px-4 py-2.5 bg-slate-900 text-white flex items-center justify-between gap-3 shrink-0 select-none ${isDraggable && !isMaximized ? 'cursor-grab active:cursor-grabbing' : ''}`}
+          className={`px-4 py-2.5 bg-surface-header text-white flex items-center justify-between gap-3 shrink-0 select-none ${isDraggable && !isMaximized ? 'cursor-grab active:cursor-grabbing' : ''}`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
             {icon && <span className="text-blue-400 shrink-0">{icon}</span>}
             <div className="min-w-0">
               <div className="font-extrabold text-xs text-white truncate flex items-center gap-2"><span>{title}</span></div>
-              {subtitle && <div className="text-[10px] text-slate-400 truncate">{subtitle}</div>}
+              {subtitle && <div className="text-[10px] text-fg-subtle truncate">{subtitle}</div>}
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {headerExtra}
             {isMinimizable && (
-              <button type="button" onClick={() => setIsMinimized(true)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer text-xs font-mono" title="Minimize">—</button>
+              <button type="button" onClick={() => setIsMinimized(true)} className="w-6 h-6 rounded flex items-center justify-center text-fg-subtle hover:text-white hover:bg-surface-header-elevated transition-colors cursor-pointer text-xs font-mono" title="Minimize">—</button>
             )}
             {isMaximizable && (
-              <button type="button" onClick={toggleMaximize} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer text-xs" title={isMaximized ? 'Restore' : 'Maximize'}>{isMaximized ? '❐' : '□'}</button>
+              <button type="button" onClick={toggleMaximize} className="w-6 h-6 rounded flex items-center justify-center text-fg-subtle hover:text-white hover:bg-surface-header-elevated transition-colors cursor-pointer text-xs" title={isMaximized ? 'Restore' : 'Maximize'}>{isMaximized ? '❐' : '□'}</button>
             )}
-            <button type="button" onClick={onClose} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer" title="Close">
+            <button type="button" onClick={onClose} className="w-6 h-6 rounded flex items-center justify-center text-fg-subtle hover:text-rose-400 hover:bg-surface-header-elevated transition-colors cursor-pointer" title="Close">
               <XIcon className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto min-h-0 bg-slate-50/50 flex flex-col">{children}</div>
-        {footer && <div className="shrink-0 bg-white border-t border-slate-200">{footer}</div>}
+        <div className="flex-1 overflow-y-auto min-h-0 bg-surface-subtle/50 flex flex-col">{children}</div>
+        {footer && <div className="shrink-0 bg-surface-card border-t border-border-subtle">{footer}</div>}
 
         {isResizable && !isMaximized && (
-          <div onMouseDown={handleMouseDownResize} className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize flex items-end justify-end p-0.5 select-none text-slate-300 hover:text-slate-600 transition-colors" title="Drag to resize">
+          <div onMouseDown={handleMouseDownResize} className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize flex items-end justify-end p-0.5 select-none text-fg-faint hover:text-fg-secondary transition-colors" title="Drag to resize">
             <svg viewBox="0 0 10 10" className="w-2.5 h-2.5 fill-current"><polygon points="10,0 10,10 0,10" /></svg>
           </div>
         )}

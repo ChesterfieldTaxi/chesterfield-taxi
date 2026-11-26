@@ -114,12 +114,12 @@ export function DispatchLeftBookingSidebar({
         style={{
           width: isDesktop ? `${sidebarWidth}px` : undefined,
         }}
-        className={`h-full bg-white border-r border-slate-200 flex flex-col shrink-0 relative z-20 shadow-xs ${
+        className={`h-full bg-surface-card border-r border-border-subtle flex flex-col shrink-0 relative z-20 shadow-xs ${
           activeMobileTab === 'booking' ? 'flex w-full' : 'hidden lg:flex'
         }`}
       >
         {/* Browser-style Tab Bar (Pill tabs on mobile, classic tabs on desktop) */}
-        <div className="h-11 lg:h-9 bg-slate-100 border-b border-slate-200 flex items-center px-1.5 lg:px-1 shrink-0 select-none relative">
+        <div className="h-11 lg:h-9 bg-surface-muted border-b border-border-subtle flex items-center px-1.5 lg:px-1 shrink-0 select-none relative">
           <div className="flex-1 flex items-center gap-1.5 lg:gap-1 overflow-x-auto h-full scrollbar-none py-1.5 lg:py-1 min-w-0">
             {drafts.map((d) => {
               const isActive = d.id === activeDraftId;
@@ -137,8 +137,8 @@ export function DispatchLeftBookingSidebar({
                   title={d.formValues?.passengerName || label}
                   className={`group relative h-8 lg:h-7 px-2.5 lg:px-2 rounded-xl lg:rounded-t-md lg:rounded-b-none text-xs font-semibold flex items-center gap-1.5 lg:gap-1 cursor-pointer border lg:border-b-0 transition-colors shrink-0 max-w-[140px] lg:max-w-[104px] ${
                     isActive
-                      ? 'bg-white text-blue-600 border-slate-300 shadow-xs'
-                      : 'bg-slate-200/70 text-slate-600 hover:bg-slate-200 border-transparent'
+                      ? 'bg-surface-card text-blue-600 border-border-strong shadow-xs'
+                      : 'bg-surface-emphasis/70 text-fg-secondary hover:bg-surface-emphasis border-transparent'
                   }`}
                 >
                   {hasData && (
@@ -151,7 +151,7 @@ export function DispatchLeftBookingSidebar({
                   <button
                     type="button"
                     onClick={(e) => onCloseDraft(d.id, e)}
-                    className="w-5 h-5 lg:w-3.5 lg:h-3.5 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-300/80 cursor-pointer shrink-0"
+                    className="w-5 h-5 lg:w-3.5 lg:h-3.5 rounded-full flex items-center justify-center text-fg-subtle hover:text-fg-secondary hover:bg-surface-strong/80 cursor-pointer shrink-0"
                     title="Close Tab"
                     aria-label={`Close ${label}`}
                   >
@@ -162,12 +162,12 @@ export function DispatchLeftBookingSidebar({
             })}
           </div>
 
-          <div className="flex items-center shrink-0 pl-1.5 lg:pl-1 border-l border-slate-200 gap-1 lg:gap-0.5">
+          <div className="flex items-center shrink-0 pl-1.5 lg:pl-1 border-l border-border-subtle gap-1 lg:gap-0.5">
             {drafts.length < maxDrafts && (
               <button
                 type="button"
                 onClick={onCreateDraft}
-                className="h-8 w-8 lg:h-7 lg:w-7 rounded-xl lg:rounded bg-white lg:bg-transparent border border-slate-200 lg:border-transparent hover:bg-slate-200 text-slate-700 lg:text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                className="h-8 w-8 lg:h-7 lg:w-7 rounded-xl lg:rounded bg-surface-card lg:bg-transparent border border-border-subtle lg:border-transparent hover:bg-surface-emphasis text-fg-secondary lg:text-fg-secondary hover:text-fg-primary flex items-center justify-center transition-colors shrink-0 cursor-pointer"
                 title="Open new draft booking tab"
                 aria-label="New booking tab"
               >
@@ -181,8 +181,8 @@ export function DispatchLeftBookingSidebar({
                 onClick={() => onTabOverflowOpenChange(!isTabOverflowOpen)}
                 className={`h-8 w-8 lg:h-7 lg:w-auto lg:px-1.5 rounded-xl lg:rounded flex items-center justify-center text-xs font-bold transition-colors cursor-pointer ${
                   isTabOverflowOpen
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-white lg:bg-transparent border border-slate-200 lg:border-transparent hover:bg-slate-200 text-slate-600 lg:text-slate-500 hover:text-slate-800'
+                    ? 'bg-status-info-bg-strong text-status-info-fg'
+                    : 'bg-surface-card lg:bg-transparent border border-border-subtle lg:border-transparent hover:bg-surface-emphasis text-fg-secondary lg:text-fg-muted hover:text-fg-strong'
                 }`}
                 title="All Open Draft Tabs"
                 aria-label="All open tabs"
@@ -193,8 +193,8 @@ export function DispatchLeftBookingSidebar({
               {isTabOverflowOpen && (
                 <>
                   {/* Desktop Popover */}
-                  <div className="hidden lg:block absolute right-0 top-8 w-64 bg-white border border-slate-200 rounded-xl shadow-xl py-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
-                    <div className="px-3 py-1.5 border-b border-slate-100 flex items-center justify-between text-slate-500 font-semibold text-[11px] uppercase tracking-wider">
+                  <div className="hidden lg:block absolute right-0 top-8 w-64 bg-surface-card border border-border-subtle rounded-xl shadow-xl py-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
+                    <div className="px-3 py-1.5 border-b border-border-faint flex items-center justify-between text-fg-muted font-semibold text-[11px] uppercase tracking-wider">
                       <span>
                         Open Tabs ({drafts.length}/{maxDrafts})
                       </span>
@@ -205,13 +205,13 @@ export function DispatchLeftBookingSidebar({
                             onCreateDraft();
                             onTabOverflowOpenChange(false);
                           }}
-                          className="text-blue-600 hover:text-blue-800 font-bold text-xs capitalize cursor-pointer"
+                          className="text-blue-600 hover:text-status-info-fg font-bold text-xs capitalize cursor-pointer"
                         >
                           + New Tab
                         </button>
                       )}
                     </div>
-                    <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 py-1">
+                    <div className="max-h-64 overflow-y-auto divide-y divide-border-faint py-1">
                       {drafts.map((d) => {
                         const isActive = d.id === activeDraftId;
                         const label = getDraftTabLabel(d, drafts.length);
@@ -223,8 +223,8 @@ export function DispatchLeftBookingSidebar({
                             key={d.id}
                             className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors ${
                               isActive
-                                ? 'bg-blue-50/80 text-blue-700'
-                                : 'hover:bg-slate-50 text-slate-700'
+                                ? 'bg-status-info-bg/80 text-status-info-fg'
+                                : 'hover:bg-surface-subtle text-fg-secondary'
                             }`}
                             onClick={() => {
                               onActiveDraftIdChange(d.id);
@@ -235,18 +235,18 @@ export function DispatchLeftBookingSidebar({
                               {d.isNew ? (
                                 <DocumentTextIcon className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                               ) : (
-                                <PencilIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                <PencilIcon className="w-3.5 h-3.5 text-fg-muted shrink-0" />
                               )}
                               <div className="min-w-0">
                                 <div className="font-semibold truncate text-xs flex items-center gap-1.5">
                                   <span>{label}</span>
                                   {isActive && (
-                                    <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.2 rounded font-bold">
+                                    <span className="text-[10px] bg-status-info-bg-strong text-status-info-fg px-1.5 py-0.2 rounded font-bold">
                                       Active
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-[11px] text-slate-400 truncate">{subtitle}</div>
+                                <div className="text-[11px] text-fg-subtle truncate">{subtitle}</div>
                               </div>
                             </div>
                             <button
@@ -255,7 +255,7 @@ export function DispatchLeftBookingSidebar({
                                 e.stopPropagation();
                                 onCloseDraft(d.id, e);
                               }}
-                              className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-red-500 transition-colors ml-2 cursor-pointer"
+                              className="p-1 rounded hover:bg-surface-emphasis text-fg-subtle hover:text-red-500 transition-colors ml-2 cursor-pointer"
                               title="Close tab"
                             >
                               <XIcon className="w-3.5 h-3.5" />
@@ -268,20 +268,20 @@ export function DispatchLeftBookingSidebar({
 
                   {/* Mobile Drag-Down-to-Close Draft Tabs Sheet */}
                   <div
-                    className="lg:hidden fixed inset-0 z-[120] bg-slate-900/50 backdrop-blur-[2px] flex items-end"
+                    className="lg:hidden fixed inset-0 z-[120] bg-surface-overlay/50 backdrop-blur-[2px] flex items-end"
                     onClick={() => onTabOverflowOpenChange(false)}
                   >
                     <div
                       style={sheetStyle}
                       onClick={(e) => e.stopPropagation()}
-                      className="w-full bg-white rounded-t-3xl shadow-2xl border-t border-slate-200 max-h-[75dvh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200 pb-[max(1rem,env(safe-area-inset-bottom))]"
+                      className="w-full bg-surface-card rounded-t-3xl shadow-2xl border-t border-border-subtle max-h-[75dvh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200 pb-[max(1rem,env(safe-area-inset-bottom))]"
                     >
                       <div
                         {...dragHandlers}
-                        className="bg-slate-900 text-white px-4 pt-2 pb-3 shrink-0 touch-none"
+                        className="bg-surface-header text-white px-4 pt-2 pb-3 shrink-0 touch-none"
                       >
                         <div
-                          className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5"
+                          className="w-10 h-1 rounded-full bg-surface-strong/80 mx-auto mb-2.5"
                           aria-hidden="true"
                         />
                         <div className="flex items-center justify-between gap-2">
@@ -305,7 +305,7 @@ export function DispatchLeftBookingSidebar({
                             <button
                               type="button"
                               onClick={() => onTabOverflowOpenChange(false)}
-                              className="p-1.5 rounded-full bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
+                              className="p-1.5 rounded-full bg-surface-header-elevated text-slate-300 hover:text-white cursor-pointer"
                               aria-label="Close tabs sheet"
                             >
                               <XIcon className="w-4 h-4" />
@@ -331,8 +331,8 @@ export function DispatchLeftBookingSidebar({
                               }}
                               className={`flex items-center justify-between gap-2 p-3 rounded-2xl border cursor-pointer transition-colors ${
                                 isActive
-                                  ? 'bg-blue-50 border-blue-300 text-blue-900'
-                                  : 'bg-slate-50 border-slate-200 text-slate-800 active:bg-slate-100'
+                                  ? 'bg-status-info-bg border-status-info-border text-status-info-fg'
+                                  : 'bg-surface-subtle border-border-subtle text-fg-strong active:bg-surface-muted'
                               }`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
@@ -340,7 +340,7 @@ export function DispatchLeftBookingSidebar({
                                   className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                                     isActive
                                       ? 'bg-blue-600 text-white'
-                                      : 'bg-white border border-slate-200 text-slate-500'
+                                      : 'bg-surface-card border border-border-subtle text-fg-muted'
                                   }`}
                                 >
                                   {d.isNew ? (
@@ -358,7 +358,7 @@ export function DispatchLeftBookingSidebar({
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                                  <div className="text-[11px] text-fg-muted truncate mt-0.5">
                                     {subtitle}
                                   </div>
                                 </div>
@@ -369,7 +369,7 @@ export function DispatchLeftBookingSidebar({
                                   e.stopPropagation();
                                   onCloseDraft(d.id, e);
                                 }}
-                                className="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 flex items-center justify-center shrink-0 cursor-pointer"
+                                className="w-8 h-8 rounded-xl bg-surface-card border border-border-subtle text-fg-subtle hover:text-rose-600 hover:border-status-danger-border flex items-center justify-center shrink-0 cursor-pointer"
                                 aria-label={`Close ${label}`}
                               >
                                 <XIcon className="w-4 h-4" />
@@ -388,12 +388,12 @@ export function DispatchLeftBookingSidebar({
 
         {/* Sticky Edit-Mode Trip Lifecycle & Actions Context Bar */}
         {activeEditTrip && tripActions && (
-          <div className="px-2.5 py-1.5 bg-blue-50/90 border-b border-blue-200/80 flex items-center justify-between gap-1.5 shrink-0 text-xs">
+          <div className="px-2.5 py-1.5 bg-status-info-bg/90 border-b border-status-info-border/80 flex items-center justify-between gap-1.5 shrink-0 text-xs">
             <div className="flex items-center gap-1.5 min-w-0">
               <button
                 type="button"
                 onClick={() => tripActions.onReview(activeEditTrip, 'details')}
-                className="font-mono font-extrabold text-[11px] text-blue-800 hover:text-blue-600 hover:underline cursor-pointer shrink-0"
+                className="font-mono font-extrabold text-[11px] text-status-info-fg hover:text-blue-600 hover:underline cursor-pointer shrink-0"
                 title="Open Trip Details & Audit"
               >
                 #{activeEditTrip.id.slice(-6).toUpperCase()}
@@ -557,14 +557,14 @@ export function DispatchLeftBookingSidebar({
         className={`hidden lg:flex items-center justify-center w-2 h-full cursor-col-resize transition-colors z-30 shrink-0 select-none group ${
           activeResizeHandle === 'sidebar'
             ? 'bg-blue-500/30'
-            : 'bg-slate-200/60 hover:bg-blue-500/20'
+            : 'bg-surface-emphasis/60 hover:bg-blue-500/20'
         }`}
       >
         <div
           className={`w-0.5 h-10 rounded-full transition-colors ${
             activeResizeHandle === 'sidebar'
               ? 'bg-blue-600'
-              : 'bg-slate-300 group-hover:bg-blue-500'
+              : 'bg-surface-strong group-hover:bg-blue-500'
           }`}
         />
       </div>

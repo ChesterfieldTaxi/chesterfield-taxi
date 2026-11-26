@@ -89,7 +89,7 @@ export function TripQueueCompactList({
 }: TripQueueCompactListProps) {
   const nowMs = useLiveClockNowMs(30_000);
   return (
-    <div className="flex-1 overflow-auto divide-y divide-slate-100 text-xs">
+    <div className="flex-1 overflow-auto divide-y divide-border-faint text-xs">
       {filteredTrips.map((trip) => {
         const isSelected = selectedQueueTripId === trip.id;
         const isChecked = selectedTripIds.includes(trip.id);
@@ -114,10 +114,10 @@ export function TripQueueCompactList({
             onDoubleClick={() => onEditTripFromQueue(trip)}
             className={`h-9 px-3 flex items-center justify-between gap-2 cursor-pointer transition-colors ${
               isUnconfirmedTrip
-                ? 'bg-amber-50/80 border-l-4 border-l-amber-500'
+                ? 'bg-status-warning-bg/80 border-l-4 border-l-amber-500'
                 : isSelected
-                ? 'bg-blue-50 font-medium'
-                : 'hover:bg-slate-50'
+                ? 'bg-status-info-bg font-medium'
+                : 'hover:bg-surface-subtle'
             }`}
           >
             <div className="flex items-center gap-2 min-w-0">
@@ -129,10 +129,10 @@ export function TripQueueCompactList({
                   e.stopPropagation();
                   onToggleSelectTrip(trip.id);
                 }}
-                className="rounded border-slate-300 text-blue-600 cursor-pointer"
+                className="rounded border-border-strong text-blue-600 cursor-pointer"
               />
-              <span className="font-semibold text-slate-700 shrink-0 whitespace-nowrap">{pickupTimeStr}</span>
-              <span className="font-bold text-slate-900 shrink-0 max-w-[120px] truncate">
+              <span className="font-semibold text-fg-secondary shrink-0 whitespace-nowrap">{pickupTimeStr}</span>
+              <span className="font-bold text-fg-primary shrink-0 max-w-[120px] truncate">
                 {trip.passenger.firstName} {trip.passenger.lastName}
               </span>
               <DispatchSlaBadge sla={slaSummary.byTripId[trip.id]} />
@@ -151,7 +151,7 @@ export function TripQueueCompactList({
                     onSearchTermChange(trip.multiCarGroupId!);
                     onSearchExpandedChange(true);
                   }}
-                  className="px-1.5 py-0.2 rounded bg-violet-100 hover:bg-violet-200 text-violet-800 border border-violet-300 text-[10px] font-black shrink-0 cursor-pointer"
+                  className="px-1.5 py-0.2 rounded bg-status-staged-bg-strong hover:bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border text-[10px] font-black shrink-0 cursor-pointer"
                   title={`Multi-car order ${trip.multiCarGroupId} — click to filter all ${trip.multiCarTotal} cars`}
                 >
                   Car {trip.multiCarIndex || 1}/{trip.multiCarTotal}
@@ -159,13 +159,13 @@ export function TripQueueCompactList({
               )}
               {stopCount > 0 ? (
                 <span
-                  className="inline-flex items-center gap-1 text-slate-500 min-w-0 max-w-[260px]"
+                  className="inline-flex items-center gap-1 text-fg-muted min-w-0 max-w-[260px]"
                   title={itineraryTooltip}
                 >
                   <span className="truncate max-w-[95px]">{trip.pickupLocation.address}</span>
                   <span className="shrink-0">→</span>
                   <span
-                    className="bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded-full text-[10px] font-extrabold shrink-0"
+                    className="bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border px-1.5 py-0.2 rounded-full text-[10px] font-extrabold shrink-0"
                     title={itineraryTooltip}
                   >
                     +{stopCount} stop{stopCount === 1 ? '' : 's'}
@@ -175,7 +175,7 @@ export function TripQueueCompactList({
                 </span>
               ) : (
                 <span
-                  className="text-slate-500 truncate max-w-[200px]"
+                  className="text-fg-muted truncate max-w-[200px]"
                   title={`${trip.pickupLocation.address} → ${trip.dropoffLocation.address}`}
                 >
                   {trip.pickupLocation.address} → {trip.dropoffLocation.address}
@@ -239,7 +239,7 @@ export function TripQueueCompactList({
                 isDesktop={isDesktop}
                 title="Quick-assign or stage driver"
               />
-              <span className="font-bold text-slate-900">
+              <span className="font-bold text-fg-primary">
                 ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
               </span>
               <div className="flex items-center gap-1">
@@ -251,7 +251,7 @@ export function TripQueueCompactList({
                       e.stopPropagation();
                       onOpenReviewModal(trip, 'details');
                     }}
-                    className="inline-flex items-center px-1.5 py-0.2 rounded-full bg-violet-100 hover:bg-violet-200 text-violet-950 border border-violet-400 text-[9.5px] font-extrabold animate-pulse whitespace-nowrap cursor-pointer"
+                    className="inline-flex items-center px-1.5 py-0.2 rounded-full bg-status-staged-bg-strong hover:bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border text-[9.5px] font-extrabold animate-pulse whitespace-nowrap cursor-pointer"
                     title="Passenger requested itinerary change on /track — click to Approve or Decline"
                   >
                     📝 Rider Edit Req
@@ -262,7 +262,7 @@ export function TripQueueCompactList({
                     const pendingAck = getPendingDriverUpdateAck(trip);
                     return (
                       <span
-                        className="inline-flex items-center px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-950 border border-amber-400 text-[9.5px] font-extrabold animate-pulse whitespace-nowrap"
+                        className="inline-flex items-center px-1.5 py-0.2 rounded-full bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border text-[9.5px] font-extrabold animate-pulse whitespace-nowrap"
                         title={
                           pendingAck
                             ? `Trip updated — awaiting driver acknowledgement:\n• ${pendingAck.changesSummary.join('\n• ')}`
@@ -331,7 +331,7 @@ export function TripQueueCompactList({
         );
       })}
       {filteredTrips.length === 0 && (
-        <div className="py-12 text-center text-slate-500 font-semibold text-xs">No trips found.</div>
+        <div className="py-12 text-center text-fg-muted font-semibold text-xs">No trips found.</div>
       )}
     </div>
   );

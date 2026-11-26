@@ -92,14 +92,14 @@ export const DispatchLiveMapPane = React.memo(function DispatchLiveMapPane({
         className={`hidden lg:flex items-center justify-center h-2 w-full cursor-row-resize transition-colors z-30 shrink-0 select-none group ${
           activeResizeHandle === 'queue'
             ? 'bg-blue-500/30'
-            : 'bg-slate-200/60 hover:bg-blue-500/20'
+            : 'bg-surface-emphasis/60 hover:bg-blue-500/20'
         }`}
       >
         <div
           className={`h-0.5 w-12 rounded-full transition-colors ${
             activeResizeHandle === 'queue'
               ? 'bg-blue-600'
-              : 'bg-slate-300 group-hover:bg-blue-500'
+              : 'bg-surface-strong group-hover:bg-blue-500'
           }`}
         />
       </div>

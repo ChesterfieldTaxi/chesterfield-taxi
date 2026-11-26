@@ -18,6 +18,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, getFirestore } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseApp, isFirebaseConfigured } from '../firebase';
+import type { ThemePreference } from '../../../config/theme-tokens';
 
 export type UserRole = 'customer' | 'driver' | 'dispatcher' | 'admin' | 'corporate_manager';
 
@@ -36,10 +37,16 @@ export interface AdminUser {
   isArchived?: boolean;
   isBlacklisted?: boolean;
   blacklistReason?: string;
+  themePreference?: ThemePreference;
 }
 
 const DEMO_SESSION_KEY = 'chesterfield_taxi_admin_session';
+const DEMO_USER_THEME_PREFIX = 'ct_demo_user_theme_';
 export const LOCAL_CORPORATE_MANAGERS_KEY = 'ct_provisioned_corporate_managers';
+
+function parseThemePreference(raw: unknown): ThemePreference | undefined {
+  return raw === 'light' || raw === 'dark' || raw === 'system' ? raw : undefined;
+}
 
 export class AdminAuthService {
   private isConfigured: boolean;
@@ -58,6 +65,7 @@ export class AdminAuthService {
     assignedVehicleUnit?: string;
     corporateAccountId?: string;
     corporateAccountNumber?: string;
+    themePreference?: ThemePreference;
   }> {
     if (!this.isConfigured) return { roles: ['customer'] };
 
@@ -100,6 +108,7 @@ export class AdminAuthService {
             typeof data?.corporateAccountNumber === 'string' && data.corporateAccountNumber.trim()
               ? data.corporateAccountNumber.trim()
               : undefined,
+          themePreference: parseThemePreference(data?.themePreference),
         };
       }
 
@@ -118,6 +127,7 @@ export class AdminAuthService {
           assignedVehicleUnit: this.cachedUser.assignedVehicleUnit,
           corporateAccountId: this.cachedUser.corporateAccountId,
           corporateAccountNumber: this.cachedUser.corporateAccountNumber,
+          themePreference: this.cachedUser.themePreference,
         };
       }
       return { roles: ['customer'] };
@@ -216,6 +226,7 @@ export class AdminAuthService {
               assignedVehicleUnit: profile.assignedVehicleUnit,
               corporateAccountId: profile.corporateAccountId,
               corporateAccountNumber: profile.corporateAccountNumber,
+              themePreference: profile.themePreference,
             };
             this.cachedUser = hydrated;
             callback(hydrated);
@@ -278,6 +289,7 @@ export class AdminAuthService {
           assignedVehicleUnit: profile.assignedVehicleUnit,
           corporateAccountId: profile.corporateAccountId,
           corporateAccountNumber: profile.corporateAccountNumber,
+          themePreference: profile.themePreference,
         };
         this.cachedUser = signedInUser;
         return signedInUser;
@@ -546,6 +558,77 @@ export class AdminAuthService {
       }
     }
     throw new Error('Facebook Sign-In requires Firebase to be configured.');
+  }
+
+  public async getUserThemePreference(uid: string): Promise<ThemePreference | undefined> {
+    const cleanUid = uid.trim();
+    if (!cleanUid) return undefined;
+
+    if (this.cachedUser?.uid === cleanUid && this.cachedUser.themePreference) {
+      return this.cachedUser.themePreference;
+    }
+
+    if (this.isConfigured && !this.cachedUser?.isDemo) {
+      try {
+        const db = getFirestore(getFirebaseApp());
+        const snap = await getDoc(doc(db, 'users', cleanUid));
+        if (snap.exists()) {
+          const pref = parseThemePreference(snap.data()?.themePreference);
+          if (pref && this.cachedUser?.uid === cleanUid) {
+            this.cachedUser = { ...this.cachedUser, themePreference: pref };
+          }
+          return pref;
+        }
+      } catch (err) {
+        console.warn('[AdminAuthService] Could not fetch user themePreference:', err);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        return parseThemePreference(
+          window.localStorage.getItem(`${DEMO_USER_THEME_PREFIX}${cleanUid}`)
+        );
+      } catch {}
+    }
+    return undefined;
+  }
+
+  public async updateUserThemePreference(
+    uid: string,
+    preference: ThemePreference
+  ): Promise<void> {
+    const cleanUid = uid.trim();
+    if (!cleanUid || !parseThemePreference(preference)) return;
+
+    if (this.cachedUser?.uid === cleanUid) {
+      this.cachedUser = { ...this.cachedUser, themePreference: preference };
+      if (this.cachedUser.isDemo && typeof window !== 'undefined') {
+        try {
+          window.sessionStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(this.cachedUser));
+        } catch {}
+      }
+    }
+
+    if (this.isConfigured && !this.cachedUser?.isDemo) {
+      try {
+        const db = getFirestore(getFirebaseApp());
+        await setDoc(
+          doc(db, 'users', cleanUid),
+          { themePreference: preference, updatedAt: new Date().toISOString() },
+          { merge: true }
+        );
+        return;
+      } catch (err) {
+        console.warn('[AdminAuthService] Could not persist user themePreference:', err);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(`${DEMO_USER_THEME_PREFIX}${cleanUid}`, preference);
+      } catch {}
+    }
   }
 
   public async signOut(): Promise<void> {
