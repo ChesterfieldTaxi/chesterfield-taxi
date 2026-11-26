@@ -31,10 +31,12 @@ import {
 import { DispatchLocationInput } from '../components/domain/dispatch/DispatchLocationInput';
 import { RoleViewSwitcher } from '../components/domain/common/RoleViewSwitcher';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
+import { AppearanceToggle } from '../components/ui/AppearanceToggle';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
+import { useTheme } from '../hooks/useTheme';
 import {
   AlertTriangleIcon,
   BuildingIcon,
@@ -108,54 +110,54 @@ function formatRideStatusBadge(status: string): {
   if (s === 'in_progress') {
     return {
       label: 'In Progress',
-      className: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      className: 'bg-status-staged-bg-strong text-status-staged-fg border-status-staged-border',
     };
   }
   if (s === 'arrived') {
     return {
       label: 'Driver Arrived',
-      className: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+      className: 'bg-status-success-bg-strong text-status-success-fg border-status-success-border',
     };
   }
   if (s === 'en_route') {
     return {
       label: 'En Route',
-      className: 'bg-blue-100 text-blue-800 border-blue-200',
+      className: 'bg-status-info-bg-strong text-status-info-fg border-status-info-border',
     };
   }
   if (s === 'assigned' || s === 'accepted' || s === 'offered') {
     return {
       label: 'Driver Assigned',
-      className: 'bg-sky-100 text-sky-800 border-sky-200',
+      className: 'bg-status-info-bg-strong text-status-info-fg border-status-info-border',
     };
   }
   if (s === 'confirmed') {
     return {
       label: 'Confirmed',
-      className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      className: 'bg-status-success-bg text-status-success-fg border-status-success-border',
     };
   }
   if (s === 'unconfirmed' || s === 'pending') {
     return {
       label: 'Pending Dispatch',
-      className: 'bg-amber-50 text-amber-800 border-amber-200',
+      className: 'bg-status-warning-bg text-status-warning-fg border-status-warning-border',
     };
   }
   if (s === 'completed') {
     return {
       label: 'Completed',
-      className: 'bg-slate-100 text-slate-700 border-slate-200',
+      className: 'bg-surface-muted text-fg-secondary border-border-subtle',
     };
   }
   if (s === 'cancelled' || s === 'declined') {
     return {
       label: 'Cancelled',
-      className: 'bg-rose-50 text-rose-700 border-rose-200',
+      className: 'bg-status-danger-bg text-status-danger-fg border-status-danger-border',
     };
   }
   return {
     label: status || 'Scheduled',
-    className: 'bg-slate-100 text-slate-700 border-slate-200',
+    className: 'bg-surface-muted text-fg-secondary border-border-subtle',
   };
 }
 
@@ -167,23 +169,23 @@ function formatInvoiceStatusPill(status: InvoiceRecord['status']): {
     case 'paid':
       return {
         label: 'Paid',
-        className: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+        className: 'bg-status-success-bg-strong text-status-success-fg border-status-success-border',
       };
     case 'overdue':
       return {
         label: 'Overdue',
-        className: 'bg-rose-100 text-rose-800 border-rose-200',
+        className: 'bg-status-danger-bg-strong text-status-danger-fg border-status-danger-border',
       };
     case 'draft':
       return {
         label: 'Draft',
-        className: 'bg-slate-100 text-slate-600 border-slate-200',
+        className: 'bg-surface-muted text-fg-secondary border-border-subtle',
       };
     case 'issued':
     default:
       return {
         label: 'Unpaid',
-        className: 'bg-amber-100 text-amber-900 border-amber-200',
+        className: 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border',
       };
   }
 }
@@ -197,6 +199,10 @@ export default function CorporatePortalRoute() {
   // Auth & Tenant Context
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const { preference: themePreference, setPreference: setThemePreference } = useTheme({
+    uid: currentUser?.uid,
+    profilePreference: currentUser?.themePreference,
+  });
   const [isAdminSuperuser, setIsAdminSuperuser] = useState(false);
   const [adminAccountsList, setAdminAccountsList] = useState<CorporateAccountConfig[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
@@ -801,26 +807,26 @@ export default function CorporatePortalRoute() {
 
   if (!selectedAccountId && !isLoadingSummary) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
-        <Card className="max-w-md w-full border border-slate-200 shadow-lg rounded-2xl p-6 text-center space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center mx-auto">
+      <div className="min-h-screen bg-surface-subtle flex flex-col items-center justify-center p-6">
+        <Card className="max-w-md w-full border border-border-subtle shadow-lg rounded-2xl p-6 text-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-status-staged-bg border border-status-staged-border text-status-staged-fg flex items-center justify-center mx-auto">
             <BuildingIcon className="w-6 h-6" />
           </div>
           <div className="space-y-1">
-            <h1 className="text-lg font-extrabold text-slate-900">
+            <h1 className="text-lg font-extrabold text-fg-primary">
               Corporate Account Pending Assignment
             </h1>
-            <p className="text-xs text-slate-600 leading-relaxed">
+            <p className="text-xs text-fg-secondary leading-relaxed">
               Your profile ({currentUser?.email}) is enabled as a Corporate Manager, but has not yet
               been linked to a Corporate Account ID. Please contact Chesterfield Taxi Corporate
               Billing to finalize account binding.
             </p>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
-            <div className="font-bold text-slate-800">24/7 Corporate Support Desk</div>
+          <div className="p-3 rounded-xl bg-surface-subtle border border-border-subtle text-xs space-y-1">
+            <div className="font-bold text-fg-strong">24/7 Corporate Support Desk</div>
             <a
               href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
-              className="font-mono font-bold text-indigo-600 hover:underline block"
+              className="font-mono font-bold text-status-staged-fg hover:underline block"
             >
               {COMPANY_CONFIG.phone.dispatch}
             </a>
@@ -836,7 +842,7 @@ export default function CorporatePortalRoute() {
   const account = summary?.account;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
+    <div className="min-h-screen bg-surface-subtle text-fg-primary flex flex-col">
       {/* ─── Executive Slate/Indigo Header ─── */}
       <header className="sticky top-0 z-40 bg-slate-950 text-white border-b border-slate-800 shadow-md print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
@@ -856,8 +862,8 @@ export default function CorporatePortalRoute() {
             </Link>
 
             {account && (
-              <div className="hidden md:flex items-center gap-2 pl-3 ml-1 border-l border-slate-800 min-w-0">
-                <span className="text-xs font-bold text-slate-100 truncate max-w-[220px]">
+              <div className="hidden md:flex items-center gap-2 pl-3 ml-1 border-l border-border-header min-w-0">
+                <span className="text-xs font-bold text-fg-on-header truncate max-w-[220px]">
                   {account.companyName}
                 </span>
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-950/90 text-indigo-300 border border-indigo-800/80 shrink-0">
@@ -889,7 +895,7 @@ export default function CorporatePortalRoute() {
                     nextParams.set('accountId', nextId);
                     setSearchParams(nextParams, { replace: true });
                   }}
-                  triggerClassName="max-w-[160px] sm:max-w-[230px] border-transparent bg-transparent hover:bg-slate-800/70"
+                  triggerClassName="max-w-[160px] sm:max-w-[230px] border-transparent bg-transparent hover:bg-surface-header-elevated/70"
                 >
                   {adminAccountsList.map((acc) => (
                     <option key={acc.id} value={acc.id}>
@@ -908,6 +914,12 @@ export default function CorporatePortalRoute() {
               <span>{COMPANY_CONFIG.phone.dispatch}</span>
             </a>
 
+            <AppearanceToggle
+              variant="cycle"
+              preference={themePreference}
+              onChange={setThemePreference}
+              className="!bg-slate-900 !border-slate-800 !text-slate-300 hover:!text-white hover:!bg-slate-800"
+            />
             <RoleViewSwitcher currentView="corporate" user={currentUser} variant="dark" />
             <UserDropdown
               email={currentUser?.email}
@@ -963,7 +975,7 @@ export default function CorporatePortalRoute() {
                   className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                     isActive
                       ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                      : 'text-slate-300 hover:text-white hover:bg-surface-header-elevated/80'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5 shrink-0" />
@@ -994,8 +1006,8 @@ export default function CorporatePortalRoute() {
             role="status"
             className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between gap-3 shadow-xs ${
               feedbackBanner.type === 'success'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                : 'bg-rose-50 border-rose-200 text-rose-900'
+                ? 'bg-status-success-bg border-status-success-border text-status-success-fg'
+                : 'bg-status-danger-bg border-status-danger-border text-status-danger-fg'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -1009,7 +1021,7 @@ export default function CorporatePortalRoute() {
             <button
               type="button"
               onClick={() => setFeedbackBanner(null)}
-              className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              className="text-fg-subtle hover:text-fg-secondary cursor-pointer"
             >
               <XIcon className="w-4 h-4" />
             </button>
@@ -1017,7 +1029,7 @@ export default function CorporatePortalRoute() {
         )}
 
         {loadError && (
-          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-center justify-between gap-3">
+          <div className="p-4 rounded-2xl bg-status-danger-bg border border-status-danger-border text-status-danger-fg text-xs font-semibold flex items-center justify-between gap-3">
             <span>{loadError}</span>
             <Button size="sm" variant="outline" onClick={() => refreshPortalData()}>
               Retry
@@ -1026,9 +1038,9 @@ export default function CorporatePortalRoute() {
         )}
 
         {isLoadingSummary || !summary || !account ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-16 flex flex-col items-center justify-center gap-3">
+          <div className="bg-surface-card rounded-2xl border border-border-subtle p-16 flex flex-col items-center justify-center gap-3">
             <SpinnerIcon className="w-6 h-6 animate-spin text-indigo-600" />
-            <span className="text-xs font-semibold text-slate-500">
+            <span className="text-xs font-semibold text-fg-muted">
               Loading corporate account telemetry &amp; billing statements...
             </span>
           </div>
@@ -1040,29 +1052,29 @@ export default function CorporatePortalRoute() {
             {activeTab === 'overview' && (
               <div className="space-y-6">
                 {/* Executive Summary Strip */}
-                <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 sm:p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-lg sm:text-xl font-black text-slate-950">
+                      <h1 className="text-lg sm:text-xl font-black text-fg-primary">
                         {account.companyName}
                       </h1>
                       <Badge variant={account.isActive ? 'success' : 'warning'} size="sm">
                         {account.isActive ? 'Active Contract' : 'Account Paused'}
                       </Badge>
-                      <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-status-staged-bg text-status-staged-fg border border-status-staged-border">
                         {account.accountNumber}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500">
-                      Terms: <strong className="text-slate-700">{account.billingCycle.toUpperCase()}</strong>
+                    <p className="text-xs text-fg-muted">
+                      Terms: <strong className="text-fg-secondary">{account.billingCycle.toUpperCase()}</strong>
                       {account.discountPercent > 0 && (
                         <>
                           {' '}
                           • Corporate Contract Discount:{' '}
-                          <strong className="text-emerald-700">{account.discountPercent}%</strong>
+                          <strong className="text-status-success-fg">{account.discountPercent}%</strong>
                         </>
                       )}{' '}
-                      • Billing Contact: <span className="text-slate-700">{account.billingContactEmail}</span>
+                      • Billing Contact: <span className="text-fg-secondary">{account.billingContactEmail}</span>
                     </p>
                   </div>
 
@@ -1095,16 +1107,16 @@ export default function CorporatePortalRoute() {
                   <div
                     className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                       summary.overdueInvoiceCount > 0
-                        ? 'bg-rose-50/90 border-rose-200 text-rose-950'
-                        : 'bg-amber-50/90 border-amber-200 text-amber-950'
+                        ? 'bg-status-danger-bg/90 border-status-danger-border text-status-danger-fg'
+                        : 'bg-status-warning-bg/90 border-status-warning-border text-status-warning-fg'
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div
                         className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                           summary.overdueInvoiceCount > 0
-                            ? 'bg-rose-100 text-rose-700'
-                            : 'bg-amber-100 text-amber-800'
+                            ? 'bg-status-danger-bg-strong text-status-danger-fg'
+                            : 'bg-status-warning-bg-strong text-status-warning-fg'
                         }`}
                       >
                         <CreditCardIcon className="w-5 h-5" />
@@ -1129,7 +1141,7 @@ export default function CorporatePortalRoute() {
                       size="sm"
                       variant="primary"
                       onClick={() => handleSelectTab('billing')}
-                      className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0 cursor-pointer"
+                      className="bg-surface-header hover:bg-surface-header-elevated text-white text-xs font-bold shrink-0 cursor-pointer"
                     >
                       View &amp; Pay Statements &rarr;
                     </Button>
@@ -1139,32 +1151,32 @@ export default function CorporatePortalRoute() {
                 {/* 4 KPI Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* 1. Credit Limit Utilization Meter */}
-                  <Card className="border border-slate-200/90 shadow-2xs">
+                  <Card className="border border-border-subtle/90 shadow-2xs">
                     <CardContent className="p-4 space-y-2.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-fg-muted">
                           Credit Utilization
                         </span>
                         <span
                           className={`text-[11px] font-mono font-black px-2 py-0.5 rounded-full border ${
                             summary.utilizationLevel === 'critical'
-                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              ? 'bg-status-danger-bg text-status-danger-fg border-status-danger-border'
                               : summary.utilizationLevel === 'warning'
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              ? 'bg-status-warning-bg text-status-warning-fg border-status-warning-border'
+                              : 'bg-status-success-bg text-status-success-fg border-status-success-border'
                           }`}
                         >
                           {summary.creditUtilizationPercent.toFixed(1)}%
                         </span>
                       </div>
-                      <div className="text-xl font-black text-slate-950 font-mono">
+                      <div className="text-xl font-black text-fg-primary font-mono">
                         ${summary.totalExposure.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        <span className="text-xs font-semibold text-slate-400">
+                        <span className="text-xs font-semibold text-fg-subtle">
                           {' '}
                           / ${summary.creditLimit.toLocaleString()}
                         </span>
                       </div>
-                      <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="w-full h-2 rounded-full bg-surface-muted overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-300 ${
                             summary.utilizationLevel === 'critical'
@@ -1178,9 +1190,9 @@ export default function CorporatePortalRoute() {
                           }}
                         />
                       </div>
-                      <div className="text-[11px] text-slate-500 flex justify-between">
+                      <div className="text-[11px] text-fg-muted flex justify-between">
                         <span>Available Credit:</span>
-                        <span className="font-mono font-bold text-slate-800">
+                        <span className="font-mono font-bold text-fg-strong">
                           ${summary.availableCredit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
@@ -1188,56 +1200,56 @@ export default function CorporatePortalRoute() {
                   </Card>
 
                   {/* 2. Unbilled Cycle Spend */}
-                  <Card className="border border-slate-200/90 shadow-2xs">
+                  <Card className="border border-border-subtle/90 shadow-2xs">
                     <CardContent className="p-4 space-y-2">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-fg-muted block">
                         Unbilled Cycle Spend
                       </span>
-                      <div className="text-xl font-black text-slate-950 font-mono">
+                      <div className="text-xl font-black text-fg-primary font-mono">
                         ${summary.unbilledSpend.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </div>
-                      <p className="text-[11px] text-slate-500">
-                        <strong className="text-slate-800">{summary.completedCycleRides.length}</strong>{' '}
+                      <p className="text-[11px] text-fg-muted">
+                        <strong className="text-fg-strong">{summary.completedCycleRides.length}</strong>{' '}
                         completed ride(s) in current {account.billingCycle.toUpperCase()} window
                       </p>
                     </CardContent>
                   </Card>
 
                   {/* 3. Live & Upcoming Rides */}
-                  <Card className="border border-slate-200/90 shadow-2xs">
+                  <Card className="border border-border-subtle/90 shadow-2xs">
                     <CardContent className="p-4 space-y-2">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-fg-muted block">
                         Live &amp; Upcoming Rides
                       </span>
-                      <div className="text-xl font-black text-indigo-700 font-mono">
+                      <div className="text-xl font-black text-status-staged-fg font-mono">
                         {summary.activeRides.length}
                       </div>
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-[11px] text-fg-muted">
                         Total historical company trips:{' '}
-                        <strong className="text-slate-800">{summary.allTrips.length}</strong>
+                        <strong className="text-fg-strong">{summary.allTrips.length}</strong>
                       </p>
                     </CardContent>
                   </Card>
 
                   {/* 4. Active PO Authorization Badge */}
-                  <Card className="border border-indigo-200/90 bg-indigo-50/40 shadow-2xs">
+                  <Card className="border border-status-staged-border/90 bg-status-staged-bg/40 shadow-2xs">
                     <CardContent className="p-4 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-900">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-status-staged-fg">
                           Active PO Code
                         </span>
                         <span
                           className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
                             account.poRequired
-                              ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                              ? 'bg-status-success-bg-strong text-status-success-fg border-status-success-border'
+                              : 'bg-surface-muted text-fg-secondary border-border-subtle'
                           }`}
                         >
                           {account.poRequired ? 'PO Enforced' : 'PO Optional'}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-indigo-200">
-                        <span className="font-mono font-black text-xs text-slate-900 truncate">
+                      <div className="flex items-center justify-between gap-2 bg-surface-card px-2.5 py-1.5 rounded-xl border border-status-staged-border">
+                        <span className="font-mono font-black text-xs text-fg-primary truncate">
                           {account.currentPoNumber || 'Not Configured'}
                         </span>
                         {account.currentPoNumber && (
@@ -1248,12 +1260,12 @@ export default function CorporatePortalRoute() {
                               setCopiedPoBadge(true);
                               setTimeout(() => setCopiedPoBadge(false), 2000);
                             }}
-                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 shrink-0 cursor-pointer"
+                            className="text-[11px] font-bold text-indigo-600 hover:text-status-staged-fg inline-flex items-center gap-1 shrink-0 cursor-pointer"
                           >
                             {copiedPoBadge ? (
                               <>
                                 <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
-                                <span className="text-emerald-700">Copied</span>
+                                <span className="text-status-success-fg">Copied</span>
                               </>
                             ) : (
                               <>
@@ -1267,7 +1279,7 @@ export default function CorporatePortalRoute() {
                       <button
                         type="button"
                         onClick={() => handleSelectTab('team')}
-                        className="text-[11px] font-bold text-indigo-700 hover:underline cursor-pointer"
+                        className="text-[11px] font-bold text-status-staged-fg hover:underline cursor-pointer"
                       >
                         Rotate PO or view audit log &rarr;
                       </button>
@@ -1276,14 +1288,14 @@ export default function CorporatePortalRoute() {
                 </div>
 
                 {/* Company Rides Table & Mobile Cards */}
-                <Card className="border border-slate-200/90 shadow-2xs overflow-hidden">
-                  <CardHeader className="border-b border-slate-100 pb-3">
+                <Card className="border border-border-subtle/90 shadow-2xs overflow-hidden">
+                  <CardHeader className="border-b border-border-faint pb-3">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                       <div>
-                        <CardTitle className="text-sm font-black text-slate-900">
+                        <CardTitle className="text-sm font-black text-fg-primary">
                           Company Transportation Log &amp; Live Tracking
                         </CardTitle>
-                        <CardDescription className="text-xs text-slate-500">
+                        <CardDescription className="text-xs text-fg-muted">
                           Real-time status for employee &amp; guest reservations billed to{' '}
                           {account.accountNumber}
                         </CardDescription>
@@ -1291,17 +1303,17 @@ export default function CorporatePortalRoute() {
 
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="relative flex-1 sm:flex-initial sm:w-56">
-                          <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <SearchIcon className="w-3.5 h-3.5 text-fg-subtle absolute left-3 top-1/2 -translate-y-1/2" />
                           <input
                             type="text"
                             value={rideSearch}
                             onChange={(e) => setRideSearch(e.target.value)}
                             placeholder="Search traveler, PO#, route..."
-                            className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-hidden focus:border-indigo-500"
+                            className="w-full pl-8 pr-3 py-1.5 bg-surface-subtle border border-border-subtle rounded-xl text-xs focus:bg-surface-card focus:outline-hidden focus:border-indigo-500"
                           />
                         </div>
 
-                        <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
+                        <div className="inline-flex bg-surface-muted p-1 rounded-xl border border-border-subtle text-[11px] font-bold">
                           {(
                             [
                               { id: 'all', label: 'All' },
@@ -1316,8 +1328,8 @@ export default function CorporatePortalRoute() {
                               onClick={() => setRideFilter(f.id)}
                               className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
                                 rideFilter === f.id
-                                  ? 'bg-white text-slate-900 shadow-2xs'
-                                  : 'text-slate-600 hover:text-slate-900'
+                                  ? 'bg-surface-card text-fg-primary shadow-2xs'
+                                  : 'text-fg-secondary hover:text-fg-primary'
                               }`}
                             >
                               {f.label}
@@ -1342,12 +1354,12 @@ export default function CorporatePortalRoute() {
                   <CardContent className="p-0">
                     {filteredRides.length === 0 ? (
                       <div className="p-12 text-center space-y-3">
-                        <CarIcon className="w-8 h-8 text-slate-300 mx-auto" />
+                        <CarIcon className="w-8 h-8 text-fg-faint mx-auto" />
                         <div>
-                          <p className="text-sm font-bold text-slate-700">
+                          <p className="text-sm font-bold text-fg-secondary">
                             No company rides match this view
                           </p>
-                          <p className="text-xs text-slate-500 mt-0.5">
+                          <p className="text-xs text-fg-muted mt-0.5">
                             Book an executive airport transfer or employee shuttle directly onto{' '}
                             {account.accountNumber}.
                           </p>
@@ -1367,7 +1379,7 @@ export default function CorporatePortalRoute() {
                         {/* Desktop Table */}
                         <div className="hidden md:block overflow-x-auto">
                           <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                            <thead className="bg-surface-subtle border-b border-border-subtle text-[10px] font-extrabold uppercase tracking-wider text-fg-muted">
                               <tr>
                                 <th className="px-4 py-3">Pickup Schedule</th>
                                 <th className="px-4 py-3">Traveler &amp; Cost Center</th>
@@ -1378,7 +1390,7 @@ export default function CorporatePortalRoute() {
                                 <th className="px-4 py-3 text-right">Live Tracking</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-border-faint">
                               {filteredRides.map((trip) => {
                                 const meta = (trip.metadata || {}) as Record<string, any>;
                                 const statusBadge = formatRideStatusBadge(trip.status);
@@ -1402,33 +1414,33 @@ export default function CorporatePortalRoute() {
                                   trip.scheduledPickupTime || trip.actualPickupTime || trip.createdAt;
 
                                 return (
-                                  <tr key={trip.id} className="hover:bg-slate-50/70">
+                                  <tr key={trip.id} className="hover:bg-surface-subtle/70">
                                     <td className="px-4 py-3 whitespace-nowrap">
-                                      <div className="font-bold text-slate-900">
+                                      <div className="font-bold text-fg-primary">
                                         {dateRaw ? new Date(dateRaw).toLocaleDateString() : 'ASAP'}
                                       </div>
-                                      <div className="text-[11px] font-mono text-slate-500">
+                                      <div className="text-[11px] font-mono text-fg-muted">
                                         #{trip.id.slice(-8).toUpperCase()}
                                       </div>
                                     </td>
                                     <td className="px-4 py-3">
-                                      <div className="font-bold text-slate-900">{traveler}</div>
-                                      <span className="inline-block text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 mt-0.5">
+                                      <div className="font-bold text-fg-primary">{traveler}</div>
+                                      <span className="inline-block text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-surface-muted text-fg-secondary mt-0.5">
                                         {costCenter}
                                       </span>
                                     </td>
                                     <td className="px-4 py-3 max-w-xs">
-                                      <div className="truncate font-medium text-slate-800">
+                                      <div className="truncate font-medium text-fg-strong">
                                         {trip.pickupLocation?.address}
                                       </div>
-                                      <div className="truncate text-[11px] text-slate-500">
+                                      <div className="truncate text-[11px] text-fg-muted">
                                         &rarr; {trip.dropoffLocation?.address}
                                       </div>
                                     </td>
-                                    <td className="px-4 py-3 font-mono text-[11px] font-semibold text-slate-700 whitespace-nowrap">
+                                    <td className="px-4 py-3 font-mono text-[11px] font-semibold text-fg-secondary whitespace-nowrap">
                                       {poNum || '—'}
                                     </td>
-                                    <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                                    <td className="px-4 py-3 text-right font-mono font-bold text-fg-primary whitespace-nowrap">
                                       ${Number(trip.pricing?.totalFare || 0).toFixed(2)}
                                     </td>
                                     <td className="px-4 py-3 whitespace-nowrap">
@@ -1441,7 +1453,7 @@ export default function CorporatePortalRoute() {
                                     <td className="px-4 py-3 text-right whitespace-nowrap">
                                       <Link
                                         to={trackHref}
-                                        className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
+                                        className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-status-staged-fg hover:underline"
                                       >
                                         <span>Track</span>
                                         <ExternalLinkIcon className="w-3.5 h-3.5" />
@@ -1455,7 +1467,7 @@ export default function CorporatePortalRoute() {
                         </div>
 
                         {/* Mobile Cards */}
-                        <div className="md:hidden divide-y divide-slate-100">
+                        <div className="md:hidden divide-y divide-border-faint">
                           {filteredRides.map((trip) => {
                             const meta = (trip.metadata || {}) as Record<string, any>;
                             const statusBadge = formatRideStatusBadge(trip.status);
@@ -1470,8 +1482,8 @@ export default function CorporatePortalRoute() {
                               <div key={trip.id} className="p-4 space-y-2 text-xs">
                                 <div className="flex items-center justify-between gap-2">
                                   <div>
-                                    <span className="font-extrabold text-slate-900">{traveler}</span>
-                                    <span className="ml-2 font-mono text-[10px] text-slate-500">
+                                    <span className="font-extrabold text-fg-primary">{traveler}</span>
+                                    <span className="ml-2 font-mono text-[10px] text-fg-muted">
                                       #{trip.id.slice(-6).toUpperCase()}
                                     </span>
                                   </div>
@@ -1481,7 +1493,7 @@ export default function CorporatePortalRoute() {
                                     {statusBadge.label}
                                   </span>
                                 </div>
-                                <div className="text-slate-700 space-y-0.5">
+                                <div className="text-fg-secondary space-y-0.5">
                                   <div className="truncate">
                                     <strong>From:</strong> {trip.pickupLocation?.address}
                                   </div>
@@ -1490,7 +1502,7 @@ export default function CorporatePortalRoute() {
                                   </div>
                                 </div>
                                 <div className="flex items-center justify-between pt-1 text-[11px]">
-                                  <span className="font-mono text-slate-500">
+                                  <span className="font-mono text-fg-muted">
                                     PO: {meta.billingPo || account.currentPoNumber || '—'} • $
                                     {Number(trip.pricing?.totalFare || 0).toFixed(2)}
                                   </span>
@@ -1519,22 +1531,22 @@ export default function CorporatePortalRoute() {
             {activeTab === 'book' && (
               <div className="space-y-5">
                 {/* B2B Travel Coordinator Quick-Fill Toolbar */}
-                <Card className="border border-indigo-200/90 bg-gradient-to-br from-white via-white to-indigo-50/40 shadow-xs">
+                <Card className="border border-status-staged-border/90 bg-gradient-to-br from-surface-card via-surface-card to-status-staged-bg/40 shadow-xs">
                   <CardContent className="p-4 sm:p-5 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border-faint">
                       <div>
                         <div className="flex items-center gap-2">
-                          <BuildingIcon className="w-4 h-4 text-indigo-600" />
-                          <h2 className="text-sm font-black text-slate-950">
+                          <BuildingIcon className="w-4 h-4 text-status-staged-fg" />
+                          <h2 className="text-sm font-black text-fg-primary">
                             Corporate Travel Coordinator Quick-Fill
                           </h2>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="text-xs text-fg-muted mt-0.5">
                           Pre-bound to <strong>{account.companyName}</strong> ({account.accountNumber}
                           {account.currentPoNumber ? ` • Active PO: ${account.currentPoNumber}` : ''})
                         </p>
                       </div>
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 self-start sm:self-auto">
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full bg-status-success-bg text-status-success-fg border border-status-success-border self-start sm:self-auto">
                         <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-600" />
                         Direct Corporate Billing Verified
                       </span>
@@ -1543,7 +1555,7 @@ export default function CorporatePortalRoute() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                       {/* 1. Authorized Employee / Guest Picker */}
                       <div>
-                        <label className="font-bold text-slate-700 block mb-1.5">
+                        <label className="font-bold text-fg-secondary block mb-1.5">
                           1. Select Authorized Employee or Guest Traveler
                         </label>
                         <div className="flex items-center gap-2">
@@ -1584,7 +1596,7 @@ export default function CorporatePortalRoute() {
 
                       {/* 2. Department / Cost Center Selector */}
                       <div>
-                        <label className="font-bold text-slate-700 block mb-1.5">
+                        <label className="font-bold text-fg-secondary block mb-1.5">
                           2. Department / Cost Center Allocation
                         </label>
                         <Select
@@ -1608,40 +1620,40 @@ export default function CorporatePortalRoute() {
 
                     {/* 3. 1-Tap Company Saved Locations Chips */}
                     <div>
-                      <span className="text-xs font-bold text-slate-700 block mb-2">
+                      <span className="text-xs font-bold text-fg-secondary block mb-2">
                         3. 1-Tap Company Locations &amp; Regional Airport Hubs
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         {quickLocations.map((loc) => (
                           <div
                             key={loc.id}
-                            className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs"
+                            className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-card border border-border-subtle/90 shadow-2xs"
                           >
                             <div className="min-w-0">
-                              <div className="text-xs font-bold text-slate-900 truncate flex items-center gap-1">
+                              <div className="text-xs font-bold text-fg-primary truncate flex items-center gap-1">
                                 {loc.label.toLowerCase().includes('airport') ||
                                 loc.label.includes('STL') ||
                                 loc.label.includes('SUS') ? (
                                   <PlaneIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                                 ) : (
-                                  <MapPinIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                  <MapPinIcon className="w-3.5 h-3.5 text-fg-muted shrink-0" />
                                 )}
                                 <span className="truncate">{loc.label}</span>
                               </div>
-                              <div className="text-[10px] text-slate-500 truncate">{loc.address}</div>
+                              <div className="text-[10px] text-fg-muted truncate">{loc.address}</div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => handleApplySavedLocation(loc, 'pickup')}
-                                className="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-extrabold cursor-pointer"
+                                className="px-2 py-1 rounded-lg bg-status-staged-bg hover:bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border text-[10px] font-extrabold cursor-pointer"
                               >
                                 Pickup
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleApplySavedLocation(loc, 'dropoff')}
-                                className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 text-[10px] font-extrabold cursor-pointer"
+                                className="px-2 py-1 rounded-lg bg-surface-muted hover:bg-surface-emphasis text-fg-strong border border-border-subtle text-[10px] font-extrabold cursor-pointer"
                               >
                                 Dropoff
                               </button>
@@ -1658,8 +1670,8 @@ export default function CorporatePortalRoute() {
                   <div
                     className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-start gap-2.5 ${
                       portalPolicy.creditLimitEnforcement === 'hard_block'
-                        ? 'bg-rose-50 border-rose-200 text-rose-900'
-                        : 'bg-amber-50 border-amber-200 text-amber-900'
+                        ? 'bg-status-danger-bg border-status-danger-border text-status-danger-fg'
+                        : 'bg-status-warning-bg border-status-warning-border text-status-warning-fg'
                     }`}
                   >
                     <AlertTriangleIcon className="w-4 h-4 shrink-0 mt-0.5" />
@@ -1703,15 +1715,15 @@ export default function CorporatePortalRoute() {
             {activeTab === 'team' && (
               <div className="space-y-6">
                 {/* 1. Anti-Fraud PO Rotation & Audit Trail */}
-                <Card className="border border-indigo-200/90 shadow-2xs">
-                  <CardHeader className="border-b border-slate-100">
+                <Card className="border border-status-staged-border/90 shadow-2xs">
+                  <CardHeader className="border-b border-border-faint">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div>
-                        <CardTitle className="text-sm font-black text-slate-950 flex items-center gap-2">
-                          <ShieldCheckIcon className="w-4 h-4 text-indigo-600" />
+                        <CardTitle className="text-sm font-black text-fg-primary flex items-center gap-2">
+                          <ShieldCheckIcon className="w-4 h-4 text-status-staged-fg" />
                           <span>1-Click Anti-Fraud Purchase Order (PO) Rotation</span>
                         </CardTitle>
-                        <CardDescription className="text-xs text-slate-500">
+                        <CardDescription className="text-xs text-fg-muted">
                           Rotating your PO immediately revokes the prior code so former employees or
                           unauthorized callers cannot bill rides to {account.accountNumber}.
                         </CardDescription>
@@ -1723,22 +1735,22 @@ export default function CorporatePortalRoute() {
                   </CardHeader>
                   <CardContent className="p-4 sm:p-5 space-y-4 text-xs">
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
-                      <div className="lg:col-span-4 p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-800 block">
+                      <div className="lg:col-span-4 p-3.5 rounded-xl bg-status-staged-bg/70 border border-status-staged-border">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-status-staged-fg block">
                           Current Active PO Number
                         </span>
-                        <div className="text-lg font-mono font-black text-slate-950 mt-0.5">
+                        <div className="text-lg font-mono font-black text-fg-primary mt-0.5">
                           {account.currentPoNumber || 'None Assigned'}
                         </div>
                         {account.poGeneratedAt && (
-                          <div className="text-[10px] text-slate-500 mt-0.5">
+                          <div className="text-[10px] text-fg-muted mt-0.5">
                             Issued: {new Date(account.poGeneratedAt).toLocaleString()}
                           </div>
                         )}
                       </div>
 
                       <div className="lg:col-span-5 space-y-1.5">
-                        <label className="font-bold text-slate-700 block">
+                        <label className="font-bold text-fg-secondary block">
                           Audit Reason for PO Rotation
                         </label>
                         <input
@@ -1746,7 +1758,7 @@ export default function CorporatePortalRoute() {
                           value={poRotationReason}
                           onChange={(e) => setPoRotationReason(e.target.value)}
                           placeholder="e.g. Monthly billing cycle rotation / Employee departure"
-                          className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                          className="w-full h-10 px-3 bg-surface-card border border-border-strong rounded-xl text-xs"
                         />
                       </div>
 
@@ -1768,13 +1780,13 @@ export default function CorporatePortalRoute() {
                     {/* PO History Audit Trail */}
                     {(account.poNumberHistory || []).length > 0 && (
                       <div className="pt-2">
-                        <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
+                        <div className="text-[11px] font-extrabold uppercase tracking-wider text-fg-muted mb-2 flex items-center gap-1.5">
                           <HistoryIcon className="w-3.5 h-3.5" />
                           <span>Revoked PO Audit Trail ({account.poNumberHistory!.length})</span>
                         </div>
-                        <div className="border border-slate-200 rounded-xl overflow-hidden">
+                        <div className="border border-border-subtle rounded-xl overflow-hidden">
                           <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-500">
+                            <thead className="bg-surface-subtle border-b border-border-subtle text-[10px] font-bold uppercase text-fg-muted">
                               <tr>
                                 <th className="px-3 py-2">Revoked PO #</th>
                                 <th className="px-3 py-2">Rotated At</th>
@@ -1782,19 +1794,19 @@ export default function CorporatePortalRoute() {
                                 <th className="px-3 py-2">Reason</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-border-faint">
                               {account.poNumberHistory!.map((item, idx) => (
                                 <tr key={`${item.poNumber}-${idx}`}>
-                                  <td className="px-3 py-2 font-mono font-bold text-rose-700 line-through">
+                                  <td className="px-3 py-2 font-mono font-bold text-status-danger-fg line-through">
                                     {item.poNumber}
                                   </td>
-                                  <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                                  <td className="px-3 py-2 text-fg-secondary whitespace-nowrap">
                                     {new Date(item.rotatedAt).toLocaleString()}
                                   </td>
-                                  <td className="px-3 py-2 font-mono text-slate-600">
+                                  <td className="px-3 py-2 font-mono text-fg-secondary">
                                     {item.rotatedBy || 'Corporate Portal'}
                                   </td>
-                                  <td className="px-3 py-2 text-slate-700">{item.reason || '—'}</td>
+                                  <td className="px-3 py-2 text-fg-secondary">{item.reason || '—'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -1807,19 +1819,19 @@ export default function CorporatePortalRoute() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* 2. Authorized Riders Directory */}
-                  <Card className="border border-slate-200/90 shadow-2xs">
-                    <CardHeader className="border-b border-slate-100">
-                      <CardTitle className="text-sm font-black text-slate-900 flex items-center gap-2">
+                  <Card className="border border-border-subtle/90 shadow-2xs">
+                    <CardHeader className="border-b border-border-faint">
+                      <CardTitle className="text-sm font-black text-fg-primary flex items-center gap-2">
                         <UsersIcon className="w-4 h-4 text-indigo-600" />
                         <span>Authorized Employees &amp; Guest Riders</span>
                       </CardTitle>
-                      <CardDescription className="text-xs text-slate-500">
+                      <CardDescription className="text-xs text-fg-muted">
                         One-click traveler profiles available in the Book Company Ride tab.
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="p-4 space-y-4 text-xs">
                       {canManageRiders ? (
-                        <form onSubmit={handleAddRider} className="space-y-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                        <form onSubmit={handleAddRider} className="space-y-2.5 p-3 bg-surface-subtle rounded-xl border border-border-subtle/80">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <input
                               type="text"
@@ -1827,14 +1839,14 @@ export default function CorporatePortalRoute() {
                               value={newRiderName}
                               onChange={(e) => setNewRiderName(e.target.value)}
                               placeholder="Full Name *"
-                              className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                              className="px-3 py-2 bg-surface-card border border-border-strong rounded-lg text-xs"
                             />
                             <input
                               type="tel"
                               value={newRiderPhone}
                               onChange={(e) => setNewRiderPhone(formatUsPhone(e.target.value))}
                               placeholder="Mobile Phone"
-                              className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                              className="px-3 py-2 bg-surface-card border border-border-strong rounded-lg text-xs"
                             />
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1843,14 +1855,14 @@ export default function CorporatePortalRoute() {
                               value={newRiderEmail}
                               onChange={(e) => setNewRiderEmail(e.target.value)}
                               placeholder="Work Email"
-                              className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                              className="px-3 py-2 bg-surface-card border border-border-strong rounded-lg text-xs"
                             />
                             <input
                               type="text"
                               value={newRiderDept}
                               onChange={(e) => setNewRiderDept(e.target.value)}
                               placeholder="Department / Cost Center"
-                              className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                              className="px-3 py-2 bg-surface-card border border-border-strong rounded-lg text-xs"
                             />
                           </div>
                           <div className="flex items-center justify-between pt-1">
@@ -1859,46 +1871,46 @@ export default function CorporatePortalRoute() {
                                 type="checkbox"
                                 checked={newRiderVip}
                                 onChange={(e) => setNewRiderVip(e.target.checked)}
-                                className="w-4 h-4 rounded border-slate-300 text-indigo-600"
+                                className="w-4 h-4 rounded border-border-strong text-indigo-600"
                               />
-                              <span className="font-semibold text-slate-700">Executive / VIP Priority</span>
+                              <span className="font-semibold text-fg-secondary">Executive / VIP Priority</span>
                             </label>
                             <Button
                               type="submit"
                               size="sm"
                               variant="primary"
                               disabled={isSavingSettings}
-                              className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
+                              className="bg-surface-header hover:bg-surface-header-elevated text-white text-xs font-bold cursor-pointer"
                             >
                               + Add Rider
                             </Button>
                           </div>
                         </form>
                       ) : (
-                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-center gap-2">
-                          <LockIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <div className="p-2.5 rounded-xl bg-surface-subtle border border-border-subtle text-[11px] text-fg-secondary flex items-center gap-2">
+                          <LockIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
                           <span>Authorized rider list is managed by Chesterfield Corporate Administration.</span>
                         </div>
                       )}
 
-                      <div className="divide-y divide-slate-100">
+                      <div className="divide-y divide-border-faint">
                         {(account.authorizedRiders || []).map((r) => (
                           <div key={r.id} className="py-2.5 flex items-center justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                              <div className="font-bold text-fg-primary flex items-center gap-1.5">
                                 <span className="truncate">{r.name}</span>
                                 {r.isVip && (
-                                  <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
+                                  <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-status-warning-bg-strong text-status-warning-fg">
                                     VIP
                                   </span>
                                 )}
                                 {r.department && (
-                                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
+                                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-surface-muted text-fg-secondary">
                                     {r.department}
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[11px] text-slate-500 truncate">
+                              <div className="text-[11px] text-fg-muted truncate">
                                 {[r.email, r.phone].filter(Boolean).join(' • ') || 'No contact info'}
                               </div>
                             </div>
@@ -1906,7 +1918,7 @@ export default function CorporatePortalRoute() {
                               <button
                                 type="button"
                                 onClick={() => handleRemoveRider(r.id)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                className="p-1.5 rounded-lg text-fg-subtle hover:text-rose-600 hover:bg-status-danger-bg cursor-pointer"
                                 title="Remove rider"
                               >
                                 <TrashIcon className="w-3.5 h-3.5" />
@@ -1915,7 +1927,7 @@ export default function CorporatePortalRoute() {
                           </div>
                         ))}
                         {(!account.authorizedRiders || account.authorizedRiders.length === 0) && (
-                          <p className="text-slate-400 text-center py-4">
+                          <p className="text-fg-subtle text-center py-4">
                             No saved employee/guest profiles yet.
                           </p>
                         )}
@@ -1925,33 +1937,33 @@ export default function CorporatePortalRoute() {
 
                   {/* 3. Saved Company Locations + Cost Centers & Bookers */}
                   <div className="space-y-6">
-                    <Card className="border border-slate-200/90 shadow-2xs">
-                      <CardHeader className="border-b border-slate-100">
-                        <CardTitle className="text-sm font-black text-slate-900 flex items-center gap-2">
+                    <Card className="border border-border-subtle/90 shadow-2xs">
+                      <CardHeader className="border-b border-border-faint">
+                        <CardTitle className="text-sm font-black text-fg-primary flex items-center gap-2">
                           <MapPinIcon className="w-4 h-4 text-indigo-600" />
                           <span>Saved Company Locations</span>
                         </CardTitle>
-                        <CardDescription className="text-xs text-slate-500">
+                        <CardDescription className="text-xs text-fg-muted">
                           Offices, campuses, hotels, and pickup gates for 1-tap booking.
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="p-4 space-y-3 text-xs">
                         {canManageLocations ? (
-                          <form onSubmit={handleAddSavedPlace} className="space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                          <form onSubmit={handleAddSavedPlace} className="space-y-2 p-3 bg-surface-subtle rounded-xl border border-border-subtle/80">
                             <input
                               type="text"
                               required
                               value={newPlaceLabel}
                               onChange={(e) => setNewPlaceLabel(e.target.value)}
                               placeholder="Label (e.g. St. Louis HQ West Lobby) *"
-                              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                              className="w-full px-3 py-2 bg-surface-card border border-border-strong rounded-lg text-xs"
                             />
                             <DispatchLocationInput
                               value={newPlaceAddress}
                               onChange={(val) => setNewPlaceAddress(val)}
                               onPlaceSelected={(details) => setNewPlaceAddress(details.address)}
                               placeholder="Street Address *"
-                              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                              className="w-full px-3 py-2 bg-surface-card border border-border-strong rounded-lg text-xs"
                             />
                             <div className="flex items-center gap-2">
                               <input
@@ -1959,41 +1971,41 @@ export default function CorporatePortalRoute() {
                                 value={newPlaceNotes}
                                 onChange={(e) => setNewPlaceNotes(e.target.value)}
                                 placeholder="Pickup / Gate / Security Instructions"
-                                className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"
+                                className="flex-1 px-3 py-2 bg-surface-card border border-border-strong rounded-lg text-xs"
                               />
                               <Button
                                 type="submit"
                                 size="sm"
                                 variant="primary"
                                 disabled={isSavingSettings}
-                                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0 cursor-pointer"
+                                className="bg-surface-header hover:bg-surface-header-elevated text-white text-xs font-bold shrink-0 cursor-pointer"
                               >
                                 + Save Place
                               </Button>
                             </div>
                           </form>
                         ) : (
-                          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-center gap-2">
-                            <LockIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <div className="p-2.5 rounded-xl bg-surface-subtle border border-border-subtle text-[11px] text-fg-secondary flex items-center gap-2">
+                            <LockIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
                             <span>Saved company pickup/dropoff locations are managed by Chesterfield Corporate Administration.</span>
                           </div>
                         )}
 
-                        <div className="divide-y divide-slate-100">
+                        <div className="divide-y divide-border-faint">
                           {(account.savedCompanyLocations || []).map((loc) => (
                             <div key={loc.id} className="py-2.5 flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <div className="font-bold text-slate-900">{loc.label}</div>
-                                <div className="text-[11px] text-slate-600 truncate">{loc.address}</div>
+                                <div className="font-bold text-fg-primary">{loc.label}</div>
+                                <div className="text-[11px] text-fg-secondary truncate">{loc.address}</div>
                                 {loc.notes && (
-                                  <div className="text-[10px] text-indigo-700 mt-0.5">{loc.notes}</div>
+                                  <div className="text-[10px] text-status-staged-fg mt-0.5">{loc.notes}</div>
                                 )}
                               </div>
                               {canManageLocations && (
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveSavedPlace(loc.id)}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                  className="p-1.5 rounded-lg text-fg-subtle hover:text-rose-600 hover:bg-status-danger-bg cursor-pointer"
                                   title="Remove location"
                                 >
                                   <TrashIcon className="w-3.5 h-3.5" />
@@ -2006,16 +2018,16 @@ export default function CorporatePortalRoute() {
                     </Card>
 
                     {/* Cost Centers & Authorized Booker Emails */}
-                    <Card className="border border-slate-200/90 shadow-2xs">
-                      <CardHeader className="border-b border-slate-100">
-                        <CardTitle className="text-sm font-black text-slate-900 flex items-center gap-2">
+                    <Card className="border border-border-subtle/90 shadow-2xs">
+                      <CardHeader className="border-b border-border-faint">
+                        <CardTitle className="text-sm font-black text-fg-primary flex items-center gap-2">
                           <TagIcon className="w-4 h-4 text-indigo-600" />
                           <span>Cost Centers &amp; Authorized Bookers</span>
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-4 space-y-4 text-xs">
                         <div>
-                          <span className="font-bold text-slate-700 block mb-1.5">
+                          <span className="font-bold text-fg-secondary block mb-1.5">
                             Department / Cost Center Codes
                           </span>
                           <form onSubmit={handleAddCostCenter} className="flex gap-2 mb-2">
@@ -2024,7 +2036,7 @@ export default function CorporatePortalRoute() {
                               value={newCostCenterTag}
                               onChange={(e) => setNewCostCenterTag(e.target.value)}
                               placeholder="e.g. EXEC-100 or R&D-STL"
-                              className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                              className="flex-1 px-3 py-1.5 bg-surface-card border border-border-strong rounded-lg text-xs font-mono"
                             />
                             <Button type="submit" size="sm" variant="outline" className="font-bold cursor-pointer">
                               Add Tag
@@ -2034,7 +2046,7 @@ export default function CorporatePortalRoute() {
                             {(account.costCenters || []).map((cc) => (
                               <span
                                 key={cc}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-900 font-mono font-bold text-[11px]"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-status-staged-bg border border-status-staged-border text-status-staged-fg font-mono font-bold text-[11px]"
                               >
                                 {cc}
                                 <button
@@ -2049,8 +2061,8 @@ export default function CorporatePortalRoute() {
                           </div>
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100">
-                          <span className="font-bold text-slate-700 block mb-1.5">
+                        <div className="pt-3 border-t border-border-faint">
+                          <span className="font-bold text-fg-secondary block mb-1.5">
                             Authorized Travel Booker Emails
                           </span>
                           <form onSubmit={handleAddBooker} className="flex gap-2 mb-2">
@@ -2059,7 +2071,7 @@ export default function CorporatePortalRoute() {
                               value={newBookerEmail}
                               onChange={(e) => setNewBookerEmail(e.target.value)}
                               placeholder="coordinator@company.com"
-                              className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                              className="flex-1 px-3 py-1.5 bg-surface-card border border-border-strong rounded-lg text-xs"
                             />
                             <Button type="submit" size="sm" variant="outline" className="font-bold cursor-pointer">
                               Authorize
@@ -2069,13 +2081,13 @@ export default function CorporatePortalRoute() {
                             {(account.authorizedBookers || []).map((email) => (
                               <span
                                 key={email}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-medium"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-muted border border-border-subtle text-fg-strong text-[11px] font-medium"
                               >
                                 {email}
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveBooker(email)}
-                                  className="text-slate-400 hover:text-rose-600 cursor-pointer"
+                                  className="text-fg-subtle hover:text-rose-600 cursor-pointer"
                                 >
                                   <XIcon className="w-3 h-3" />
                                 </button>
@@ -2095,12 +2107,12 @@ export default function CorporatePortalRoute() {
                ═══════════════════════════════════════════════════════════════════ */}
             {activeTab === 'billing' && (
               <div className="space-y-5">
-                <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-base font-black text-slate-950">
+                    <h2 className="text-base font-black text-fg-primary">
                       Corporate Statements &amp; 1-Tap Online Remittance
                     </h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs text-fg-muted mt-0.5">
                       Download itemized PDF invoices, export CSV expense logs for accounting, or pay
                       open statements online.
                     </p>
@@ -2117,33 +2129,33 @@ export default function CorporatePortalRoute() {
                   </Button>
                 </div>
 
-                <Card className="border border-slate-200/90 shadow-2xs overflow-hidden">
+                <Card className="border border-border-subtle/90 shadow-2xs overflow-hidden">
                   <CardContent className="p-0">
                     {summary.invoices.length === 0 ? (
                       <div className="p-12 text-center space-y-2">
-                        <FileTextIcon className="w-8 h-8 text-slate-300 mx-auto" />
-                        <p className="text-sm font-bold text-slate-700">
+                        <FileTextIcon className="w-8 h-8 text-fg-faint mx-auto" />
+                        <p className="text-sm font-bold text-fg-secondary">
                           No issued statements yet for {account.companyName}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-fg-muted">
                           Unbilled cycle spend (${summary.unbilledSpend.toFixed(2)}) will appear here
                           when consolidated at the close of your {account.billingCycle.toUpperCase()}{' '}
                           cycle.
                         </p>
                       </div>
                     ) : (
-                      <div className="divide-y divide-slate-100">
+                      <div className="divide-y divide-border-faint">
                         {summary.invoices.map((inv) => {
                           const pill = formatInvoiceStatusPill(inv.status);
                           const isPayable = inv.status === 'issued' || inv.status === 'overdue';
                           return (
                             <div
                               key={inv.id}
-                              className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/60"
+                              className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-surface-subtle/60"
                             >
                               <div className="space-y-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className="font-mono font-black text-sm text-slate-950">
+                                  <span className="font-mono font-black text-sm text-fg-primary">
                                     {inv.invoiceNumber}
                                   </span>
                                   <span
@@ -2151,12 +2163,12 @@ export default function CorporatePortalRoute() {
                                   >
                                     {pill.label}
                                   </span>
-                                  <span className="text-xs text-slate-500">
+                                  <span className="text-xs text-fg-muted">
                                     Issued: {inv.issuedDate} • Due:{' '}
-                                    <strong className="text-slate-700">{inv.dueDate}</strong>
+                                    <strong className="text-fg-secondary">{inv.dueDate}</strong>
                                   </span>
                                 </div>
-                                <div className="text-xs text-slate-600">
+                                <div className="text-xs text-fg-secondary">
                                   {inv.lineItems?.length || inv.tripIds?.length || 1} itemized
                                   line(s)
                                   {inv.paidDate ? ` • Settled on ${inv.paidDate}` : ''}
@@ -2166,10 +2178,10 @@ export default function CorporatePortalRoute() {
 
                               <div className="flex flex-wrap items-center gap-2.5">
                                 <div className="text-right mr-2">
-                                  <div className="text-[10px] font-bold uppercase text-slate-400">
+                                  <div className="text-[10px] font-bold uppercase text-fg-subtle">
                                     Statement Total
                                   </div>
-                                  <div className="text-base font-mono font-black text-slate-950">
+                                  <div className="text-base font-mono font-black text-fg-primary">
                                     ${Number(inv.totalAmount || 0).toFixed(2)}
                                   </div>
                                 </div>
@@ -2214,57 +2226,57 @@ export default function CorporatePortalRoute() {
 
       {/* ─── Printable PDF Statement Modal ─── */}
       {selectedStatement && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto print:static print:bg-white print:p-0">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-6 sm:p-8 space-y-6 shadow-2xl my-auto print:shadow-none print:border-0 print:max-w-none">
+        <div className="fixed inset-0 z-50 bg-surface-overlay/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto print:static print:bg-white print:p-0">
+          <div className="bg-surface-card print:bg-white print:text-slate-900 rounded-2xl border border-border-subtle max-w-3xl w-full p-6 sm:p-8 space-y-6 shadow-2xl my-auto print:shadow-none print:border-0 print:max-w-none">
             {isLoadingStatement ? (
               <div className="py-16 flex flex-col items-center justify-center gap-2">
-                <SpinnerIcon className="w-6 h-6 animate-spin text-indigo-600" />
-                <span className="text-xs text-slate-500">Preparing printable statement...</span>
+                <SpinnerIcon className="w-6 h-6 animate-spin text-status-staged-fg" />
+                <span className="text-xs text-fg-muted">Preparing printable statement...</span>
               </div>
             ) : (
               <>
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-slate-200">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-border-subtle">
                   <div>
-                    <div className="text-lg font-black text-slate-950">
+                    <div className="text-lg font-black text-fg-primary print:text-slate-950">
                       {companySettings?.name || COMPANY_CONFIG.legalName}
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-fg-muted">
                       {companySettings?.address || COMPANY_CONFIG.address.formatted}
                     </div>
-                    <div className="text-xs text-slate-500 font-mono">
+                    <div className="text-xs text-fg-muted font-mono">
                       Billing &amp; Dispatch: {companySettings?.phone || COMPANY_CONFIG.phone.dispatch}
                     </div>
                   </div>
                   <div className="sm:text-right">
-                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-600 block">
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-status-staged-fg block">
                       Corporate B2B Statement
                     </span>
-                    <div className="text-xl font-mono font-black text-slate-950">
+                    <div className="text-xl font-mono font-black text-fg-primary print:text-slate-950">
                       {selectedStatement.invoiceNumber}
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
+                    <div className="text-xs text-fg-muted mt-0.5">
                       Issued: {selectedStatement.issuedDate} • Due: {selectedStatement.dueDate}
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-surface-subtle p-4 rounded-xl border border-border-subtle/80">
                   <div>
-                    <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                    <span className="text-[10px] font-bold uppercase text-fg-subtle block">
                       Bill To Corporate Account
                     </span>
-                    <div className="font-extrabold text-slate-900 mt-0.5">
+                    <div className="font-extrabold text-fg-primary mt-0.5">
                       {account?.companyName || selectedStatement.customerName}
                     </div>
-                    <div className="font-mono text-indigo-700 font-bold">
+                    <div className="font-mono text-status-staged-fg font-bold">
                       Account #: {account?.accountNumber || selectedStatement.accountNumber}
                     </div>
-                    <div className="text-slate-600">
+                    <div className="text-fg-secondary">
                       {printableStatement?.billingAddress || selectedStatement.customerEmail}
                     </div>
                   </div>
                   <div className="sm:text-right">
-                    <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                    <span className="text-[10px] font-bold uppercase text-fg-subtle block">
                       Settlement Status
                     </span>
                     <div className="mt-1">
@@ -2277,7 +2289,7 @@ export default function CorporatePortalRoute() {
                       </span>
                     </div>
                     {selectedStatement.paidDate && (
-                      <div className="text-emerald-700 font-semibold mt-1">
+                      <div className="text-status-success-fg font-semibold mt-1">
                         Paid on {selectedStatement.paidDate}
                       </div>
                     )}
@@ -2285,9 +2297,9 @@ export default function CorporatePortalRoute() {
                 </div>
 
                 {/* Line Items */}
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <div className="border border-border-subtle rounded-xl overflow-hidden">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-500">
+                    <thead className="bg-surface-subtle border-b border-border-subtle text-[10px] font-bold uppercase text-fg-muted">
                       <tr>
                         <th className="px-4 py-2.5">Date</th>
                         <th className="px-4 py-2.5">Traveler / PO #</th>
@@ -2295,62 +2307,62 @@ export default function CorporatePortalRoute() {
                         <th className="px-4 py-2.5 text-right">Amount</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-border-faint">
                       {(printableStatement?.lineItems || selectedStatement.lineItems || []).map(
                         (li, idx) => (
                           <tr key={idx}>
-                            <td className="px-4 py-2.5 font-mono text-slate-600 whitespace-nowrap">
+                            <td className="px-4 py-2.5 font-mono text-fg-secondary whitespace-nowrap">
                               {li.date || selectedStatement.issuedDate}
                             </td>
                             <td className="px-4 py-2.5">
-                              <div className="font-bold text-slate-900">
+                              <div className="font-bold text-fg-primary">
                                 {li.passengerName || selectedStatement.customerName}
                               </div>
                               {li.poNumber && (
-                                <div className="text-[10px] font-mono text-slate-500">
+                                <div className="text-[10px] font-mono text-fg-muted">
                                   PO: {li.poNumber}
                                 </div>
                               )}
                             </td>
-                            <td className="px-4 py-2.5 text-slate-700">
+                            <td className="px-4 py-2.5 text-fg-secondary">
                               <div>{li.description}</div>
                               {li.pickupDropoff && (
-                                <div className="text-[11px] font-mono text-slate-500 mt-0.5">
+                                <div className="text-[11px] font-mono text-fg-muted mt-0.5">
                                   {li.pickupDropoff}
                                 </div>
                               )}
                             </td>
-                            <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                            <td className="px-4 py-2.5 text-right font-mono font-bold text-fg-primary whitespace-nowrap">
                               ${Number(li.amount || 0).toFixed(2)}
                             </td>
                           </tr>
                         )
                       )}
                     </tbody>
-                    <tfoot className="bg-slate-50 border-t border-slate-200">
+                    <tfoot className="bg-surface-subtle border-t border-border-subtle">
                       {(printableStatement?.discountAmount ?? 0) > 0 && (
                         <tr>
-                          <td colSpan={3} className="px-4 py-2 text-right text-emerald-700 font-semibold">
+                          <td colSpan={3} className="px-4 py-2 text-right text-status-success-fg font-semibold">
                             Contract Discount:
                           </td>
-                          <td className="px-4 py-2 text-right font-mono font-bold text-emerald-700">
+                          <td className="px-4 py-2 text-right font-mono font-bold text-status-success-fg">
                             -${printableStatement!.discountAmount!.toFixed(2)}
                           </td>
                         </tr>
                       )}
                       <tr>
-                        <td colSpan={3} className="px-4 py-1.5 text-right text-[11px] text-slate-500">
+                        <td colSpan={3} className="px-4 py-1.5 text-right text-[11px] text-fg-muted">
                           Sales &amp; Transit Tax (MO RS 144.030 Exempt):
                         </td>
-                        <td className="px-4 py-1.5 text-right font-mono text-[11px] text-slate-500">
+                        <td className="px-4 py-1.5 text-right font-mono text-[11px] text-fg-muted">
                           $0.00
                         </td>
                       </tr>
-                      <tr className="border-t border-slate-200 bg-indigo-50/50">
-                        <td colSpan={3} className="px-4 py-3 text-right font-black text-sm text-slate-950">
+                      <tr className="border-t border-border-subtle bg-status-staged-bg/50">
+                        <td colSpan={3} className="px-4 py-3 text-right font-black text-sm text-fg-primary print:text-slate-950">
                           Total Statement Balance:
                         </td>
-                        <td className="px-4 py-3 text-right font-mono font-black text-base text-indigo-700">
+                        <td className="px-4 py-3 text-right font-mono font-black text-base text-status-staged-fg">
                           ${Number(selectedStatement.totalAmount || 0).toFixed(2)}
                         </td>
                       </tr>
@@ -2359,7 +2371,7 @@ export default function CorporatePortalRoute() {
                 </div>
 
                 {/* Remittance & Print Actions */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-200 print:hidden">
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-border-subtle print:hidden">
                   <Button
                     type="button"
                     variant="outline"

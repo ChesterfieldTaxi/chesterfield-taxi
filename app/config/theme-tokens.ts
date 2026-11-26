@@ -62,6 +62,7 @@ export const DARK_MODE_ENABLED_PATH_PREFIXES = [
   '/app/login',
   '/app/register',
   '/app/hub',
+  '/app/corporate',
 ] as const;
 
 export function isDarkModeRoutePath(pathname: string): boolean {
