@@ -142,18 +142,33 @@ export function AdminCustomersSubpage({
     return buildCustomerProfilesList(trips, settings.invoices || []);
   }, [trips, settings.invoices, governanceRefreshKey]);
 
-  const blacklistedCustomers = allCustomers.filter((c) => Boolean(c.isBlacklisted));
-  const nonBlacklistedCustomers = allCustomers.filter((c) => !c.isBlacklisted);
-  const activeCustomers = nonBlacklistedCustomers.filter((c) => !c.isArchived);
-  const archivedCustomers = nonBlacklistedCustomers.filter((c) => Boolean(c.isArchived));
-  const displayedCustomers =
-    archiveFilter === 'active'
-      ? activeCustomers
-      : archiveFilter === 'archived'
-      ? archivedCustomers
-      : archiveFilter === 'blacklist'
-      ? blacklistedCustomers
-      : nonBlacklistedCustomers;
+  const blacklistedCustomers = useMemo(
+    () => allCustomers.filter((c) => Boolean(c.isBlacklisted)),
+    [allCustomers]
+  );
+  const nonBlacklistedCustomers = useMemo(
+    () => allCustomers.filter((c) => !c.isBlacklisted),
+    [allCustomers]
+  );
+  const activeCustomers = useMemo(
+    () => nonBlacklistedCustomers.filter((c) => !c.isArchived),
+    [nonBlacklistedCustomers]
+  );
+  const archivedCustomers = useMemo(
+    () => nonBlacklistedCustomers.filter((c) => Boolean(c.isArchived)),
+    [nonBlacklistedCustomers]
+  );
+  const displayedCustomers = useMemo(
+    () =>
+      archiveFilter === 'active'
+        ? activeCustomers
+        : archiveFilter === 'archived'
+        ? archivedCustomers
+        : archiveFilter === 'blacklist'
+        ? blacklistedCustomers
+        : nonBlacklistedCustomers,
+    [archiveFilter, activeCustomers, archivedCustomers, blacklistedCustomers, nonBlacklistedCustomers]
+  );
 
   const deleteContactForProfile = (cust: CustomerProfile) => {
     const contactService = getContactService();

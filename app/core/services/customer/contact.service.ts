@@ -851,20 +851,50 @@ class ContactService {
     }
   }
 
+  private hasWarnedStorageQuota = false;
+
   private saveToStorage() {
     if (typeof window === 'undefined' || !window.localStorage) return;
+    const uniqueList: ContactRecord[] = [];
+    const seenIds = new Set<string>();
+    for (const [key, record] of this.customContacts.entries()) {
+      if (!isIndexKey(key) && !seenIds.has(record.id)) {
+        seenIds.add(record.id);
+        uniqueList.push(record);
+      }
+    }
     try {
-      const uniqueList: ContactRecord[] = [];
-      const seenIds = new Set<string>();
-      for (const [key, record] of this.customContacts.entries()) {
-        if (!isIndexKey(key) && !seenIds.has(record.id)) {
-          seenIds.add(record.id);
-          uniqueList.push(record);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(uniqueList));
+    } catch (err) {
+      const isQuotaError =
+        typeof DOMException !== 'undefined' &&
+        err instanceof DOMException &&
+        (err.name === 'QuotaExceededError' ||
+          err.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+          err.code === 22 ||
+          err.code === 1014);
+
+      if (isQuotaError) {
+        if (!this.hasWarnedStorageQuota) {
+          this.hasWarnedStorageQuota = true;
+          console.warn(
+            `[ContactService] localStorage quota exceeded while caching ${uniqueList.length} contacts; trimming local cache to recent records.`
+          );
+        }
+        // Gracefully fall back to caching the most recently updated contacts
+        const recentSubset = [...uniqueList]
+          .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+          .slice(0, 1500);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(recentSubset));
+        } catch {
+          try {
+            localStorage.removeItem(STORAGE_KEY);
+          } catch {
+            // Ignore secondary storage errors
+          }
         }
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(uniqueList));
-    } catch {
-      // Storage write error
     }
   }
 

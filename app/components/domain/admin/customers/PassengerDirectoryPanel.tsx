@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../ui/Card';
 import { Badge } from '../../../ui/Badge';
@@ -6,18 +6,40 @@ import { Button } from '../../../ui/Button';
 import {
   BanIcon,
   CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   ExternalLinkIcon,
   MailIcon,
   PhoneIcon,
   PlusIcon,
   SpinnerIcon,
+  Squares2X2Icon,
   StarIcon,
+  TableCellsIcon,
   TrashIcon,
   UsersIcon,
   XIcon,
 } from '../../../ui/Icons';
 import { ArchiveBoxIcon } from '../UniversalArchiveDrawer';
-import type { CustomerArchiveFilter, CustomerProfile } from './types';
+import {
+  ALPHABET_BUCKETS,
+  computeAlphabetCounts,
+  DIRECTORY_PAGE_SIZES,
+  DIRECTORY_SORT_OPTIONS,
+  DIRECTORY_VIEW_STORAGE_KEY,
+  filterAndSortCustomers,
+  getAlphabetBucket,
+  getReliabilityScoreTone,
+  paginateCustomers,
+} from './customer-directory.util';
+import { PassengerDirectoryTable } from './PassengerDirectoryTable';
+import type {
+  AlphabetBucket,
+  CustomerArchiveFilter,
+  CustomerProfile,
+  CustomerSortField,
+  DirectoryViewMode,
+} from './types';
 
 export interface PassengerDirectoryPanelProps {
   isLoading: boolean;
@@ -57,21 +79,115 @@ export function PassengerDirectoryPanel({
   onPurgeAllBlacklisted,
 }: PassengerDirectoryPanelProps) {
   const [vipOnly, setVipOnly] = useState(false);
+  const [localSearch, setLocalSearch] = useState(searchTerm);
+  const deferredSearch = useDeferredValue(searchTerm);
+  const [sortOptionId, setSortOptionId] = useState<string>(DIRECTORY_SORT_OPTIONS[0].id);
+  const [alphabetBucket, setAlphabetBucket] = useState<AlphabetBucket>('All');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(DIRECTORY_PAGE_SIZES[0]);
+  const [viewMode, setViewMode] = useState<DirectoryViewMode>('cards');
+
   const [confirmPurgeAll, setConfirmPurgeAll] = useState(false);
   const [confirmPurgeId, setConfirmPurgeId] = useState<string | null>(null);
   const [isPurging, setIsPurging] = useState(false);
 
-  const filteredCustomers = displayedCustomers.filter((c) => {
-    if (vipOnly && !c.isVip) return false;
-    if (!searchTerm.trim()) return true;
-    const q = searchTerm.toLowerCase();
-    return (
-      c.name.toLowerCase().includes(q) ||
-      c.email.toLowerCase().includes(q) ||
-      c.phone.toLowerCase().includes(q) ||
-      Boolean(c.corporateAccountName && c.corporateAccountName.toLowerCase().includes(q))
+  // Hydrate persisted view preference on client mount (SSR-safe)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = window.localStorage.getItem(DIRECTORY_VIEW_STORAGE_KEY);
+      if (saved === 'cards' || saved === 'table') {
+        setViewMode(saved);
+      }
+    } catch {
+      // Ignore storage read errors
+    }
+  }, []);
+
+  const handleSetViewMode = (mode: DirectoryViewMode) => {
+    setViewMode(mode);
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(DIRECTORY_VIEW_STORAGE_KEY, mode);
+    } catch {
+      // Ignore storage write errors
+    }
+  };
+
+  // Sync external searchTerm changes into local input state
+  useEffect(() => {
+    setLocalSearch(searchTerm);
+  }, [searchTerm]);
+
+  // Debounce search propagation so typing stays instant with 9,000+ records
+  useEffect(() => {
+    if (localSearch === searchTerm) return;
+    const timer = window.setTimeout(() => {
+      setSearchTerm(localSearch);
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [localSearch, searchTerm, setSearchTerm]);
+
+  const activeSortOption = useMemo(
+    () => DIRECTORY_SORT_OPTIONS.find((opt) => opt.id === sortOptionId) ?? DIRECTORY_SORT_OPTIONS[0],
+    [sortOptionId]
+  );
+
+  const handleSortColumn = (field: CustomerSortField) => {
+    const nextDirection =
+      activeSortOption.field === field
+        ? activeSortOption.direction === 'asc'
+          ? 'desc'
+          : 'asc'
+        : field === 'name'
+        ? 'asc'
+        : 'desc';
+    const match = DIRECTORY_SORT_OPTIONS.find(
+      (opt) => opt.field === field && opt.direction === nextDirection
     );
-  });
+    if (match) {
+      setSortOptionId(match.id);
+    }
+  };
+
+  // Reset pagination to page 1 when any filter, sort, or bucket changes
+  useEffect(() => {
+    setPage(1);
+  }, [activeSortOption.id, alphabetBucket, deferredSearch, archiveFilter, vipOnly]);
+
+  const matchingCustomers = useMemo(
+    () =>
+      filterAndSortCustomers(displayedCustomers, {
+        searchTerm: deferredSearch,
+        vipOnly,
+        alphabetBucket: 'All',
+        sortField: activeSortOption.field,
+        sortDirection: activeSortOption.direction,
+      }),
+    [displayedCustomers, deferredSearch, vipOnly, activeSortOption.field, activeSortOption.direction]
+  );
+
+  const alphabetCounts = useMemo(
+    () => computeAlphabetCounts(matchingCustomers),
+    [matchingCustomers]
+  );
+
+  const bucketedCustomers = useMemo(() => {
+    if (alphabetBucket === 'All') return matchingCustomers;
+    return matchingCustomers.filter((c) => getAlphabetBucket(c.name) === alphabetBucket);
+  }, [matchingCustomers, alphabetBucket]);
+
+  const paginated = useMemo(
+    () => paginateCustomers(bucketedCustomers, page, pageSize),
+    [bucketedCustomers, page, pageSize]
+  );
+
+  // Keep page in bounds if items are archived/purged
+  useEffect(() => {
+    if (page > paginated.totalPages) {
+      setPage(paginated.totalPages);
+    }
+  }, [page, paginated.totalPages]);
 
   return (
     <div className="space-y-4">
@@ -82,14 +198,17 @@ export function PassengerDirectoryPanel({
             <input
               type="text"
               placeholder="Search passengers by name, phone, email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
               className="w-full pl-3 pr-8 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs font-medium text-fg-strong placeholder-fg-subtle focus:bg-surface-card focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             />
-            {searchTerm && (
+            {localSearch && (
               <button
                 type="button"
-                onClick={() => setSearchTerm('')}
+                onClick={() => {
+                  setLocalSearch('');
+                  setSearchTerm('');
+                }}
                 aria-label="Clear passenger search"
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-secondary cursor-pointer"
               >
@@ -178,6 +297,59 @@ export function PassengerDirectoryPanel({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0 w-full lg:w-auto justify-end">
+          {/* Sort Selector */}
+          <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-fg-muted">
+            <span className="hidden sm:inline">Sort:</span>
+            <select
+              aria-label="Sort passengers"
+              value={sortOptionId}
+              onChange={(e) => setSortOptionId(e.target.value)}
+              className="px-2.5 py-1.5 rounded-xl bg-surface-subtle border border-border-subtle text-xs font-bold text-fg-primary focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
+            >
+              {DIRECTORY_SORT_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/* Cards / Table View Toggle */}
+          <div
+            className="inline-flex items-center bg-surface-muted p-1 rounded-xl border border-border-subtle"
+            role="group"
+            aria-label="Directory view mode"
+          >
+            <button
+              type="button"
+              onClick={() => handleSetViewMode('cards')}
+              aria-pressed={viewMode === 'cards'}
+              title="Cards view"
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'cards'
+                  ? 'bg-surface-card text-fg-primary shadow-xs'
+                  : 'text-fg-muted hover:text-fg-primary'
+              }`}
+            >
+              <Squares2X2Icon className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Cards</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetViewMode('table')}
+              aria-pressed={viewMode === 'table'}
+              title="Table view"
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                viewMode === 'table'
+                  ? 'bg-surface-card text-fg-primary shadow-xs'
+                  : 'text-fg-muted hover:text-fg-primary'
+              }`}
+            >
+              <TableCellsIcon className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Table</span>
+            </button>
+          </div>
+
           {archiveFilter === 'blacklist' && blacklistCount > 0 && (
             confirmPurgeAll ? (
               <div className="inline-flex items-center gap-1.5 bg-status-danger-bg border border-status-danger-border px-2.5 py-1 rounded-xl">
@@ -255,22 +427,91 @@ export function PassengerDirectoryPanel({
         </div>
       </div>
 
-      {/* ─── Passenger Directory Grid ─── */}
+      {/* ─── Alphabet Page Bar ─── */}
+      {!isLoading && (
+        <div
+          className="bg-surface-card px-2.5 py-2 rounded-2xl border border-border-subtle/90 shadow-xs flex items-center gap-1 overflow-x-auto"
+          role="tablist"
+          aria-label="Filter passengers by starting letter"
+        >
+          {ALPHABET_BUCKETS.map((bucket) => {
+            const count = alphabetCounts[bucket] ?? 0;
+            const isActive = alphabetBucket === bucket;
+            const isDisabled = bucket !== 'All' && count === 0;
+
+            return (
+              <button
+                key={bucket}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                disabled={isDisabled}
+                onClick={() => setAlphabetBucket(bucket)}
+                title={
+                  bucket === 'All'
+                    ? `All passengers (${count})`
+                    : `${bucket}: ${count} passenger${count === 1 ? '' : 's'}`
+                }
+                className={`px-2 py-1 rounded-lg text-[11px] font-extrabold transition-all shrink-0 tabular-nums ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-xs cursor-pointer'
+                    : isDisabled
+                    ? 'text-fg-subtle/40 cursor-not-allowed'
+                    : 'text-fg-secondary hover:bg-surface-muted hover:text-fg-primary cursor-pointer'
+                }`}
+              >
+                {bucket}
+                {bucket === 'All' && (
+                  <span className={`ml-1 text-[10px] ${isActive ? 'text-white/90' : 'text-fg-subtle'}`}>
+                    ({count})
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ─── Passenger Directory Content (Cards or Table) ─── */}
       {isLoading ? (
         <div className="bg-surface-card rounded-2xl border border-border-subtle/80 p-12 flex items-center justify-center gap-2 text-fg-subtle">
           <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
           <span className="text-xs font-semibold">Loading passenger directory...</span>
         </div>
+      ) : paginated.totalItems === 0 ? (
+        <div className="py-12 text-center bg-surface-card rounded-2xl border border-border-subtle">
+          <UsersIcon className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+          <p className="text-fg-secondary font-bold text-sm">No passengers found</p>
+          <p className="text-fg-subtle font-medium text-xs mt-1">
+            {deferredSearch
+              ? `No clients matched "${deferredSearch}".`
+              : alphabetBucket !== 'All'
+              ? `No clients found under "${alphabetBucket}".`
+              : vipOnly
+              ? 'No VIP priority clients match the active filter.'
+              : 'Add a client or switch the archive filter above.'}
+          </p>
+        </div>
+      ) : viewMode === 'table' ? (
+        <PassengerDirectoryTable
+          customers={paginated.items}
+          sortField={activeSortOption.field}
+          sortDirection={activeSortOption.direction}
+          onSortColumn={handleSortColumn}
+          onOpenCustomer={onOpenCustomer}
+          onToggleArchiveCustomer={onToggleArchiveCustomer}
+          onRestoreCustomer={onRestoreCustomer}
+          onPurgeCustomer={onPurgeCustomer}
+          confirmPurgeId={confirmPurgeId}
+          setConfirmPurgeId={setConfirmPurgeId}
+          isPurging={isPurging}
+          setIsPurging={setIsPurging}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
-          {filteredCustomers.map((cust) => {
+          {paginated.items.map((cust) => {
             const score = cust.customerScore ?? 90;
-            const scoreTone =
-              score >= 80
-                ? 'bg-status-success-bg text-status-success-fg border-status-success-border'
-                : score >= 60
-                ? 'bg-status-warning-bg text-status-warning-fg border-status-warning-border'
-                : 'bg-status-danger-bg text-status-danger-fg border-status-danger-border';
+            const scoreTone = getReliabilityScoreTone(score);
             const initial = (cust.name || 'C').trim().charAt(0).toUpperCase();
 
             return (
@@ -490,20 +731,64 @@ export function PassengerDirectoryPanel({
               </Card>
             );
           })}
+        </div>
+      )}
 
-          {filteredCustomers.length === 0 && (
-            <div className="col-span-full py-12 text-center bg-surface-card rounded-2xl border border-border-subtle">
-              <UsersIcon className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-              <p className="text-fg-secondary font-bold text-sm">No passengers found</p>
-              <p className="text-fg-subtle font-medium text-xs mt-1">
-                {searchTerm
-                  ? `No clients matched "${searchTerm}".`
-                  : vipOnly
-                  ? 'No VIP priority clients match the active filter.'
-                  : 'Add a client or switch the archive filter above.'}
-              </p>
-            </div>
-          )}
+      {/* ─── Pagination Footer ─── */}
+      {!isLoading && paginated.totalItems > 0 && (
+        <div className="bg-surface-card px-3.5 py-2.5 rounded-2xl border border-border-subtle/90 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
+          <div className="flex items-center gap-3 text-fg-secondary font-medium">
+            <span className="tabular-nums">
+              Showing <strong className="text-fg-primary font-extrabold">{paginated.startIndex}–{paginated.endIndex}</strong> of{' '}
+              <strong className="text-fg-primary font-extrabold">{paginated.totalItems}</strong>
+            </span>
+            <label className="inline-flex items-center gap-1.5 text-fg-muted font-semibold">
+              <span>Per page:</span>
+              <select
+                aria-label="Passengers per page"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="px-2 py-1 rounded-lg bg-surface-subtle border border-border-subtle text-xs font-bold text-fg-primary focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+              >
+                {DIRECTORY_PAGE_SIZES.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={paginated.currentPage <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="text-xs font-bold px-2.5 py-1 h-auto border-border-subtle text-fg-secondary disabled:opacity-40 cursor-pointer"
+            >
+              <ChevronLeftIcon className="w-3.5 h-3.5 mr-1" />
+              Prev
+            </Button>
+            <span className="text-xs font-bold text-fg-secondary tabular-nums px-1.5">
+              Page {paginated.currentPage} of {paginated.totalPages}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={paginated.currentPage >= paginated.totalPages}
+              onClick={() => setPage((p) => Math.min(paginated.totalPages, p + 1))}
+              className="text-xs font-bold px-2.5 py-1 h-auto border-border-subtle text-fg-secondary disabled:opacity-40 cursor-pointer"
+            >
+              Next
+              <ChevronRightIcon className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </div>
         </div>
       )}
     </div>

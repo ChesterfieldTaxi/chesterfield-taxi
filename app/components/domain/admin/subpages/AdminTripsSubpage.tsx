@@ -5,7 +5,14 @@ import { Button } from '../../../ui/Button';
 import { Checkbox } from '../../../ui/Checkbox';
 import { Select } from '../../../ui/Select';
 import { Alert } from '../../../ui/Alert';
-import { DownloadIcon, SearchIcon, SpinnerIcon } from '../../../ui/Icons';
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  DownloadIcon,
+  SearchIcon,
+  SpinnerIcon,
+} from '../../../ui/Icons';
+import { ADMIN_TRIPS_PAGE_SIZES } from '../trips/admin-trips-pagination.util';
 import { TripAuditModal } from '../TripAuditModal';
 import { DispatchCompleteTripModal } from '../../dispatch/drawer/DispatchCompleteTripModal';
 import { AdminTripsTablePanel } from '../trips/AdminTripsTablePanel';
@@ -149,7 +156,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
 
           {ctrl.activeSub === 'exceptions' ? (
             <AdminTripsExceptionsPanel
-              trips={ctrl.exceptionTrips}
+              trips={ctrl.paginatedTrips}
               drivers={ctrl.drivers}
               dispatchAutomation={ctrl.appSettings.dispatchAutomation}
               exceptionByTripId={ctrl.exceptionByTripId}
@@ -177,7 +184,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
             />
           ) : (
             <AdminTripsTablePanel
-              trips={ctrl.activeSub === 'dispatch' ? ctrl.activeQueueTrips : ctrl.historyTrips}
+              trips={ctrl.paginatedTrips}
               drivers={ctrl.drivers}
               vehicles={ctrl.vehicles}
               fleetCars={ctrl.fleetCars}
@@ -212,6 +219,66 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
               onAuditTrip={ctrl.setAuditModalTrip}
               onToggleArchive={ctrl.handleToggleArchiveTrip}
             />
+          )}
+
+          {!ctrl.isLoading && ctrl.pagination.totalItems > 0 && (
+            <div className="bg-surface-card px-4 py-2.5 rounded-2xl border border-border-subtle/90 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
+              <div className="flex items-center gap-3 text-fg-secondary font-medium">
+                <span className="tabular-nums">
+                  Showing{' '}
+                  <strong className="text-fg-primary font-extrabold">
+                    {ctrl.pagination.startIndex}–{ctrl.pagination.endIndex}
+                  </strong>{' '}
+                  of{' '}
+                  <strong className="text-fg-primary font-extrabold">
+                    {ctrl.pagination.totalItems}
+                  </strong>
+                </span>
+                <label className="inline-flex items-center gap-1.5 text-fg-muted font-semibold">
+                  <span>Per page:</span>
+                  <select
+                    aria-label="Trips per page"
+                    value={ctrl.pageSize}
+                    onChange={(e) => ctrl.setPageSize(Number(e.target.value))}
+                    className="px-2 py-1 rounded-lg bg-surface-subtle border border-border-subtle text-xs font-bold text-fg-primary focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
+                  >
+                    {ADMIN_TRIPS_PAGE_SIZES.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={ctrl.pagination.currentPage <= 1}
+                  onClick={() => ctrl.setPage((p) => Math.max(1, p - 1))}
+                  className="text-xs font-bold px-2.5 py-1 h-auto border-border-subtle text-fg-secondary disabled:opacity-40 cursor-pointer"
+                >
+                  <ChevronLeftIcon className="w-3.5 h-3.5 mr-1" />
+                  Prev
+                </Button>
+                <span className="text-xs font-bold text-fg-secondary tabular-nums px-1.5">
+                  Page {ctrl.pagination.currentPage} of {ctrl.pagination.totalPages}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={ctrl.pagination.currentPage >= ctrl.pagination.totalPages}
+                  onClick={() => ctrl.setPage((p) => Math.min(ctrl.pagination.totalPages, p + 1))}
+                  className="text-xs font-bold px-2.5 py-1 h-auto border-border-subtle text-fg-secondary disabled:opacity-40 cursor-pointer"
+                >
+                  Next
+                  <ChevronRightIcon className="w-3.5 h-3.5 ml-1" />
+                </Button>
+              </div>
+            </div>
           )}
         </>
       )}

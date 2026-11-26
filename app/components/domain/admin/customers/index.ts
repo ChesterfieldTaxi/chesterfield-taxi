@@ -1,7 +1,21 @@
 export * from './types';
-export { buildCustomerProfilesList } from './customer-directory.util';
+export {
+  ALPHABET_BUCKETS,
+  buildCustomerProfilesList,
+  computeAlphabetCounts,
+  DIRECTORY_PAGE_SIZES,
+  DIRECTORY_SORT_OPTIONS,
+  DIRECTORY_TABLE_COLUMNS,
+  DIRECTORY_VIEW_STORAGE_KEY,
+  filterAndSortCustomers,
+  getAlphabetBucket,
+  getReliabilityScoreTone,
+  paginateCustomers,
+} from './customer-directory.util';
 export { PassengerDirectoryPanel } from './PassengerDirectoryPanel';
 export type { PassengerDirectoryPanelProps } from './PassengerDirectoryPanel';
+export { PassengerDirectoryTable } from './PassengerDirectoryTable';
+export type { PassengerDirectoryTableProps } from './PassengerDirectoryTable';
 export { CustomerProfileDrawer } from './CustomerProfileDrawer';
 export type { CustomerProfileDrawerProps } from './CustomerProfileDrawer';
 export { CorporateGovernanceCard } from './CorporateGovernanceCard';

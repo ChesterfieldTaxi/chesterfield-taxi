@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useDeferredValue } from 'react';
 import type { Trip, TripStatus } from '../../../../core/types/trip';
 import {
   evaluateTripDriverLateStatus,
@@ -25,6 +25,10 @@ import {
 } from '../../../../core/utils/admin-trips-exceptions.util';
 import { escapeCsvCell } from '../../../../core/services/analytics';
 import { notifyAdminTripStatusEmail } from './admin-trips-email.util';
+import {
+  ADMIN_TRIPS_PAGE_SIZES,
+  paginateTrips,
+} from './admin-trips-pagination.util';
 
 export type TripsSubTab = 'dispatch' | 'standing-orders' | 'exceptions' | 'history';
 
@@ -46,7 +50,10 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(ADMIN_TRIPS_PAGE_SIZES[0]);
   const nowMs = useLiveClockNowMs(30_000);
   const [includeArchivedInHistory, setIncludeArchivedInHistory] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
@@ -344,7 +351,7 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
   };
 
   const filterBySearch = (list: Trip[]) => {
-    const term = searchTerm.trim().toLowerCase();
+    const term = deferredSearchTerm.trim().toLowerCase();
     if (!term) return list;
     return list.filter((t) =>
       [
@@ -367,7 +374,7 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
 
   const activeQueueTrips = useMemo(
     () => filterBySearch(trips.filter((t) => isAdminActiveQueueTrip(t, isArchivedTrip(t)))),
-    [trips, searchTerm]
+    [trips, deferredSearchTerm]
   );
 
   const exceptionTrips = useMemo(
@@ -375,7 +382,7 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
       filterBySearch(
         trips.filter((t) => !isArchivedTrip(t) && Boolean(exceptionByTripId[t.id]?.isException))
       ),
-    [trips, exceptionByTripId, searchTerm]
+    [trips, exceptionByTripId, deferredSearchTerm]
   );
 
   const historyTrips = useMemo(() => {
@@ -387,7 +394,32 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
         ? base.filter((t) => evaluateTripDriverLateStatus(t, nowMs).isLate)
         : base.filter((t) => t.status === statusFilter);
     return filterBySearch(statusFiltered);
-  }, [trips, includeArchivedInHistory, statusFilter, searchTerm, nowMs]);
+  }, [trips, includeArchivedInHistory, statusFilter, deferredSearchTerm, nowMs]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeSub, deferredSearchTerm, statusFilter, includeArchivedInHistory, pageSize]);
+
+  const currentTabTrips = useMemo(
+    () =>
+      activeSub === 'dispatch'
+        ? activeQueueTrips
+        : activeSub === 'exceptions'
+        ? exceptionTrips
+        : historyTrips,
+    [activeSub, activeQueueTrips, exceptionTrips, historyTrips]
+  );
+
+  const pagination = useMemo(
+    () => paginateTrips(currentTabTrips, page, pageSize),
+    [currentTabTrips, page, pageSize]
+  );
+
+  useEffect(() => {
+    if (page > pagination.totalPages) {
+      setPage(pagination.totalPages);
+    }
+  }, [page, pagination.totalPages]);
 
   const handleExportCSV = () => {
     const sourceTrips =
@@ -460,6 +492,11 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
     activeQueueTrips,
     exceptionTrips,
     historyTrips,
+    paginatedTrips: pagination.items,
+    pagination,
+    pageSize,
+    setPageSize,
+    setPage,
     handleStatusTransition,
     handleDriverDropdownChange,
     handleSendStaged,
