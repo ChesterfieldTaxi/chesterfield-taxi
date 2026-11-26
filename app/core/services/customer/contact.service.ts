@@ -19,9 +19,14 @@ import {
   startAfter,
   where,
   type DocumentData,
+  type QueryConstraint,
   type QueryDocumentSnapshot,
   type QuerySnapshot,
 } from 'firebase/firestore';
+import {
+  getKpiSummaryService,
+  resolveContactLetterBucket,
+} from '../analytics/kpi-summary.service';
 import type {
   CommsChannel,
   CommsContactType,
@@ -124,8 +129,25 @@ export interface ContactRecord {
   emailLower?: string;
   /** Lowercase word/prefix/phone-last4 tokens for indexed `array-contains` search (Phase 101) */
   nameSearchTokens?: string[];
+  /** Lowercase trimmed name for server-side alphabetical sorting (Phase 101) */
+  nameLower?: string;
+  /** A-Z or '#' bucket for server-side alphabet filtering (Phase 101) */
+  letterBucket?: string;
   createdAt?: string | number;
   updatedAt: number;
+}
+
+export type ContactDirectoryArchiveFilter = 'active' | 'archived' | 'blacklist' | 'all';
+export type ContactDirectorySortField = 'name' | 'tripCount' | 'totalSpend' | 'customerScore';
+
+export interface ContactDirectoryQueryOptions {
+  cursor?: string | null;
+  limit?: number;
+  archiveFilter?: ContactDirectoryArchiveFilter;
+  vipOnly?: boolean;
+  letterBucket?: string;
+  sortField?: ContactDirectorySortField;
+  sortDirection?: 'asc' | 'desc';
 }
 
 export interface ContactPageResult {
@@ -186,6 +208,8 @@ export function computeContactSearchFields(record: Partial<ContactRecord>): {
   phoneNormalized: string;
   emailLower: string;
   nameSearchTokens: string[];
+  nameLower: string;
+  letterBucket: string;
 } {
   const phoneNormalized = normalizePhone(
     record.phone || record.mobilePhone || record.homePhone || record.workPhone || ''
@@ -234,10 +258,15 @@ export function computeContactSearchFields(record: Partial<ContactRecord>): {
     }
   }
 
+  const nameLower = String(record.name || '').trim().toLowerCase();
+  const letterBucket = resolveContactLetterBucket(record.name);
+
   return {
     phoneNormalized,
     emailLower,
     nameSearchTokens: Array.from(tokenSet).slice(0, 35),
+    nameLower,
+    letterBucket,
   };
 }
 
@@ -1297,17 +1326,29 @@ class ContactService {
       customerScore: profile.customerScore ?? mergedExisting.customerScore ?? 90,
       tripCount: profile.tripCount ?? mergedExisting.tripCount ?? 1,
       totalSpend: profile.totalSpend ?? mergedExisting.totalSpend ?? 0,
+      isArchived: profile.isArchived ?? mergedExisting.isArchived ?? false,
+      isBlacklisted: profile.isBlacklisted ?? mergedExisting.isBlacklisted ?? false,
       updatedAt: Date.now(),
     };
     const searchFields = computeContactSearchFields(record);
     record.phoneNormalized = searchFields.phoneNormalized;
     record.emailLower = searchFields.emailLower;
     record.nameSearchTokens = searchFields.nameSearchTokens;
+    record.nameLower = searchFields.nameLower;
+    record.letterBucket = searchFields.letterBucket;
 
     this.indexContactRecord(record);
     this.searchQueryLru.clear();
     this.saveToStorage();
     this.persistContactToFirestore(record);
+
+    if (primaryExisting) {
+      getKpiSummaryService()
+        .recordContactTransition(primaryExisting, record)
+        .catch(() => {});
+    } else {
+      getKpiSummaryService().recordContactCreated(record).catch(() => {});
+    }
 
     try {
       const bus = getWorkspaceBus();
@@ -1412,7 +1453,14 @@ class ContactService {
 
   /** Persists an already-built record (index + storage + Firestore + CONTACT_UPDATED + listeners). */
   private commitContactRecord(record: ContactRecord): ContactRecord {
-    const baseNext: ContactRecord = { ...record, updatedAt: Date.now() };
+    const prev = this.customContacts.get(record.id);
+    const baseNext: ContactRecord = {
+      ...record,
+      isVip: Boolean(record.isVip),
+      isArchived: Boolean(record.isArchived),
+      isBlacklisted: Boolean(record.isBlacklisted),
+      updatedAt: Date.now(),
+    };
     const next: ContactRecord = {
       ...baseNext,
       ...computeContactSearchFields(baseNext),
@@ -1421,6 +1469,9 @@ class ContactService {
     this.searchQueryLru.clear();
     this.saveToStorage();
     this.persistContactToFirestore(next);
+    if (prev) {
+      getKpiSummaryService().recordContactTransition(prev, next).catch(() => {});
+    }
     try {
       getWorkspaceBus().publish('CONTACT_UPDATED', { contact: next });
     } catch {}
@@ -1638,26 +1689,63 @@ class ContactService {
   }
 
   /**
-   * Cursor-paginated contact directory fetch (`limit` default 50) replacing
-   * the legacy 9,000-doc `syncContactsFromFirestore()` full collection scan.
+   * Cursor-paginated, server-filtered & sorted contact directory fetch (`limit` default 50).
+   * Supports `archiveFilter` (`active`/`archived`/`blacklist`/`all`), `vipOnly`,
+   * `letterBucket` (`All`/`A`–`Z`/`#`), and `sortField` (`name`/`tripCount`/`totalSpend`/`customerScore`).
    */
   public async listContactsPage(
-    cursor: string | null = null,
+    cursorOrOptions: string | null | ContactDirectoryQueryOptions = null,
     limitCount: number = 50
   ): Promise<ContactPageResult> {
-    const safeLimit = Math.min(200, Math.max(1, limitCount));
+    const opts: ContactDirectoryQueryOptions =
+      cursorOrOptions && typeof cursorOrOptions === 'object'
+        ? cursorOrOptions
+        : { cursor: cursorOrOptions, limit: limitCount };
+
+    const cursor = opts.cursor ?? null;
+    const safeLimit = Math.min(200, Math.max(1, opts.limit ?? limitCount ?? 50));
+    const archiveFilter: ContactDirectoryArchiveFilter = opts.archiveFilter ?? 'all';
+    const vipOnly = Boolean(opts.vipOnly);
+    const letterBucket = opts.letterBucket && opts.letterBucket !== 'All' ? opts.letterBucket : null;
+    const sortField: ContactDirectorySortField = opts.sortField ?? 'name';
+    const sortDirection: 'asc' | 'desc' = opts.sortDirection ?? (sortField === 'name' ? 'asc' : 'desc');
 
     if (!isFirebaseConfigured() || !this.isAuthenticatedStaff()) {
-      const all = this.getAllContacts().sort(
-        (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0) || a.name.localeCompare(b.name)
-      );
+      let filtered = this.getAllContacts().filter((c) => {
+        const blacklisted = Boolean(c.isBlacklisted);
+        const archived = Boolean(c.isArchived);
+        if (archiveFilter === 'active' && (blacklisted || archived)) return false;
+        if (archiveFilter === 'archived' && (blacklisted || !archived)) return false;
+        if (archiveFilter === 'blacklist' && !blacklisted) return false;
+        if (archiveFilter === 'all' && blacklisted) return false;
+        if (vipOnly && !c.isVip) return false;
+        if (letterBucket && resolveContactLetterBucket(c.name) !== letterBucket) return false;
+        return true;
+      });
+
+      const dir = sortDirection === 'asc' ? 1 : -1;
+      filtered = filtered.sort((a, b) => {
+        let cmp = 0;
+        if (sortField === 'name') {
+          cmp = (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+        } else if (sortField === 'tripCount') {
+          cmp = (a.tripCount ?? 0) - (b.tripCount ?? 0);
+        } else if (sortField === 'totalSpend') {
+          cmp = (a.totalSpend ?? 0) - (b.totalSpend ?? 0);
+        } else if (sortField === 'customerScore') {
+          cmp = (a.customerScore ?? 90) - (b.customerScore ?? 90);
+        }
+        if (cmp !== 0) return cmp * dir;
+        return a.id.localeCompare(b.id);
+      });
+
       let startIdx = 0;
       if (cursor) {
-        const foundIdx = all.findIndex((c) => c.id === cursor);
+        const foundIdx = filtered.findIndex((c) => c.id === cursor);
         if (foundIdx >= 0) startIdx = foundIdx + 1;
       }
-      const slice = all.slice(startIdx, startIdx + safeLimit);
-      const hasMore = startIdx + safeLimit < all.length;
+      const slice = filtered.slice(startIdx, startIdx + safeLimit);
+      const hasMore = startIdx + safeLimit < filtered.length;
       const last = slice[slice.length - 1];
       return {
         contacts: slice,
@@ -1669,17 +1757,49 @@ class ContactService {
     try {
       const db = getFirestoreDb();
       const coll = collection(db, 'contacts');
-      const cursorSnap = cursor ? this.contactPageCursors.get(cursor) : undefined;
+      const cursorKey = `${archiveFilter}|${vipOnly ? '1' : '0'}|${letterBucket || 'All'}|${sortField}|${sortDirection}|${cursor || ''}`;
+      const cursorSnap = cursor ? this.contactPageCursors.get(cursorKey) : undefined;
 
-      let snap = await getDocs(
-        cursorSnap
-          ? query(coll, orderBy('updatedAt', 'desc'), startAfter(cursorSnap), limit(safeLimit + 1))
-          : query(coll, orderBy('updatedAt', 'desc'), limit(safeLimit + 1))
-      );
+      const constraints: QueryConstraint[] = [];
+      if (archiveFilter === 'active') {
+        constraints.push(where('isBlacklisted', '==', false));
+        constraints.push(where('isArchived', '==', false));
+      } else if (archiveFilter === 'archived') {
+        constraints.push(where('isBlacklisted', '==', false));
+        constraints.push(where('isArchived', '==', true));
+      } else if (archiveFilter === 'blacklist') {
+        constraints.push(where('isBlacklisted', '==', true));
+      } else {
+        constraints.push(where('isBlacklisted', '==', false));
+      }
 
-      // Graceful fallback for legacy contacts missing `updatedAt` prior to backfill
-      if (!cursor && snap.empty) {
-        snap = await getDocs(query(coll, limit(safeLimit + 1)));
+      if (vipOnly) {
+        constraints.push(where('isVip', '==', true));
+      }
+      if (letterBucket) {
+        constraints.push(where('letterBucket', '==', letterBucket));
+      }
+
+      const firestoreSortField = sortField === 'name' ? 'nameLower' : sortField;
+      constraints.push(orderBy(firestoreSortField, sortDirection));
+
+      if (cursorSnap) {
+        constraints.push(startAfter(cursorSnap));
+      }
+      constraints.push(limit(safeLimit + 1));
+
+      let snap = await getDocs(query(coll, ...constraints));
+
+      // Fallback for un-backfilled legacy contacts missing `isBlacklisted` / `isArchived` / `nameLower`
+      if (
+        !cursor &&
+        snap.empty &&
+        archiveFilter === 'active' &&
+        !vipOnly &&
+        !letterBucket &&
+        sortField === 'name'
+      ) {
+        snap = await getDocs(query(coll, orderBy('updatedAt', 'desc'), limit(safeLimit + 1)));
       }
 
       const docs = snap.docs;
@@ -1705,10 +1825,11 @@ class ContactService {
       if (hasMore && pageDocs.length > 0) {
         const lastDoc = pageDocs[pageDocs.length - 1];
         nextCursor = lastDoc.id;
-        if (this.contactPageCursors.has(nextCursor)) {
-          this.contactPageCursors.delete(nextCursor);
+        const nextKey = `${archiveFilter}|${vipOnly ? '1' : '0'}|${letterBucket || 'All'}|${sortField}|${sortDirection}|${nextCursor}`;
+        if (this.contactPageCursors.has(nextKey)) {
+          this.contactPageCursors.delete(nextKey);
         }
-        this.contactPageCursors.set(nextCursor, lastDoc);
+        this.contactPageCursors.set(nextKey, lastDoc);
         while (this.contactPageCursors.size > MAX_CONTACT_PAGE_CURSORS) {
           const oldest = this.contactPageCursors.keys().next().value;
           if (!oldest) break;
@@ -1721,8 +1842,55 @@ class ContactService {
         nextCursor,
         hasMore,
       };
-    } catch (err) {
-      console.warn('[ContactService] listContactsPage fallback to cached contacts:', err);
+    } catch (err: any) {
+      console.warn('[ContactService] listContactsPage fallback (index building or offline):', err);
+      // If a composite index is still building, fall back to a single-field index query so the directory still loads
+      if (
+        isFirebaseConfigured() &&
+        this.isAuthenticatedStaff() &&
+        String(err?.code || err?.message || '').includes('failed-precondition')
+      ) {
+        try {
+          const db = getFirestoreDb();
+          const snap = await getDocs(
+            query(collection(db, 'contacts'), orderBy('updatedAt', 'desc'), limit(safeLimit + 1))
+          );
+          const docs = snap.docs;
+          const hasMoreFallback = docs.length > safeLimit;
+          const pageDocs = hasMoreFallback ? docs.slice(0, safeLimit) : docs;
+          const contacts: ContactRecord[] = [];
+          for (const docSnap of pageDocs) {
+            const data = docSnap.data() as ContactRecord | undefined;
+            if (!data || !docSnap.id) continue;
+            const remote: ContactRecord = {
+              ...data,
+              id: data.id || docSnap.id,
+              savedPaymentMethods: data.savedPaymentMethods
+                ? normalizeSavedPaymentMethods(data.savedPaymentMethods)
+                : undefined,
+            };
+            const blacklisted = Boolean(remote.isBlacklisted);
+            const archived = Boolean(remote.isArchived);
+            if (archiveFilter === 'active' && (blacklisted || archived)) continue;
+            if (archiveFilter === 'archived' && (blacklisted || !archived)) continue;
+            if (archiveFilter === 'blacklist' && !blacklisted) continue;
+            if (archiveFilter === 'all' && blacklisted) continue;
+            if (vipOnly && !remote.isVip) continue;
+            if (letterBucket && resolveContactLetterBucket(remote.name) !== letterBucket) continue;
+            this.indexContactRecord(remote);
+            contacts.push(remote);
+          }
+          if (contacts.length > 0) {
+            return {
+              contacts,
+              nextCursor: null,
+              hasMore: false,
+            };
+          }
+        } catch {
+          // Fall through to in-memory cache
+        }
+      }
       const fallback = this.getAllContacts().slice(0, safeLimit);
       return { contacts: fallback, nextCursor: null, hasMore: false };
     }
@@ -1910,6 +2078,7 @@ class ContactService {
     this.removeContactIndexes(existing);
     this.searchQueryLru.clear();
     this.saveToStorage();
+    getKpiSummaryService().recordContactDeleted(existing).catch(() => {});
     if (isFirebaseConfigured()) {
       try {
         const db = getFirestoreDb();

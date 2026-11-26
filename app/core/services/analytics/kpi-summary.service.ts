@@ -41,8 +41,47 @@ export interface KpiSummaryDoc {
   tipsTotal: number;
   /** Rolling daily buckets keyed by local `YYYY-MM-DD` */
   dailyBuckets?: Record<string, KpiDailyBucket>;
+  /** Contact directory counters (Phase 101) */
+  contactsTotal?: number;
+  contactsActive?: number;
+  contactsArchived?: number;
+  contactsBlacklisted?: number;
+  contactsVip?: number;
+  contactsByLetter?: Record<string, number>;
   updatedAt: string;
   seededAt?: string;
+}
+
+export function resolveContactLetterBucket(name?: string | null): string {
+  const firstChar = String(name || '').trim().charAt(0).toUpperCase();
+  return /^[A-Z]$/.test(firstChar) ? firstChar : '#';
+}
+
+interface ContactCounterFlags {
+  isActive: boolean;
+  isArchived: boolean;
+  isBlacklisted: boolean;
+  isVip: boolean;
+  letterBucket: string;
+}
+
+function classifyContactFlags(contact: {
+  name?: string | null;
+  isArchived?: boolean;
+  isBlacklisted?: boolean;
+  isVip?: boolean;
+}): ContactCounterFlags {
+  const isBlacklisted = Boolean(contact.isBlacklisted);
+  const isArchived = !isBlacklisted && Boolean(contact.isArchived);
+  const isActive = !isBlacklisted && !isArchived;
+  const isVip = !isBlacklisted && Boolean(contact.isVip);
+  return {
+    isActive,
+    isArchived,
+    isBlacklisted,
+    isVip,
+    letterBucket: resolveContactLetterBucket(contact.name),
+  };
 }
 
 type LifecycleBucket = 'open' | 'completed' | 'cancelled';
@@ -390,6 +429,12 @@ class KpiSummaryService {
             completedRevenue: roundMoney(Number(raw.completedRevenue || 0)),
             tipsTotal: roundMoney(Number(raw.tipsTotal || 0)),
             dailyBuckets: raw.dailyBuckets || {},
+            ...(raw.contactsTotal !== undefined ? { contactsTotal: Number(raw.contactsTotal || 0) } : {}),
+            ...(raw.contactsActive !== undefined ? { contactsActive: Number(raw.contactsActive || 0) } : {}),
+            ...(raw.contactsArchived !== undefined ? { contactsArchived: Number(raw.contactsArchived || 0) } : {}),
+            ...(raw.contactsBlacklisted !== undefined ? { contactsBlacklisted: Number(raw.contactsBlacklisted || 0) } : {}),
+            ...(raw.contactsVip !== undefined ? { contactsVip: Number(raw.contactsVip || 0) } : {}),
+            ...(raw.contactsByLetter ? { contactsByLetter: raw.contactsByLetter } : {}),
             updatedAt: String(raw.updatedAt || new Date().toISOString()),
             ...(raw.seededAt ? { seededAt: String(raw.seededAt) } : {}),
           };
@@ -684,6 +729,161 @@ class KpiSummaryService {
       this.applyLocalDeltas(deltas);
     }
     await this.persistIncrementDeltas(deltas);
+  }
+
+  private async applyAndPersistContactDeltas(deltas: {
+    total?: number;
+    active?: number;
+    archived?: number;
+    blacklisted?: number;
+    vip?: number;
+    letters?: Record<string, number>;
+  }): Promise<void> {
+    const nowIso = new Date().toISOString();
+    const hasLetterDelta = Boolean(
+      deltas.letters && Object.values(deltas.letters).some((v) => v !== 0)
+    );
+    const hasAnyDelta =
+      Boolean(deltas.total) ||
+      Boolean(deltas.active) ||
+      Boolean(deltas.archived) ||
+      Boolean(deltas.blacklisted) ||
+      Boolean(deltas.vip) ||
+      hasLetterDelta;
+    if (!hasAnyDelta) return;
+
+    if (this.cachedSummary) {
+      const nextLetters = { ...(this.cachedSummary.contactsByLetter || {}) };
+      if (deltas.letters) {
+        for (const [letter, delta] of Object.entries(deltas.letters)) {
+          if (delta) {
+            nextLetters[letter] = Math.max(0, Number(nextLetters[letter] || 0) + delta);
+          }
+        }
+      }
+      this.cachedSummary = {
+        ...this.cachedSummary,
+        contactsTotal: Math.max(
+          0,
+          Number(this.cachedSummary.contactsTotal || 0) + (deltas.total || 0)
+        ),
+        contactsActive: Math.max(
+          0,
+          Number(this.cachedSummary.contactsActive || 0) + (deltas.active || 0)
+        ),
+        contactsArchived: Math.max(
+          0,
+          Number(this.cachedSummary.contactsArchived || 0) + (deltas.archived || 0)
+        ),
+        contactsBlacklisted: Math.max(
+          0,
+          Number(this.cachedSummary.contactsBlacklisted || 0) + (deltas.blacklisted || 0)
+        ),
+        contactsVip: Math.max(
+          0,
+          Number(this.cachedSummary.contactsVip || 0) + (deltas.vip || 0)
+        ),
+        contactsByLetter: nextLetters,
+        updatedAt: nowIso,
+      };
+      this.notifyListeners();
+    }
+
+    if (!isFirebaseConfigured()) return;
+
+    const patch: Record<string, unknown> = { updatedAt: nowIso };
+    if (deltas.total) patch.contactsTotal = increment(deltas.total);
+    if (deltas.active) patch.contactsActive = increment(deltas.active);
+    if (deltas.archived) patch.contactsArchived = increment(deltas.archived);
+    if (deltas.blacklisted) patch.contactsBlacklisted = increment(deltas.blacklisted);
+    if (deltas.vip) patch.contactsVip = increment(deltas.vip);
+    if (deltas.letters) {
+      const letterPatch: Record<string, unknown> = {};
+      for (const [letter, delta] of Object.entries(deltas.letters)) {
+        if (delta) letterPatch[letter] = increment(delta);
+      }
+      if (Object.keys(letterPatch).length > 0) {
+        patch.contactsByLetter = letterPatch;
+      }
+    }
+
+    try {
+      const db = getFirestoreDb();
+      await setDoc(doc(db, KPI_SUMMARY_COLLECTION, KPI_SUMMARY_DOC_ID), patch, { merge: true });
+    } catch {
+      // Non-fatal if caller lacks /analytics write permissions
+    }
+  }
+
+  public async recordContactCreated(contact: {
+    name?: string | null;
+    isArchived?: boolean;
+    isBlacklisted?: boolean;
+    isVip?: boolean;
+  }): Promise<void> {
+    const f = classifyContactFlags(contact);
+    await this.applyAndPersistContactDeltas({
+      total: 1,
+      active: f.isActive ? 1 : 0,
+      archived: f.isArchived ? 1 : 0,
+      blacklisted: f.isBlacklisted ? 1 : 0,
+      vip: f.isVip ? 1 : 0,
+      letters: f.isBlacklisted ? {} : { [f.letterBucket]: 1 },
+    });
+  }
+
+  public async recordContactTransition(
+    prevContact: {
+      name?: string | null;
+      isArchived?: boolean;
+      isBlacklisted?: boolean;
+      isVip?: boolean;
+    },
+    nextContact: {
+      name?: string | null;
+      isArchived?: boolean;
+      isBlacklisted?: boolean;
+      isVip?: boolean;
+    }
+  ): Promise<void> {
+    const prev = classifyContactFlags(prevContact);
+    const next = classifyContactFlags(nextContact);
+
+    const letters: Record<string, number> = {};
+    if (!prev.isBlacklisted) {
+      letters[prev.letterBucket] = (letters[prev.letterBucket] || 0) - 1;
+    }
+    if (!next.isBlacklisted) {
+      letters[next.letterBucket] = (letters[next.letterBucket] || 0) + 1;
+    }
+    for (const key of Object.keys(letters)) {
+      if (letters[key] === 0) delete letters[key];
+    }
+
+    await this.applyAndPersistContactDeltas({
+      active: (next.isActive ? 1 : 0) - (prev.isActive ? 1 : 0),
+      archived: (next.isArchived ? 1 : 0) - (prev.isArchived ? 1 : 0),
+      blacklisted: (next.isBlacklisted ? 1 : 0) - (prev.isBlacklisted ? 1 : 0),
+      vip: (next.isVip ? 1 : 0) - (prev.isVip ? 1 : 0),
+      letters,
+    });
+  }
+
+  public async recordContactDeleted(contact: {
+    name?: string | null;
+    isArchived?: boolean;
+    isBlacklisted?: boolean;
+    isVip?: boolean;
+  }): Promise<void> {
+    const f = classifyContactFlags(contact);
+    await this.applyAndPersistContactDeltas({
+      total: -1,
+      active: f.isActive ? -1 : 0,
+      archived: f.isArchived ? -1 : 0,
+      blacklisted: f.isBlacklisted ? -1 : 0,
+      vip: f.isVip ? -1 : 0,
+      letters: f.isBlacklisted ? {} : { [f.letterBucket]: -1 },
+    });
   }
 }
 

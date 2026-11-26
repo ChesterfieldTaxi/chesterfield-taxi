@@ -11,6 +11,9 @@ Eliminate the 45,000-trip and 9,000-contact full-collection fetches and `localSt
 - **Option A — On-Demand Indexed Contact Search & Paginated Directory:** Replace `syncContactsFromFirestore()` (9,000-doc `getDocs`) and `localStorage` full-dump with normalized search fields (`phoneNormalized`, `emailLower`, `nameSearchTokens`), `searchContactsRemote(query, limit=25)`, `listContactsPage(cursor, limit=50)`, and an in-memory LRU cache.
 - **Filtered `users` Listener:** Scope `OperatorService.ensureFirestoreSubscription()` with `where('roles', 'array-contains-any', ['admin', 'dispatcher', 'driver', 'operator'])` so customer-only user docs are never downloaded.
 - **One-Time Backfill Utility:** Provide a resumable, 500-doc `writeBatch` backfill script/utility to populate normalized contact search fields for existing 9,000 contacts and seed `analytics/kpiSummary` from existing 45,000 trips.
+- **Server-Driven Passenger Directory (A–Z, Status Tabs, Sort & Auto-Scroll):** Extend `ContactService.listContactsPage` to accept `archiveFilter` (`active`/`archived`/`blacklisted`/`all`), `vipOnly`, `letterBucket` (`A`–`Z`/`#`), and `sortBy` (`name`, `tripCount`, `totalSpend`, `customerScore`) backed by indexed Firestore queries (`limit(50)` + `startAfter`), and wire an `IntersectionObserver` in `PassengerDirectoryPanel` to auto-load the next 50 on scroll.
+- **Isolate Search Cache from Directory List:** Remove the `getContactService().getAllContacts()` merge in `AdminCustomersSubpage.tsx` when `remoteSearchContacts === null` so clearing search never leaks cached search hits into `pagedContacts`.
+- **Real Contact Tab & Letter Counts in `analytics/kpiSummary`:** Extend `KpiSummaryDoc` (`contactsTotal`, `contactsActive`, `contactsArchived`, `contactsBlacklisted`, `contactsVip`, `contactsByLetter`) updated via `increment()` on contact create/archive/blacklist/VIP mutations and seeded in `scripts/backfill-spark-indexes.ts` so `PassengerDirectoryPanel` displays true 9,000+ totals instead of `(50)`.
 
 ## Files to Touch
 - `firestore.indexes.json` — Add composite indexes for windowed trips, customer/date-filtered trip queries, and indexed contact search.
@@ -28,7 +31,8 @@ Eliminate the 45,000-trip and 9,000-contact full-collection fetches and `localSt
 - `app/routes/driver.tsx` — Ensure `subscribeToDriverTrips` is used cleanly without falling back to full 45k `subscribeToAllTrips` when Firebase is configured.
 - `app/components/domain/admin/AdminDashboardTab.tsx` — Read KPIs from `kpi-summary.service.ts` and recent/active trips from `subscribeToActiveTrips`.
 - `app/components/domain/admin/trips/useAdminTripsController.ts` — Combine active-window trips with cursor-paginated `queryTripsPage` for historical browsing/filtering.
-- `app/components/domain/admin/subpages/AdminCustomersSubpage.tsx` — Use `listContactsPage` / `searchContactsRemote` and `getTripsByCustomer` instead of `getAllTrips()` + `syncContactsFromFirestore()`.
+- `app/components/domain/admin/subpages/AdminCustomersSubpage.tsx` — Use `listContactsPage` / `searchContactsRemote` and `getTripsByCustomer` instead of `getAllTrips()` + `syncContactsFromFirestore()`; isolate `pagedContacts` from search LRU cache; drive A–Z, status tabs, and sort via Firestore queries and read real directory counts from `kpi-summary.service.ts`.
+- `app/components/domain/admin/customers/PassengerDirectoryPanel.tsx` — Support server-driven A–Z, status tab, VIP, and sort callbacks, display real directory counts, and auto-load next 50 rows on scroll via `IntersectionObserver`.
 - `app/components/domain/admin/invoicing/useAdminPayoutsController.ts` — Replace `getAllTrips()` with date/status-filtered trip query.
 - `app/core/services/dispatch/standing-order.service.ts`, `app/core/services/dispatch/staged-driver-planner.service.ts`, `app/core/services/dispatch/auto-dispatch.server.ts`, `app/core/services/dispatch/sla-cron.server.ts`, `app/core/services/tracking/guest-manage-ride.server.ts` — Replace `getAllTrips()` calls with targeted active/upcoming or single-doc/token queries.
 - `scripts/backfill-spark-indexes.ts` — New resumable one-time CLI script (500-doc `writeBatch` chunks) to backfill contact search fields and seed `analytics/kpiSummary`.
@@ -44,6 +48,11 @@ Eliminate the 45,000-trip and 9,000-contact full-collection fetches and `localSt
 - [x] Migrate Dispatch (`useDispatchWorkspaceSync.ts`, `EmailDock.tsx`, `dispatch.popout.tsx`, `driver.tsx`) and Admin (`AdminDashboardTab.tsx`, `useAdminTripsController.ts`, `AdminCustomersSubpage.tsx`, `useAdminPayoutsController.ts`) to the bounded/paginated APIs and 1-read KPI summary.
 - [x] Replace remaining `getAllTrips()` calls in `standing-order.service.ts`, `staged-driver-planner.service.ts`, `auto-dispatch.server.ts`, `sla-cron.server.ts`, and `guest-manage-ride.server.ts` with targeted queries.
 - [x] Add `scripts/backfill-spark-indexes.ts` for one-time contact search-field backfill and `analytics/kpiSummary` seeding.
+- [x] Extend `firestore.indexes.json` with composite indexes needed for server-driven `contacts` directory queries (`isArchived`/`isBlacklisted`/`isVip` + `nameLower`/`tripCount`/`totalSpend`/`customerScore`).
+- [x] Extend `ContactService.listContactsPage` (`app/core/services/customer/contact.service.ts`) to support `archiveFilter`, `vipOnly`, `letterBucket`, and `sortBy` with cursor pagination (`limit(50)` + `startAfter`).
+- [x] Extend `kpi-summary.service.ts` and `scripts/backfill-spark-indexes.ts` with `contactsTotal`, `contactsActive`, `contactsArchived`, `contactsBlacklisted`, `contactsVip`, and `contactsByLetter` counters updated via `increment()` on contact lifecycle changes.
+- [x] Fix `AdminCustomersSubpage.tsx` to stop merging `getContactService().getAllContacts()` into `allCustomers` when search is cleared, and wire status tabs, VIP toggle, A–Z bucket, and sort option changes to `listContactsPage` + `kpi-summary.service.ts` counts.
+- [x] Update `PassengerDirectoryPanel.tsx` to delegate tab/letter/VIP/sort changes to server-driven handlers, render real counts from `kpiSummary`, and add an `IntersectionObserver` sentinel for automatic next-50 loading on scroll.
 
 ## Verification
 - `npm run typecheck`

@@ -11,19 +11,25 @@ import {
   getCorporateAccountService,
 } from '../../../../core/services/corporate-account.service';
 import {
+  getKpiSummaryService,
+  type KpiSummaryDoc,
+} from '../../../../core/services/analytics/kpi-summary.service';
+import {
   getContactService,
+  type ContactDirectorySortField,
   type ContactRecord,
 } from '../../../../core/services/customer/contact.service';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
 import { getOperatorService, type DriverRosterItem } from '../../../../core/services/operator.service';
-import { Button } from '../../../ui/Button';
 import {
+  DIRECTORY_SORT_OPTIONS,
   PassengerDirectoryPanel,
   CustomerProfileDrawer,
   CorporateDirectoryPanel,
   CorporateAccountDirectoryDrawer,
   CorporatePortalManagersModal,
   type AdminCustomersSubpageProps,
+  type AlphabetBucket,
   type CustomerArchiveFilter,
   type CustomerProfile,
   type CustomersPageMode,
@@ -106,13 +112,16 @@ export function AdminCustomersSubpage({
     mode ?? (initialSubTab === 'corporate' ? 'corporate' : 'passengers');
   const [searchTerm, setSearchTerm] = useState('');
   const [archiveFilter, setArchiveFilter] = useState<CustomerArchiveFilter>('active');
-  const [pagedContacts, setPagedContacts] = useState<ContactRecord[]>(() =>
-    getContactService().getAllContacts()
-  );
+  const [vipOnly, setVipOnly] = useState(false);
+  const [alphabetBucket, setAlphabetBucket] = useState<AlphabetBucket>('All');
+  const [sortOptionId, setSortOptionId] = useState<string>(DIRECTORY_SORT_OPTIONS[0].id);
+
+  const [pagedContacts, setPagedContacts] = useState<ContactRecord[]>([]);
   const [contactsCursor, setContactsCursor] = useState<string | null>(null);
   const [hasMoreContacts, setHasMoreContacts] = useState<boolean>(false);
   const [isLoadingMoreContacts, setIsLoadingMoreContacts] = useState<boolean>(false);
   const [remoteSearchContacts, setRemoteSearchContacts] = useState<ContactRecord[] | null>(null);
+  const [kpiSummary, setKpiSummary] = useState<KpiSummaryDoc | null>(null);
 
   const [selectedCustomerTrips, setSelectedCustomerTrips] = useState<Trip[]>([]);
   const [drivers, setDrivers] = useState<DriverRosterItem[]>([]);
@@ -189,7 +198,12 @@ export function AdminCustomersSubpage({
     };
   }, [handleOpenCustomer]);
 
-  // Initial bounded page fetch (`listContactsPage(null, 50)`) — replaces 45k trips + 9k contacts dump
+  const activeSortOption = useMemo(
+    () => DIRECTORY_SORT_OPTIONS.find((opt) => opt.id === sortOptionId) ?? DIRECTORY_SORT_OPTIONS[0],
+    [sortOptionId]
+  );
+
+  // Subscribe to 1-read KPI summary (real directory tab & A–Z counts) + governance/contact listeners
   useEffect(() => {
     if (effectiveMode !== 'passengers') {
       setIsLoading(false);
@@ -197,22 +211,10 @@ export function AdminCustomersSubpage({
     }
     const govService = getUniversalGovernanceService();
     const contactService = getContactService();
-    let cancelled = false;
 
-    setIsLoading(true);
-    contactService
-      .listContactsPage(null, CONTACTS_PAGE_SIZE)
-      .then((page) => {
-        if (cancelled) return;
-        setPagedContacts(page.contacts);
-        setContactsCursor(page.nextCursor);
-        setHasMoreContacts(page.hasMore);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-
+    const unsubKpi = getKpiSummaryService().subscribeToKpiSummary((summary) => {
+      setKpiSummary(summary);
+    });
     void govService.syncPassengerGovernanceFromFirestore().catch(() => 0);
 
     const unsubGov = govService.subscribe(() => {
@@ -237,12 +239,52 @@ export function AdminCustomersSubpage({
     const unsubDrivers = opSvc.subscribeToDrivers((roster) => setDrivers(roster));
 
     return () => {
-      cancelled = true;
+      unsubKpi();
       unsubGov();
       unsubContacts();
       unsubDrivers();
     };
   }, [effectiveMode]);
+
+  // Server-driven directory query (`listContactsPage`) whenever filter, VIP, A–Z bucket, or sort changes
+  useEffect(() => {
+    if (effectiveMode !== 'passengers') return;
+    const contactService = getContactService();
+    let cancelled = false;
+
+    setIsLoading(true);
+    contactService
+      .listContactsPage({
+        cursor: null,
+        limit: CONTACTS_PAGE_SIZE,
+        archiveFilter,
+        vipOnly,
+        letterBucket: alphabetBucket,
+        sortField: activeSortOption.field as ContactDirectorySortField,
+        sortDirection: activeSortOption.direction,
+      })
+      .then((page) => {
+        if (cancelled) return;
+        setPagedContacts(page.contacts);
+        setContactsCursor(page.nextCursor);
+        setHasMoreContacts(page.hasMore);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    effectiveMode,
+    archiveFilter,
+    vipOnly,
+    alphabetBucket,
+    activeSortOption.field,
+    activeSortOption.direction,
+  ]);
 
   // On-demand indexed remote contact search when `searchTerm` has >= 2 characters
   useEffect(() => {
@@ -305,11 +347,19 @@ export function AdminCustomersSubpage({
     };
   }, [selectedCustomer?.id, selectedCustomer?.email, selectedCustomer?.phone]);
 
-  const handleLoadMoreContacts = async () => {
+  const handleLoadMoreContacts = useCallback(async () => {
     if (isLoadingMoreContacts || !hasMoreContacts || !contactsCursor) return;
     setIsLoadingMoreContacts(true);
     try {
-      const next = await getContactService().listContactsPage(contactsCursor, CONTACTS_PAGE_SIZE);
+      const next = await getContactService().listContactsPage({
+        cursor: contactsCursor,
+        limit: CONTACTS_PAGE_SIZE,
+        archiveFilter,
+        vipOnly,
+        letterBucket: alphabetBucket,
+        sortField: activeSortOption.field as ContactDirectorySortField,
+        sortDirection: activeSortOption.direction,
+      });
       setPagedContacts((prev) => {
         const byId = new Map<string, ContactRecord>();
         for (const c of prev) byId.set(c.id, c);
@@ -321,7 +371,16 @@ export function AdminCustomersSubpage({
     } finally {
       setIsLoadingMoreContacts(false);
     }
-  };
+  }, [
+    isLoadingMoreContacts,
+    hasMoreContacts,
+    contactsCursor,
+    archiveFilter,
+    vipOnly,
+    alphabetBucket,
+    activeSortOption.field,
+    activeSortOption.direction,
+  ]);
 
   const allCustomers = useMemo<CustomerProfile[]>(() => {
     if (effectiveMode !== 'passengers') return [];
@@ -331,20 +390,8 @@ export function AdminCustomersSubpage({
       return contactRecordsToCustomerProfiles(remoteSearchContacts, settings.invoices || []);
     }
 
-    const mergedById = new Map<string, ContactRecord>();
-    for (const c of pagedContacts) {
-      if (c?.id) mergedById.set(c.id, c);
-    }
-    for (const c of getContactService().getAllContacts()) {
-      if (c?.id && !mergedById.has(c.id)) {
-        mergedById.set(c.id, c);
-      }
-    }
-
-    return contactRecordsToCustomerProfiles(
-      Array.from(mergedById.values()),
-      settings.invoices || []
-    );
+    // Strictly render `pagedContacts` — never merge search LRU cache (`getAllContacts()`)
+    return contactRecordsToCustomerProfiles(pagedContacts, settings.invoices || []);
   }, [effectiveMode, pagedContacts, remoteSearchContacts, settings.invoices, governanceRefreshKey]);
 
   const blacklistedCustomers = useMemo(
@@ -395,6 +442,24 @@ export function AdminCustomersSubpage({
     }
   };
 
+  const syncContactGovernanceFlag = (
+    cust: CustomerProfile,
+    patch: { isArchived?: boolean; isBlacklisted?: boolean; blacklistReason?: string }
+  ) => {
+    const contactService = getContactService();
+    const existing =
+      (cust.id && !cust.id.startsWith('cust-') ? contactService.getContactById(cust.id) : null) ||
+      (cust.phone && cust.phone !== 'No phone' ? contactService.getContactByPhone(cust.phone) : null) ||
+      (cust.email && cust.email !== 'N/A' ? contactService.getContactByEmail(cust.email) : null);
+
+    if (existing) {
+      contactService.saveContact({
+        ...existing,
+        ...patch,
+      });
+    }
+  };
+
   const handleRestoreCustomer = async (cust: CustomerProfile) => {
     const gov = getUniversalGovernanceService();
     if (cust.phone && cust.phone !== 'No phone') {
@@ -403,6 +468,7 @@ export function AdminCustomersSubpage({
     if (cust.email && cust.email !== 'N/A') {
       await gov.setBlacklistStatus('passenger', cust.email, false);
     }
+    syncContactGovernanceFlag(cust, { isBlacklisted: false, blacklistReason: '' });
     setGovernanceRefreshKey((k) => k + 1);
   };
 
@@ -529,51 +595,61 @@ export function AdminCustomersSubpage({
     setPendingArchiveCorp(null);
   };
 
+  const hasSeededContactCounts = kpiSummary?.contactsTotal !== undefined;
+  const resolvedAllCount = hasSeededContactCounts
+    ? Math.max(0, Number(kpiSummary?.contactsTotal || 0) - Number(kpiSummary?.contactsBlacklisted || 0))
+    : nonBlacklistedCustomers.length;
+  const resolvedActiveCount = hasSeededContactCounts
+    ? Number(kpiSummary?.contactsActive || 0)
+    : activeCustomers.length;
+  const resolvedArchivedCount = hasSeededContactCounts
+    ? Number(kpiSummary?.contactsArchived || 0)
+    : archivedCustomers.length;
+  const resolvedBlacklistCount = hasSeededContactCounts
+    ? Number(kpiSummary?.contactsBlacklisted || 0)
+    : blacklistedCustomers.length;
+  const resolvedVipCount = hasSeededContactCounts
+    ? Number(kpiSummary?.contactsVip || 0)
+    : displayedCustomers.filter((c) => c.isVip).length;
+
   return (
     <div className="space-y-4">
       {effectiveMode === 'passengers' && (
-        <>
-          <PassengerDirectoryPanel
-            isLoading={isLoading}
-            allCount={nonBlacklistedCustomers.length}
-            activeCount={activeCustomers.length}
-            archivedCount={archivedCustomers.length}
-            blacklistCount={blacklistedCustomers.length}
-            vipCount={displayedCustomers.filter((c) => c.isVip).length}
-            displayedCustomers={displayedCustomers}
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            archiveFilter={archiveFilter}
-            setArchiveFilter={setArchiveFilter}
-            onOpenCustomer={handleOpenCustomer}
-            onToggleArchiveCustomer={async (cust) => {
-              const nextArchived = !cust.isArchived;
-              const gov = getUniversalGovernanceService();
-              await gov.setArchiveStatus('passenger', cust.email, nextArchived);
-              if (cust.phone) await gov.setArchiveStatus('passenger', cust.phone, nextArchived);
-              setGovernanceRefreshKey((k) => k + 1);
-            }}
-            onRestoreCustomer={handleRestoreCustomer}
-            onPurgeCustomer={handlePurgeCustomer}
-            onPurgeAllBlacklisted={handlePurgeAllBlacklisted}
-          />
-          {!isLoading && hasMoreContacts && !searchTerm.trim() && (
-            <div className="flex justify-center pt-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isLoadingMoreContacts}
-                onClick={() => void handleLoadMoreContacts()}
-                className="text-xs font-bold border-border-subtle text-fg-secondary hover:bg-surface-subtle cursor-pointer"
-              >
-                {isLoadingMoreContacts
-                  ? 'Loading more passengers...'
-                  : `Load More Passengers (+${CONTACTS_PAGE_SIZE})`}
-              </Button>
-            </div>
-          )}
-        </>
+        <PassengerDirectoryPanel
+          isLoading={isLoading}
+          allCount={resolvedAllCount}
+          activeCount={resolvedActiveCount}
+          archivedCount={resolvedArchivedCount}
+          blacklistCount={resolvedBlacklistCount}
+          vipCount={resolvedVipCount}
+          displayedCustomers={displayedCustomers}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          archiveFilter={archiveFilter}
+          setArchiveFilter={setArchiveFilter}
+          vipOnly={vipOnly}
+          onVipOnlyChange={setVipOnly}
+          alphabetBucket={alphabetBucket}
+          onAlphabetBucketChange={setAlphabetBucket}
+          sortOptionId={sortOptionId}
+          onSortOptionChange={setSortOptionId}
+          serverLetterCounts={kpiSummary?.contactsByLetter}
+          hasMore={hasMoreContacts}
+          isLoadingMore={isLoadingMoreContacts}
+          onLoadMore={handleLoadMoreContacts}
+          onOpenCustomer={handleOpenCustomer}
+          onToggleArchiveCustomer={async (cust) => {
+            const nextArchived = !cust.isArchived;
+            const gov = getUniversalGovernanceService();
+            await gov.setArchiveStatus('passenger', cust.email, nextArchived);
+            if (cust.phone) await gov.setArchiveStatus('passenger', cust.phone, nextArchived);
+            syncContactGovernanceFlag(cust, { isArchived: nextArchived });
+            setGovernanceRefreshKey((k) => k + 1);
+          }}
+          onRestoreCustomer={handleRestoreCustomer}
+          onPurgeCustomer={handlePurgeCustomer}
+          onPurgeAllBlacklisted={handlePurgeAllBlacklisted}
+        />
       )}
 
       {effectiveMode === 'corporate' && (
@@ -640,6 +716,11 @@ export function AdminCustomersSubpage({
             setGovernanceRefreshKey((k) => k + 1);
           }}
           onGovernanceMutated={(updated) => {
+            syncContactGovernanceFlag(updated, {
+              isArchived: updated.isArchived,
+              isBlacklisted: updated.isBlacklisted,
+              blacklistReason: updated.blacklistReason,
+            });
             setSelectedCustomer(updated);
             setGovernanceRefreshKey((k) => k + 1);
           }}

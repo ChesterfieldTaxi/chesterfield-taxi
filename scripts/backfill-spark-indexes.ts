@@ -205,6 +205,12 @@ function createEmptyCheckpoint(): BackfillCheckpoint {
       completedRevenue: 0,
       tipsTotal: 0,
       dailyBuckets: {},
+      contactsTotal: 0,
+      contactsActive: 0,
+      contactsArchived: 0,
+      contactsBlacklisted: 0,
+      contactsVip: 0,
+      contactsByLetter: {},
       updatedAt: nowIso,
       seededAt: nowIso,
     },
@@ -392,6 +398,9 @@ async function runBackfill(): Promise<void> {
 
       const batch = writeBatch(db);
       let mutationsInBatch = 0;
+      const lettersAcc =
+        checkpoint.kpiAccumulator.contactsByLetter ||
+        (checkpoint.kpiAccumulator.contactsByLetter = {});
 
       for (const docSnap of snap.docs) {
         const data = docSnap.data() as Partial<ContactRecord>;
@@ -399,6 +408,31 @@ async function runBackfill(): Promise<void> {
           ...data,
           id: data.id || docSnap.id,
         });
+        const isBlacklisted = Boolean(data.isBlacklisted);
+        const isArchived = Boolean(data.isArchived);
+        const isVip = Boolean(data.isVip);
+
+        // Accumulate real directory tab & A–Z letter counters
+        checkpoint.kpiAccumulator.contactsTotal =
+          (checkpoint.kpiAccumulator.contactsTotal || 0) + 1;
+        if (isBlacklisted) {
+          checkpoint.kpiAccumulator.contactsBlacklisted =
+            (checkpoint.kpiAccumulator.contactsBlacklisted || 0) + 1;
+        } else if (isArchived) {
+          checkpoint.kpiAccumulator.contactsArchived =
+            (checkpoint.kpiAccumulator.contactsArchived || 0) + 1;
+        } else {
+          checkpoint.kpiAccumulator.contactsActive =
+            (checkpoint.kpiAccumulator.contactsActive || 0) + 1;
+        }
+        if (!isBlacklisted && isVip) {
+          checkpoint.kpiAccumulator.contactsVip =
+            (checkpoint.kpiAccumulator.contactsVip || 0) + 1;
+        }
+        if (!isBlacklisted) {
+          lettersAcc[computed.letterBucket] = (lettersAcc[computed.letterBucket] || 0) + 1;
+        }
+
         const nextUpdatedAt =
           typeof data.updatedAt === 'number' && Number.isFinite(data.updatedAt) && data.updatedAt > 0
             ? data.updatedAt
@@ -407,6 +441,11 @@ async function runBackfill(): Promise<void> {
         const needsPatch =
           data.phoneNormalized !== computed.phoneNormalized ||
           data.emailLower !== computed.emailLower ||
+          data.nameLower !== computed.nameLower ||
+          data.letterBucket !== computed.letterBucket ||
+          typeof data.isArchived !== 'boolean' ||
+          typeof data.isBlacklisted !== 'boolean' ||
+          typeof data.isVip !== 'boolean' ||
           !arraysEqual(data.nameSearchTokens, computed.nameSearchTokens) ||
           typeof data.updatedAt !== 'number';
 
@@ -421,6 +460,11 @@ async function runBackfill(): Promise<void> {
                 phoneNormalized: computed.phoneNormalized,
                 emailLower: computed.emailLower,
                 nameSearchTokens: computed.nameSearchTokens,
+                nameLower: computed.nameLower,
+                letterBucket: computed.letterBucket,
+                isArchived,
+                isBlacklisted,
+                isVip,
                 updatedAt: nextUpdatedAt,
               }),
               { merge: true }
@@ -445,7 +489,25 @@ async function runBackfill(): Promise<void> {
         `  Contacts page processed: scanned=${checkpoint.contactsScanned}, updated=${checkpoint.contactsUpdated}, cursor=${checkpoint.lastContactDocId}`
       );
 
-      if (checkpoint.contactsCompleted) break;
+      if (checkpoint.contactsCompleted) {
+        if (opts.commit) {
+          await setDoc(
+            doc(db, KPI_SUMMARY_COLLECTION, KPI_SUMMARY_DOC_ID),
+            sanitizePayload({
+              contactsTotal: checkpoint.kpiAccumulator.contactsTotal || 0,
+              contactsActive: checkpoint.kpiAccumulator.contactsActive || 0,
+              contactsArchived: checkpoint.kpiAccumulator.contactsArchived || 0,
+              contactsBlacklisted: checkpoint.kpiAccumulator.contactsBlacklisted || 0,
+              contactsVip: checkpoint.kpiAccumulator.contactsVip || 0,
+              contactsByLetter: checkpoint.kpiAccumulator.contactsByLetter || {},
+              updatedAt: new Date().toISOString(),
+            }),
+            { merge: true }
+          );
+          console.log('  Seeded contact directory counts into /analytics/kpiSummary.');
+        }
+        break;
+      }
     }
   } else if (!opts.kpiOnly) {
     console.log(
@@ -538,7 +600,8 @@ async function runBackfill(): Promise<void> {
       if (opts.commit) {
         await setDoc(
           doc(db, KPI_SUMMARY_COLLECTION, KPI_SUMMARY_DOC_ID),
-          sanitizePayload(finalSummary)
+          sanitizePayload(finalSummary),
+          { merge: true }
         );
         saveCheckpoint(opts.checkpointPath, checkpoint);
         console.log(`Seeded /${KPI_SUMMARY_COLLECTION}/${KPI_SUMMARY_DOC_ID} successfully.`);

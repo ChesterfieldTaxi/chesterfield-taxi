@@ -1,4 +1,4 @@
-import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { Card, CardHeader, CardTitle, CardContent } from '../../../ui/Card';
 import { Badge } from '../../../ui/Badge';
@@ -51,6 +51,16 @@ export interface PassengerDirectoryPanelProps {
   setSearchTerm: (val: string) => void;
   archiveFilter: CustomerArchiveFilter;
   setArchiveFilter: (val: CustomerArchiveFilter) => void;
+  vipOnly?: boolean;
+  onVipOnlyChange?: (val: boolean) => void;
+  alphabetBucket?: AlphabetBucket;
+  onAlphabetBucketChange?: (val: AlphabetBucket) => void;
+  sortOptionId?: string;
+  onSortOptionChange?: (val: string) => void;
+  serverLetterCounts?: Record<string, number>;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void | Promise<void>;
   onOpenCustomer: (cust: CustomerProfile, editMode?: boolean) => void;
   onToggleArchiveCustomer: (cust: CustomerProfile) => Promise<void>;
   onRestoreCustomer: (cust: CustomerProfile) => Promise<void>;
@@ -70,20 +80,51 @@ export function PassengerDirectoryPanel({
   setSearchTerm,
   archiveFilter,
   setArchiveFilter,
+  vipOnly: controlledVipOnly,
+  onVipOnlyChange,
+  alphabetBucket: controlledAlphabetBucket,
+  onAlphabetBucketChange,
+  sortOptionId: controlledSortOptionId,
+  onSortOptionChange,
+  serverLetterCounts,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
   onOpenCustomer,
   onToggleArchiveCustomer,
   onRestoreCustomer,
   onPurgeCustomer,
   onPurgeAllBlacklisted,
 }: PassengerDirectoryPanelProps) {
-  const [vipOnly, setVipOnly] = useState(false);
+  const isServerDriven = Boolean(onLoadMore);
+  const [localVipOnly, setLocalVipOnly] = useState(false);
+  const vipOnly = controlledVipOnly !== undefined ? controlledVipOnly : localVipOnly;
+  const setVipOnly = (val: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof val === 'function' ? val(vipOnly) : val;
+    if (onVipOnlyChange) onVipOnlyChange(next);
+    else setLocalVipOnly(next);
+  };
+
   const [localSearch, setLocalSearch] = useState(searchTerm);
   const deferredSearch = useDeferredValue(searchTerm);
-  const [sortOptionId, setSortOptionId] = useState<string>(DIRECTORY_SORT_OPTIONS[0].id);
-  const [alphabetBucket, setAlphabetBucket] = useState<AlphabetBucket>('All');
+  const [localSortOptionId, setLocalSortOptionId] = useState<string>(DIRECTORY_SORT_OPTIONS[0].id);
+  const sortOptionId = controlledSortOptionId ?? localSortOptionId;
+  const setSortOptionId = (nextId: string) => {
+    if (onSortOptionChange) onSortOptionChange(nextId);
+    else setLocalSortOptionId(nextId);
+  };
+
+  const [localAlphabetBucket, setLocalAlphabetBucket] = useState<AlphabetBucket>('All');
+  const alphabetBucket = controlledAlphabetBucket ?? localAlphabetBucket;
+  const setAlphabetBucket = (nextBucket: AlphabetBucket) => {
+    if (onAlphabetBucketChange) onAlphabetBucketChange(nextBucket);
+    else setLocalAlphabetBucket(nextBucket);
+  };
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DIRECTORY_PAGE_SIZES[0]);
   const [viewMode, setViewMode] = useState<DirectoryViewMode>('table');
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
 
   const [confirmPurgeAll, setConfirmPurgeAll] = useState(false);
   const [confirmPurgeId, setConfirmPurgeId] = useState<string | null>(null);
@@ -153,39 +194,80 @@ export function PassengerDirectoryPanel({
     setPage(1);
   }, [activeSortOption.id, alphabetBucket, deferredSearch, archiveFilter, vipOnly]);
 
-  const matchingCustomers = useMemo(
-    () =>
-      filterAndSortCustomers(displayedCustomers, {
-        searchTerm: deferredSearch,
-        vipOnly,
-        alphabetBucket: 'All',
-        sortField: activeSortOption.field,
-        sortDirection: activeSortOption.direction,
-      }),
-    [displayedCustomers, deferredSearch, vipOnly, activeSortOption.field, activeSortOption.direction]
-  );
+  const matchingCustomers = useMemo(() => {
+    if (isServerDriven) return displayedCustomers;
+    return filterAndSortCustomers(displayedCustomers, {
+      searchTerm: deferredSearch,
+      vipOnly,
+      alphabetBucket: 'All',
+      sortField: activeSortOption.field,
+      sortDirection: activeSortOption.direction,
+    });
+  }, [
+    isServerDriven,
+    displayedCustomers,
+    deferredSearch,
+    vipOnly,
+    activeSortOption.field,
+    activeSortOption.direction,
+  ]);
 
-  const alphabetCounts = useMemo(
-    () => computeAlphabetCounts(matchingCustomers),
-    [matchingCustomers]
-  );
+  const alphabetCounts = useMemo(() => {
+    if (serverLetterCounts && !deferredSearch.trim()) {
+      const counts = {} as Record<AlphabetBucket, number>;
+      for (const bucket of ALPHABET_BUCKETS) {
+        counts[bucket] = bucket === 'All' ? allCount : Number(serverLetterCounts[bucket] || 0);
+      }
+      return counts;
+    }
+    return computeAlphabetCounts(matchingCustomers);
+  }, [serverLetterCounts, deferredSearch, allCount, matchingCustomers]);
 
   const bucketedCustomers = useMemo(() => {
-    if (alphabetBucket === 'All') return matchingCustomers;
+    if (isServerDriven || alphabetBucket === 'All') return matchingCustomers;
     return matchingCustomers.filter((c) => getAlphabetBucket(c.name) === alphabetBucket);
-  }, [matchingCustomers, alphabetBucket]);
+  }, [isServerDriven, matchingCustomers, alphabetBucket]);
 
-  const paginated = useMemo(
-    () => paginateCustomers(bucketedCustomers, page, pageSize),
-    [bucketedCustomers, page, pageSize]
-  );
+  const paginated = useMemo(() => {
+    if (isServerDriven) {
+      return {
+        items: bucketedCustomers,
+        totalItems: bucketedCustomers.length,
+        totalPages: 1,
+        currentPage: 1,
+        startIndex: bucketedCustomers.length === 0 ? 0 : 1,
+        endIndex: bucketedCustomers.length,
+      };
+    }
+    return paginateCustomers(bucketedCustomers, page, pageSize);
+  }, [isServerDriven, bucketedCustomers, page, pageSize]);
 
   // Keep page in bounds if items are archived/purged
   useEffect(() => {
-    if (page > paginated.totalPages) {
+    if (!isServerDriven && page > paginated.totalPages) {
       setPage(paginated.totalPages);
     }
-  }, [page, paginated.totalPages]);
+  }, [isServerDriven, page, paginated.totalPages]);
+
+  // Auto-load next 50 rows on scroll via IntersectionObserver in server-driven mode
+  useEffect(() => {
+    if (!isServerDriven || !hasMore || isLoadingMore || isLoading || deferredSearch.trim()) {
+      return;
+    }
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void onLoadMore?.();
+        }
+      },
+      { rootMargin: '240px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [isServerDriven, hasMore, isLoadingMore, isLoading, deferredSearch, onLoadMore]);
 
   return (
     <div className="space-y-4">
@@ -623,8 +705,39 @@ export function PassengerDirectoryPanel({
         </div>
       )}
 
-      {/* ─── Pagination Footer ─── */}
-      {!isLoading && paginated.totalItems > 0 && (
+      {/* ─── Server-Driven Auto-Scroll Sentinel & Status Footer ─── */}
+      {isServerDriven && !isLoading && paginated.totalItems > 0 && (
+        <div className="bg-surface-card px-3.5 py-2.5 rounded-2xl border border-border-subtle/90 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
+          <span className="text-fg-secondary font-medium tabular-nums">
+            Loaded <strong className="text-fg-primary font-extrabold">{paginated.totalItems}</strong>{' '}
+            {deferredSearch.trim()
+              ? 'matching passenger(s)'
+              : alphabetBucket === 'All' && !vipOnly && archiveFilter === 'active'
+              ? `of ${activeCount} active passenger(s)`
+              : 'passenger(s)'}
+          </span>
+          {hasMore && !deferredSearch.trim() ? (
+            <div ref={loadMoreSentinelRef} className="flex items-center gap-2">
+              {isLoadingMore && <SpinnerIcon className="w-3.5 h-3.5 animate-spin text-blue-600" />}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isLoadingMore}
+                onClick={() => void onLoadMore?.()}
+                className="text-xs font-bold px-3 py-1 h-auto border-border-subtle text-fg-secondary hover:bg-surface-subtle cursor-pointer"
+              >
+                {isLoadingMore ? 'Loading next 50...' : 'Load More (+50)'}
+              </Button>
+            </div>
+          ) : (
+            <span className="text-[11px] text-fg-muted font-semibold">End of results</span>
+          )}
+        </div>
+      )}
+
+      {/* ─── Legacy Client-Side Pagination Footer ─── */}
+      {!isServerDriven && !isLoading && paginated.totalItems > 0 && (
         <div className="bg-surface-card px-3.5 py-2.5 rounded-2xl border border-border-subtle/90 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
           <div className="flex items-center gap-3 text-fg-secondary font-medium">
             <span className="tabular-nums">
