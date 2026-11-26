@@ -3,8 +3,34 @@ import type { DriverMeterExtra } from '../types/driver';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { summarizeTripStopProgress } from '../services/driver/driver-stop-progress';
 
-export type DriverTab = 'active' | 'offers' | 'earnings' | 'scheduled' | 'schedule';
+export type DriverTab = 'active' | 'offers' | 'scheduled' | 'messages' | 'profile';
+export type DriverProfileSubTab = 'earnings' | 'hours' | 'account';
 export type PreferredNavApp = 'google' | 'apple' | 'waze';
+
+export interface DriverBottomTabConfig {
+  id: DriverTab;
+  label: string;
+  requiresOnDuty?: boolean;
+}
+
+export const DRIVER_BOTTOM_TABS: readonly DriverBottomTabConfig[] = [
+  { id: 'active', label: 'Active' },
+  { id: 'offers', label: 'Offers', requiresOnDuty: true },
+  { id: 'scheduled', label: 'Queue' },
+  { id: 'messages', label: 'Messages' },
+  { id: 'profile', label: 'Profile' },
+];
+
+export interface DriverProfileSubTabConfig {
+  id: DriverProfileSubTab;
+  label: string;
+}
+
+export const DRIVER_PROFILE_SUB_TABS: readonly DriverProfileSubTabConfig[] = [
+  { id: 'earnings', label: 'Earnings' },
+  { id: 'hours', label: 'Hours' },
+  { id: 'account', label: 'Account' },
+];
 
 export interface RideFareSnapshot {
   isQuotedLocked: boolean;

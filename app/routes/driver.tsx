@@ -41,10 +41,10 @@ import { pushNotificationService } from '../core/services/notifications/push-not
 import type { DriverPayoutRecord, DriverSettlementMethod } from '../core/types/payment';
 import {
   SpinnerIcon,
-  CalendarIcon,
+  BellIcon,
   CarIcon,
   ClockIcon,
-  DollarSignIcon,
+  UserIcon,
 } from '../components/ui/Icons';
 import { useDriverTelemetry } from '../core/hooks/useDriverTelemetry';
 import { useDriverMultiStopProgress } from '../core/hooks/useDriverMultiStopProgress';
@@ -55,22 +55,30 @@ import { validatePhoneNumber } from '../core/utils/phone';
 import { formatVehicleTierDisplay } from '../core/utils/vehicle-tier-format.util';
 import { useBottomSheetDragToClose } from '../core/hooks/useBottomSheetDragToClose';
 import {
+  DRIVER_BOTTOM_TABS,
   formatCabUnitLabel,
   formatStepLabel,
   isTripQuotedLocked,
   maskPhoneForDisplay,
   openMapNavigation,
   splitDriverExtras,
+  type DriverProfileSubTab,
   type DriverTab,
   type LastStepUndoState,
   type PreferredNavApp,
   type RideFareSnapshot,
 } from '../core/utils/driver-ui.util';
+import {
+  dispatchAlertsService,
+  isAlertReadByDriver,
+  type DispatchAlertRecord,
+} from '../core/services/dispatch/dispatch-alerts.service';
 import { DriverShiftControls } from '../components/domain/driver/DriverShiftControls';
 import { DriverOfferSheet } from '../components/domain/driver/DriverOfferSheet';
 import { DriverLiveMeterCard } from '../components/domain/driver/DriverLiveMeterCard';
 import { DriverPaymentTerminalModal } from '../components/domain/driver/DriverPaymentTerminalModal';
-import { DriverEarningsHistoryPane } from '../components/domain/driver/DriverEarningsHistoryPane';
+import { DriverMessagesPane } from '../components/domain/driver/DriverMessagesPane';
+import { DriverProfilePane } from '../components/domain/driver/DriverProfilePane';
 
 export {
   formatCabUnitLabel,
@@ -139,6 +147,8 @@ export default function DriverAppRoute() {
   const [allDriverTrips, setAllDriverTrips] = useState<Trip[]>([]);
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState<DriverTab>('active');
+  const [profileSubTab, setProfileSubTab] = useState<DriverProfileSubTab>('earnings');
+  const [driverAlerts, setDriverAlerts] = useState<DispatchAlertRecord[]>([]);
 
   // Menus & Notices
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -367,6 +377,28 @@ export default function DriverAppRoute() {
   useEffect(() => {
     refreshPayoutHistory();
   }, [refreshPayoutHistory, currentTab]);
+
+  // 4B. Subscribe to driver-scoped dispatch alerts
+  useEffect(() => {
+    if (!authUserUid) {
+      setDriverAlerts([]);
+      return;
+    }
+    return dispatchAlertsService.subscribeForDriver(authUserUid, setDriverAlerts);
+  }, [authUserUid]);
+
+  const unreadMessagesCount = useMemo(
+    () => driverAlerts.filter((a) => !isAlertReadByDriver(a, authUserUid)).length,
+    [driverAlerts, authUserUid]
+  );
+
+  const handleMarkAlertRead = useCallback(
+    (alertId: string) => {
+      if (!authUserUid) return;
+      void dispatchAlertsService.markDriverAlertRead(alertId, authUserUid);
+    },
+    [authUserUid]
+  );
 
   // 5. Scoped Driver Real-Time Trip Subscription (Firestore `allow list` compliant!)
   useEffect(() => {
@@ -1730,9 +1762,18 @@ export default function DriverAppRoute() {
             />
           )}
 
-          {(currentTab === 'earnings' || currentTab === 'schedule') && (
-            <DriverEarningsHistoryPane
-              mode={currentTab}
+          {currentTab === 'messages' && (
+            <DriverMessagesPane
+              alerts={driverAlerts}
+              driverUid={authUserUid}
+              onMarkRead={handleMarkAlertRead}
+            />
+          )}
+
+          {currentTab === 'profile' && (
+            <DriverProfilePane
+              subTab={profileSubTab}
+              onChangeSubTab={setProfileSubTab}
               driver={driver}
               globalCommissionRate={globalCommissionRate}
               payoutHistory={payoutHistory}
@@ -1751,108 +1792,88 @@ export default function DriverAppRoute() {
               onAddTimeOff={handleAddTimeOff}
               onRemoveTimeOff={handleRemoveTimeOff}
               onSaveSchedule={handleSaveSchedule}
+              preferredNavApp={preferredNavApp}
+              onChangeNavApp={handleChangeNavApp}
+              onOpenVehiclePicker={() => setShowVehiclePickerModal(true)}
+              onSignOut={handleSignOut}
             />
           )}
         </div>
       </main>
 
-      {/* STICKY BOTTOM TAB NAVIGATION BAR (non-overlapping flex footer) */}
+      {/* STICKY BOTTOM TAB NAVIGATION BAR (config-driven 5-tab footer) */}
       <nav className="shrink-0 z-40 bg-slate-900/95 border-t border-slate-800 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl">
         <div className="grid grid-cols-5 gap-1.5 max-w-lg mx-auto">
-          <button
-            type="button"
-            onClick={() => setCurrentTab('active')}
-            className={`py-2 px-1 min-h-[52px] rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer relative ${
-              currentTab === 'active'
-                ? 'bg-blue-600 text-white shadow-md font-black'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <CarIcon className="w-5 h-5" />
-            <span className="truncate">Active</span>
-            {activeTrip && (
-              <span
-                className={`w-2 h-2 rounded-full absolute top-1.5 right-2 ${
-                  currentTab === 'active' ? 'bg-white' : 'bg-emerald-400'
-                }`}
-              />
-            )}
-          </button>
+          {DRIVER_BOTTOM_TABS.map((tab) => {
+            const isDisabled = Boolean(tab.requiresOnDuty && driver?.dutyStatus !== 'on_duty');
+            const isSelected = currentTab === tab.id;
 
-          <button
-            type="button"
-            disabled={driver?.dutyStatus !== 'on_duty'}
-            onClick={() => setCurrentTab('offers')}
-            className={`py-2 px-1 min-h-[52px] rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 relative ${
-              driver?.dutyStatus !== 'on_duty'
-                ? 'text-slate-600 cursor-not-allowed'
-                : currentTab === 'offers'
-                ? 'bg-blue-600 text-white shadow-md font-black cursor-pointer'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 cursor-pointer'
-            }`}
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-            </svg>
-            <span className="truncate">Offers</span>
-            {offeredTrips.length > 0 && driver?.dutyStatus === 'on_duty' && (
-              <span
-                className={`px-1.5 text-[9px] rounded-full font-black absolute top-1 right-2 ${
-                  currentTab === 'offers' ? 'bg-slate-950 text-blue-300' : 'bg-blue-600 text-white'
-                }`}
-              >
-                {offeredTrips.length}
-              </span>
-            )}
-          </button>
+            const icon =
+              tab.id === 'active' ? (
+                <CarIcon className="w-5 h-5" />
+              ) : tab.id === 'offers' ? (
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+              ) : tab.id === 'scheduled' ? (
+                <ClockIcon className="w-5 h-5" />
+              ) : tab.id === 'messages' ? (
+                <BellIcon className="w-5 h-5" />
+              ) : (
+                <UserIcon className="w-5 h-5" />
+              );
 
-          <button
-            type="button"
-            onClick={() => setCurrentTab('scheduled')}
-            className={`py-2 px-1 min-h-[52px] rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer relative ${
-              currentTab === 'scheduled'
-                ? 'bg-blue-600 text-white shadow-md font-black'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <ClockIcon className="w-5 h-5" />
-            <span className="truncate">Queue</span>
-            {scheduledTrips.length > 0 && (
-              <span
-                className={`px-1.5 text-[9px] rounded-full font-black absolute top-1 right-2 ${
-                  currentTab === 'scheduled' ? 'bg-slate-950 text-blue-300' : 'bg-slate-700 text-white'
+            const badgeCount =
+              tab.id === 'offers' && driver?.dutyStatus === 'on_duty'
+                ? offeredTrips.length
+                : tab.id === 'scheduled'
+                ? scheduledTrips.length
+                : tab.id === 'messages'
+                ? unreadMessagesCount
+                : 0;
+
+            const badgeColorClass =
+              tab.id === 'scheduled'
+                ? isSelected
+                  ? 'bg-slate-950 text-blue-300'
+                  : 'bg-slate-700 text-white'
+                : isSelected
+                ? 'bg-slate-950 text-blue-300'
+                : 'bg-blue-600 text-white';
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                disabled={isDisabled}
+                onClick={() => setCurrentTab(tab.id)}
+                className={`py-2 px-1 min-h-[52px] rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 relative ${
+                  isDisabled
+                    ? 'text-slate-600 cursor-not-allowed'
+                    : isSelected
+                    ? 'bg-blue-600 text-white shadow-md font-black cursor-pointer'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 cursor-pointer'
                 }`}
               >
-                {scheduledTrips.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setCurrentTab('earnings')}
-            className={`py-2 px-1 min-h-[52px] rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
-              currentTab === 'earnings'
-                ? 'bg-blue-600 text-white shadow-md font-black'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <DollarSignIcon className="w-5 h-5" />
-            <span className="truncate">Earnings</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setCurrentTab('schedule')}
-            className={`py-2 px-1 min-h-[52px] rounded-2xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
-              currentTab === 'schedule'
-                ? 'bg-blue-600 text-white shadow-md font-black'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <CalendarIcon className="w-5 h-5" />
-            <span className="truncate">Hours</span>
-          </button>
+                {icon}
+                <span className="truncate">{tab.label}</span>
+                {tab.id === 'active' && activeTrip && (
+                  <span
+                    className={`w-2 h-2 rounded-full absolute top-1.5 right-2 ${
+                      isSelected ? 'bg-white' : 'bg-emerald-400'
+                    }`}
+                  />
+                )}
+                {badgeCount > 0 && (
+                  <span
+                    className={`px-1.5 text-[9px] rounded-full font-black absolute top-1 right-2 ${badgeColorClass}`}
+                  >
+                    {badgeCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </nav>
 

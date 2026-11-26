@@ -30,6 +30,8 @@ export interface DispatchAlertRecord extends DispatchMessageItem {
   dismissedAt?: number | null;
   dedupeKey?: string | null;
   source?: 'manual' | 'system';
+  targetDriverId?: string | null;
+  readBy?: Record<string, number>;
   createdByUid?: string | null;
   createdByName?: string | null;
   updatedAt?: number;
@@ -39,6 +41,7 @@ export interface SendDispatchAlertInput {
   to: string;
   text: string;
   priority: 'normal' | 'urgent';
+  targetDriverId?: string | null;
   createdByUid?: string | null;
   createdByName?: string | null;
 }
@@ -93,7 +96,47 @@ function formatAlertTimestamp(epochMs: number): string {
   });
 }
 
-function normalizeAlertRecord(
+function normalizeReadBy(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const result: Record<string, number> = {};
+  for (const [uid, ts] of Object.entries(raw as Record<string, unknown>)) {
+    if (uid && typeof ts === 'number' && Number.isFinite(ts)) {
+      result[uid] = ts;
+    }
+  }
+  return result;
+}
+
+export function isAlertVisibleToDriver(
+  alert: DispatchAlertRecord,
+  driverUid: string
+): boolean {
+  if (!driverUid) return false;
+  if (alert.dismissedAt) return false;
+  if (alert.to === 'Dispatch Operations') return false;
+  return !alert.targetDriverId || alert.targetDriverId === driverUid;
+}
+
+export function isAlertReadByDriver(
+  alert: DispatchAlertRecord,
+  driverUid: string | null | undefined
+): boolean {
+  return Boolean(
+    driverUid &&
+      alert.readBy &&
+      typeof alert.readBy[driverUid] === 'number' &&
+      Number.isFinite(alert.readBy[driverUid])
+  );
+}
+
+export function filterAlertsForDriver(
+  alerts: DispatchAlertRecord[],
+  driverUid: string
+): DispatchAlertRecord[] {
+  return alerts.filter((item) => isAlertVisibleToDriver(item, driverUid));
+}
+
+export function normalizeAlertRecord(
   id: string,
   raw: Partial<DispatchAlertRecord>
 ): DispatchAlertRecord {
@@ -123,6 +166,11 @@ function normalizeAlertRecord(
         : null,
     dedupeKey: typeof raw.dedupeKey === 'string' && raw.dedupeKey ? raw.dedupeKey : null,
     source: raw.source === 'system' ? 'system' : 'manual',
+    targetDriverId:
+      typeof raw.targetDriverId === 'string' && raw.targetDriverId.trim()
+        ? raw.targetDriverId.trim()
+        : null,
+    readBy: normalizeReadBy(raw.readBy),
     createdByUid: typeof raw.createdByUid === 'string' ? raw.createdByUid : null,
     createdByName: typeof raw.createdByName === 'string' ? raw.createdByName : null,
   };
@@ -312,6 +360,11 @@ export class DispatchAlertsService {
     }
   }
 
+  public getDriverAlerts(driverUid: string): DispatchAlertRecord[] {
+    if (!driverUid) return [];
+    return filterAlertsForDriver(this.getActiveAlerts(), driverUid);
+  }
+
   public subscribe(listener: (alerts: DispatchAlertRecord[]) => void): () => void {
     this.listeners.add(listener);
     if (this.isConfigured && typeof window !== 'undefined' && !this.firestoreUnsub) {
@@ -325,6 +378,19 @@ export class DispatchAlertsService {
     return () => {
       this.listeners.delete(listener);
     };
+  }
+
+  public subscribeForDriver(
+    driverUid: string,
+    listener: (alerts: DispatchAlertRecord[]) => void
+  ): () => void {
+    if (!driverUid) {
+      listener([]);
+      return () => {};
+    }
+    return this.subscribe((active) => {
+      listener(filterAlertsForDriver(active, driverUid));
+    });
   }
 
   private async persistRecord(record: DispatchAlertRecord): Promise<void> {
@@ -361,6 +427,11 @@ export class DispatchAlertsService {
       dismissedAt: null,
       dedupeKey: null,
       source: 'manual',
+      targetDriverId:
+        typeof input.targetDriverId === 'string' && input.targetDriverId.trim()
+          ? input.targetDriverId.trim()
+          : null,
+      readBy: {},
       createdByUid: input.createdByUid ?? null,
       createdByName: input.createdByName ?? null,
     };
@@ -385,6 +456,43 @@ export class DispatchAlertsService {
     this.saveOfflineCache(true);
     this.notifyListeners();
     await this.persistRecord(updated);
+  }
+
+  public async markDriverAlertRead(alertId: string, driverUid: string): Promise<void> {
+    if (!driverUid) return;
+    const existing = this.records.get(alertId);
+    if (!existing) return;
+    if (isAlertReadByDriver(existing, driverUid)) return;
+
+    const now = Date.now();
+    const nextReadBy: Record<string, number> = {
+      ...(existing.readBy || {}),
+      [driverUid]: now,
+    };
+    const updated: DispatchAlertRecord = {
+      ...existing,
+      readBy: nextReadBy,
+      updatedAt: now,
+    };
+    this.records.set(alertId, updated);
+    this.saveOfflineCache(true);
+    this.notifyListeners();
+
+    if (!this.isConfigured || typeof window === 'undefined') return;
+    try {
+      const db = getFirestoreDb();
+      const docRef = doc(db, COLLECTION_NAME, alertId);
+      await setDoc(
+        docRef,
+        sanitizeFirestoreDocument({
+          readBy: { [driverUid]: now },
+          updatedAt: now,
+        }),
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn('[DispatchAlertsService] Failed to mark driver alert read:', err);
+    }
   }
 
   public async togglePin(id: string): Promise<void> {
@@ -581,6 +689,8 @@ export class DispatchAlertsService {
         dismissedAt: null,
         dedupeKey,
         source: 'system',
+        targetDriverId: null,
+        readBy: {},
         createdByUid: null,
         createdByName: 'System',
       };

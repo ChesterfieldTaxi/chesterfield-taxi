@@ -40,6 +40,7 @@ export function useDispatchFleetAlerts({ settings, user }: UseDispatchFleetAlert
   );
   const [messages, setMessages] = useState<DispatchMessageItem[]>([]);
   const [msgRecipient, setMsgRecipient] = useState<string>('All Drivers');
+  const [msgTargetDriverId, setMsgTargetDriverId] = useState<string | null>(null);
   const [msgText, setMsgText] = useState<string>('');
   const [msgPriority, setMsgPriority] = useState<'normal' | 'urgent'>('normal');
   // Default to 'unread' so read alerts automatically hide from the active view
@@ -194,15 +195,18 @@ export function useDispatchFleetAlerts({ settings, user }: UseDispatchFleetAlert
       if (!trimmed) return;
 
       setMsgText('');
+      const resolvedTargetDriverId =
+        msgRecipient !== 'All Drivers' && msgTargetDriverId ? msgTargetDriverId : null;
       void dispatchAlertsService.sendAlert({
         to: msgRecipient,
         text: trimmed,
         priority: msgPriority,
+        targetDriverId: resolvedTargetDriverId,
         createdByUid: user?.uid ?? null,
         createdByName: user?.displayName || user?.email || null,
       });
     },
-    [msgRecipient, msgText, msgPriority, user]
+    [msgRecipient, msgTargetDriverId, msgText, msgPriority, user]
   );
 
   const handleSaveNewPreset = useCallback(() => {
@@ -275,6 +279,8 @@ export function useDispatchFleetAlerts({ settings, user }: UseDispatchFleetAlert
     alertDismissMinutes,
     msgRecipient,
     setMsgRecipient,
+    msgTargetDriverId,
+    setMsgTargetDriverId,
     msgText,
     setMsgText,
     msgPriority,

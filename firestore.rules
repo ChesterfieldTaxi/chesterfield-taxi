@@ -416,7 +416,30 @@ service cloud.firestore {
     // 2F. Real-Time Dispatch Fleet Alerts & App Suite Workspace
     // ─────────────────────────────────────────────────────────────
     match /dispatch_alerts/{alertId} {
-      allow read, write: if isDispatcher();
+      allow read: if isDispatcher() || (
+        isDriver() && (
+          !('targetDriverId' in resource.data) ||
+          resource.data.targetDriverId == null ||
+          resource.data.targetDriverId == request.auth.uid
+        )
+      );
+      allow create, delete: if isDispatcher();
+      allow update: if isDispatcher() || (
+        isDriver() && (
+          !('targetDriverId' in resource.data) ||
+          resource.data.targetDriverId == null ||
+          resource.data.targetDriverId == request.auth.uid
+        ) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'updatedAt']) &&
+        'readBy' in request.resource.data &&
+        request.resource.data.readBy is map &&
+        request.auth.uid in request.resource.data.readBy &&
+        (
+          (!('readBy' in resource.data) || resource.data.readBy == null)
+            ? request.resource.data.readBy.keys().hasOnly([request.auth.uid])
+            : request.resource.data.readBy.diff(resource.data.readBy).affectedKeys().hasOnly([request.auth.uid])
+        )
+      );
     }
 
     match /dispatch_notes/{noteId} {
