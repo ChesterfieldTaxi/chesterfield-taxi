@@ -78,8 +78,11 @@ export default function DispatchPopoutRoute() {
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     const bookingService = getBookingService();
-    const unsubTrips = bookingService.subscribeToAllTrips
-      ? bookingService.subscribeToAllTrips(
+    const subscribeFn = bookingService.subscribeToActiveTrips
+      ? bookingService.subscribeToActiveTrips.bind(bookingService)
+      : bookingService.subscribeToAllTrips?.bind(bookingService);
+    const unsubTrips = subscribeFn
+      ? subscribeFn(
           (list: Trip[]) => setTrips(list),
           (err: any) => console.error('[DispatchPopout] Trip subscription error:', err)
         )

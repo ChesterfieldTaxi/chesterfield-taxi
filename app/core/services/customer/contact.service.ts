@@ -7,7 +7,21 @@
  * Persists custom updates in localStorage with cross-tab synchronization via WorkspaceBus.
  */
 
-import { collection, deleteDoc, doc, getDocs, setDoc } from 'firebase/firestore';
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  setDoc,
+  startAfter,
+  where,
+  type DocumentData,
+  type QueryDocumentSnapshot,
+  type QuerySnapshot,
+} from 'firebase/firestore';
 import type {
   CommsChannel,
   CommsContactType,
@@ -104,8 +118,20 @@ export interface ContactRecord {
   isBlacklisted?: boolean;
   blacklistReason?: string;
   isArchived?: boolean;
+  /** Normalized 10-digit/digits-only phone for indexed prefix/exact search (Phase 101) */
+  phoneNormalized?: string;
+  /** Lowercase primary email for indexed prefix/exact search (Phase 101) */
+  emailLower?: string;
+  /** Lowercase word/prefix/phone-last4 tokens for indexed `array-contains` search (Phase 101) */
+  nameSearchTokens?: string[];
   createdAt?: string | number;
   updatedAt: number;
+}
+
+export interface ContactPageResult {
+  contacts: ContactRecord[];
+  nextCursor: string | null;
+  hasMore: boolean;
 }
 
 export interface UnifiedContactQuery {
@@ -137,6 +163,10 @@ export interface UnifiedContactResolution {
 
 const STORAGE_KEY = 'ct_contacts_database';
 const EMAIL_BASIC_PATTERN = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+const MAX_CONTACT_LRU_SIZE = 300;
+const MAX_SEARCH_LRU_SIZE = 60;
+const SEARCH_LRU_TTL_MS = 60_000;
+const MAX_CONTACT_PAGE_CURSORS = 100;
 
 export function normalizePhone(phone: string): string {
   if (!phone) return '';
@@ -145,6 +175,70 @@ export function normalizePhone(phone: string): string {
     return digits.slice(1);
   }
   return digits;
+}
+
+/**
+ * Pure helper generating normalized Firestore search fields (`phoneNormalized`,
+ * `emailLower`, `nameSearchTokens`) for a contact record. Shared by `ContactService`
+ * and `scripts/backfill-spark-indexes.ts`.
+ */
+export function computeContactSearchFields(record: Partial<ContactRecord>): {
+  phoneNormalized: string;
+  emailLower: string;
+  nameSearchTokens: string[];
+} {
+  const phoneNormalized = normalizePhone(
+    record.phone || record.mobilePhone || record.homePhone || record.workPhone || ''
+  );
+  const emailLower =
+    normalizeEmail(record.email) || normalizeEmail(record.secondaryEmail) || '';
+
+  const tokenSet = new Set<string>();
+  const rawSources = [
+    record.name,
+    record.firstName,
+    record.lastName,
+    record.corporateAccountName,
+    emailLower ? emailLower.split('@')[0] : '',
+  ];
+
+  const words: string[] = [];
+  for (const src of rawSources) {
+    if (!src) continue;
+    const parts = String(src)
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 2);
+    for (const w of parts) {
+      if (!words.includes(w)) {
+        words.push(w);
+      }
+    }
+  }
+
+  for (const word of words.slice(0, 6)) {
+    const maxPrefixLen = Math.min(word.length, 10);
+    for (let len = 2; len <= maxPrefixLen; len++) {
+      tokenSet.add(word.slice(0, len));
+    }
+    if (word.length > 10) {
+      tokenSet.add(word);
+    }
+    if (tokenSet.size >= 30) break;
+  }
+
+  if (phoneNormalized.length >= 4) {
+    tokenSet.add(phoneNormalized.slice(-4));
+    if (phoneNormalized.length >= 7) {
+      tokenSet.add(phoneNormalized);
+    }
+  }
+
+  return {
+    phoneNormalized,
+    emailLower,
+    nameSearchTokens: Array.from(tokenSet).slice(0, 35),
+  };
 }
 
 /**
@@ -746,7 +840,7 @@ export function mergeCommsThreads(input: {
 function sampleProfileToContactRecord(
   sample: (typeof SAMPLE_PASSENGER_PROFILES)[number]
 ): ContactRecord {
-  return {
+  const base: ContactRecord = {
     id: sample.id,
     name: `${sample.firstName} ${sample.lastName}`.trim(),
     firstName: sample.firstName,
@@ -768,6 +862,10 @@ function sampleProfileToContactRecord(
     customerScore: sample.vipStatus ? 95 : 85,
     updatedAt: 0,
   };
+  return {
+    ...base,
+    ...computeContactSearchFields(base),
+  };
 }
 
 function isIndexKey(key: string): boolean {
@@ -776,6 +874,9 @@ function isIndexKey(key: string): boolean {
 
 class ContactService {
   private customContacts: Map<string, ContactRecord> = new Map();
+  private primaryContactLruOrder: Map<string, true> = new Map();
+  private searchQueryLru: Map<string, { results: ContactRecord[]; expiresAt: number }> = new Map();
+  private contactPageCursors: Map<string, QueryDocumentSnapshot<DocumentData>> = new Map();
   private listeners: Set<(event: { action: 'saved' | 'deleted'; contact: ContactRecord }) => void> =
     new Set();
 
@@ -783,7 +884,7 @@ class ContactService {
     this.loadFromStorage();
     if (typeof window !== 'undefined') {
       window.addEventListener('storage', (e) => {
-        if (e.key === STORAGE_KEY) {
+        if (e.key === STORAGE_KEY && !isFirebaseConfigured()) {
           this.loadFromStorage();
           this.notifyListeners({ action: 'saved', contact: {} as ContactRecord });
         }
@@ -794,15 +895,39 @@ class ContactService {
         if (msg.type === 'CONTACT_UPDATED' && (msg.payload as any)?.contact) {
           const contact = (msg.payload as any).contact as ContactRecord;
           this.indexContactRecord(contact);
+          this.searchQueryLru.clear();
           this.notifyListeners({ action: 'saved', contact });
         }
       });
     }
   }
 
-  private indexContactRecord(record: ContactRecord) {
-    if (!record || !record.id) return;
+  private touchLruId(id: string) {
+    if (!id) return;
+    if (this.primaryContactLruOrder.has(id)) {
+      this.primaryContactLruOrder.delete(id);
+    }
+    this.primaryContactLruOrder.set(id, true);
+    while (this.primaryContactLruOrder.size > MAX_CONTACT_LRU_SIZE) {
+      const oldestId = this.primaryContactLruOrder.keys().next().value;
+      if (!oldestId) break;
+      this.primaryContactLruOrder.delete(oldestId);
+      const evicted = this.customContacts.get(oldestId);
+      if (evicted) {
+        this.removeContactIndexes(evicted);
+      }
+    }
+  }
+
+  private indexContactRecord(rawRecord: ContactRecord) {
+    if (!rawRecord || !rawRecord.id) return;
+    const record: ContactRecord =
+      rawRecord.nameSearchTokens && rawRecord.phoneNormalized !== undefined
+        ? rawRecord
+        : { ...rawRecord, ...computeContactSearchFields(rawRecord) };
+
     this.customContacts.set(record.id, record);
+    this.touchLruId(record.id);
 
     const phones = collectContactPhonesE164(record);
     for (const p of phones) {
@@ -820,6 +945,7 @@ class ContactService {
 
   private removeContactIndexes(record: ContactRecord) {
     this.customContacts.delete(record.id);
+    this.primaryContactLruOrder.delete(record.id);
     for (const p of collectContactPhonesE164(record)) {
       const norm = normalizePhone(p);
       if (norm && this.customContacts.get(`phone_${norm}`)?.id === record.id) {
@@ -835,13 +961,23 @@ class ContactService {
 
   private loadFromStorage() {
     if (typeof window === 'undefined' || !window.localStorage) return;
+    if (isFirebaseConfigured()) {
+      // Remove any legacy 9,000-contact localStorage full-dump when Firestore is configured
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // Ignore storage cleanup errors
+      }
+      return;
+    }
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           this.customContacts.clear();
-          for (const item of parsed) {
+          this.primaryContactLruOrder.clear();
+          for (const item of parsed.slice(0, MAX_CONTACT_LRU_SIZE)) {
             this.indexContactRecord(item);
           }
         }
@@ -851,10 +987,12 @@ class ContactService {
     }
   }
 
-  private hasWarnedStorageQuota = false;
-
   private saveToStorage() {
     if (typeof window === 'undefined' || !window.localStorage) return;
+    if (isFirebaseConfigured()) {
+      // Never dump full contact directory to localStorage when Firebase is configured
+      return;
+    }
     const uniqueList: ContactRecord[] = [];
     const seenIds = new Set<string>();
     for (const [key, record] of this.customContacts.entries()) {
@@ -864,37 +1002,12 @@ class ContactService {
       }
     }
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(uniqueList));
-    } catch (err) {
-      const isQuotaError =
-        typeof DOMException !== 'undefined' &&
-        err instanceof DOMException &&
-        (err.name === 'QuotaExceededError' ||
-          err.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
-          err.code === 22 ||
-          err.code === 1014);
-
-      if (isQuotaError) {
-        if (!this.hasWarnedStorageQuota) {
-          this.hasWarnedStorageQuota = true;
-          console.warn(
-            `[ContactService] localStorage quota exceeded while caching ${uniqueList.length} contacts; trimming local cache to recent records.`
-          );
-        }
-        // Gracefully fall back to caching the most recently updated contacts
-        const recentSubset = [...uniqueList]
-          .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-          .slice(0, 1500);
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(recentSubset));
-        } catch {
-          try {
-            localStorage.removeItem(STORAGE_KEY);
-          } catch {
-            // Ignore secondary storage errors
-          }
-        }
-      }
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(uniqueList.slice(0, MAX_CONTACT_LRU_SIZE))
+      );
+    } catch {
+      // Ignore offline storage quota warnings
     }
   }
 
@@ -915,6 +1028,9 @@ class ContactService {
 
   public resetForTests(): void {
     this.customContacts.clear();
+    this.primaryContactLruOrder.clear();
+    this.searchQueryLru.clear();
+    this.contactPageCursors.clear();
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
         localStorage.removeItem(STORAGE_KEY);
@@ -1183,8 +1299,13 @@ class ContactService {
       totalSpend: profile.totalSpend ?? mergedExisting.totalSpend ?? 0,
       updatedAt: Date.now(),
     };
+    const searchFields = computeContactSearchFields(record);
+    record.phoneNormalized = searchFields.phoneNormalized;
+    record.emailLower = searchFields.emailLower;
+    record.nameSearchTokens = searchFields.nameSearchTokens;
 
     this.indexContactRecord(record);
+    this.searchQueryLru.clear();
     this.saveToStorage();
     this.persistContactToFirestore(record);
 
@@ -1291,8 +1412,13 @@ class ContactService {
 
   /** Persists an already-built record (index + storage + Firestore + CONTACT_UPDATED + listeners). */
   private commitContactRecord(record: ContactRecord): ContactRecord {
-    const next: ContactRecord = { ...record, updatedAt: Date.now() };
+    const baseNext: ContactRecord = { ...record, updatedAt: Date.now() };
+    const next: ContactRecord = {
+      ...baseNext,
+      ...computeContactSearchFields(baseNext),
+    };
     this.indexContactRecord(next);
+    this.searchQueryLru.clear();
     this.saveToStorage();
     this.persistContactToFirestore(next);
     try {
@@ -1323,24 +1449,247 @@ class ContactService {
     try {
       const db = getFirestoreDb();
       if (!db) return;
-      void setDoc(doc(db, 'contacts', record.id), sanitizePayload(record), { merge: true }).catch(
-        () => {}
-      );
+      const enriched: ContactRecord = {
+        ...record,
+        ...computeContactSearchFields(record),
+      };
+      void setDoc(doc(db, 'contacts', enriched.id), sanitizePayload(enriched), {
+        merge: true,
+      }).catch(() => {});
     } catch {
-      // Non-blocking fallback to localStorage + WorkspaceBus
+      // Non-blocking fallback to in-memory LRU + WorkspaceBus
     }
   }
 
-  public async syncContactsFromFirestore(): Promise<number> {
-    if (!isFirebaseConfigured() || !this.isAuthenticatedStaff()) return 0;
+  private matchesContactSearchQuery(
+    record: ContactRecord,
+    trimmedLower: string,
+    queryWords: string[],
+    digits: string
+  ): boolean {
+    const phoneNorm = record.phoneNormalized ?? normalizePhone(record.phone);
+    const emailNorm = (record.emailLower ?? normalizeEmail(record.email) ?? '').toLowerCase();
+    const haystack = [
+      record.name,
+      record.firstName,
+      record.lastName,
+      record.corporateAccountName,
+      emailNorm,
+      record.phone,
+      phoneNorm,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    if (digits.length >= 3 && phoneNorm.includes(digits)) {
+      return true;
+    }
+    if (emailNorm && emailNorm.includes(trimmedLower)) {
+      return true;
+    }
+    if (queryWords.length > 0 && queryWords.every((w) => haystack.includes(w))) {
+      return true;
+    }
+    return haystack.includes(trimmedLower);
+  }
+
+  /**
+   * On-demand indexed remote contact search (`phoneNormalized`, `emailLower`,
+   * `nameSearchTokens`) with a 60-second in-memory LRU cache (Phase 101).
+   */
+  public async searchContactsRemote(
+    rawQuery: string,
+    limitCount: number = 25
+  ): Promise<ContactRecord[]> {
+    const trimmed = String(rawQuery || '').trim();
+    const trimmedLower = trimmed.toLowerCase();
+    if (trimmedLower.length < 2) return [];
+
+    const safeLimit = Math.min(100, Math.max(1, limitCount));
+    const cacheKey = `${trimmedLower}|${safeLimit}`;
+    const cachedHit = this.searchQueryLru.get(cacheKey);
+    const now = Date.now();
+    if (cachedHit && now < cachedHit.expiresAt) {
+      this.searchQueryLru.delete(cacheKey);
+      this.searchQueryLru.set(cacheKey, cachedHit);
+      return cachedHit.results;
+    }
+
+    const digits = normalizePhone(trimmed);
+    const queryWords = trimmedLower
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 2);
+
+    const localMatches = this.getAllContacts().filter((c) =>
+      this.matchesContactSearchQuery(c, trimmedLower, queryWords, digits)
+    );
+
+    const remoteMatches: ContactRecord[] = [];
+    if (isFirebaseConfigured() && this.isAuthenticatedStaff()) {
+      try {
+        const db = getFirestoreDb();
+        const coll = collection(db, 'contacts');
+        const queries: Array<Promise<QuerySnapshot<DocumentData>>> = [];
+
+        if (digits.length >= 3) {
+          queries.push(
+            getDocs(
+              query(
+                coll,
+                where('phoneNormalized', '>=', digits),
+                where('phoneNormalized', '<=', `${digits}\uf8ff`),
+                limit(safeLimit)
+              )
+            )
+          );
+          if (digits.length >= 4) {
+            queries.push(
+              getDocs(
+                query(
+                  coll,
+                  where('nameSearchTokens', 'array-contains', digits.slice(-4)),
+                  limit(safeLimit)
+                )
+              )
+            );
+          }
+        }
+
+        if (/[a-z@]/.test(trimmedLower)) {
+          queries.push(
+            getDocs(
+              query(
+                coll,
+                where('emailLower', '>=', trimmedLower),
+                where('emailLower', '<=', `${trimmedLower}\uf8ff`),
+                limit(safeLimit)
+              )
+            )
+          );
+        }
+
+        if (queryWords.length > 0) {
+          // Pick the longest query word (clamped to 10 chars) for highest index selectivity
+          const bestWord = [...queryWords].sort((a, b) => b.length - a.length)[0].slice(0, 10);
+          if (bestWord.length >= 2) {
+            queries.push(
+              getDocs(
+                query(
+                  coll,
+                  where('nameSearchTokens', 'array-contains', bestWord),
+                  limit(Math.min(100, safeLimit * 2))
+                )
+              )
+            );
+          }
+        }
+
+        const settled = await Promise.allSettled(queries);
+        for (const res of settled) {
+          if (res.status !== 'fulfilled') continue;
+          res.value.forEach((docSnap) => {
+            const data = docSnap.data() as ContactRecord | undefined;
+            if (!data || !docSnap.id) return;
+            const remote: ContactRecord = {
+              ...data,
+              id: data.id || docSnap.id,
+              savedPaymentMethods: data.savedPaymentMethods
+                ? normalizeSavedPaymentMethods(data.savedPaymentMethods)
+                : undefined,
+            };
+            this.indexContactRecord(remote);
+            if (this.matchesContactSearchQuery(remote, trimmedLower, queryWords, digits)) {
+              remoteMatches.push(remote);
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('[ContactService] searchContactsRemote fallback to LRU cache:', err);
+      }
+    }
+
+    const deduped = new Map<string, ContactRecord>();
+    const seenPhones = new Set<string>();
+    const pushUnique = (c: ContactRecord) => {
+      if (!c?.id || deduped.has(c.id)) return;
+      const pNorm = normalizePhone(c.phone);
+      if (pNorm && seenPhones.has(pNorm)) return;
+      if (pNorm) seenPhones.add(pNorm);
+      deduped.set(c.id, c);
+    };
+
+    for (const r of remoteMatches) pushUnique(r);
+    for (const l of localMatches) pushUnique(l);
+
+    const results = Array.from(deduped.values()).slice(0, safeLimit);
+
+    this.searchQueryLru.set(cacheKey, {
+      results,
+      expiresAt: now + SEARCH_LRU_TTL_MS,
+    });
+    while (this.searchQueryLru.size > MAX_SEARCH_LRU_SIZE) {
+      const oldest = this.searchQueryLru.keys().next().value;
+      if (!oldest) break;
+      this.searchQueryLru.delete(oldest);
+    }
+
+    return results;
+  }
+
+  /**
+   * Cursor-paginated contact directory fetch (`limit` default 50) replacing
+   * the legacy 9,000-doc `syncContactsFromFirestore()` full collection scan.
+   */
+  public async listContactsPage(
+    cursor: string | null = null,
+    limitCount: number = 50
+  ): Promise<ContactPageResult> {
+    const safeLimit = Math.min(200, Math.max(1, limitCount));
+
+    if (!isFirebaseConfigured() || !this.isAuthenticatedStaff()) {
+      const all = this.getAllContacts().sort(
+        (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0) || a.name.localeCompare(b.name)
+      );
+      let startIdx = 0;
+      if (cursor) {
+        const foundIdx = all.findIndex((c) => c.id === cursor);
+        if (foundIdx >= 0) startIdx = foundIdx + 1;
+      }
+      const slice = all.slice(startIdx, startIdx + safeLimit);
+      const hasMore = startIdx + safeLimit < all.length;
+      const last = slice[slice.length - 1];
+      return {
+        contacts: slice,
+        nextCursor: hasMore && last ? last.id : null,
+        hasMore,
+      };
+    }
+
     try {
       const db = getFirestoreDb();
-      if (!db) return 0;
-      const snap = await getDocs(collection(db, 'contacts'));
-      let synced = 0;
-      snap.forEach((docSnap) => {
+      const coll = collection(db, 'contacts');
+      const cursorSnap = cursor ? this.contactPageCursors.get(cursor) : undefined;
+
+      let snap = await getDocs(
+        cursorSnap
+          ? query(coll, orderBy('updatedAt', 'desc'), startAfter(cursorSnap), limit(safeLimit + 1))
+          : query(coll, orderBy('updatedAt', 'desc'), limit(safeLimit + 1))
+      );
+
+      // Graceful fallback for legacy contacts missing `updatedAt` prior to backfill
+      if (!cursor && snap.empty) {
+        snap = await getDocs(query(coll, limit(safeLimit + 1)));
+      }
+
+      const docs = snap.docs;
+      const hasMore = docs.length > safeLimit;
+      const pageDocs = hasMore ? docs.slice(0, safeLimit) : docs;
+
+      const contacts: ContactRecord[] = [];
+      for (const docSnap of pageDocs) {
         const data = docSnap.data() as ContactRecord | undefined;
-        if (!data || !docSnap.id) return;
+        if (!data || !docSnap.id) continue;
         const remote: ContactRecord = {
           ...data,
           id: data.id || docSnap.id,
@@ -1348,20 +1697,43 @@ class ContactService {
             ? normalizeSavedPaymentMethods(data.savedPaymentMethods)
             : undefined,
         };
-        const existing = this.customContacts.get(remote.id);
-        if (!existing || (remote.updatedAt || 0) >= (existing.updatedAt || 0)) {
-          this.indexContactRecord(remote);
-          synced += 1;
-        }
-      });
-      if (synced > 0) {
-        this.saveToStorage();
-        this.notifyListeners({ action: 'saved', contact: {} as ContactRecord });
+        this.indexContactRecord(remote);
+        contacts.push(remote);
       }
-      return synced;
-    } catch {
-      return 0;
+
+      let nextCursor: string | null = null;
+      if (hasMore && pageDocs.length > 0) {
+        const lastDoc = pageDocs[pageDocs.length - 1];
+        nextCursor = lastDoc.id;
+        if (this.contactPageCursors.has(nextCursor)) {
+          this.contactPageCursors.delete(nextCursor);
+        }
+        this.contactPageCursors.set(nextCursor, lastDoc);
+        while (this.contactPageCursors.size > MAX_CONTACT_PAGE_CURSORS) {
+          const oldest = this.contactPageCursors.keys().next().value;
+          if (!oldest) break;
+          this.contactPageCursors.delete(oldest);
+        }
+      }
+
+      return {
+        contacts,
+        nextCursor,
+        hasMore,
+      };
+    } catch (err) {
+      console.warn('[ContactService] listContactsPage fallback to cached contacts:', err);
+      const fallback = this.getAllContacts().slice(0, safeLimit);
+      return { contacts: fallback, nextCursor: null, hasMore: false };
     }
+  }
+
+  /**
+   * @deprecated Bulk 9,000-doc sync removed in Phase 101. Use `listContactsPage` or `searchContactsRemote`.
+   */
+  public async syncContactsFromFirestore(): Promise<number> {
+    const page = await this.listContactsPage(null, 50);
+    return page.contacts.length;
   }
 
   public upsertSavedPaymentMethod(
@@ -1536,6 +1908,7 @@ class ContactService {
     if (!existing) return false;
 
     this.removeContactIndexes(existing);
+    this.searchQueryLru.clear();
     this.saveToStorage();
     if (isFirebaseConfigured()) {
       try {

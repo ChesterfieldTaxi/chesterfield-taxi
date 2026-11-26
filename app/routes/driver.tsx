@@ -14,6 +14,7 @@ import type { Trip, TripStatus } from '../core/types/trip';
 import type { DriverAppPoliciesConfig, VehicleTierConfig } from '../core/types/config';
 import type { PhysicalFleetAsset } from '../core/types/fleet';
 import { getBookingService } from '../core/services/booking';
+import { isFirebaseConfigured } from '../core/services/firebase';
 import { authorizedFetch } from '../core/services/auth/auth-headers';
 import {
   DEFAULT_DRIVER_APP_POLICIES_CONFIG,
@@ -447,9 +448,11 @@ export default function DriverAppRoute() {
 
     let unsubTrips: (() => void) | undefined;
     if (bookingService.subscribeToDriverTrips) {
-      unsubTrips = bookingService.subscribeToDriverTrips(driver.id, handleTripsUpdate);
-    } else if (bookingService.subscribeToAllTrips) {
-      unsubTrips = bookingService.subscribeToAllTrips(handleTripsUpdate);
+      unsubTrips = bookingService.subscribeToDriverTrips(driver.id, handleTripsUpdate, (err) => {
+        console.warn('[DriverApp] Scoped driver trips subscription error:', err);
+      });
+    } else if (!isFirebaseConfigured() && bookingService.subscribeToActiveTrips) {
+      unsubTrips = bookingService.subscribeToActiveTrips(handleTripsUpdate);
     }
 
     return () => {

@@ -630,12 +630,16 @@ export function useDispatchWorkspaceSync({
       setTrips(updatedTrips);
     };
 
-    if (service.subscribeToAllTrips) {
+    if (service.subscribeToActiveTrips) {
+      return service.subscribeToActiveTrips(handleTripsUpdate, (err) =>
+        console.error('[Dispatch] Active trips subscription error:', err)
+      );
+    } else if (service.subscribeToAllTrips) {
       return service.subscribeToAllTrips(handleTripsUpdate, (err) =>
         console.error('[Dispatch] Trips subscription error:', err)
       );
-    } else if (service.getAllTrips) {
-      service.getAllTrips().then(handleTripsUpdate).catch(console.error);
+    } else if (service.getActiveAndUpcomingTrips) {
+      service.getActiveAndUpcomingTrips().then(handleTripsUpdate).catch(console.error);
     }
   }, [setTrips, autoOfferContextRef, autoOfferStartedIdsRef]);
 

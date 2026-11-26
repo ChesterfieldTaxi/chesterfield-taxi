@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo, useDeferredValue } from 'react';
+import React, { useState, useEffect, useMemo, useDeferredValue, useCallback } from 'react';
 import type { Trip, TripStatus } from '../../../../core/types/trip';
 import {
   evaluateTripDriverLateStatus,
   useLiveClockNowMs,
 } from '../../../../core/hooks/dispatch/dispatch-workspace.util';
 import { getBookingService } from '../../../../core/services/booking';
+import { isFirebaseConfigured } from '../../../../core/services/firebase';
 import { getAdminConfigService } from '../../../../core/services/config/admin-config.service';
 import { getAdminAuthService } from '../../../../core/services/auth/admin-auth.service';
 import {
@@ -37,6 +38,7 @@ let cachedAdminTrips: Trip[] | null = null;
 
 function readInitialCachedTrips(): Trip[] {
   if (cachedAdminTrips !== null) return cachedAdminTrips;
+  if (isFirebaseConfigured()) return [];
   if (typeof window === 'undefined' || !window.localStorage) return [];
   try {
     const raw = window.localStorage.getItem(LOCAL_TRIPS_CACHE_KEY);
@@ -46,6 +48,29 @@ function readInitialCachedTrips(): Trip[] {
   } catch {
     return [];
   }
+}
+
+function mergeTripLists(primary: ReadonlyArray<Trip>, secondary: ReadonlyArray<Trip>): Trip[] {
+  const byId = new Map<string, Trip>();
+  for (const t of secondary) {
+    if (t?.id) byId.set(t.id, t);
+  }
+  for (const t of primary) {
+    if (!t?.id) continue;
+    const existing = byId.get(t.id);
+    if (!existing) {
+      byId.set(t.id, t);
+    } else {
+      const pMs = Date.parse(t.updatedAt || t.createdAt || '') || 0;
+      const eMs = Date.parse(existing.updatedAt || existing.createdAt || '') || 0;
+      if (pMs >= eMs) {
+        byId.set(t.id, t);
+      }
+    }
+  }
+  return Array.from(byId.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 }
 
 export function normalizeTripsSubTab(raw?: string): TripsSubTab {
@@ -59,7 +84,14 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
   const [activeSub, setActiveSub] = useState<TripsSubTab>(() =>
     normalizeTripsSubTab(initialSubTab)
   );
-  const [trips, setTrips] = useState<Trip[]>(() => readInitialCachedTrips());
+  const [activeWindowTrips, setActiveWindowTrips] = useState<Trip[]>(() =>
+    readInitialCachedTrips()
+  );
+  const [historicalTrips, setHistoricalTrips] = useState<Trip[]>([]);
+  const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null);
+  const [historyHasMore, setHistoryHasMore] = useState<boolean>(false);
+  const [isFetchingHistoryPage, setIsFetchingHistoryPage] = useState<boolean>(false);
+
   const [drivers, setDrivers] = useState<DriverRosterItem[]>([]);
   const [appSettings, setAppSettings] = useState(() => getAdminConfigService().getCachedSettings());
   const [assignMode, setAssignMode] = useState<'send_to_driver' | 'stage_hold'>('send_to_driver');
@@ -79,6 +111,20 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
   const [openActionTripId, setOpenActionTripId] = useState<string | null>(null);
+
+  const trips = useMemo(
+    () => mergeTripLists(activeWindowTrips, historicalTrips),
+    [activeWindowTrips, historicalTrips]
+  );
+
+  const setTrips: React.Dispatch<React.SetStateAction<Trip[]>> = useCallback((updater) => {
+    setActiveWindowTrips((prevActive) => {
+      const combined = mergeTripLists(prevActive, historicalTrips);
+      const nextList = typeof updater === 'function' ? updater(combined) : updater;
+      cachedAdminTrips = nextList;
+      return nextList;
+    });
+  }, [historicalTrips]);
 
   const openCompleteTripModal = (trip: Trip) => {
     setCompleteTripTarget(trip);
@@ -104,16 +150,17 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
     };
   }, []);
 
+  // 1. Shared singleton Active-Window subscription for real-time dispatch & exceptions
   useEffect(() => {
     if (readInitialCachedTrips().length === 0) {
       setIsLoading(true);
     }
     const service = getBookingService();
-    if (service.subscribeToAllTrips) {
-      return service.subscribeToAllTrips(
+    if (service.subscribeToActiveTrips) {
+      return service.subscribeToActiveTrips(
         (updatedTrips) => {
           cachedAdminTrips = updatedTrips;
-          setTrips(updatedTrips);
+          setActiveWindowTrips(updatedTrips);
           setIsLoading(false);
           setSelectedTrip((prev) =>
             prev ? updatedTrips.find((t) => t.id === prev.id) || prev : null
@@ -122,12 +169,12 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
         () => setIsLoading(false)
       );
     }
-    if (service.getAllTrips) {
+    if (service.getActiveAndUpcomingTrips) {
       service
-        .getAllTrips()
+        .getActiveAndUpcomingTrips({ limit: 500 })
         .then((data) => {
           cachedAdminTrips = data;
-          setTrips(data);
+          setActiveWindowTrips(data);
           setIsLoading(false);
         })
         .catch((err) => {
@@ -138,6 +185,73 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
       setIsLoading(false);
     }
   }, []);
+
+  // 2. Cursor-paginated historical queries (`queryTripsPage`) when browsing `history`
+  const resolvedHistoryQueryStatus = useMemo<TripStatus | 'all'>(() => {
+    if (statusFilter === 'all' || statusFilter === 'late') return 'all';
+    return statusFilter as TripStatus;
+  }, [statusFilter]);
+
+  useEffect(() => {
+    if (activeSub !== 'history') return;
+    const service = getBookingService();
+    if (!service.queryTripsPage) return;
+
+    let cancelled = false;
+    setIsFetchingHistoryPage(true);
+    service
+      .queryTripsPage({
+        limit: 50,
+        cursor: null,
+        status: resolvedHistoryQueryStatus,
+        includeArchived: includeArchivedInHistory,
+        orderField: 'createdAt',
+        orderDirection: 'desc',
+      })
+      .then((res) => {
+        if (cancelled) return;
+        setHistoricalTrips(res.trips);
+        setHistoryNextCursor(res.nextCursor);
+        setHistoryHasMore(res.hasMore);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsFetchingHistoryPage(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSub, resolvedHistoryQueryStatus, includeArchivedInHistory]);
+
+  const loadMoreHistory = useCallback(async () => {
+    if (isFetchingHistoryPage || !historyHasMore || !historyNextCursor) return;
+    const service = getBookingService();
+    if (!service.queryTripsPage) return;
+
+    setIsFetchingHistoryPage(true);
+    try {
+      const res = await service.queryTripsPage({
+        limit: 50,
+        cursor: historyNextCursor,
+        status: resolvedHistoryQueryStatus,
+        includeArchived: includeArchivedInHistory,
+        orderField: 'createdAt',
+        orderDirection: 'desc',
+      });
+      setHistoricalTrips((prev) => mergeTripLists(res.trips, prev));
+      setHistoryNextCursor(res.nextCursor);
+      setHistoryHasMore(res.hasMore);
+    } finally {
+      setIsFetchingHistoryPage(false);
+    }
+  }, [
+    isFetchingHistoryPage,
+    historyHasMore,
+    historyNextCursor,
+    resolvedHistoryQueryStatus,
+    includeArchivedInHistory,
+  ]);
 
   const actorEmail = useMemo(() => {
     const u = getAdminAuthService().getCurrentUser();
@@ -182,6 +296,13 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
           actorRole: 'admin',
           reason: options?.reason || `Admin updated trip to ${newStatus}`,
         });
+        if (updated) {
+          setHistoricalTrips((prev) =>
+            prev.some((t) => t.id === updated.id)
+              ? prev.map((t) => (t.id === updated.id ? updated : t))
+              : prev
+          );
+        }
         const currentTrip = updated || previousTrip;
         const mailNote = currentTrip
           ? await notifyAdminTripStatusEmail({
@@ -355,7 +476,10 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
     try {
       setActionLoadingId(trip.id);
       await getUniversalGovernanceService().setArchiveStatus('trip', trip.id, !currentArchiveState);
-      setTrips((prev) =>
+      setActiveWindowTrips((prev) =>
+        prev.map((t) => (t.id === trip.id ? { ...t, isArchived: !currentArchiveState } : t))
+      );
+      setHistoricalTrips((prev) =>
         prev.map((t) => (t.id === trip.id ? { ...t, isArchived: !currentArchiveState } : t))
       );
       showSuccess(
@@ -430,16 +554,33 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
     [activeSub, activeQueueTrips, exceptionTrips, historyTrips]
   );
 
-  const pagination = useMemo(
-    () => paginateTrips(currentTabTrips, page, pageSize),
-    [currentTabTrips, page, pageSize]
-  );
+  const canAdvanceRemoteHistory =
+    activeSub === 'history' && historyHasMore && !deferredSearchTerm.trim();
+
+  // Fetch the next 50-trip cursor batch on demand when the operator pages beyond loaded items
+  useEffect(() => {
+    const loadedPages = Math.max(1, Math.ceil(currentTabTrips.length / pageSize));
+    if (canAdvanceRemoteHistory && page > loadedPages) {
+      void loadMoreHistory();
+    }
+  }, [canAdvanceRemoteHistory, page, currentTabTrips.length, pageSize, loadMoreHistory]);
+
+  const pagination = useMemo(() => {
+    const base = paginateTrips(currentTabTrips, page, pageSize);
+    if (!canAdvanceRemoteHistory) return base;
+    const loadedPages = Math.max(1, Math.ceil(currentTabTrips.length / pageSize));
+    return {
+      ...base,
+      totalPages: loadedPages + 1,
+      totalItems: Math.max(base.totalItems, loadedPages * pageSize + 1),
+    };
+  }, [currentTabTrips, page, pageSize, canAdvanceRemoteHistory]);
 
   useEffect(() => {
-    if (page > pagination.totalPages) {
+    if (!canAdvanceRemoteHistory && page > pagination.totalPages) {
       setPage(pagination.totalPages);
     }
-  }, [page, pagination.totalPages]);
+  }, [canAdvanceRemoteHistory, page, pagination.totalPages]);
 
   const handleExportCSV = () => {
     const sourceTrips =
@@ -486,6 +627,9 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
     assignMode,
     setAssignMode,
     isLoading,
+    isFetchingHistoryPage,
+    historyHasMore,
+    loadMoreHistory,
     error,
     setError,
     searchTerm,

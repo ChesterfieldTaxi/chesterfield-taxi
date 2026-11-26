@@ -20,11 +20,17 @@ import {
   query,
   where,
   orderBy,
+  limit,
+  startAfter,
   updateDoc,
   runTransaction,
   collection,
   onSnapshot,
   type Firestore,
+  type DocumentData,
+  type QueryConstraint,
+  type QueryDocumentSnapshot,
+  type QuerySnapshot,
 } from 'firebase/firestore';
 
 import type {
@@ -43,6 +49,10 @@ import type {
   QuoteRequest,
   QuoteResponse,
   BookingStatusResponse,
+  TripPageQueryOptions,
+  TripPageResult,
+  CustomerTripsQuery,
+  ActiveAndUpcomingTripsOptions,
 } from '../booking-service';
 import { calculateTripPricing } from '../pricing';
 import {
@@ -96,7 +106,131 @@ export {
   sanitizeFirestoreUpdate,
 };
 
-import { getFirestoreDb, getFirebaseApp } from '../firebase';
+import { getFirestoreDb, getFirebaseApp, isFirebaseConfigured } from '../firebase';
+import { getKpiSummaryService } from '../analytics/kpi-summary.service';
+
+const MOCK_TRIPS_STORAGE_KEY = 'chesterfield_taxi_mock_trips';
+const MAX_LOCAL_FALLBACK_TRIPS = 200;
+const ACTIVE_WINDOW_LIMIT = 500;
+const ACTIVE_WINDOW_PAST_MS = 7 * 86_400_000;
+const ACTIVE_WINDOW_FUTURE_MS = 30 * 86_400_000;
+const ACTIVE_TEARDOWN_GRACE_MS = 30_000;
+const MAX_CURSOR_CACHE_SIZE = 120;
+
+export const ACTIVE_WINDOW_TRIP_STATUSES: TripStatus[] = [
+  'UNCONFIRMED',
+  'CONFIRMED',
+  'unconfirmed',
+  'confirmed',
+  'pending',
+  'offered',
+  'assigned',
+  'accepted',
+  'en_route',
+  'arrived',
+  'in_progress',
+];
+
+const ACTIVE_WINDOW_STATUS_SET = new Set<string>(ACTIVE_WINDOW_TRIP_STATUSES);
+
+/**
+ * Shared singleton Active-Window trip cache & ref-counted subscription state (Phase 101).
+ */
+const sharedTripCache = new Map<string, Trip>();
+const sharedQueryMembership = new Map<string, Set<string>>();
+const sharedOptimisticLockUntil = new Map<string, number>();
+const activeWindowSubscribers = new Set<(trips: Trip[]) => void>();
+const activeWindowErrorSubscribers = new Set<(err: Error) => void>();
+let activeWindowUnsubs: Array<() => void> = [];
+let activeWindowTeardownTimer: ReturnType<typeof setTimeout> | null = null;
+let hasInitialActiveSnapshot = false;
+let hasCleanedLegacyStorageBloat = false;
+const pageCursorSnapshots = new Map<string, QueryDocumentSnapshot<DocumentData>>();
+
+function setBoundedPageCursor(
+  key: string,
+  snap: QueryDocumentSnapshot<DocumentData>
+): void {
+  if (pageCursorSnapshots.has(key)) {
+    pageCursorSnapshots.delete(key);
+  }
+  pageCursorSnapshots.set(key, snap);
+  while (pageCursorSnapshots.size > MAX_CURSOR_CACHE_SIZE) {
+    const oldest = pageCursorSnapshots.keys().next().value;
+    if (oldest === undefined) break;
+    pageCursorSnapshots.delete(oldest);
+  }
+}
+
+function isTripInsideActiveWindow(trip: Trip, nowMs: number = Date.now()): boolean {
+  if (ACTIVE_WINDOW_STATUS_SET.has(String(trip.status || ''))) return true;
+  const pastCutoffMs = nowMs - ACTIVE_WINDOW_PAST_MS;
+  const futureCutoffMs = nowMs + ACTIVE_WINDOW_FUTURE_MS;
+
+  if (trip.scheduledPickupTime) {
+    const schedMs = Date.parse(trip.scheduledPickupTime);
+    if (Number.isFinite(schedMs) && schedMs >= pastCutoffMs && schedMs <= futureCutoffMs) {
+      return true;
+    }
+  }
+  const createdOrUpdatedMs = Date.parse(trip.updatedAt || trip.createdAt || '');
+  if (Number.isFinite(createdOrUpdatedMs) && createdOrUpdatedMs >= pastCutoffMs) {
+    return true;
+  }
+  return false;
+}
+
+function getSortedActiveWindowTrips(): Trip[] {
+  const nowMs = Date.now();
+  const list: Trip[] = [];
+  for (const trip of sharedTripCache.values()) {
+    if (isTripInsideActiveWindow(trip, nowMs)) {
+      list.push(trip);
+    }
+  }
+  return list.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+function notifyActiveWindowSubscribers(): void {
+  if (activeWindowSubscribers.size === 0) return;
+  const sorted = getSortedActiveWindowTrips();
+  for (const cb of activeWindowSubscribers) {
+    try {
+      cb(sorted);
+    } catch (err) {
+      console.warn('[FirebaseBookingService] Active-window subscriber callback error:', err);
+    }
+  }
+}
+
+function normalizeDigitsOnly(phone?: string | null): string {
+  if (!phone) return '';
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return digits.slice(1);
+  }
+  return digits;
+}
+
+function buildPhoneQueryCandidates(rawPhone?: string | null): string[] {
+  const clean = String(rawPhone || '').trim();
+  const digits = normalizeDigitsOnly(clean);
+  const candidates = new Set<string>();
+  if (clean && clean !== 'No phone') candidates.add(clean);
+  if (digits.length === 10) {
+    candidates.add(digits);
+    candidates.add(`+1${digits}`);
+    candidates.add(`1${digits}`);
+    candidates.add(`(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`);
+    candidates.add(`${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`);
+  } else if (digits.length >= 7) {
+    candidates.add(digits);
+    candidates.add(`+${digits}`);
+  }
+  return Array.from(candidates).slice(0, 10);
+}
 
 export class FirebaseBookingService implements IBookingService {
   private db: Firestore;
@@ -526,35 +660,19 @@ export class FirebaseBookingService implements IBookingService {
 
     const sanitizedTrip = sanitizePayload(newTrip);
 
-    // Always mirror to localStorage fallback cache so that client dispatch and admin tabs
-    // see the booking immediately even if Firestore writes fail, are delayed, or security rules reject
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
-        const existing = window.localStorage.getItem(STORAGE_KEY);
-        const trips: Trip[] = existing ? JSON.parse(existing) : [];
-        const idx = trips.findIndex((t) => t.id === sanitizedTrip.id);
-        if (idx >= 0) {
-          trips[idx] = sanitizedTrip;
-        } else {
-          trips.unshift(sanitizedTrip);
-        }
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trips));
-        window.dispatchEvent(new CustomEvent('chesterfield_trip_created', { detail: sanitizedTrip }));
-      } catch (storageErr) {
-        console.warn('[FirebaseBookingService] LocalStorage mirror error:', storageErr);
-      }
-    }
+    this.cacheAndNotifyOptimistically(sanitizedTrip);
 
     if (!this.skipNetworkPersistence) {
       try {
         await setDoc(tripDocRef, sanitizedTrip);
       } catch (err: unknown) {
-        console.warn('[FirebaseBookingService] Firestore setDoc failed (e.g. cloud security rules pending deploy), trip preserved in local storage:', err);
+        console.warn('[FirebaseBookingService] Firestore setDoc failed (e.g. cloud security rules pending deploy), trip preserved in memory cache:', err);
       }
 
       // Mirror strictly zero-PII public tracking projection & last-4 phone lookup index
       this.syncPublicTrackingProjection(sanitizedTrip, true).catch(() => {});
+      // Atomically increment 1-read dashboard KPI summary
+      getKpiSummaryService().recordTripCreated(sanitizedTrip).catch(() => {});
     }
 
     getCommsThreadService()
@@ -613,6 +731,9 @@ export class FirebaseBookingService implements IBookingService {
         const snapshot = await getDoc(tripDocRef);
         if (snapshot.exists()) {
           trip = snapshot.data() as Trip;
+          if (trip?.id) {
+            sharedTripCache.set(trip.id, trip);
+          }
           break;
         }
       } catch (e) {
@@ -651,14 +772,16 @@ export class FirebaseBookingService implements IBookingService {
     cancelledBy: 'passenger' | 'driver' | 'admin' | 'system' = 'passenger'
   ): Promise<Trip> {
     const tripDocRef = doc(this.db, this.collectionName, bookingId);
-    let trip: Trip | null = null;
-    try {
-      const snapshot = await getDoc(tripDocRef);
-      if (snapshot.exists()) {
-        trip = snapshot.data() as Trip;
+    let trip: Trip | null = sharedTripCache.get(bookingId) || null;
+    if (!trip) {
+      try {
+        const snapshot = await getDoc(tripDocRef);
+        if (snapshot.exists()) {
+          trip = snapshot.data() as Trip;
+        }
+      } catch (e) {
+        // ignore
       }
-    } catch (e) {
-      // ignore
     }
 
     if (!trip) {
@@ -693,6 +816,14 @@ export class FirebaseBookingService implements IBookingService {
       statusHistory: [...trip.statusHistory, historyEntry],
     };
 
+    const cancelledTrip: Trip = {
+      ...trip,
+      ...updates,
+    };
+
+    // Optimistic in-memory update & immediate subscriber notification (zero localStorage churn)
+    this.cacheAndNotifyOptimistically(cancelledTrip);
+
     const sanitizedUpdates = sanitizePayload(updates);
     try {
       await updateDoc(tripDocRef, sanitizedUpdates);
@@ -700,26 +831,8 @@ export class FirebaseBookingService implements IBookingService {
       console.warn('[FirebaseBookingService] cancelBooking updateDoc warning:', err);
     }
 
-    const cancelledTrip: Trip = {
-      ...trip,
-      ...updates,
-    };
-
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
-        const existing = window.localStorage.getItem(STORAGE_KEY);
-        const trips: Trip[] = existing ? JSON.parse(existing) : [];
-        const idx = trips.findIndex((t) => t.id === cancelledTrip.id);
-        if (idx >= 0) trips[idx] = cancelledTrip;
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trips));
-        window.dispatchEvent(new CustomEvent('chesterfield_trip_created', { detail: cancelledTrip }));
-      } catch (e) {
-        // ignore
-      }
-    }
-
     this.syncPublicTrackingProjection(cancelledTrip).catch(() => {});
+    getKpiSummaryService().recordTripTransition(trip, cancelledTrip).catch(() => {});
 
     return cancelledTrip;
   }
@@ -796,10 +909,68 @@ export class FirebaseBookingService implements IBookingService {
     };
   }
 
+  /**
+   * Updates the shared in-memory trip cache, immediately notifies active-window subscribers,
+   * and skips `localStorage` (`chesterfield_taxi_mock_trips`) serialization churn when
+   * Firebase is configured.
+   */
+  private cacheAndNotifyOptimistically(trip: Trip, lockMs: number = 4_000): void {
+    if (!trip?.id) return;
+    sharedTripCache.set(trip.id, trip);
+    sharedOptimisticLockUntil.set(trip.id, Date.now() + lockMs);
+    notifyActiveWindowSubscribers();
+
+    if (typeof window !== 'undefined') {
+      if (!isFirebaseConfigured() || this.skipNetworkPersistence) {
+        try {
+          const existing = window.localStorage?.getItem(MOCK_TRIPS_STORAGE_KEY);
+          const trips: Trip[] = existing ? JSON.parse(existing) : [];
+          const idx = trips.findIndex((t) => t.id === trip.id);
+          if (idx >= 0) {
+            trips[idx] = trip;
+          } else {
+            trips.unshift(trip);
+          }
+          if (trips.length > MAX_LOCAL_FALLBACK_TRIPS) {
+            trips.length = MAX_LOCAL_FALLBACK_TRIPS;
+          }
+          window.localStorage?.setItem(MOCK_TRIPS_STORAGE_KEY, JSON.stringify(trips));
+        } catch {
+          // Ignore quota or storage errors in offline/mock mode
+        }
+      } else if (!hasCleanedLegacyStorageBloat) {
+        hasCleanedLegacyStorageBloat = true;
+        try {
+          window.localStorage?.removeItem(MOCK_TRIPS_STORAGE_KEY);
+        } catch {
+          // Ignore storage cleanup errors
+        }
+      }
+
+      try {
+        window.dispatchEvent(new CustomEvent('chesterfield_trip_created', { detail: trip }));
+      } catch {
+        // Ignore custom event dispatch errors
+      }
+    }
+  }
+
   private getLocalTrips(): Trip[] {
+    if (isFirebaseConfigured() && !this.skipNetworkPersistence) {
+      if (typeof window !== 'undefined' && !hasCleanedLegacyStorageBloat) {
+        hasCleanedLegacyStorageBloat = true;
+        try {
+          window.localStorage?.removeItem(MOCK_TRIPS_STORAGE_KEY);
+        } catch {
+          // Ignore storage cleanup errors
+        }
+      }
+      return Array.from(sharedTripCache.values());
+    }
+
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
-        const stored = window.localStorage.getItem('chesterfield_taxi_mock_trips');
+        const stored = window.localStorage.getItem(MOCK_TRIPS_STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored) as Trip[];
           return parsed.filter(
@@ -814,23 +985,23 @@ export class FirebaseBookingService implements IBookingService {
         console.warn('[FirebaseBookingService] Failed to read local trips:', err);
       }
     }
-    return [];
+    return Array.from(sharedTripCache.values());
   }
 
   private mergeTrips(remoteTrips: Trip[], localTrips: Trip[]): Trip[] {
     const map = new Map<string, Trip>();
-    // Add remote trips first
     for (const trip of remoteTrips) {
       map.set(trip.id, trip);
     }
-    // Overlay or add local trips (especially recently created unconfirmed ones)
     for (const trip of localTrips) {
       if (!map.has(trip.id)) {
         map.set(trip.id, trip);
       } else {
-        // If local version has newer or pending updates, retain it
         const remote = map.get(trip.id)!;
-        if (new Date(trip.updatedAt || trip.createdAt).getTime() > new Date(remote.updatedAt || remote.createdAt).getTime()) {
+        if (
+          new Date(trip.updatedAt || trip.createdAt).getTime() >
+          new Date(remote.updatedAt || remote.createdAt).getTime()
+        ) {
           map.set(trip.id, trip);
         }
       }
@@ -840,77 +1011,533 @@ export class FirebaseBookingService implements IBookingService {
     );
   }
 
-  public async getAllTrips(): Promise<Trip[]> {
-    const localTrips = this.getLocalTrips();
-    try {
-      const q = query(collection(this.db, this.collectionName), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const remoteTrips: Trip[] = [];
-      snapshot.forEach((d) => {
-        remoteTrips.push(d.data() as Trip);
-      });
-      return this.mergeTrips(remoteTrips, localTrips);
-    } catch (err) {
-      console.warn('[FirebaseBookingService] getAllTrips remote fetch warning, using local:', err);
-      return localTrips;
+  private applyActiveWindowDocChanges(
+    queryKey: string,
+    snapshot: QuerySnapshot<unknown, DocumentData>
+  ): void {
+    const nowMs = Date.now();
+    const recentCutoffMs = nowMs - ACTIVE_WINDOW_PAST_MS;
+    let changed = !hasInitialActiveSnapshot;
+
+    for (const change of snapshot.docChanges()) {
+      const raw = change.doc.data() as Trip;
+      if (!raw) continue;
+      const id = raw.id || change.doc.id;
+      const incoming: Trip = { ...raw, id };
+
+      if (change.type === 'added' || change.type === 'modified') {
+        let members = sharedQueryMembership.get(id);
+        if (!members) {
+          members = new Set<string>();
+          sharedQueryMembership.set(id, members);
+        }
+        members.add(queryKey);
+
+        const existing = sharedTripCache.get(id);
+        const lockUntil = sharedOptimisticLockUntil.get(id) || 0;
+        const incomingMs = Date.parse(incoming.updatedAt || incoming.createdAt || '') || 0;
+        const existingMs = existing
+          ? Date.parse(existing.updatedAt || existing.createdAt || '') || 0
+          : 0;
+
+        if (existing && nowMs < lockUntil && existingMs > incomingMs) {
+          continue;
+        }
+        sharedTripCache.set(id, incoming);
+        changed = true;
+      } else if (change.type === 'removed') {
+        const members = sharedQueryMembership.get(id);
+        if (members) {
+          members.delete(queryKey);
+          if (members.size === 0) {
+            sharedQueryMembership.delete(id);
+          }
+        }
+        const remaining = sharedQueryMembership.get(id)?.size || 0;
+        if (remaining === 0) {
+          const existing = sharedTripCache.get(id);
+          const updatedMs = existing
+            ? Date.parse(existing.updatedAt || existing.createdAt || '') || 0
+            : 0;
+          if (!existing || updatedMs < recentCutoffMs) {
+            sharedTripCache.delete(id);
+            changed = true;
+          }
+        }
+      }
     }
+
+    hasInitialActiveSnapshot = true;
+    if (changed) {
+      notifyActiveWindowSubscribers();
+    }
+  }
+
+  private ensureSingletonActiveWindowListeners(): void {
+    if (
+      activeWindowUnsubs.length > 0 ||
+      !isFirebaseConfigured() ||
+      this.skipNetworkPersistence
+    ) {
+      return;
+    }
+
+    const nowMs = Date.now();
+    const pastIso = new Date(nowMs - ACTIVE_WINDOW_PAST_MS).toISOString();
+    const futureIso = new Date(nowMs + ACTIVE_WINDOW_FUTURE_MS).toISOString();
+
+    const coll = collection(this.db, this.collectionName);
+    const queries: Array<{ key: string; q: ReturnType<typeof query> }> = [
+      {
+        key: 'active_status',
+        q: query(coll, where('status', 'in', ACTIVE_WINDOW_TRIP_STATUSES), limit(ACTIVE_WINDOW_LIMIT)),
+      },
+      {
+        key: 'scheduled_window',
+        q: query(
+          coll,
+          where('scheduledPickupTime', '>=', pastIso),
+          where('scheduledPickupTime', '<=', futureIso),
+          orderBy('scheduledPickupTime', 'desc'),
+          limit(ACTIVE_WINDOW_LIMIT)
+        ),
+      },
+      {
+        key: 'recent_created',
+        q: query(
+          coll,
+          where('createdAt', '>=', pastIso),
+          orderBy('createdAt', 'desc'),
+          limit(ACTIVE_WINDOW_LIMIT)
+        ),
+      },
+    ];
+
+    for (const { key, q } of queries) {
+      const unsub = onSnapshot(
+        q,
+        (snapshot) => {
+          this.applyActiveWindowDocChanges(key, snapshot);
+        },
+        (err) => {
+          console.warn(`[FirebaseBookingService] Active-window (${key}) snapshot warning:`, err);
+          for (const errCb of activeWindowErrorSubscribers) {
+            try {
+              errCb(err);
+            } catch {
+              // Ignore subscriber error handler failures
+            }
+          }
+        }
+      );
+      activeWindowUnsubs.push(unsub);
+    }
+  }
+
+  /**
+   * Singleton ref-counted Active-Window subscription (`status in ACTIVE_WINDOW_TRIP_STATUSES`
+   * + recent 7 days / next 30 days capped at `limit(500)`), applying incremental
+   * `snapshot.docChanges()` into `sharedTripCache`.
+   */
+  public subscribeToActiveTrips(
+    onUpdate: (trips: Trip[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    if (activeWindowTeardownTimer) {
+      clearTimeout(activeWindowTeardownTimer);
+      activeWindowTeardownTimer = null;
+    }
+
+    activeWindowSubscribers.add(onUpdate);
+    if (onError) {
+      activeWindowErrorSubscribers.add(onError);
+    }
+
+    if (!isFirebaseConfigured() || this.skipNetworkPersistence) {
+      const locals = this.getLocalTrips();
+      for (const t of locals) {
+        if (t?.id) sharedTripCache.set(t.id, t);
+      }
+      Promise.resolve()
+        .then(() => onUpdate(getSortedActiveWindowTrips()))
+        .catch(onError);
+    } else if (hasInitialActiveSnapshot || sharedTripCache.size > 0) {
+      Promise.resolve()
+        .then(() => onUpdate(getSortedActiveWindowTrips()))
+        .catch(onError);
+    }
+
+    this.ensureSingletonActiveWindowListeners();
+
+    return () => {
+      activeWindowSubscribers.delete(onUpdate);
+      if (onError) {
+        activeWindowErrorSubscribers.delete(onError);
+      }
+      if (activeWindowSubscribers.size === 0 && activeWindowUnsubs.length > 0) {
+        activeWindowTeardownTimer = setTimeout(() => {
+          activeWindowTeardownTimer = null;
+          if (activeWindowSubscribers.size === 0) {
+            for (const u of activeWindowUnsubs) {
+              try {
+                u();
+              } catch {}
+            }
+            activeWindowUnsubs = [];
+            sharedQueryMembership.clear();
+            hasInitialActiveSnapshot = false;
+          }
+        }, ACTIVE_TEARDOWN_GRACE_MS);
+      }
+    };
+  }
+
+  /**
+   * Cursor-based (`startAfter` + `limit`) historical and filtered trip query.
+   */
+  public async queryTripsPage(options?: TripPageQueryOptions): Promise<TripPageResult> {
+    const pageSize = Math.min(250, Math.max(1, options?.limit ?? 50));
+    const includeArchived = Boolean(options?.includeArchived);
+    const orderField = options?.orderField || 'createdAt';
+    const orderDir = options?.orderDirection || 'desc';
+
+    if (!isFirebaseConfigured() || this.skipNetworkPersistence) {
+      let all = this.getLocalTrips();
+      if (!includeArchived) {
+        all = all.filter((t) => !t.isArchived);
+      }
+      if (options?.status && options.status !== 'all') {
+        const allowed = new Set(Array.isArray(options.status) ? options.status : [options.status]);
+        all = all.filter((t) => allowed.has(t.status));
+      }
+      if (options?.driverId) {
+        all = all.filter((t) => t.assignedDriverId === options.driverId);
+      }
+      if (options?.corporateAccountId) {
+        all = all.filter((t) => t.corporateAccountId === options.corporateAccountId);
+      }
+      if (options?.startDateIso) {
+        all = all.filter((t) => String((t as any)[orderField] || t.createdAt || '') >= options.startDateIso!);
+      }
+      if (options?.endDateIso) {
+        all = all.filter((t) => String((t as any)[orderField] || t.createdAt || '') <= options.endDateIso!);
+      }
+      all.sort((a, b) => {
+        const va = String((a as any)[orderField] || a.createdAt || '');
+        const vb = String((b as any)[orderField] || b.createdAt || '');
+        return orderDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+      });
+      let startIdx = 0;
+      if (options?.cursor) {
+        const cursorId = options.cursor.split('|')[0];
+        const foundIdx = all.findIndex((t) => t.id === cursorId);
+        if (foundIdx >= 0) startIdx = foundIdx + 1;
+      }
+      const slice = all.slice(startIdx, startIdx + pageSize);
+      const hasMore = startIdx + pageSize < all.length;
+      const last = slice[slice.length - 1];
+      return {
+        trips: slice,
+        nextCursor: hasMore && last ? `${last.id}|${String((last as any)[orderField] || '')}` : null,
+        hasMore,
+      };
+    }
+
+    try {
+      const constraints: QueryConstraint[] = [];
+      if (options?.status && options.status !== 'all') {
+        if (Array.isArray(options.status)) {
+          if (options.status.length === 1) {
+            constraints.push(where('status', '==', options.status[0]));
+          } else if (options.status.length > 1) {
+            constraints.push(where('status', 'in', options.status.slice(0, 30)));
+          }
+        } else {
+          constraints.push(where('status', '==', options.status));
+        }
+      }
+      if (options?.driverId) {
+        constraints.push(where('assignedDriverId', '==', options.driverId));
+      }
+      if (options?.corporateAccountId) {
+        constraints.push(where('corporateAccountId', '==', options.corporateAccountId));
+      }
+      if (options?.startDateIso) {
+        constraints.push(where(orderField, '>=', options.startDateIso));
+      }
+      if (options?.endDateIso) {
+        constraints.push(where(orderField, '<=', options.endDateIso));
+      }
+
+      constraints.push(orderBy(orderField, orderDir));
+
+      if (options?.cursor) {
+        const cachedSnap = pageCursorSnapshots.get(options.cursor);
+        if (cachedSnap) {
+          constraints.push(startAfter(cachedSnap));
+        } else if (options.cursor.includes('|')) {
+          const fallbackOrderVal = options.cursor.slice(options.cursor.indexOf('|') + 1);
+          if (fallbackOrderVal) {
+            constraints.push(startAfter(fallbackOrderVal));
+          }
+        }
+      }
+
+      constraints.push(limit(pageSize + 1));
+
+      const q = query(collection(this.db, this.collectionName), ...constraints);
+      const snap = await getDocs(q);
+      const docs = snap.docs;
+      const hasMore = docs.length > pageSize;
+      const pageDocs = hasMore ? docs.slice(0, pageSize) : docs;
+
+      const trips: Trip[] = [];
+      for (const docSnap of pageDocs) {
+        const data = docSnap.data() as Trip;
+        const trip: Trip = { ...data, id: data.id || docSnap.id };
+        sharedTripCache.set(trip.id, trip);
+        if (includeArchived || !trip.isArchived) {
+          trips.push(trip);
+        }
+      }
+
+      let nextCursor: string | null = null;
+      if (hasMore && pageDocs.length > 0) {
+        const lastDoc = pageDocs[pageDocs.length - 1];
+        const lastData = lastDoc.data() as Record<string, unknown>;
+        nextCursor = `${lastDoc.id}|${String(lastData[orderField] || '')}`;
+        setBoundedPageCursor(nextCursor, lastDoc);
+      }
+
+      return {
+        trips,
+        nextCursor,
+        hasMore,
+      };
+    } catch (err) {
+      console.warn('[FirebaseBookingService] queryTripsPage warning:', err);
+      return { trips: [], nextCursor: null, hasMore: false };
+    }
+  }
+
+  /**
+   * Targeted customer trip lookup by `customerId`, `email`, and/or `phone` (bounded by `limit`, default 50).
+   */
+  public async getTripsByCustomer(customerQuery: string | CustomerTripsQuery): Promise<Trip[]> {
+    const params: CustomerTripsQuery =
+      typeof customerQuery === 'string' ? { customerId: customerQuery } : customerQuery || {};
+    const maxLimit = Math.min(200, Math.max(1, params.limit ?? 50));
+
+    const cleanId = String(params.customerId || '').trim();
+    const validUid =
+      cleanId &&
+      !cleanId.startsWith('cust-') &&
+      !cleanId.startsWith('cust_new_') &&
+      !cleanId.startsWith('contact_')
+        ? cleanId
+        : '';
+    const rawEmail = String(params.email || '').trim();
+    const emailLower = rawEmail && rawEmail !== 'N/A' ? rawEmail.toLowerCase() : '';
+    const phoneDigits = normalizeDigitsOnly(params.phone);
+    const phoneCandidates = buildPhoneQueryCandidates(params.phone);
+
+    const matchLocalTrip = (t: Trip): boolean => {
+      if (validUid && (t.customerId === validUid || t.userId === validUid)) return true;
+      if (emailLower && t.passenger?.email?.trim().toLowerCase() === emailLower) return true;
+      if (phoneDigits.length >= 7 && normalizeDigitsOnly(t.passenger?.phone) === phoneDigits) {
+        return true;
+      }
+      return false;
+    };
+
+    const cachedMatches = this.getLocalTrips().filter(matchLocalTrip);
+    if (!isFirebaseConfigured() || this.skipNetworkPersistence) {
+      return cachedMatches
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, maxLimit);
+    }
+
+    const coll = collection(this.db, this.collectionName);
+    const queryPromises: Array<Promise<QuerySnapshot<DocumentData>>> = [];
+
+    if (validUid) {
+      queryPromises.push(getDocs(query(coll, where('customerId', '==', validUid), limit(maxLimit))));
+      queryPromises.push(getDocs(query(coll, where('userId', '==', validUid), limit(maxLimit))));
+    }
+    if (emailLower) {
+      const emailVariants = Array.from(new Set([rawEmail, emailLower].filter(Boolean)));
+      queryPromises.push(
+        getDocs(
+          query(
+            coll,
+            emailVariants.length > 1
+              ? where('passenger.email', 'in', emailVariants)
+              : where('passenger.email', '==', emailVariants[0]),
+            limit(maxLimit)
+          )
+        )
+      );
+    }
+    if (phoneCandidates.length > 0) {
+      queryPromises.push(
+        getDocs(
+          query(
+            coll,
+            phoneCandidates.length > 1
+              ? where('passenger.phone', 'in', phoneCandidates)
+              : where('passenger.phone', '==', phoneCandidates[0]),
+            limit(maxLimit)
+          )
+        )
+      );
+    }
+
+    if (queryPromises.length === 0) {
+      return cachedMatches.slice(0, maxLimit);
+    }
+
+    const remoteTrips: Trip[] = [];
+    const settled = await Promise.allSettled(queryPromises);
+    for (const res of settled) {
+      if (res.status === 'fulfilled') {
+        res.value.forEach((docSnap) => {
+          const data = docSnap.data() as Trip;
+          const trip: Trip = { ...data, id: data.id || docSnap.id };
+          sharedTripCache.set(trip.id, trip);
+          remoteTrips.push(trip);
+        });
+      }
+    }
+
+    return this.mergeTrips(remoteTrips, cachedMatches).slice(0, maxLimit);
+  }
+
+  /**
+   * Targeted active/upcoming (or trackingToken / standingOrderId) query without scanning 45k trips.
+   */
+  public async getActiveAndUpcomingTrips(
+    options?: ActiveAndUpcomingTripsOptions
+  ): Promise<Trip[]> {
+    const cap = Math.min(500, Math.max(1, options?.limit ?? 250));
+    const pastHours = options?.pastHours ?? 24;
+    const futureHours = options?.futureHours ?? 24 * 7;
+
+    if (options?.trackingToken) {
+      const token = options.trackingToken.trim();
+      if (!token) return [];
+      const localMatch = this.getLocalTrips().filter((t) => t.trackingToken === token);
+      if (!isFirebaseConfigured() || this.skipNetworkPersistence) {
+        return localMatch.slice(0, cap);
+      }
+      try {
+        const snap = await getDocs(
+          query(
+            collection(this.db, this.collectionName),
+            where('trackingToken', '==', token),
+            limit(Math.min(10, cap))
+          )
+        );
+        const remote = snap.docs.map((d) => {
+          const trip = { ...(d.data() as Trip), id: (d.data() as Trip).id || d.id };
+          sharedTripCache.set(trip.id, trip);
+          return trip;
+        });
+        return this.mergeTrips(remote, localMatch).slice(0, cap);
+      } catch {
+        return localMatch.slice(0, cap);
+      }
+    }
+
+    if (options?.standingOrderId) {
+      const seriesId = options.standingOrderId.trim();
+      if (!seriesId) return [];
+      const localMatch = this.getLocalTrips().filter(
+        (t) => (t.metadata as Record<string, unknown> | undefined)?.standingOrderId === seriesId
+      );
+      if (!isFirebaseConfigured() || this.skipNetworkPersistence) {
+        return localMatch.slice(0, cap);
+      }
+      try {
+        const snap = await getDocs(
+          query(
+            collection(this.db, this.collectionName),
+            where('metadata.standingOrderId', '==', seriesId),
+            limit(cap)
+          )
+        );
+        const remote = snap.docs.map((d) => {
+          const trip = { ...(d.data() as Trip), id: (d.data() as Trip).id || d.id };
+          sharedTripCache.set(trip.id, trip);
+          return trip;
+        });
+        return this.mergeTrips(remote, localMatch).slice(0, cap);
+      } catch {
+        return localMatch.slice(0, cap);
+      }
+    }
+
+    const nowMs = Date.now();
+    const pastCutoffMs = nowMs - pastHours * 3_600_000;
+    const futureCutoffMs = nowMs + futureHours * 3_600_000;
+
+    // Reuse warm singleton cache with zero Firestore reads when active listener is running
+    if (hasInitialActiveSnapshot && sharedTripCache.size > 0) {
+      return getSortedActiveWindowTrips().slice(0, cap);
+    }
+
+    if (!isFirebaseConfigured() || this.skipNetworkPersistence) {
+      return this.getLocalTrips()
+        .filter((t) => {
+          if (ACTIVE_WINDOW_STATUS_SET.has(String(t.status || ''))) return true;
+          const schedMs = t.scheduledPickupTime ? Date.parse(t.scheduledPickupTime) : NaN;
+          return Number.isFinite(schedMs) && schedMs >= pastCutoffMs && schedMs <= futureCutoffMs;
+        })
+        .slice(0, cap);
+    }
+
+    try {
+      const coll = collection(this.db, this.collectionName);
+      const pastIso = new Date(pastCutoffMs).toISOString();
+      const futureIso = new Date(futureCutoffMs).toISOString();
+      const [activeSnap, schedSnap] = await Promise.all([
+        getDocs(query(coll, where('status', 'in', ACTIVE_WINDOW_TRIP_STATUSES), limit(cap))),
+        getDocs(
+          query(
+            coll,
+            where('scheduledPickupTime', '>=', pastIso),
+            where('scheduledPickupTime', '<=', futureIso),
+            orderBy('scheduledPickupTime', 'asc'),
+            limit(cap)
+          )
+        ),
+      ]);
+      const remote: Trip[] = [];
+      for (const docSnap of [...activeSnap.docs, ...schedSnap.docs]) {
+        const data = docSnap.data() as Trip;
+        const trip: Trip = { ...data, id: data.id || docSnap.id };
+        sharedTripCache.set(trip.id, trip);
+        remote.push(trip);
+      }
+      return this.mergeTrips(remote, this.getLocalTrips()).slice(0, cap);
+    } catch (err) {
+      console.warn('[FirebaseBookingService] getActiveAndUpcomingTrips warning:', err);
+      return this.getLocalTrips().slice(0, cap);
+    }
+  }
+
+  public async getAllTrips(): Promise<Trip[]> {
+    return this.getActiveAndUpcomingTrips({
+      pastHours: 24 * 7,
+      futureHours: 24 * 30,
+      limit: ACTIVE_WINDOW_LIMIT,
+    });
   }
 
   public subscribeToAllTrips(
     onUpdate: (trips: Trip[]) => void,
     onError?: (error: Error) => void
   ): () => void {
-    let latestRemoteTrips: Trip[] = [];
-    const localTrips = this.getLocalTrips();
-
-    // Push initial local trips immediately
-    if (localTrips.length > 0) {
-      Promise.resolve().then(() => onUpdate(localTrips)).catch(onError);
-    }
-
-    // Listen for local trip creations across tabs (ignore unrelated localStorage keys like drafts/alerts!)
-    const handleLocalTripEvent = () => {
-      const freshLocal = this.getLocalTrips();
-      onUpdate(this.mergeTrips(latestRemoteTrips, freshLocal));
-    };
-    const handleStorageEvent = (e: StorageEvent) => {
-      if (e.key && e.key !== 'chesterfield_taxi_mock_trips') return;
-      handleLocalTripEvent();
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('chesterfield_trip_created', handleLocalTripEvent);
-      window.addEventListener('storage', handleStorageEvent);
-    }
-
-    const q = query(collection(this.db, this.collectionName), orderBy('createdAt', 'desc'));
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const trips: Trip[] = [];
-        snapshot.forEach((d) => {
-          trips.push(d.data() as Trip);
-        });
-        latestRemoteTrips = trips;
-        const merged = this.mergeTrips(latestRemoteTrips, this.getLocalTrips());
-        onUpdate(merged);
-      },
-      (err) => {
-        console.warn('[FirebaseBookingService] Snapshot error on all trips (using local trips):', err);
-        const fallback = this.getLocalTrips();
-        onUpdate(fallback);
-        if (onError) onError(err);
-      }
-    );
-
-    return () => {
-      unsubscribe();
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('chesterfield_trip_created', handleLocalTripEvent);
-        window.removeEventListener('storage', handleStorageEvent);
-      }
-    };
+    return this.subscribeToActiveTrips(onUpdate, onError);
   }
 
   /**
@@ -1023,7 +1650,10 @@ export class FirebaseBookingService implements IBookingService {
       changedTrip.multiCarTripIds.map(async (siblingId) => {
         try {
           const sibRef = doc(this.db, this.collectionName, siblingId);
-          let siblingTrip: Trip | null = siblingId === changedTrip.id ? changedTrip : null;
+          let siblingTrip: Trip | null =
+            siblingId === changedTrip.id
+              ? changedTrip
+              : sharedTripCache.get(siblingId) || null;
           if (!siblingTrip) {
             try {
               const snap = await getDoc(sibRef);
@@ -1047,22 +1677,13 @@ export class FirebaseBookingService implements IBookingService {
               ? { multiCarAssociates: associates, updatedAt: now }
               : { multiCarAssociates: associates, multiCarDriverIds: driverIds, updatedAt: now };
 
+          if (siblingTrip) {
+            this.cacheAndNotifyOptimistically({ ...siblingTrip, ...patch });
+          }
+
           try {
             await updateDoc(sibRef, sanitizePayload(patch));
           } catch {}
-
-          // Keep localStorage mirror fresh too
-          if (typeof window !== 'undefined' && window.localStorage) {
-            try {
-              const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
-              const list: Trip[] = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]');
-              const idx = list.findIndex((t) => t.id === siblingId);
-              if (idx >= 0) {
-                list[idx] = { ...list[idx], ...patch };
-                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-              }
-            } catch {}
-          }
         } catch (err) {
           console.warn(`[FirebaseBookingService] Multi-car associate sync warning for ${siblingId}:`, err);
         }
@@ -1347,19 +1968,8 @@ export class FirebaseBookingService implements IBookingService {
       };
     }
 
-    if (updatedTrip && typeof window !== 'undefined' && window.localStorage) {
-      try {
-        const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
-        const trips: Trip[] = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]');
-        const idx = trips.findIndex((t) => t.id === updatedTrip!.id);
-        if (idx >= 0) trips[idx] = updatedTrip;
-        else trips.unshift(updatedTrip);
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trips));
-        window.dispatchEvent(new CustomEvent('chesterfield_trip_created', { detail: updatedTrip }));
-      } catch {}
-    }
-
     if (updatedTrip) {
+      this.cacheAndNotifyOptimistically(updatedTrip);
       this.syncPublicTrackingProjection(updatedTrip).catch(() => {});
       this.syncMultiCarConvoyAssociates(
         updatedTrip,
@@ -1488,18 +2098,8 @@ export class FirebaseBookingService implements IBookingService {
       };
     }
 
-    if (updatedTrip && typeof window !== 'undefined' && window.localStorage) {
-      try {
-        const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
-        const trips: Trip[] = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]');
-        const idx = trips.findIndex((t) => t.id === updatedTrip!.id);
-        if (idx >= 0) trips[idx] = updatedTrip;
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trips));
-        window.dispatchEvent(new CustomEvent('chesterfield_trip_created', { detail: updatedTrip }));
-      } catch {}
-    }
-
     if (updatedTrip) {
+      this.cacheAndNotifyOptimistically(updatedTrip);
       this.syncPublicTrackingProjection(updatedTrip).catch(() => {});
       this.syncMultiCarConvoyAssociates(updatedTrip, undefined, 'driver').catch(() => {});
     }
@@ -1518,17 +2118,19 @@ export class FirebaseBookingService implements IBookingService {
     }
   ): Promise<Trip> {
     const tripDocRef = doc(this.db, this.collectionName, tripId);
-    let trip: Trip | null = null;
-    let docExistsOnFirestore = false;
+    let trip: Trip | null = sharedTripCache.get(tripId) || null;
+    let docExistsOnFirestore = Boolean(trip && isFirebaseConfigured());
 
-    try {
-      const snapshot = await getDoc(tripDocRef);
-      if (snapshot.exists()) {
-        trip = snapshot.data() as Trip;
-        docExistsOnFirestore = true;
+    if (!trip) {
+      try {
+        const snapshot = await getDoc(tripDocRef);
+        if (snapshot.exists()) {
+          trip = snapshot.data() as Trip;
+          docExistsOnFirestore = true;
+        }
+      } catch (e) {
+        // Permission or network error
       }
-    } catch (e) {
-      // Permission or network error
     }
 
     if (!trip) {
@@ -1666,6 +2268,9 @@ export class FirebaseBookingService implements IBookingService {
       ...updates,
     };
 
+    // Optimistic in-memory update & immediate subscriber notification (zero localStorage churn)
+    this.cacheAndNotifyOptimistically(updatedTrip);
+
     const sanitizedUpdates = sanitizePayload(updates);
     try {
       if (docExistsOnFirestore) {
@@ -1673,26 +2278,22 @@ export class FirebaseBookingService implements IBookingService {
       } else {
         await setDoc(tripDocRef, sanitizePayload(updatedTrip), { merge: true });
       }
-    } catch (updateErr) {
-      console.warn('[FirebaseBookingService] updateTripStatus Firestore sync warning:', updateErr);
-    }
-
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
-        const existing = window.localStorage.getItem(STORAGE_KEY);
-        const trips: Trip[] = existing ? JSON.parse(existing) : [];
-        const idx = trips.findIndex((t) => t.id === updatedTrip.id);
-        if (idx >= 0) trips[idx] = updatedTrip;
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trips));
-        window.dispatchEvent(new CustomEvent('chesterfield_trip_created', { detail: updatedTrip }));
-      } catch (e) {
-        // ignore
+    } catch (updateErr: any) {
+      if (docExistsOnFirestore && String(updateErr?.code || '').includes('not-found')) {
+        try {
+          await setDoc(tripDocRef, sanitizePayload(updatedTrip), { merge: true });
+        } catch (fallbackErr) {
+          console.warn('[FirebaseBookingService] updateTripStatus setDoc fallback warning:', fallbackErr);
+        }
+      } else {
+        console.warn('[FirebaseBookingService] updateTripStatus Firestore sync warning:', updateErr);
       }
     }
 
     // Mirror status & assigned vehicle updates to zero-PII public tracking projection
     this.syncPublicTrackingProjection(updatedTrip).catch(() => {});
+    // Atomically update 1-read dashboard KPI summary on status transitions
+    getKpiSummaryService().recordTripTransition(trip, updatedTrip).catch(() => {});
 
     // Keep linked multi-car convoy associates synced when status or driver changes
     if (updatedTrip.multiCarGroupId && updatedTrip.multiCarTripIds && updatedTrip.multiCarTripIds.length > 1) {
@@ -1725,7 +2326,14 @@ export class FirebaseBookingService implements IBookingService {
       } catch (err) {
         console.warn('[FirebaseBookingService] Telemetry updateDoc warning:', err);
       }
-      const cachedTrip = this.getLocalTrips().find((t) => t.id === tripId);
+      const cachedTrip = sharedTripCache.get(tripId) || this.getLocalTrips().find((t) => t.id === tripId);
+      const nextTelemetryTrip = {
+        ...(cachedTrip || ({ id: tripId } as Trip)),
+        ...telemetryPatch,
+      } as Trip;
+      if (cachedTrip) {
+        sharedTripCache.set(tripId, nextTelemetryTrip);
+      }
       const token = cachedTrip?.trackingToken;
       if (token) {
         const ping = updates.driverTelemetry || updates.currentLocation;
@@ -1737,22 +2345,21 @@ export class FirebaseBookingService implements IBookingService {
           ).catch(() => {});
         }
       }
-      return {
-        ...(cachedTrip || ({ id: tripId } as Trip)),
-        ...telemetryPatch,
-      } as Trip;
+      return nextTelemetryTrip;
     }
 
-    let trip: Trip | null = null;
-    let docExistsOnFirestore = false;
-    try {
-      const snapshot = await getDoc(tripDocRef);
-      if (snapshot.exists()) {
-        trip = snapshot.data() as Trip;
-        docExistsOnFirestore = true;
+    let trip: Trip | null = sharedTripCache.get(tripId) || null;
+    let docExistsOnFirestore = Boolean(trip && isFirebaseConfigured());
+    if (!trip) {
+      try {
+        const snapshot = await getDoc(tripDocRef);
+        if (snapshot.exists()) {
+          trip = snapshot.data() as Trip;
+          docExistsOnFirestore = true;
+        }
+      } catch (e) {
+        // ignore
       }
-    } catch (e) {
-      // ignore
     }
 
     if (!trip) {
@@ -1845,31 +2452,35 @@ export class FirebaseBookingService implements IBookingService {
       ...cleanUpdates,
     };
 
+    // Optimistic in-memory update & immediate subscriber notification (zero localStorage churn)
+    this.cacheAndNotifyOptimistically(mergedTrip);
+
     try {
       if (docExistsOnFirestore) {
         await updateDoc(tripDocRef, cleanUpdates);
       } else {
         await setDoc(tripDocRef, sanitizePayload(mergedTrip), { merge: true });
       }
-    } catch (err) {
-      console.warn('[FirebaseBookingService] updateTrip Firestore sync warning:', err);
-    }
-
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        const STORAGE_KEY = 'chesterfield_taxi_mock_trips';
-        const existing = window.localStorage.getItem(STORAGE_KEY);
-        const trips: Trip[] = existing ? JSON.parse(existing) : [];
-        const idx = trips.findIndex((t) => t.id === mergedTrip.id);
-        if (idx >= 0) trips[idx] = mergedTrip;
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(trips));
-        window.dispatchEvent(new CustomEvent('chesterfield_trip_created', { detail: mergedTrip }));
-      } catch (e) {
-        // ignore
+    } catch (err: any) {
+      if (docExistsOnFirestore && String(err?.code || '').includes('not-found')) {
+        try {
+          await setDoc(tripDocRef, sanitizePayload(mergedTrip), { merge: true });
+        } catch (fallbackErr) {
+          console.warn('[FirebaseBookingService] updateTrip setDoc fallback warning:', fallbackErr);
+        }
+      } else {
+        console.warn('[FirebaseBookingService] updateTrip Firestore sync warning:', err);
       }
     }
 
     this.syncPublicTrackingProjection(mergedTrip).catch(() => {});
+    if (
+      updates.status !== undefined ||
+      updates.pricing?.totalFare !== undefined ||
+      updates.payment?.tipAmount !== undefined
+    ) {
+      getKpiSummaryService().recordTripTransition(trip, mergedTrip).catch(() => {});
+    }
 
     // Sync linked multi-car convoy associates whenever driver, vehicle, or status changes
     const affectsConvoy =

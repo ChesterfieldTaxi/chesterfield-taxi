@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   normalizeCorporatePortalPolicy,
   type CorporateAccountConfig,
+  type InvoiceRecord,
 } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
 import { getBookingService } from '../../../../core/services/booking';
@@ -9,11 +10,14 @@ import {
   archiveCorporateAccountRecord,
   getCorporateAccountService,
 } from '../../../../core/services/corporate-account.service';
-import { getContactService } from '../../../../core/services/customer/contact.service';
+import {
+  getContactService,
+  type ContactRecord,
+} from '../../../../core/services/customer/contact.service';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
 import { getOperatorService, type DriverRosterItem } from '../../../../core/services/operator.service';
+import { Button } from '../../../ui/Button';
 import {
-  buildCustomerProfilesList,
   PassengerDirectoryPanel,
   CustomerProfileDrawer,
   CorporateDirectoryPanel,
@@ -27,9 +31,69 @@ import {
 
 export type { CustomersSubTab, AdminCustomersSubpageProps };
 
-const DIRECTORY_SYNC_TTL_MS = 60_000;
-let lastDirectorySyncAtMs = 0;
-let cachedDirectoryTrips: Trip[] | null = null;
+const CONTACTS_PAGE_SIZE = 50;
+
+function contactRecordsToCustomerProfiles(
+  contacts: ReadonlyArray<ContactRecord>,
+  invoices: ReadonlyArray<InvoiceRecord> = []
+): CustomerProfile[] {
+  const invoiceEmailsSet = new Set<string>();
+  for (const inv of invoices) {
+    if (inv.customerEmail) invoiceEmailsSet.add(inv.customerEmail.trim().toLowerCase());
+    if (inv.customerName) invoiceEmailsSet.add(inv.customerName.trim().toLowerCase());
+  }
+
+  const govService = getUniversalGovernanceService();
+  const profiles: CustomerProfile[] = [];
+  const seenIds = new Set<string>();
+
+  for (const sc of contacts) {
+    if (!sc?.id || seenIds.has(sc.id)) continue;
+    seenIds.add(sc.id);
+
+    const emailVal = sc.email || 'N/A';
+    const phoneVal = sc.phone || 'No phone';
+    const gov = govService.isPassengerBlacklistedSync(phoneVal, emailVal);
+    if (gov.isPurged) continue;
+
+    const tripCount = sc.tripCount ?? 1;
+    const totalSpend = sc.totalSpend ?? 0;
+    const score =
+      sc.customerScore ??
+      govService.calculateCustomerScore({
+        completedTrips: tripCount,
+        cancelledTrips: 0,
+        noShows: 0,
+        totalSpend,
+      });
+
+    const hasInv =
+      Boolean(sc.corporateAccountName) ||
+      (emailVal !== 'N/A' && invoiceEmailsSet.has(emailVal.toLowerCase())) ||
+      invoiceEmailsSet.has((sc.name || '').toLowerCase());
+
+    profiles.push({
+      id: sc.id,
+      name: sc.name || 'Customer',
+      email: emailVal,
+      phone: phoneVal,
+      tripCount,
+      totalSpend,
+      lastRideDate: 'Recent',
+      isVip: Boolean(sc.isVip),
+      corporateAccountName: sc.corporateAccountName,
+      hasInvoicesOrCorporate: hasInv,
+      preferredVehicle: sc.preferredVehicleTier,
+      notes: sc.notes,
+      customerScore: score,
+      isBlacklisted: Boolean(sc.isBlacklisted || gov.isBlacklisted),
+      blacklistReason: sc.blacklistReason || gov.reason,
+      isArchived: Boolean(sc.isArchived || gov.isArchived),
+    });
+  }
+
+  return profiles;
+}
 
 export function AdminCustomersSubpage({
   settings,
@@ -39,16 +103,17 @@ export function AdminCustomersSubpage({
   const [activeSub, setActiveSub] = useState<CustomersSubTab>(initialSubTab);
   const [searchTerm, setSearchTerm] = useState('');
   const [archiveFilter, setArchiveFilter] = useState<CustomerArchiveFilter>('active');
-  const [trips, setTrips] = useState<Trip[]>(() => cachedDirectoryTrips ?? []);
+  const [pagedContacts, setPagedContacts] = useState<ContactRecord[]>(() =>
+    getContactService().getAllContacts()
+  );
+  const [contactsCursor, setContactsCursor] = useState<string | null>(null);
+  const [hasMoreContacts, setHasMoreContacts] = useState<boolean>(false);
+  const [isLoadingMoreContacts, setIsLoadingMoreContacts] = useState<boolean>(false);
+  const [remoteSearchContacts, setRemoteSearchContacts] = useState<ContactRecord[] | null>(null);
+
+  const [selectedCustomerTrips, setSelectedCustomerTrips] = useState<Trip[]>([]);
   const [drivers, setDrivers] = useState<DriverRosterItem[]>([]);
-  const [isLoading, setIsLoading] = useState(() => {
-    if (cachedDirectoryTrips !== null) return false;
-    try {
-      return getContactService().getAllContacts().length === 0;
-    } catch {
-      return true;
-    }
-  });
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerProfile | null>(null);
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [governanceRefreshKey, setGovernanceRefreshKey] = useState(0);
@@ -65,114 +130,218 @@ export function AdminCustomersSubpage({
     setActiveSub(initialSubTab);
   }, [initialSubTab]);
 
-  const handleOpenCustomer = (cust: CustomerProfile, editMode = false) => {
+  const handleOpenCustomer = useCallback((cust: CustomerProfile, editMode = false) => {
     setSelectedCustomer(cust);
     setIsEditingCustomer(editMode);
-  };
+  }, []);
 
-  // Deep-link support (?phone=... or ?id=...)
+  // Deep-link support (?phone=... or ?id=...) using LRU cache + indexed remote search fallback
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    let cancelled = false;
     try {
       const params = new URLSearchParams(window.location.search);
       const targetPhone = params.get('phone');
       const targetId = params.get('id');
-      if (targetPhone || targetId) {
-        const contactService = getContactService();
-        const match = targetPhone
-          ? contactService.getContactByPhone(targetPhone)
-          : contactService.getContactById(targetId!);
-        if (match) {
-          handleOpenCustomer(
-            {
-              id: match.id,
-              name: match.name,
-              email: match.email || 'N/A',
-              phone: match.phone,
-              tripCount: match.tripCount || 1,
-              totalSpend: match.totalSpend || 0,
-              lastRideDate: 'Recent',
-              isVip: match.isVip ?? false,
-              preferredVehicle: match.preferredVehicleTier,
-              corporateAccountName: match.corporateAccountName,
-              hasInvoicesOrCorporate: Boolean(match.corporateAccountName),
-              notes: match.notes,
-              customerScore: match.customerScore ?? 90,
-            },
-            true
-          );
-        }
+      if (!targetPhone && !targetId) return;
+
+      const contactService = getContactService();
+      const openFromContact = (match: ContactRecord) => {
+        if (cancelled) return;
+        handleOpenCustomer(
+          {
+            id: match.id,
+            name: match.name,
+            email: match.email || 'N/A',
+            phone: match.phone,
+            tripCount: match.tripCount || 1,
+            totalSpend: match.totalSpend || 0,
+            lastRideDate: 'Recent',
+            isVip: match.isVip ?? false,
+            preferredVehicle: match.preferredVehicleTier,
+            corporateAccountName: match.corporateAccountName,
+            hasInvoicesOrCorporate: Boolean(match.corporateAccountName),
+            notes: match.notes,
+            customerScore: match.customerScore ?? 90,
+          },
+          true
+        );
+      };
+
+      const localMatch = targetPhone
+        ? contactService.getContactByPhone(targetPhone)
+        : contactService.getContactById(targetId!);
+      if (localMatch) {
+        openFromContact(localMatch);
+      } else {
+        void contactService
+          .searchContactsRemote(targetPhone || targetId!, 5)
+          .then((matches) => {
+            if (matches[0]) openFromContact(matches[0]);
+          })
+          .catch(() => {});
       }
     } catch {
       // Ignore URL parse warnings
     }
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [handleOpenCustomer]);
 
+  // Initial bounded page fetch (`listContactsPage(null, 50)`) — replaces 45k trips + 9k contacts dump
   useEffect(() => {
-    const service = getBookingService();
     const govService = getUniversalGovernanceService();
     const contactService = getContactService();
+    let cancelled = false;
 
-    const now = Date.now();
-    const isCacheFresh =
-      cachedDirectoryTrips !== null && now - lastDirectorySyncAtMs < DIRECTORY_SYNC_TTL_MS;
-
-    // Render cached contacts/trips immediately; only show spinner when neither trips nor contacts exist locally
-    const hasLocalContacts = contactService.getAllContacts().length > 0;
-    if (cachedDirectoryTrips === null && !hasLocalContacts) {
-      setIsLoading(true);
-    } else {
-      setIsLoading(false);
-    }
-
-    if (!isCacheFresh) {
-      lastDirectorySyncAtMs = now;
-      const tripsPromise = service.getAllTrips
-        ? service
-            .getAllTrips()
-            .then((data) => {
-              cachedDirectoryTrips = data;
-              setTrips(data);
-            })
-            .catch(() => {})
-        : Promise.resolve();
-
-      // Background-sync governance & contacts without blocking initial render when cached data exists;
-      // listeners below refresh the directory only if records actually changed.
-      const syncPromise = Promise.all([
-        govService.syncPassengerGovernanceFromFirestore().catch(() => 0),
-        contactService.syncContactsFromFirestore().catch(() => 0),
-      ]);
-
-      // Clear loading as soon as trips resolve; governance & contacts sync in background
-      tripsPromise.finally(() => {
-        setIsLoading(false);
+    setIsLoading(true);
+    contactService
+      .listContactsPage(null, CONTACTS_PAGE_SIZE)
+      .then((page) => {
+        if (cancelled) return;
+        setPagedContacts(page.contacts);
+        setContactsCursor(page.nextCursor);
+        setHasMoreContacts(page.hasMore);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
       });
-      void syncPromise;
-    }
+
+    void govService.syncPassengerGovernanceFromFirestore().catch(() => 0);
 
     const unsubGov = govService.subscribe(() => {
       setGovernanceRefreshKey((k) => k + 1);
     });
-    const unsubContacts = contactService.subscribe(() => {
+    const unsubContacts = contactService.subscribe((evt) => {
+      if (evt.action === 'saved' && evt.contact?.id) {
+        setPagedContacts((prev) => {
+          const exists = prev.some((c) => c.id === evt.contact.id);
+          return exists
+            ? prev.map((c) => (c.id === evt.contact.id ? evt.contact : c))
+            : [evt.contact, ...prev];
+        });
+      } else if (evt.action === 'deleted' && evt.contact?.id) {
+        setPagedContacts((prev) => prev.filter((c) => c.id !== evt.contact.id));
+      }
       setGovernanceRefreshKey((k) => k + 1);
     });
+
     const opSvc = getOperatorService();
     setDrivers(opSvc.getDriverRoster());
     const unsubDrivers = opSvc.subscribeToDrivers((roster) => setDrivers(roster));
 
     return () => {
+      cancelled = true;
       unsubGov();
       unsubContacts();
       unsubDrivers();
     };
   }, []);
 
+  // On-demand indexed remote contact search when `searchTerm` has >= 2 characters
+  useEffect(() => {
+    const trimmed = searchTerm.trim();
+    if (trimmed.length < 2) {
+      setRemoteSearchContacts(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      getContactService()
+        .searchContactsRemote(trimmed, CONTACTS_PAGE_SIZE)
+        .then((matches) => {
+          if (!cancelled) {
+            setRemoteSearchContacts(matches);
+          }
+        })
+        .catch(() => {});
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchTerm]);
+
+  // On-demand customer trip fetch ONLY when a customer drawer is opened
+  useEffect(() => {
+    if (!selectedCustomer || selectedCustomer.id.startsWith('cust_new_')) {
+      setSelectedCustomerTrips([]);
+      return;
+    }
+
+    const service = getBookingService();
+    if (!service.getTripsByCustomer) {
+      setSelectedCustomerTrips([]);
+      return;
+    }
+
+    let cancelled = false;
+    service
+      .getTripsByCustomer({
+        customerId: selectedCustomer.id,
+        email: selectedCustomer.email,
+        phone: selectedCustomer.phone,
+        limit: 50,
+      })
+      .then((customerTrips) => {
+        if (!cancelled) {
+          setSelectedCustomerTrips(customerTrips);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedCustomerTrips([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCustomer?.id, selectedCustomer?.email, selectedCustomer?.phone]);
+
+  const handleLoadMoreContacts = async () => {
+    if (isLoadingMoreContacts || !hasMoreContacts || !contactsCursor) return;
+    setIsLoadingMoreContacts(true);
+    try {
+      const next = await getContactService().listContactsPage(contactsCursor, CONTACTS_PAGE_SIZE);
+      setPagedContacts((prev) => {
+        const byId = new Map<string, ContactRecord>();
+        for (const c of prev) byId.set(c.id, c);
+        for (const c of next.contacts) byId.set(c.id, c);
+        return Array.from(byId.values());
+      });
+      setContactsCursor(next.nextCursor);
+      setHasMoreContacts(next.hasMore);
+    } finally {
+      setIsLoadingMoreContacts(false);
+    }
+  };
+
   const allCustomers = useMemo<CustomerProfile[]>(() => {
     if (activeSub !== 'directory') return [];
     void governanceRefreshKey;
-    return buildCustomerProfilesList(trips, settings.invoices || []);
-  }, [activeSub, trips, settings.invoices, governanceRefreshKey]);
+
+    if (remoteSearchContacts !== null) {
+      return contactRecordsToCustomerProfiles(remoteSearchContacts, settings.invoices || []);
+    }
+
+    const mergedById = new Map<string, ContactRecord>();
+    for (const c of pagedContacts) {
+      if (c?.id) mergedById.set(c.id, c);
+    }
+    for (const c of getContactService().getAllContacts()) {
+      if (c?.id && !mergedById.has(c.id)) {
+        mergedById.set(c.id, c);
+      }
+    }
+
+    return contactRecordsToCustomerProfiles(
+      Array.from(mergedById.values()),
+      settings.invoices || []
+    );
+  }, [activeSub, pagedContacts, remoteSearchContacts, settings.invoices, governanceRefreshKey]);
 
   const blacklistedCustomers = useMemo(
     () => allCustomers.filter((c) => Boolean(c.isBlacklisted)),
@@ -359,30 +528,48 @@ export function AdminCustomersSubpage({
   return (
     <div className="space-y-4">
       {activeSub === 'directory' && (
-        <PassengerDirectoryPanel
-          isLoading={isLoading}
-          allCount={nonBlacklistedCustomers.length}
-          activeCount={activeCustomers.length}
-          archivedCount={archivedCustomers.length}
-          blacklistCount={blacklistedCustomers.length}
-          vipCount={displayedCustomers.filter((c) => c.isVip).length}
-          displayedCustomers={displayedCustomers}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          archiveFilter={archiveFilter}
-          setArchiveFilter={setArchiveFilter}
-          onOpenCustomer={handleOpenCustomer}
-          onToggleArchiveCustomer={async (cust) => {
-            const nextArchived = !cust.isArchived;
-            const gov = getUniversalGovernanceService();
-            await gov.setArchiveStatus('passenger', cust.email, nextArchived);
-            if (cust.phone) await gov.setArchiveStatus('passenger', cust.phone, nextArchived);
-            setGovernanceRefreshKey((k) => k + 1);
-          }}
-          onRestoreCustomer={handleRestoreCustomer}
-          onPurgeCustomer={handlePurgeCustomer}
-          onPurgeAllBlacklisted={handlePurgeAllBlacklisted}
-        />
+        <>
+          <PassengerDirectoryPanel
+            isLoading={isLoading}
+            allCount={nonBlacklistedCustomers.length}
+            activeCount={activeCustomers.length}
+            archivedCount={archivedCustomers.length}
+            blacklistCount={blacklistedCustomers.length}
+            vipCount={displayedCustomers.filter((c) => c.isVip).length}
+            displayedCustomers={displayedCustomers}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            archiveFilter={archiveFilter}
+            setArchiveFilter={setArchiveFilter}
+            onOpenCustomer={handleOpenCustomer}
+            onToggleArchiveCustomer={async (cust) => {
+              const nextArchived = !cust.isArchived;
+              const gov = getUniversalGovernanceService();
+              await gov.setArchiveStatus('passenger', cust.email, nextArchived);
+              if (cust.phone) await gov.setArchiveStatus('passenger', cust.phone, nextArchived);
+              setGovernanceRefreshKey((k) => k + 1);
+            }}
+            onRestoreCustomer={handleRestoreCustomer}
+            onPurgeCustomer={handlePurgeCustomer}
+            onPurgeAllBlacklisted={handlePurgeAllBlacklisted}
+          />
+          {!isLoading && hasMoreContacts && !searchTerm.trim() && (
+            <div className="flex justify-center pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isLoadingMoreContacts}
+                onClick={() => void handleLoadMoreContacts()}
+                className="text-xs font-bold border-border-subtle text-fg-secondary hover:bg-surface-subtle cursor-pointer"
+              >
+                {isLoadingMoreContacts
+                  ? 'Loading more passengers...'
+                  : `Load More Passengers (+${CONTACTS_PAGE_SIZE})`}
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       {activeSub === 'corporate' && (
@@ -435,7 +622,7 @@ export function AdminCustomersSubpage({
         selectedCustomer={selectedCustomer}
         isEditingCustomer={isEditingCustomer}
         setIsEditingCustomer={setIsEditingCustomer}
-        trips={trips}
+        trips={selectedCustomerTrips}
         corporateAccounts={corporateClients}
         vehicles={settings.vehicles}
         drivers={drivers}

@@ -257,7 +257,11 @@ async function resolveTripFromParams(
     if (res?.trip) return res.trip;
   }
 
-  if (bookingService.getAllTrips) {
+  if (bookingService.getActiveAndUpcomingTrips) {
+    const active = await bookingService.getActiveAndUpcomingTrips({ limit: 150 });
+    const match = active.find((t) => t.id === tripId);
+    if (match) return match;
+  } else if (bookingService.getAllTrips) {
     const all = await bookingService.getAllTrips();
     const match = all.find((t) => t.id === tripId);
     if (match) return match;

@@ -46,6 +46,7 @@ import {
   getServiceAccountDatastoreToken,
   listCollectionFirestoreRest,
   patchFirestoreTripRest,
+  queryActiveAndUpcomingTripsFirestoreRest,
 } from './sla-cron.server';
 
 const VALID_TRIP_ID_PATTERN = /^[a-zA-Z0-9_-]{4,64}$/;
@@ -186,12 +187,21 @@ export async function executeServerAutoDispatchForTrip(
     }
   }
 
-  if (!targetTrip && baseBookingService.getAllTrips) {
-    try {
-      const all = await baseBookingService.getAllTrips();
-      targetTrip = all.find((t) => t.id === tripId) || null;
-    } catch {
-      targetTrip = null;
+  if (!targetTrip && options?.bookingServiceOverride) {
+    if (baseBookingService.getActiveAndUpcomingTrips) {
+      try {
+        const active = await baseBookingService.getActiveAndUpcomingTrips({ limit: 150 });
+        targetTrip = active.find((t) => t.id === tripId) || null;
+      } catch {
+        targetTrip = null;
+      }
+    } else if (baseBookingService.getAllTrips) {
+      try {
+        const all = await baseBookingService.getAllTrips();
+        targetTrip = all.find((t) => t.id === tripId) || null;
+      } catch {
+        targetTrip = null;
+      }
     }
   }
 
@@ -228,13 +238,23 @@ export async function executeServerAutoDispatchForTrip(
 
     if (!options?.bookingServiceOverride && restToken && isFirebaseConfigured()) {
       const [restTrips, restDrivers] = await Promise.all([
-        listCollectionFirestoreRest<Trip>('trips', restToken, 250),
+        queryActiveAndUpcomingTripsFirestoreRest(restToken, 250),
         stagedDrivers.length === 0
           ? listCollectionFirestoreRest<AutoDispatchDriverInput>('drivers', restToken, 150)
           : Promise.resolve(stagedDrivers),
       ]);
       if (restTrips) stagedTrips = restTrips;
       if (restDrivers) stagedDrivers = restDrivers;
+    } else if (baseBookingService.getActiveAndUpcomingTrips) {
+      try {
+        stagedTrips = await baseBookingService.getActiveAndUpcomingTrips({
+          pastHours: 12,
+          futureHours: 24,
+          limit: 250,
+        });
+      } catch {
+        stagedTrips = [targetTrip];
+      }
     } else if (baseBookingService.getAllTrips) {
       try {
         stagedTrips = await baseBookingService.getAllTrips();
@@ -325,7 +345,7 @@ export async function executeServerAutoDispatchForTrip(
 
   if (!options?.bookingServiceOverride && restToken && isFirebaseConfigured()) {
     const [restTrips, restDrivers, restZones] = await Promise.all([
-      listCollectionFirestoreRest<Trip>('trips', restToken, 250),
+      queryActiveAndUpcomingTripsFirestoreRest(restToken, 250),
       drivers.length === 0
         ? listCollectionFirestoreRest<AutoDispatchDriverInput>('drivers', restToken, 150)
         : Promise.resolve(drivers),
@@ -336,6 +356,16 @@ export async function executeServerAutoDispatchForTrip(
     if (restTrips) allTrips = restTrips;
     if (restDrivers) drivers = restDrivers;
     if (restZones && restZones.length > 0) zones = restZones;
+  } else if (baseBookingService.getActiveAndUpcomingTrips) {
+    try {
+      allTrips = await baseBookingService.getActiveAndUpcomingTrips({
+        pastHours: 12,
+        futureHours: 24,
+        limit: 250,
+      });
+    } catch {
+      allTrips = [targetTrip];
+    }
   } else if (baseBookingService.getAllTrips) {
     try {
       allTrips = await baseBookingService.getAllTrips();

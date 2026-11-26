@@ -7,7 +7,13 @@
  */
 
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  type Firestore,
+} from 'firebase/firestore';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
@@ -85,7 +91,20 @@ export function getFirebaseApp(customConfig?: FirebaseConfig): FirebaseApp {
 export function getFirestoreDb(customConfig?: FirebaseConfig): Firestore {
   if (!firestoreInstance) {
     const app = getFirebaseApp(customConfig);
-    firestoreInstance = getFirestore(app);
+    if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+      try {
+        firestoreInstance = initializeFirestore(app, {
+          localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager(),
+          }),
+        });
+      } catch {
+        // Safe fallback if Firestore was already initialized on this FirebaseApp or IndexedDB is unavailable
+        firestoreInstance = getFirestore(app);
+      }
+    } else {
+      firestoreInstance = getFirestore(app);
+    }
   }
   return firestoreInstance;
 }

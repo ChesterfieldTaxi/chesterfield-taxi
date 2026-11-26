@@ -1,13 +1,12 @@
 /**
  * Passenger Lookup Service
- * 
+ *
  * Provides search and profile resolution for dispatchers and operators.
- * Searches past customer history in Firestore by telephone number or email address,
- * with fallbacks to regional accounts for instant operational readiness.
+ * Uses indexed remote contact search (`ContactService.searchContactsRemote`)
+ * with an in-memory LRU cache and regional sample fallbacks — zero `getAllTrips()` scans.
  */
 
-import { getBookingService } from './index';
-import type { Trip } from '../../types';
+import { getContactService } from '../customer/contact.service';
 
 export interface PassengerProfile {
   id: string;
@@ -113,97 +112,83 @@ export const SAMPLE_PASSENGER_PROFILES: PassengerProfile[] = [
   },
 ];
 
-function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, '');
+function normalizePhoneDigits(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return digits.slice(1);
+  }
+  return digits;
+}
+
+function mapTierToPassengerTier(
+  tier?: string
+): PassengerProfile['preferredVehicleTier'] {
+  if (tier === 'premium' || tier === 'executive') return 'premium';
+  if (tier === 'xl' || tier === 'suv' || tier === 'van') return 'xl';
+  if (tier === 'wheelchair') return 'wheelchair';
+  return 'standard';
 }
 
 export class PassengerLookupService {
   /**
-   * Searches for passenger profiles matching query string against phone, email, or name.
+   * Searches for passenger profiles matching query string against phone, email, or name
+   * via `ContactService.searchContactsRemote` (bounded to 25 indexed matches + LRU cache).
    */
   public async searchPassengers(query: string): Promise<PassengerProfile[]> {
-    const trimmed = query.trim().toLowerCase();
-    if (!trimmed || trimmed.length < 2) {
+    const trimmed = query.trim();
+    const trimmedLower = trimmed.toLowerCase();
+    if (!trimmedLower || trimmedLower.length < 2) {
       return [];
     }
 
-    const cleanNumeric = normalizePhone(trimmed);
+    const cleanNumeric = normalizePhoneDigits(trimmedLower);
+    const combined = new Map<string, PassengerProfile>();
 
-    // 1. Gather historical profiles from existing Firestore trips
-    const firestoreProfiles: PassengerProfile[] = [];
     try {
-      const bookingService = getBookingService();
-      let trips: Trip[] = [];
-      if (bookingService.getAllTrips) {
-        trips = await bookingService.getAllTrips();
+      const contacts = await getContactService().searchContactsRemote(trimmed, 25);
+      for (const c of contacts) {
+        if (c.isBlacklisted) continue;
+        const nameParts = String(c.name || '').trim().split(/\s+/);
+        const firstName = c.firstName || nameParts[0] || 'Customer';
+        const lastName =
+          c.lastName !== undefined ? c.lastName : nameParts.slice(1).join(' ');
+        const dedupeKey =
+          normalizePhoneDigits(c.phone || '') || (c.email || '').toLowerCase() || c.id;
+
+        combined.set(dedupeKey, {
+          id: c.id,
+          firstName,
+          lastName,
+          phone: c.phone || '',
+          email: c.email || '',
+          corporateAccountId: c.corporateAccountId,
+          notes: c.notes || c.internalDispatcherNotes,
+          preferredVehicleTier: mapTierToPassengerTier(c.preferredVehicleTier),
+          recentPickupAddress: c.homeAddress || c.savedPlaces?.[0]?.address,
+          recentDropoffAddress: c.workAddress || c.savedPlaces?.[1]?.address,
+          totalTrips: c.tripCount || 1,
+          vipStatus: Boolean(c.isVip),
+        });
       }
-
-      // Map trips into unique passenger profiles
-      const seen = new Map<string, PassengerProfile>();
-      for (const trip of trips) {
-        if (!trip.passenger || !trip.passenger.phone) continue;
-        const phone = trip.passenger.phone;
-        const norm = normalizePhone(phone);
-        const email = (trip.passenger.email || '').toLowerCase();
-        const fullName = `${trip.passenger.firstName} ${trip.passenger.lastName}`.toLowerCase();
-
-        const matchesQuery =
-          (cleanNumeric && norm.includes(cleanNumeric)) ||
-          email.includes(trimmed) ||
-          fullName.includes(trimmed);
-
-        if (matchesQuery) {
-          if (!seen.has(norm)) {
-            seen.set(norm, {
-              id: trip.customerId || `pass_${norm}`,
-              firstName: trip.passenger.firstName,
-              lastName: trip.passenger.lastName,
-              phone: trip.passenger.phone,
-              email: trip.passenger.email,
-              corporateAccountId: (trip.metadata?.corporateAccountId as string) || undefined,
-              notes: trip.passenger.specialRequests || trip.driverNotes,
-              preferredVehicleTier: trip.vehicleTier as any,
-              recentPickupAddress: trip.pickupLocation?.address,
-              recentDropoffAddress: trip.dropoffLocation?.address,
-              totalTrips: 1,
-              vipStatus: Boolean(trip.metadata?.vipStatus),
-            });
-          } else {
-            const existing = seen.get(norm)!;
-            existing.totalTrips = (existing.totalTrips || 1) + 1;
-          }
-        }
-      }
-      firestoreProfiles.push(...Array.from(seen.values()));
     } catch (err) {
-      console.warn('[PassengerLookupService] Error searching Firestore trips:', err);
+      console.warn('[PassengerLookupService] Error searching contacts:', err);
     }
 
-    // 2. Filter sample fallback profiles
-    const sampleMatches = SAMPLE_PASSENGER_PROFILES.filter((profile) => {
-      const norm = normalizePhone(profile.phone);
+    // Merge sample fallback profiles if not already present
+    for (const profile of SAMPLE_PASSENGER_PROFILES) {
+      const norm = normalizePhoneDigits(profile.phone);
       const email = profile.email.toLowerCase();
       const fullName = `${profile.firstName} ${profile.lastName}`.toLowerCase();
-      return (
-        (cleanNumeric && norm.includes(cleanNumeric)) ||
-        email.includes(trimmed) ||
-        fullName.includes(trimmed)
-      );
-    });
-
-    // Merge and deduplicate by normalized phone
-    const combined = new Map<string, PassengerProfile>();
-    for (const p of firestoreProfiles) {
-      combined.set(normalizePhone(p.phone), p);
-    }
-    for (const p of sampleMatches) {
-      const norm = normalizePhone(p.phone);
-      if (!combined.has(norm)) {
-        combined.set(norm, p);
+      const matches =
+        (cleanNumeric.length >= 3 && norm.includes(cleanNumeric)) ||
+        email.includes(trimmedLower) ||
+        fullName.includes(trimmedLower);
+      if (matches && !combined.has(norm)) {
+        combined.set(norm, profile);
       }
     }
 
-    return Array.from(combined.values());
+    return Array.from(combined.values()).slice(0, 25);
   }
 }
 

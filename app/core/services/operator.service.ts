@@ -10,14 +10,16 @@ import {
   collection,
   doc,
   getDocs,
-  getDoc,
   setDoc,
   deleteDoc,
   onSnapshot,
-  getFirestore,
+  query,
+  where,
 } from 'firebase/firestore';
-import { getFirebaseApp, isFirebaseConfigured } from './firebase';
+import { getFirestoreDb, isFirebaseConfigured } from './firebase';
 import type { UserRole } from './auth/admin-auth.service';
+
+const STAFF_AND_DRIVER_ROLES = ['admin', 'dispatcher', 'driver', 'operator'] as const;
 import type { GeoPoint } from '../types/trip';
 import type { DriverScheduleConfig } from '../types/driver';
 import type { ThemePreference } from '../../config/theme-tokens';
@@ -357,8 +359,12 @@ export class OperatorService {
     }
 
     try {
-      const db = getFirestore(getFirebaseApp());
-      const querySnapshot = await getDocs(collection(db, 'users'));
+      const db = getFirestoreDb();
+      const staffQuery = query(
+        collection(db, 'users'),
+        where('roles', 'array-contains-any', [...STAFF_AND_DRIVER_ROLES])
+      );
+      const querySnapshot = await getDocs(staffQuery);
       if (querySnapshot.empty) {
         if (!this.operators || this.operators.length === 0) {
           this.operators = DEFAULT_OPERATORS;
@@ -534,9 +540,13 @@ export class OperatorService {
     if (this.unsubscribeFirestore || !isFirebaseConfigured()) return;
 
     try {
-      const db = getFirestore(getFirebaseApp());
-      this.unsubscribeFirestore = onSnapshot(
+      const db = getFirestoreDb();
+      const staffQuery = query(
         collection(db, 'users'),
+        where('roles', 'array-contains-any', [...STAFF_AND_DRIVER_ROLES])
+      );
+      this.unsubscribeFirestore = onSnapshot(
+        staffQuery,
         (snapshot) => {
           const fetched: OperatorUser[] = [];
           snapshot.forEach((docSnap) => {
@@ -612,8 +622,13 @@ export class OperatorService {
     const assignedUnit = operator.assignedUnit ? operator.assignedUnit.replace(/^Cab\s*#?/i, 'Car #') : (cabNumber ? `Car #${cabNumber}` : '');
 
     const normalizedHomeAddress = String(operator.homeAddress || '').trim() || undefined;
+    const normalizedRoles: UserRole[] =
+      Array.isArray(operator.roles) && operator.roles.length > 0
+        ? Array.from(new Set(operator.roles))
+        : [operator.role];
     const completeOperator: OperatorUser = {
       ...operator,
+      roles: normalizedRoles,
       firstName,
       lastName,
       cabNumber,
@@ -626,7 +641,7 @@ export class OperatorService {
 
     if (isFirebaseConfigured()) {
       try {
-        const db = getFirestore(getFirebaseApp());
+        const db = getFirestoreDb();
         const sanitized = Object.fromEntries(
           Object.entries(completeOperator).filter(([, v]) => v !== undefined)
         );
@@ -662,7 +677,7 @@ export class OperatorService {
   public async deleteOperator(uid: string): Promise<void> {
     if (isFirebaseConfigured()) {
       try {
-        const db = getFirestore(getFirebaseApp());
+        const db = getFirestoreDb();
         await deleteDoc(doc(db, 'users', uid));
       } catch (err) {
         console.warn('[OperatorService] Firestore delete error:', err);

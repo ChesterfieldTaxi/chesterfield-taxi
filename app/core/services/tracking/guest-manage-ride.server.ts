@@ -122,6 +122,23 @@ function isValidCoordinates(coord: unknown): coord is GeoPoint {
   );
 }
 
+async function findTripByTrackingToken(
+  svc: IBookingService,
+  token: string,
+  allowLegacyScanFallback: boolean = false
+): Promise<Trip | null> {
+  if (svc.getActiveAndUpcomingTrips) {
+    const matches = await svc.getActiveAndUpcomingTrips({ trackingToken: token, limit: 5 });
+    const found = matches.find((t) => t.trackingToken === token);
+    if (found) return found;
+  }
+  if (allowLegacyScanFallback && svc.getAllTrips) {
+    const all = await svc.getAllTrips();
+    return all.find((t) => t.trackingToken === token) || null;
+  }
+  return null;
+}
+
 /**
  * Resolves a sanitized `PublicTripTrackingProjection` for `GET /api/track?token=trk_...`
  * or `POST /api/track` token lookup, merging Firestore REST with server-side projection mirror
@@ -136,16 +153,17 @@ export async function resolvePublicTrackingByTokenServer(
   // 1. Explicit test / injected booking service override
   if (options?.bookingServiceOverride) {
     const cachedProj = serverTrackingStore.projectionsByToken.get(token);
-    if (options.bookingServiceOverride.getAllTrips) {
-      const all = await options.bookingServiceOverride.getAllTrips();
-      const matched = all.find((t) => t.trackingToken === token);
-      if (matched) {
-        const built = buildPublicTrackingProjection(matched);
-        if (built) {
-          const clean = sanitizePublicTrackingProjection(built);
-          serverTrackingStore.projectionsByToken.set(token, clean);
-          return clean;
-        }
+    const matched = await findTripByTrackingToken(
+      options.bookingServiceOverride,
+      token,
+      !options.bookingServiceOverride.getActiveAndUpcomingTrips
+    );
+    if (matched) {
+      const built = buildPublicTrackingProjection(matched);
+      if (built) {
+        const clean = sanitizePublicTrackingProjection(built);
+        serverTrackingStore.projectionsByToken.set(token, clean);
+        return clean;
       }
     }
     if (cachedProj?.tripId) {
@@ -220,19 +238,16 @@ export async function resolvePublicTrackingByTokenServer(
     return sanitizePublicTrackingProjection(mirroredProj);
   }
 
-  // 3. Fallback to default BookingService (e.g., local dev / MockBookingService)
+  // 3. Targeted token lookup fallback on default BookingService (zero full-collection scans)
   try {
     const bookingService = getBookingService();
-    if (bookingService.getAllTrips) {
-      const all = await bookingService.getAllTrips();
-      const matched = all.find((t) => t.trackingToken === token);
-      if (matched) {
-        const built = buildPublicTrackingProjection(matched);
-        if (built) {
-          const clean = sanitizePublicTrackingProjection(built);
-          serverTrackingStore.projectionsByToken.set(token, clean);
-          return clean;
-        }
+    const matched = await findTripByTrackingToken(bookingService, token, false);
+    if (matched) {
+      const built = buildPublicTrackingProjection(matched);
+      if (built) {
+        const clean = sanitizePublicTrackingProjection(built);
+        serverTrackingStore.projectionsByToken.set(token, clean);
+        return clean;
       }
     }
   } catch {
@@ -249,12 +264,13 @@ async function resolveAuthoritativeTripByToken(
 ): Promise<{ trip: Trip; datastoreToken: string | null } | null> {
   // 1. Dependency-injected IBookingService override (deterministic Node test harness)
   if (options?.bookingServiceOverride) {
-    if (options.bookingServiceOverride.getAllTrips) {
-      const all = await options.bookingServiceOverride.getAllTrips();
-      const matched = all.find((t) => t.trackingToken === token);
-      if (matched) {
-        return { trip: matched, datastoreToken: null };
-      }
+    const matched = await findTripByTrackingToken(
+      options.bookingServiceOverride,
+      token,
+      !options.bookingServiceOverride.getActiveAndUpcomingTrips
+    );
+    if (matched) {
+      return { trip: matched, datastoreToken: null };
     }
     const cachedProj = serverTrackingStore.projectionsByToken.get(token);
     if (cachedProj?.tripId) {
@@ -310,20 +326,17 @@ async function resolveAuthoritativeTripByToken(
         return { trip: statusRes.trip, datastoreToken };
       }
     } catch {
-      // Continue to getAllTrips scan
+      // Continue to targeted token lookup
     }
   }
 
-  if (bookingService.getAllTrips) {
-    try {
-      const all = await bookingService.getAllTrips();
-      const matched = all.find((t) => t.trackingToken === token);
-      if (matched) {
-        return { trip: matched, datastoreToken };
-      }
-    } catch {
-      // Ignore
+  try {
+    const matched = await findTripByTrackingToken(bookingService, token, false);
+    if (matched) {
+      return { trip: matched, datastoreToken };
     }
+  } catch {
+    // Ignore
   }
 
   return null;

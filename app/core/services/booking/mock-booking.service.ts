@@ -21,7 +21,12 @@ import type {
   QuoteRequest,
   QuoteResponse,
   BookingStatusResponse,
+  TripPageQueryOptions,
+  TripPageResult,
+  CustomerTripsQuery,
+  ActiveAndUpcomingTripsOptions,
 } from '../booking-service';
+import { getKpiSummaryService } from '../analytics/kpi-summary.service';
 import { calculateTripPricing } from '../pricing';
 import { generateTrackingToken } from '../../utils/tracking-token.util';
 import { getServerRouteService, calculateLiveRoute, isGoogleMapsReady } from '../maps';
@@ -535,6 +540,7 @@ export class MockBookingService implements IBookingService {
     this.trips.set(id, newTrip);
     this.persistToStorage();
     this.notifyListeners(newTrip);
+    getKpiSummaryService().recordTripCreated(newTrip).catch(() => {});
 
     getCommsThreadService()
       .linkTripToThread({
@@ -621,6 +627,7 @@ export class MockBookingService implements IBookingService {
     this.trips.set(bookingId, updatedTrip);
     this.persistToStorage();
     this.notifyListeners(updatedTrip);
+    getKpiSummaryService().recordTripTransition(trip, updatedTrip).catch(() => {});
 
     return updatedTrip;
   }
@@ -703,6 +710,171 @@ export class MockBookingService implements IBookingService {
     return () => {
       this.allTripsListeners.delete(onUpdate);
     };
+  }
+
+  public subscribeToActiveTrips(
+    onUpdate: (trips: Trip[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    const activeStatuses = new Set<string>([
+      'UNCONFIRMED',
+      'CONFIRMED',
+      'unconfirmed',
+      'confirmed',
+      'pending',
+      'offered',
+      'assigned',
+      'accepted',
+      'en_route',
+      'arrived',
+      'in_progress',
+    ]);
+    const filterActiveWindow = (all: Trip[]): Trip[] => {
+      const nowMs = Date.now();
+      const pastCutoffMs = nowMs - 7 * 86_400_000;
+      const futureCutoffMs = nowMs + 30 * 86_400_000;
+      return all
+        .filter((t) => {
+          if (activeStatuses.has(String(t.status || ''))) return true;
+          const schedMs = t.scheduledPickupTime ? Date.parse(t.scheduledPickupTime) : NaN;
+          if (Number.isFinite(schedMs) && schedMs >= pastCutoffMs && schedMs <= futureCutoffMs) {
+            return true;
+          }
+          const updatedMs = Date.parse(t.updatedAt || t.createdAt || '');
+          return Number.isFinite(updatedMs) && updatedMs >= pastCutoffMs;
+        })
+        .slice(0, 500);
+    };
+
+    return this.subscribeToAllTrips((all) => {
+      onUpdate(filterActiveWindow(all));
+    }, onError);
+  }
+
+  public async queryTripsPage(options?: TripPageQueryOptions): Promise<TripPageResult> {
+    const pageSize = Math.min(250, Math.max(1, options?.limit ?? 50));
+    const includeArchived = Boolean(options?.includeArchived);
+    const orderField = options?.orderField || 'createdAt';
+    const orderDir = options?.orderDirection || 'desc';
+
+    let all = Array.from(this.trips.values());
+    if (!includeArchived) {
+      all = all.filter((t) => !t.isArchived);
+    }
+    if (options?.status && options.status !== 'all') {
+      const allowed = new Set(Array.isArray(options.status) ? options.status : [options.status]);
+      all = all.filter((t) => allowed.has(t.status));
+    }
+    if (options?.driverId) {
+      all = all.filter((t) => t.assignedDriverId === options.driverId);
+    }
+    if (options?.corporateAccountId) {
+      all = all.filter((t) => t.corporateAccountId === options.corporateAccountId);
+    }
+    if (options?.startDateIso) {
+      all = all.filter(
+        (t) => String((t as any)[orderField] || t.createdAt || '') >= options.startDateIso!
+      );
+    }
+    if (options?.endDateIso) {
+      all = all.filter(
+        (t) => String((t as any)[orderField] || t.createdAt || '') <= options.endDateIso!
+      );
+    }
+
+    all.sort((a, b) => {
+      const va = String((a as any)[orderField] || a.createdAt || '');
+      const vb = String((b as any)[orderField] || b.createdAt || '');
+      return orderDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    });
+
+    let startIdx = 0;
+    if (options?.cursor) {
+      const cursorId = options.cursor.split('|')[0];
+      const foundIdx = all.findIndex((t) => t.id === cursorId);
+      if (foundIdx >= 0) startIdx = foundIdx + 1;
+    }
+
+    const slice = all.slice(startIdx, startIdx + pageSize);
+    const hasMore = startIdx + pageSize < all.length;
+    const last = slice[slice.length - 1];
+
+    return {
+      trips: slice,
+      nextCursor: hasMore && last ? `${last.id}|${String((last as any)[orderField] || '')}` : null,
+      hasMore,
+    };
+  }
+
+  public async getTripsByCustomer(customerQuery: string | CustomerTripsQuery): Promise<Trip[]> {
+    const params: CustomerTripsQuery =
+      typeof customerQuery === 'string' ? { customerId: customerQuery } : customerQuery || {};
+    const maxLimit = Math.min(200, Math.max(1, params.limit ?? 50));
+    const uid = String(params.customerId || '').trim();
+    const email =
+      params.email && params.email !== 'N/A' ? params.email.trim().toLowerCase() : '';
+    const normDigits = (raw?: string) => {
+      const d = String(raw || '').replace(/\D/g, '');
+      return d.length === 11 && d.startsWith('1') ? d.slice(1) : d;
+    };
+    const phoneDigits = normDigits(params.phone);
+
+    return Array.from(this.trips.values())
+      .filter((t) => {
+        if (uid && (t.customerId === uid || t.userId === uid)) return true;
+        if (email && t.passenger?.email?.trim().toLowerCase() === email) return true;
+        if (phoneDigits.length >= 7 && normDigits(t.passenger?.phone) === phoneDigits) return true;
+        return false;
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, maxLimit);
+  }
+
+  public async getActiveAndUpcomingTrips(
+    options?: ActiveAndUpcomingTripsOptions
+  ): Promise<Trip[]> {
+    const cap = Math.min(500, Math.max(1, options?.limit ?? 250));
+    const all = Array.from(this.trips.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    if (options?.trackingToken) {
+      return all.filter((t) => t.trackingToken === options.trackingToken).slice(0, cap);
+    }
+    if (options?.standingOrderId) {
+      return all
+        .filter(
+          (t) =>
+            (t.metadata as Record<string, unknown> | undefined)?.standingOrderId ===
+            options.standingOrderId
+        )
+        .slice(0, cap);
+    }
+
+    const activeStatuses = new Set<string>([
+      'UNCONFIRMED',
+      'CONFIRMED',
+      'unconfirmed',
+      'confirmed',
+      'pending',
+      'offered',
+      'assigned',
+      'accepted',
+      'en_route',
+      'arrived',
+      'in_progress',
+    ]);
+    const nowMs = Date.now();
+    const pastCutoffMs = nowMs - (options?.pastHours ?? 24) * 3_600_000;
+    const futureCutoffMs = nowMs + (options?.futureHours ?? 24 * 7) * 3_600_000;
+
+    return all
+      .filter((t) => {
+        if (activeStatuses.has(String(t.status || ''))) return true;
+        const schedMs = t.scheduledPickupTime ? Date.parse(t.scheduledPickupTime) : NaN;
+        return Number.isFinite(schedMs) && schedMs >= pastCutoffMs && schedMs <= futureCutoffMs;
+      })
+      .slice(0, cap);
   }
 
   public subscribeToDriverTrips(
@@ -937,6 +1109,7 @@ export class MockBookingService implements IBookingService {
     this.trips.set(tripId, updated);
     this.persistToStorage();
     this.notifyListeners(updated);
+    getKpiSummaryService().recordTripTransition(trip, updated).catch(() => {});
     await this.syncMultiCarConvoyAssociates(updated);
 
     return updated;
@@ -958,6 +1131,13 @@ export class MockBookingService implements IBookingService {
     this.trips.set(tripId, updated);
     this.persistToStorage();
     this.notifyListeners(updated);
+    if (
+      updates.status !== undefined ||
+      updates.pricing?.totalFare !== undefined ||
+      updates.payment?.tipAmount !== undefined
+    ) {
+      getKpiSummaryService().recordTripTransition(trip, updated).catch(() => {});
+    }
 
     const affectsConvoy =
       updates.assignedDriverId !== undefined ||

@@ -188,6 +188,81 @@ export async function listCollectionFirestoreRest<T>(
   }
 }
 
+const ACTIVE_DISPATCH_REST_STATUSES = [
+  'UNCONFIRMED',
+  'CONFIRMED',
+  'unconfirmed',
+  'confirmed',
+  'pending',
+  'offered',
+  'assigned',
+  'accepted',
+  'en_route',
+  'arrived',
+  'in_progress',
+] as const;
+
+/**
+ * Targeted `:runQuery` REST fetch returning ONLY active/open/upcoming trips
+ * (`status IN ACTIVE_DISPATCH_REST_STATUSES`) instead of scanning arbitrary historical trips.
+ */
+export async function queryActiveAndUpcomingTripsFirestoreRest(
+  bearerToken: string,
+  maxResults: number = 300
+): Promise<Trip[] | null> {
+  const { projectId } = getResolvedFirebaseConfig();
+  if (!projectId || !bearerToken) return null;
+
+  const url =
+    `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}` +
+    `/databases/(default)/documents:runQuery`;
+
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${bearerToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'trips' }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: 'status' },
+              op: 'IN',
+              value: {
+                arrayValue: {
+                  values: ACTIVE_DISPATCH_REST_STATUSES.map((s) => ({ stringValue: s })),
+                },
+              },
+            },
+          },
+          limit: Math.min(500, Math.max(1, maxResults)),
+        },
+      }),
+    });
+    if (!resp.ok) return null;
+    const rows = (await resp.json()) as Array<{
+      document?: { name?: string; fields?: Record<string, unknown> };
+    }>;
+    if (!Array.isArray(rows)) return [];
+    const results: Trip[] = [];
+    for (const row of rows) {
+      if (!row?.document?.fields) continue;
+      const parsed = parseFirestoreRestFields(row.document.fields as Record<string, any>);
+      const docId = row.document.name?.split('/').pop() || '';
+      results.push({
+        ...parsed,
+        id: parsed.id || docId,
+      } as Trip);
+    }
+    return results;
+  } catch {
+    return null;
+  }
+}
+
 export async function patchFirestoreTripRest(
   tripId: string,
   updates: Partial<Trip>,
@@ -369,7 +444,7 @@ export async function executeSlaDispatchCronCycle(options?: {
   let zones: ZoneGeofence[] = options?.zonesOverride || [...DEFAULT_ZONES];
 
   if (!options?.bookingServiceOverride && restToken && isFirebaseConfigured()) {
-    trips = await listCollectionFirestoreRest<Trip>('trips', restToken, 300);
+    trips = await queryActiveAndUpcomingTripsFirestoreRest(restToken, 300);
     if (drivers.length === 0) {
       const restDrivers = await listCollectionFirestoreRest<AutoDispatchDriverInput>(
         'drivers',
@@ -385,7 +460,17 @@ export async function executeSlaDispatchCronCycle(options?: {
   }
 
   if (!trips) {
-    trips = baseBookingService.getAllTrips ? await baseBookingService.getAllTrips() : [];
+    if (baseBookingService.getActiveAndUpcomingTrips) {
+      trips = await baseBookingService.getActiveAndUpcomingTrips({
+        pastHours: 12,
+        futureHours: 48,
+        limit: 300,
+      });
+    } else if (baseBookingService.getAllTrips) {
+      trips = await baseBookingService.getAllTrips();
+    } else {
+      trips = [];
+    }
   }
 
   const tripMap = new Map<string, Trip>(trips.map((t) => [t.id, t]));

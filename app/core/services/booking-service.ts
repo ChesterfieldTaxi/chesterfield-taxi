@@ -100,6 +100,43 @@ export interface BookingStatusResponse {
 }
 
 /**
+ * Cursor-paginated and filtered trip query options (Phase 101).
+ */
+export interface TripPageQueryOptions {
+  limit?: number;
+  cursor?: string | null;
+  status?: TripStatus | TripStatus[] | 'all';
+  startDateIso?: string;
+  endDateIso?: string;
+  driverId?: string;
+  corporateAccountId?: string;
+  includeArchived?: boolean;
+  orderField?: 'createdAt' | 'scheduledPickupTime';
+  orderDirection?: 'asc' | 'desc';
+}
+
+export interface TripPageResult {
+  trips: Trip[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export interface CustomerTripsQuery {
+  customerId?: string;
+  email?: string;
+  phone?: string;
+  limit?: number;
+}
+
+export interface ActiveAndUpcomingTripsOptions {
+  pastHours?: number;
+  futureHours?: number;
+  limit?: number;
+  standingOrderId?: string;
+  trackingToken?: string;
+}
+
+/**
  * Core interface for booking lifecycle management.
  */
 export interface IBookingService {
@@ -149,6 +186,30 @@ export interface IBookingService {
     onUpdate: (trips: Trip[]) => void,
     onError?: (error: Error) => void
   ): () => void;
+
+  /**
+   * Shared, ref-counted active-window real-time stream (active statuses + [-7d, +30d] window,
+   * capped at 500 docs) applying incremental `docChanges()` into an in-memory Map.
+   */
+  subscribeToActiveTrips?(
+    onUpdate: (trips: Trip[]) => void,
+    onError?: (error: Error) => void
+  ): () => void;
+
+  /**
+   * Cursor-based (`startAfter` + `limit`) historical / filtered trip page query.
+   */
+  queryTripsPage?(options?: TripPageQueryOptions): Promise<TripPageResult>;
+
+  /**
+   * Scoped customer trip lookup by `customerId`, `email`, and/or `phone`.
+   */
+  getTripsByCustomer?(customerQuery: string | CustomerTripsQuery): Promise<Trip[]>;
+
+  /**
+   * Targeted active/upcoming (or token/series-scoped) trips fetch for server/dispatch callers.
+   */
+  getActiveAndUpcomingTrips?(options?: ActiveAndUpcomingTripsOptions): Promise<Trip[]>;
 
   /**
    * Scoped driver real-time stream: merges trips assigned to `driverId` and offers

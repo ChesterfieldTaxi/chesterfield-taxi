@@ -484,6 +484,35 @@ async function resolveSeriesTrips(
     return existingTrips.filter((t) => doesTripBelongToSeries(t, series));
   }
   const svc = bookingService ?? getBookingService();
+  if (svc.getActiveAndUpcomingTrips) {
+    const bySeries = await svc.getActiveAndUpcomingTrips({
+      standingOrderId: series.id,
+      limit: 250,
+    });
+    const byId = new Map<string, Trip>(bySeries.map((t) => [t.id, t]));
+
+    if (
+      Array.isArray(series.generatedTripIds) &&
+      series.generatedTripIds.length > 0 &&
+      svc.getBookingStatus
+    ) {
+      const missingIds = series.generatedTripIds
+        .filter((id) => Boolean(id) && !byId.has(id))
+        .slice(0, 50);
+      if (missingIds.length > 0) {
+        const statuses = await Promise.all(
+          missingIds.map((id) => svc.getBookingStatus(id).catch(() => null))
+        );
+        for (const res of statuses) {
+          if (res?.trip) {
+            byId.set(res.trip.id, res.trip);
+          }
+        }
+      }
+    }
+
+    return Array.from(byId.values()).filter((t) => doesTripBelongToSeries(t, series));
+  }
   if (svc.getAllTrips) {
     const all = await svc.getAllTrips();
     return all.filter((t) => doesTripBelongToSeries(t, series));

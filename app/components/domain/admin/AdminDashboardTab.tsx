@@ -6,6 +6,11 @@ import {
   type AnalyticsCsvReportType,
   type AnalyticsPeriodPreset,
 } from '../../../core/services/analytics';
+import {
+  applyKpiSummaryToDashboardSnapshot,
+  getKpiSummaryService,
+  type KpiSummaryDoc,
+} from '../../../core/services/analytics/kpi-summary.service';
 import { getBookingService } from '../../../core/services/booking';
 import { subscribeToStandingOrders } from '../../../core/services/dispatch/standing-order.service';
 import { isFirebaseConfigured } from '../../../core/services/firebase';
@@ -59,6 +64,7 @@ export function AdminDashboardTab({
 }: AdminDashboardTabProps) {
   const [activeSub, setActiveSub] = useState<DashboardSubTab>(initialSubTab);
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [kpiSummary, setKpiSummary] = useState<KpiSummaryDoc | null>(null);
   const [drivers, setDrivers] = useState<DriverRosterItem[]>([]);
   const [surchargesConfig, setSurchargesConfig] = useState<SurchargesConfig | null>(null);
   const [pricingRules, setPricingRules] = useState<NamedPricingRule[]>([]);
@@ -84,27 +90,29 @@ export function AdminDashboardTab({
     });
   }, []);
 
-  // Subscribe to real-time trips
+  // Read 1-doc KPI summary (`analytics/kpiSummary`) and subscribe to bounded active-window trips
   useEffect(() => {
     setIsLoading(true);
     const service = getBookingService();
+    const unsubKpi = getKpiSummaryService().subscribeToKpiSummary((summary) => {
+      setKpiSummary(summary);
+    });
 
-    if (service.subscribeToAllTrips) {
-      return service.subscribeToAllTrips(
+    let unsubTrips: (() => void) | undefined;
+    if (service.subscribeToActiveTrips) {
+      unsubTrips = service.subscribeToActiveTrips(
         (updatedTrips) => {
           setTrips(updatedTrips);
           setIsLoading(false);
         },
         (err) => {
-          console.warn('[AdminDashboardTab] Subscription error:', err);
+          console.warn('[AdminDashboardTab] Active-window subscription error:', err);
           setIsLoading(false);
         }
       );
-    }
-
-    if (service.getAllTrips) {
+    } else if (service.getActiveAndUpcomingTrips) {
       service
-        .getAllTrips()
+        .getActiveAndUpcomingTrips({ pastHours: 24 * 7, futureHours: 24 * 30, limit: 500 })
         .then((data) => {
           setTrips(data);
           setIsLoading(false);
@@ -115,7 +123,11 @@ export function AdminDashboardTab({
     } else {
       setIsLoading(false);
     }
-    return undefined;
+
+    return () => {
+      unsubKpi();
+      if (unsubTrips) unsubTrips();
+    };
   }, []);
 
   // Subscribe to live Surcharges, Pricing Rules, Pricing Audit Log & Standing Orders
@@ -163,19 +175,27 @@ export function AdminDashboardTab({
     [periodPreset, customStartDate, customEndDate]
   );
 
-  const snapshot = useMemo(
-    () =>
-      computeOperationalIntelligenceSnapshot({
-        allTrips: trips,
-        window: activeWindow,
-        drivers,
-        settings,
-        surchargesConfig,
-        pricingRules,
-        pricingAuditEvents,
-      }),
-    [trips, activeWindow, drivers, settings, surchargesConfig, pricingRules, pricingAuditEvents]
-  );
+  const snapshot = useMemo(() => {
+    const baseSnapshot = computeOperationalIntelligenceSnapshot({
+      allTrips: trips,
+      window: activeWindow,
+      drivers,
+      settings,
+      surchargesConfig,
+      pricingRules,
+      pricingAuditEvents,
+    });
+    return applyKpiSummaryToDashboardSnapshot(baseSnapshot, kpiSummary);
+  }, [
+    trips,
+    kpiSummary,
+    activeWindow,
+    drivers,
+    settings,
+    surchargesConfig,
+    pricingRules,
+    pricingAuditEvents,
+  ]);
 
   const handleExportCsv = useCallback(
     (reportType: AnalyticsCsvReportType) => {
@@ -201,8 +221,12 @@ export function AdminDashboardTab({
   );
 
   const nonArchivedTotalCount = useMemo(
-    () => trips.filter((t) => !t.isArchived).length,
-    [trips]
+    () =>
+      Math.max(
+        trips.filter((t) => !t.isArchived).length,
+        Number(kpiSummary?.totalTrips || 0)
+      ),
+    [trips, kpiSummary]
   );
 
   const activeStandingOrdersCount = useMemo(

@@ -71,15 +71,56 @@ export function useAdminPayoutsController({
     const opSvc = getOperatorService();
     const unsubDrivers = opSvc.subscribeToDrivers((d) => setDrivers(d));
     const unsubOps = opSvc.subscribeToOperators((ops) => setOperators(ops));
-    const bookingSvc = getBookingService();
-    if (bookingSvc.getAllTrips) {
-      bookingSvc.getAllTrips().then(setTrips).catch(() => {});
-    }
     return () => {
       unsubDrivers();
       unsubOps();
     };
   }, [isActivePayoutsSub]);
+
+  // Date/status-filtered trip query scoped to `payoutPeriod` & `activePayeeTab` (replaces 45k `getAllTrips()`)
+  useEffect(() => {
+    if (!isActivePayoutsSub) return;
+    const bookingSvc = getBookingService();
+    const now = new Date();
+    let startDateIso: string | undefined;
+    if (payoutPeriod === '7d') {
+      startDateIso = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+    } else if (payoutPeriod === '14d') {
+      startDateIso = new Date(now.getTime() - 14 * 86_400_000).toISOString();
+    } else if (payoutPeriod === '30d') {
+      startDateIso = new Date(now.getTime() - 30 * 86_400_000).toISOString();
+    } else if (payoutPeriod === 'mtd') {
+      startDateIso = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString();
+    } else {
+      startDateIso = new Date(now.getTime() - 90 * 86_400_000).toISOString();
+    }
+
+    let cancelled = false;
+    if (bookingSvc.queryTripsPage) {
+      bookingSvc
+        .queryTripsPage({
+          status: activePayeeTab === 'driver' ? 'completed' : 'all',
+          startDateIso,
+          limit: 250,
+          orderField: 'createdAt',
+          orderDirection: 'desc',
+        })
+        .then((page) => {
+          if (!cancelled) setTrips(page.trips);
+        })
+        .catch(() => {});
+    } else if (bookingSvc.getActiveAndUpcomingTrips) {
+      bookingSvc
+        .getActiveAndUpcomingTrips({ pastHours: 24 * 30, futureHours: 24, limit: 250 })
+        .then((list) => {
+          if (!cancelled) setTrips(list);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [isActivePayoutsSub, payoutPeriod, activePayeeTab]);
 
   const driverRollups = useMemo(
     () =>

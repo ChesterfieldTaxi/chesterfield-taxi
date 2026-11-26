@@ -120,12 +120,15 @@ export function EmailDock({
     };
   }, [emailService]);
 
-  // 2. Fallback subscription to `getBookingService()` if `trips` prop is omitted
+  // 2. Reuse shared active-window subscription on `getBookingService()` if `trips` prop is omitted
   useEffect(() => {
     if (externalTrips !== undefined) return;
     const bookingService = getBookingService();
-    if (!bookingService.subscribeToAllTrips) return;
-    const unsub = bookingService.subscribeToAllTrips(
+    const subscribeFn = bookingService.subscribeToActiveTrips
+      ? bookingService.subscribeToActiveTrips.bind(bookingService)
+      : bookingService.subscribeToAllTrips?.bind(bookingService);
+    if (!subscribeFn) return;
+    const unsub = subscribeFn(
       (list: Trip[]) => setFallbackTrips(list),
       () => {}
     );
