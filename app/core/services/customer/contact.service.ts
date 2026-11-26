@@ -35,6 +35,7 @@ import type {
   CommsUnreadByChannel,
 } from '../../types/comms';
 import { formatDisplayPhone, sanitizeToE164 } from '../../utils/phone';
+export { formatPhoneDisplay } from '../../utils/phone.util';
 import { getAdminAuthService } from '../auth/admin-auth.service';
 import { SAMPLE_PASSENGER_PROFILES } from '../booking/passenger-lookup.service';
 import { getFirestoreDb, isFirebaseConfigured } from '../firebase';

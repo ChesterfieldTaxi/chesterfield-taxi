@@ -5,6 +5,7 @@ import type {
 } from '../../../../core/services/analytics';
 import type { DriverRosterItem } from '../../../../core/services/operator.service';
 import type { Trip } from '../../../../core/types/trip';
+import { formatPhoneDisplay } from '../../../../core/utils/phone.util';
 import { Badge } from '../../../ui/Badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../ui/Card';
 import {
@@ -513,7 +514,7 @@ export function ExecutiveOverviewPanel({
                             {passengerPhone && (
                               <>
                                 <span>·</span>
-                                <span className="text-fg-muted">{passengerPhone}</span>
+                                <span className="text-fg-muted">{formatPhoneDisplay(passengerPhone)}</span>
                               </>
                             )}
                           </div>
@@ -591,7 +592,7 @@ export function ExecutiveOverviewPanel({
                             <div>{passengerName}</div>
                             {passengerPhone && (
                               <div className="text-[10px] text-fg-subtle font-mono">
-                                {passengerPhone}
+                                {formatPhoneDisplay(passengerPhone)}
                               </div>
                             )}
                           </td>

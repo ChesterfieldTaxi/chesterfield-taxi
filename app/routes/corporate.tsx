@@ -22,6 +22,7 @@ import {
 import type { PrintableInvoiceData } from '../core/types/invoicing';
 import type { Trip } from '../core/types/trip';
 import { getEffectiveRoles } from '../core/utils/workspace-routing.util';
+import { formatPhoneDisplay } from '../core/utils/phone.util';
 import {
   BookingEngineV2,
   formatUsPhone,
@@ -1929,7 +1930,7 @@ export default function CorporatePortalRoute() {
                                 )}
                               </div>
                               <div className="text-[11px] text-fg-muted truncate">
-                                {[r.email, r.phone].filter(Boolean).join(' • ') || 'No contact info'}
+                                {[r.email, r.phone ? formatPhoneDisplay(r.phone) : ''].filter(Boolean).join(' • ') || 'No contact info'}
                               </div>
                             </div>
                             {canManageRiders && (

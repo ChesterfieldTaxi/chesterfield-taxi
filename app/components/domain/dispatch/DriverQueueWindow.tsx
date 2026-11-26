@@ -26,6 +26,7 @@ import {
 } from './TripActionDropdown';
 import type { DriverRosterItem } from '../../../core/services/operator.service';
 import type { Trip, TripPassenger } from '../../../core/types/trip';
+import { formatPhoneDisplay } from '../../../core/utils/phone.util';
 
 export interface DriverQueueWindowProps {
   driver: DriverRosterItem | null;
@@ -414,7 +415,7 @@ export function DriverQueueWindow({
                       }
                       className="font-mono text-[11px] text-status-success-fg hover:underline font-bold"
                     >
-                      {activeItem.trip.passenger.phone}
+                      {formatPhoneDisplay(activeItem.trip.passenger.phone)}
                     </button>
                   </div>
                   <Badge variant="info">
@@ -776,7 +777,7 @@ export function DriverQueueWindow({
                               className="text-[11px] text-blue-600 hover:underline font-bold flex items-center gap-1 cursor-pointer"
                             >
                               <PhoneIcon className="w-3 h-3 text-blue-600" />
-                              <span>{item.trip.passenger.phone}</span>
+                              <span>{formatPhoneDisplay(item.trip.passenger.phone)}</span>
                             </button>
                           </div>
 

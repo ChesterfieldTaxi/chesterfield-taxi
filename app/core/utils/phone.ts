@@ -59,6 +59,7 @@ export function sanitizeToE164(phone: string | null | undefined): string {
 
 export const sanitizePhoneNumber = sanitizeToE164;
 export const toE164 = sanitizeToE164;
+export { formatPhoneDisplay } from './phone.util';
 
 /**
  * Validates a phone number against strict NANP and ITU-T E.164 standards.

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import type { AppSettings } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
+import { formatPhoneDisplay } from '../../../../core/utils/phone.util';
 import {
   FLEET_STATUS_COLORS,
   type LiveFleetDriver,
@@ -385,7 +386,7 @@ export function TripQueueCardsGrid({
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] text-fg-subtle font-mono">
-                    <span>{trip.passenger.phone}</span>
+                    <span>{formatPhoneDisplay(trip.passenger.phone)}</span>
                     {trip.passenger.phone && (
                       <button
                         type="button"

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import type { AppSettings } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
+import { formatPhoneDisplay } from '../../../../core/utils/phone.util';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import {
   DEFAULT_QUEUE_COLUMN_SORT, cycleQueueColumnSort, sortQueueTripsByColumn, useLiveClockNowMs, type QueueColumnSortState,
@@ -345,7 +346,7 @@ export function TripQueueTableView({
                       )}
                     </div>
                     <div className="text-[10px] text-fg-subtle font-mono flex items-center gap-1 whitespace-nowrap">
-                      <span>{trip.passenger.phone}</span>
+                      <span>{formatPhoneDisplay(trip.passenger.phone)}</span>
                       {trip.passenger.phone && (
                         <button
                           type="button"

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Trip } from '../../../../core/types/trip';
+import { formatPhoneDisplay } from '../../../../core/utils/phone.util';
 import {
   canTripTriggerAutoOffer,
   isTripCascadeActive,
@@ -425,7 +426,7 @@ export function DispatchTripQueueSheets({
                           <span>Call Passenger</span>
                         </span>
                         <span className="font-mono text-[11px] text-fg-muted">
-                          {sheetTrip.passenger.phone}
+                          {formatPhoneDisplay(sheetTrip.passenger.phone)}
                         </span>
                       </button>
                     )}

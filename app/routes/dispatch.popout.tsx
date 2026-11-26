@@ -9,6 +9,7 @@ import {
 import { getBookingService } from '../core/services/booking';
 import type { Trip } from '../core/types/trip';
 import { getTripIntermediateStopCount } from '../core/utils/route-markers.util';
+import { formatPhoneDisplay } from '../core/utils/phone.util';
 import { getAdminAuthService, type AdminUser } from '../core/services/auth/admin-auth.service';
 import { useTheme } from '../hooks/useTheme';
 import { SpinnerIcon } from '../components/ui/Icons';
@@ -234,7 +235,7 @@ export default function DispatchPopoutRoute() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs font-mono text-fg-muted">{drv.phone}</p>
+                      <p className="text-xs font-mono text-fg-muted">{formatPhoneDisplay(drv.phone)}</p>
                     </div>
                   );
                 })}

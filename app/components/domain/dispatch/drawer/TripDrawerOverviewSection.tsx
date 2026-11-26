@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { AppSettings } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
+import { formatPhoneDisplay } from '../../../../core/utils/phone.util';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import type { DispatchStagedPlannerController } from '../../../../core/hooks/dispatch/useDispatchStagedPlanner';
 import { getBookingService } from '../../../../core/services/booking';
@@ -594,7 +595,7 @@ export function TripDrawerOverviewSection({
                 href={`tel:${reviewTrip.passenger.phone}`}
                 className="hover:underline font-mono text-blue-600"
               >
-                {reviewTrip.passenger.phone}
+                {formatPhoneDisplay(reviewTrip.passenger.phone)}
               </a>
             </div>
             <div className="flex items-center gap-1.5">

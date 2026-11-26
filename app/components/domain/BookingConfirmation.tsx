@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router';
 import type { Trip } from '../../core/types';
+import { formatPhoneDisplay } from '../../core/utils/phone.util';
 import {
   CheckIcon,
   MapPinIcon,
@@ -500,7 +501,7 @@ export function BookingConfirmation({
                 {trip.passenger.firstName} {trip.passenger.lastName}
               </span>
               <span className="text-xs text-fg-muted block mt-0.5">
-                {trip.passenger.phone} • {trip.passenger.passengerCount} passenger(s)
+                {formatPhoneDisplay(trip.passenger.phone)} • {trip.passenger.passengerCount} passenger(s)
               </span>
             </div>
           </div>

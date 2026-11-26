@@ -10,6 +10,7 @@ import {
   TrashIcon,
 } from '../../../ui/Icons';
 import { ArchiveBoxIcon } from '../UniversalArchiveDrawer';
+import { formatPhoneDisplay } from '../../../../core/utils/phone.util';
 import {
   DIRECTORY_TABLE_COLUMNS,
   getReliabilityScoreTone,
@@ -171,7 +172,7 @@ export function PassengerDirectoryTable({
                   {/* Contact */}
                   <td className="px-3.5 py-2.5 hidden md:table-cell">
                     <div className="font-mono text-[11px] font-semibold text-fg-strong truncate max-w-[160px]">
-                      {cust.phone}
+                      {formatPhoneDisplay(cust.phone)}
                     </div>
                     <div className="text-[11px] text-fg-secondary truncate max-w-[200px]">
                       {cust.email || 'No email on file'}

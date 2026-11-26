@@ -18,6 +18,7 @@ import {
   UsersIcon,
 } from '../../../ui/Icons';
 import { ArchiveBoxIcon } from '../UniversalArchiveDrawer';
+import { formatPhoneDisplay } from '../../../../core/utils/phone.util';
 import {
   ALPHABET_BUCKETS,
   computeAlphabetCounts,
@@ -559,7 +560,7 @@ export function PassengerDirectoryPanel({
                     <div className="p-2.5 bg-surface-subtle rounded-xl border border-border-subtle/80 space-y-1.5">
                       <div className="flex items-center gap-2 text-fg-strong font-semibold">
                         <PhoneIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
-                        <span className="font-mono text-[11px] truncate">{cust.phone}</span>
+                        <span className="font-mono text-[11px] truncate">{formatPhoneDisplay(cust.phone)}</span>
                       </div>
                       <div className="flex items-center gap-2 text-fg-secondary">
                         <MailIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />

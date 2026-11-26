@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { PreferredDriverAssignmentMode, StandingOrderSeries } from '../../../core/types/standing-order';
 import type { Trip } from '../../../core/types/trip';
+import { formatPhoneDisplay } from '../../../core/utils/phone.util';
 import {
   assignPreferredDriverToSeries,
   cancelStandingOrderSeries,
@@ -328,7 +329,7 @@ function StandingOrderSeriesCard({
             {series.passenger.phone && (
               <span className="inline-flex items-center gap-1 font-mono text-[11px] text-blue-600">
                 <PhoneIcon className="w-3 h-3 text-fg-subtle shrink-0" />
-                <span>{series.passenger.phone}</span>
+                <span>{formatPhoneDisplay(series.passenger.phone)}</span>
               </span>
             )}
             {series.corporateAccountName && (
