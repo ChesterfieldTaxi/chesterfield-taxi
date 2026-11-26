@@ -26,10 +26,11 @@ import {
   type AdminCustomersSubpageProps,
   type CustomerArchiveFilter,
   type CustomerProfile,
+  type CustomersPageMode,
   type CustomersSubTab,
 } from '../customers';
 
-export type { CustomersSubTab, AdminCustomersSubpageProps };
+export type { CustomersSubTab, CustomersPageMode, AdminCustomersSubpageProps };
 
 const CONTACTS_PAGE_SIZE = 50;
 
@@ -97,10 +98,12 @@ function contactRecordsToCustomerProfiles(
 
 export function AdminCustomersSubpage({
   settings,
+  mode,
   initialSubTab = 'directory',
   onSave,
 }: AdminCustomersSubpageProps) {
-  const [activeSub, setActiveSub] = useState<CustomersSubTab>(initialSubTab);
+  const effectiveMode: CustomersPageMode =
+    mode ?? (initialSubTab === 'corporate' ? 'corporate' : 'passengers');
   const [searchTerm, setSearchTerm] = useState('');
   const [archiveFilter, setArchiveFilter] = useState<CustomerArchiveFilter>('active');
   const [pagedContacts, setPagedContacts] = useState<ContactRecord[]>(() =>
@@ -126,10 +129,6 @@ export function AdminCustomersSubpage({
   const [provisioningCorp, setProvisioningCorp] = useState<CorporateAccountConfig | null>(null);
   const [pendingArchiveCorp, setPendingArchiveCorp] = useState<CorporateAccountConfig | null>(null);
 
-  useEffect(() => {
-    setActiveSub(initialSubTab);
-  }, [initialSubTab]);
-
   const handleOpenCustomer = useCallback((cust: CustomerProfile, editMode = false) => {
     setSelectedCustomer(cust);
     setIsEditingCustomer(editMode);
@@ -137,6 +136,7 @@ export function AdminCustomersSubpage({
 
   // Deep-link support (?phone=... or ?id=...) using LRU cache + indexed remote search fallback
   useEffect(() => {
+    if (effectiveMode !== 'passengers') return;
     if (typeof window === 'undefined') return;
     let cancelled = false;
     try {
@@ -191,6 +191,10 @@ export function AdminCustomersSubpage({
 
   // Initial bounded page fetch (`listContactsPage(null, 50)`) — replaces 45k trips + 9k contacts dump
   useEffect(() => {
+    if (effectiveMode !== 'passengers') {
+      setIsLoading(false);
+      return;
+    }
     const govService = getUniversalGovernanceService();
     const contactService = getContactService();
     let cancelled = false;
@@ -238,7 +242,7 @@ export function AdminCustomersSubpage({
       unsubContacts();
       unsubDrivers();
     };
-  }, []);
+  }, [effectiveMode]);
 
   // On-demand indexed remote contact search when `searchTerm` has >= 2 characters
   useEffect(() => {
@@ -320,7 +324,7 @@ export function AdminCustomersSubpage({
   };
 
   const allCustomers = useMemo<CustomerProfile[]>(() => {
-    if (activeSub !== 'directory') return [];
+    if (effectiveMode !== 'passengers') return [];
     void governanceRefreshKey;
 
     if (remoteSearchContacts !== null) {
@@ -341,7 +345,7 @@ export function AdminCustomersSubpage({
       Array.from(mergedById.values()),
       settings.invoices || []
     );
-  }, [activeSub, pagedContacts, remoteSearchContacts, settings.invoices, governanceRefreshKey]);
+  }, [effectiveMode, pagedContacts, remoteSearchContacts, settings.invoices, governanceRefreshKey]);
 
   const blacklistedCustomers = useMemo(
     () => allCustomers.filter((c) => Boolean(c.isBlacklisted)),
@@ -435,7 +439,7 @@ export function AdminCustomersSubpage({
   };
 
   useEffect(() => {
-    if (activeSub !== 'corporate') return;
+    if (effectiveMode !== 'corporate') return;
     let cancelled = false;
     getCorporateAccountService()
       .syncAllCorporateAccountsFromFirestore()
@@ -448,7 +452,7 @@ export function AdminCustomersSubpage({
     return () => {
       cancelled = true;
     };
-  }, [activeSub]);
+  }, [effectiveMode]);
 
   const corporateClients = useMemo(() => {
     const base = settings.corporateAccounts || [];
@@ -527,7 +531,7 @@ export function AdminCustomersSubpage({
 
   return (
     <div className="space-y-4">
-      {activeSub === 'directory' && (
+      {effectiveMode === 'passengers' && (
         <>
           <PassengerDirectoryPanel
             isLoading={isLoading}
@@ -572,7 +576,7 @@ export function AdminCustomersSubpage({
         </>
       )}
 
-      {activeSub === 'corporate' && (
+      {effectiveMode === 'corporate' && (
         <CorporateDirectoryPanel
           settings={settings}
           corporateClients={corporateClients}
@@ -618,68 +622,74 @@ export function AdminCustomersSubpage({
         />
       )}
 
-      <CustomerProfileDrawer
-        selectedCustomer={selectedCustomer}
-        isEditingCustomer={isEditingCustomer}
-        setIsEditingCustomer={setIsEditingCustomer}
-        trips={selectedCustomerTrips}
-        corporateAccounts={corporateClients}
-        vehicles={settings.vehicles}
-        drivers={drivers}
-        onClose={() => {
-          setSelectedCustomer(null);
-          setIsEditingCustomer(false);
-        }}
-        onCustomerSaved={(updated) => {
-          setSelectedCustomer(updated);
-          setGovernanceRefreshKey((k) => k + 1);
-        }}
-        onGovernanceMutated={(updated) => {
-          setSelectedCustomer(updated);
-          setGovernanceRefreshKey((k) => k + 1);
-        }}
-        onPurgeCustomer={handlePurgeCustomer}
-      />
+      {effectiveMode === 'passengers' && (
+        <CustomerProfileDrawer
+          selectedCustomer={selectedCustomer}
+          isEditingCustomer={isEditingCustomer}
+          setIsEditingCustomer={setIsEditingCustomer}
+          trips={selectedCustomerTrips}
+          corporateAccounts={corporateClients}
+          vehicles={settings.vehicles}
+          drivers={drivers}
+          onClose={() => {
+            setSelectedCustomer(null);
+            setIsEditingCustomer(false);
+          }}
+          onCustomerSaved={(updated) => {
+            setSelectedCustomer(updated);
+            setGovernanceRefreshKey((k) => k + 1);
+          }}
+          onGovernanceMutated={(updated) => {
+            setSelectedCustomer(updated);
+            setGovernanceRefreshKey((k) => k + 1);
+          }}
+          onPurgeCustomer={handlePurgeCustomer}
+        />
+      )}
 
-      <CorporateAccountDirectoryDrawer
-        settings={settings}
-        editingCorp={editingCorp}
-        setEditingCorp={setEditingCorp}
-        isNewCorp={isNewCorp}
-        onClose={() => {
-          setEditingCorp(null);
-          setIsNewCorp(false);
-        }}
-        onSaveCorporateAccount={handleSaveCorporateAccount}
-        onOpenProvisionModal={(corp) => setProvisioningCorp(corp)}
-        onRequestArchive={
-          onSave
-            ? (corp) => {
-                setEditingCorp(null);
-                setIsNewCorp(false);
-                setPendingArchiveCorp(corp);
+      {effectiveMode === 'corporate' && (
+        <>
+          <CorporateAccountDirectoryDrawer
+            settings={settings}
+            editingCorp={editingCorp}
+            setEditingCorp={setEditingCorp}
+            isNewCorp={isNewCorp}
+            onClose={() => {
+              setEditingCorp(null);
+              setIsNewCorp(false);
+            }}
+            onSaveCorporateAccount={handleSaveCorporateAccount}
+            onOpenProvisionModal={(corp) => setProvisioningCorp(corp)}
+            onRequestArchive={
+              onSave
+                ? (corp) => {
+                    setEditingCorp(null);
+                    setIsNewCorp(false);
+                    setPendingArchiveCorp(corp);
+                  }
+                : undefined
+            }
+          />
+
+          <CorporatePortalManagersModal
+            provisioningCorp={provisioningCorp}
+            onClose={() => setProvisioningCorp(null)}
+            onProvisioned={async (updatedAccount) => {
+              if (onSave) {
+                await onSave({
+                  corporateAccounts: corporateClients.map((a) =>
+                    a.id === updatedAccount.id ? updatedAccount : a
+                  ),
+                });
               }
-            : undefined
-        }
-      />
-
-      <CorporatePortalManagersModal
-        provisioningCorp={provisioningCorp}
-        onClose={() => setProvisioningCorp(null)}
-        onProvisioned={async (updatedAccount) => {
-          if (onSave) {
-            await onSave({
-              corporateAccounts: corporateClients.map((a) =>
-                a.id === updatedAccount.id ? updatedAccount : a
-              ),
-            });
-          }
-          setProvisioningCorp(updatedAccount);
-          if (editingCorp?.id === updatedAccount.id) {
-            setEditingCorp(updatedAccount);
-          }
-        }}
-      />
+              setProvisioningCorp(updatedAccount);
+              if (editingCorp?.id === updatedAccount.id) {
+                setEditingCorp(updatedAccount);
+              }
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

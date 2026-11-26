@@ -13,12 +13,9 @@ import {
   PhoneIcon,
   PlusIcon,
   SpinnerIcon,
-  Squares2X2Icon,
   StarIcon,
-  TableCellsIcon,
   TrashIcon,
   UsersIcon,
-  XIcon,
 } from '../../../ui/Icons';
 import { ArchiveBoxIcon } from '../UniversalArchiveDrawer';
 import {
@@ -32,6 +29,7 @@ import {
   getReliabilityScoreTone,
   paginateCustomers,
 } from './customer-directory.util';
+import { DirectoryToolbar } from './DirectoryToolbar';
 import { PassengerDirectoryTable } from './PassengerDirectoryTable';
 import type {
   AlphabetBucket,
@@ -85,7 +83,7 @@ export function PassengerDirectoryPanel({
   const [alphabetBucket, setAlphabetBucket] = useState<AlphabetBucket>('All');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DIRECTORY_PAGE_SIZES[0]);
-  const [viewMode, setViewMode] = useState<DirectoryViewMode>('cards');
+  const [viewMode, setViewMode] = useState<DirectoryViewMode>('table');
 
   const [confirmPurgeAll, setConfirmPurgeAll] = useState(false);
   const [confirmPurgeId, setConfirmPurgeId] = useState<string | null>(null);
@@ -192,165 +190,59 @@ export function PassengerDirectoryPanel({
   return (
     <div className="space-y-4">
       {/* ─── Passenger Directory Search & Filter Toolbar ─── */}
-      <div className="bg-surface-card p-3 sm:p-4 rounded-2xl border border-border-subtle/90 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-1 min-w-0 flex-wrap">
-          <div className="relative w-full sm:w-64 lg:w-72">
-            <input
-              type="text"
-              placeholder="Search passengers by name, phone, email..."
-              value={localSearch}
-              onChange={(e) => setLocalSearch(e.target.value)}
-              className="w-full pl-3 pr-8 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs font-medium text-fg-strong placeholder-fg-subtle focus:bg-surface-card focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            />
-            {localSearch && (
-              <button
-                type="button"
-                onClick={() => {
-                  setLocalSearch('');
-                  setSearchTerm('');
-                }}
-                aria-label="Clear passenger search"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-secondary cursor-pointer"
-              >
-                <XIcon className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 sm:inline-flex items-center bg-surface-muted p-1 rounded-xl border border-border-subtle text-xs font-semibold w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => {
-                setArchiveFilter('active');
-                setConfirmPurgeAll(false);
-              }}
-              className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-all text-center whitespace-nowrap cursor-pointer ${
-                archiveFilter === 'active'
-                  ? 'bg-surface-card text-fg-primary shadow-xs font-bold'
-                  : 'text-fg-muted hover:text-fg-primary'
-              }`}
-            >
-              Active ({activeCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setArchiveFilter('archived');
-                setConfirmPurgeAll(false);
-              }}
-              className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer ${
-                archiveFilter === 'archived'
-                  ? 'bg-surface-card text-fg-primary shadow-xs font-bold'
-                  : 'text-fg-muted hover:text-fg-primary'
-              }`}
-            >
-              <ArchiveBoxIcon className="w-3.5 h-3.5 text-fg-muted shrink-0" />
-              <span>Archived ({archivedCount})</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setArchiveFilter('blacklist');
-                setConfirmPurgeAll(false);
-              }}
-              className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-all flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer ${
-                archiveFilter === 'blacklist'
-                  ? 'bg-rose-600 text-white shadow-xs font-bold'
-                  : 'text-fg-muted hover:text-status-danger-fg'
-              }`}
-            >
+      <DirectoryToolbar
+        searchValue={localSearch}
+        onSearchChange={setLocalSearch}
+        onSearchClear={() => {
+          setLocalSearch('');
+          setSearchTerm('');
+        }}
+        searchPlaceholder="Search passengers by name, phone, email..."
+        searchClearLabel="Clear passenger search"
+        filterPills={[
+          { id: 'active', label: 'Active', count: activeCount },
+          {
+            id: 'archived',
+            label: 'Archived',
+            count: archivedCount,
+            icon: <ArchiveBoxIcon className="w-3.5 h-3.5 text-fg-muted shrink-0" />,
+          },
+          {
+            id: 'blacklist',
+            label: 'Blacklist',
+            count: blacklistCount,
+            icon: (
               <BanIcon
                 className={`w-3.5 h-3.5 shrink-0 ${
                   archiveFilter === 'blacklist' ? 'text-white' : 'text-rose-500'
                 }`}
               />
-              <span>Blacklist ({blacklistCount})</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setArchiveFilter('all');
-                setConfirmPurgeAll(false);
-              }}
-              className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-all text-center whitespace-nowrap cursor-pointer ${
-                archiveFilter === 'all'
-                  ? 'bg-surface-card text-fg-primary shadow-xs font-bold'
-                  : 'text-fg-muted hover:text-fg-primary'
-              }`}
-            >
-              All ({allCount})
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setVipOnly((prev) => !prev)}
-            className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
-              vipOnly
-                ? 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border shadow-2xs'
-                : 'bg-surface-card text-fg-secondary border-border-subtle hover:bg-status-warning-bg/60 hover:text-status-warning-fg'
-            }`}
-          >
-            <StarIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            <span>VIP Only ({vipCount})</span>
-          </button>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 shrink-0 w-full lg:w-auto justify-end">
-          {/* Sort Selector */}
-          <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-fg-muted">
-            <span className="hidden sm:inline">Sort:</span>
-            <select
-              aria-label="Sort passengers"
-              value={sortOptionId}
-              onChange={(e) => setSortOptionId(e.target.value)}
-              className="px-2.5 py-1.5 rounded-xl bg-surface-subtle border border-border-subtle text-xs font-bold text-fg-primary focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
-            >
-              {DIRECTORY_SORT_OPTIONS.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {/* Cards / Table View Toggle */}
-          <div
-            className="inline-flex items-center bg-surface-muted p-1 rounded-xl border border-border-subtle"
-            role="group"
-            aria-label="Directory view mode"
-          >
-            <button
-              type="button"
-              onClick={() => handleSetViewMode('cards')}
-              aria-pressed={viewMode === 'cards'}
-              title="Cards view"
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                viewMode === 'cards'
-                  ? 'bg-surface-card text-fg-primary shadow-xs'
-                  : 'text-fg-muted hover:text-fg-primary'
-              }`}
-            >
-              <Squares2X2Icon className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Cards</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetViewMode('table')}
-              aria-pressed={viewMode === 'table'}
-              title="Table view"
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                viewMode === 'table'
-                  ? 'bg-surface-card text-fg-primary shadow-xs'
-                  : 'text-fg-muted hover:text-fg-primary'
-              }`}
-            >
-              <TableCellsIcon className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Table</span>
-            </button>
-          </div>
-
-          {archiveFilter === 'blacklist' && blacklistCount > 0 && (
+            ),
+            activeClassName: 'bg-rose-600 text-white shadow-xs font-bold',
+            inactiveClassName: 'text-fg-muted hover:text-status-danger-fg',
+          },
+          { id: 'all', label: 'All', count: allCount },
+        ]}
+        activeFilterId={archiveFilter}
+        onFilterChange={(id) => {
+          setArchiveFilter(id as CustomerArchiveFilter);
+          setConfirmPurgeAll(false);
+        }}
+        quickToggle={{
+          id: 'vip',
+          label: `VIP (${vipCount})`,
+          active: vipOnly,
+          onToggle: () => setVipOnly((prev) => !prev),
+          icon: <StarIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" />,
+        }}
+        sortOptions={DIRECTORY_SORT_OPTIONS}
+        sortValue={sortOptionId}
+        onSortChange={setSortOptionId}
+        sortAriaLabel="Sort passengers"
+        viewMode={viewMode}
+        onViewModeChange={handleSetViewMode}
+        inlineExtra={
+          archiveFilter === 'blacklist' && blacklistCount > 0 ? (
             confirmPurgeAll ? (
               <div className="inline-flex items-center gap-1.5 bg-status-danger-bg border border-status-danger-border px-2.5 py-1 rounded-xl">
                 <span className="text-[11px] font-bold text-status-danger-fg">
@@ -397,14 +289,15 @@ export function PassengerDirectoryPanel({
                 Purge All Blacklisted
               </Button>
             )
-          )}
-
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            leftIcon={<PlusIcon className="w-4 h-4" />}
-            onClick={() =>
+          ) : null
+        }
+        actions={[
+          {
+            id: 'add-client',
+            label: 'Add Client',
+            variant: 'primary',
+            icon: <PlusIcon className="w-4 h-4" />,
+            onClick: () =>
               onOpenCustomer(
                 {
                   id: `cust_new_${Date.now()}`,
@@ -418,14 +311,10 @@ export function PassengerDirectoryPanel({
                   preferredVehicle: 'Standard Sedan',
                 },
                 true
-              )
-            }
-            className="text-xs font-bold w-full sm:w-auto justify-center shrink-0"
-          >
-            Add Client
-          </Button>
-        </div>
-      </div>
+              ),
+          },
+        ]}
+      />
 
       {/* ─── Alphabet Page Bar ─── */}
       {!isLoading && (

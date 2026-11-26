@@ -1,9 +1,13 @@
-import type { InvoiceRecord } from '../../../../core/types/config';
+import type { CorporateAccountConfig, InvoiceRecord } from '../../../../core/types/config';
 import type { Trip } from '../../../../core/types/trip';
 import { getContactService } from '../../../../core/services/customer/contact.service';
 import { getUniversalGovernanceService } from '../../../../core/services/governance/universal-governance.service';
 import type {
   AlphabetBucket,
+  CorporatePoFilter,
+  CorporateSortField,
+  CorporateSortOption,
+  CorporateTableColumn,
   CustomerProfile,
   CustomerSortField,
   CustomerSortOption,
@@ -12,6 +16,7 @@ import type {
 } from './types';
 
 export const DIRECTORY_VIEW_STORAGE_KEY = 'chesterfield_admin_passenger_directory_view';
+export const CORPORATE_VIEW_STORAGE_KEY = 'chesterfield_admin_corporate_directory_view';
 
 export const DIRECTORY_PAGE_SIZES = [24, 48, 100] as const;
 
@@ -39,6 +44,75 @@ export const DIRECTORY_TABLE_COLUMNS: readonly DirectoryTableColumn[] = [
   { id: 'score', label: 'Score', sortField: 'customerScore', align: 'center' },
   { id: 'actions', label: 'Actions', align: 'right' },
 ];
+
+export const CORPORATE_SORT_OPTIONS: readonly CorporateSortOption[] = [
+  { id: 'companyName-asc', field: 'companyName', direction: 'asc', label: 'Company (A–Z)' },
+  { id: 'companyName-desc', field: 'companyName', direction: 'desc', label: 'Company (Z–A)' },
+  { id: 'accountNumber-asc', field: 'accountNumber', direction: 'asc', label: 'Account # (Asc)' },
+  { id: 'poRequired-desc', field: 'poRequired', direction: 'desc', label: 'PO Enforced First' },
+  { id: 'ridersCount-desc', field: 'ridersCount', direction: 'desc', label: 'Riders (High–Low)' },
+];
+
+export const CORPORATE_TABLE_COLUMNS: readonly CorporateTableColumn[] = [
+  { id: 'company', label: 'Company / Account', sortField: 'companyName', align: 'left' },
+  { id: 'poPolicy', label: 'PO Policy & Prefix', sortField: 'poRequired', align: 'left' },
+  {
+    id: 'assets',
+    label: 'Riders / Locations / Managers',
+    sortField: 'ridersCount',
+    align: 'left',
+    hideOnMobile: true,
+  },
+  { id: 'actions', label: 'Actions', align: 'right' },
+];
+
+export interface FilterAndSortCorporateOptions {
+  searchTerm: string;
+  filter: CorporatePoFilter;
+  sortField: CorporateSortField;
+  sortDirection: SortDirection;
+}
+
+/**
+ * Filters corporate accounts by PO enforcement status and search query, then sorts deterministically.
+ */
+export function filterAndSortCorporateAccounts(
+  accounts: ReadonlyArray<CorporateAccountConfig>,
+  options: FilterAndSortCorporateOptions
+): CorporateAccountConfig[] {
+  const q = options.searchTerm.trim().toLowerCase();
+  const filtered = accounts.filter((corp) => {
+    if (options.filter === 'po_enforced' && !corp.poRequired) return false;
+    if (options.filter === 'po_disabled' && corp.poRequired) return false;
+    if (!q) return true;
+    return (
+      corp.companyName.toLowerCase().includes(q) ||
+      corp.accountNumber.toLowerCase().includes(q) ||
+      Boolean(corp.currentPoNumber && corp.currentPoNumber.toLowerCase().includes(q)) ||
+      Boolean(corp.billingContactEmail && corp.billingContactEmail.toLowerCase().includes(q)) ||
+      Boolean(corp.billingAddress && corp.billingAddress.toLowerCase().includes(q))
+    );
+  });
+
+  const dirMultiplier = options.sortDirection === 'asc' ? 1 : -1;
+  filtered.sort((a, b) => {
+    let cmp = 0;
+    if (options.sortField === 'companyName') {
+      cmp = NAME_COLLATOR.compare(a.companyName || '', b.companyName || '');
+    } else if (options.sortField === 'accountNumber') {
+      cmp = NAME_COLLATOR.compare(a.accountNumber || '', b.accountNumber || '');
+    } else if (options.sortField === 'poRequired') {
+      cmp = Number(Boolean(a.poRequired)) - Number(Boolean(b.poRequired));
+    } else if (options.sortField === 'ridersCount') {
+      cmp = (a.authorizedRiders || []).length - (b.authorizedRiders || []).length;
+    }
+    if (cmp !== 0) return cmp * dirMultiplier;
+    const nameCmp = NAME_COLLATOR.compare(a.companyName || '', b.companyName || '');
+    return nameCmp !== 0 ? nameCmp : a.id.localeCompare(b.id);
+  });
+
+  return filtered;
+}
 
 /**
  * Returns the badge tone classes for a passenger reliability score.

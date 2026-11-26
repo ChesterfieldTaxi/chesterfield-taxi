@@ -10,7 +10,8 @@ export type AdminPrimaryTabKey =
   | 'dashboard'
   | 'trips'
   | 'automation'
-  | 'customers'
+  | 'passengers'
+  | 'corporate'
   | 'invoicing'
   | 'rates'
   | 'vehicles'
@@ -22,6 +23,7 @@ export type AdminPrimaryTabKey =
   | 'advanced';
 
 export type AdminLegacyTabAlias =
+  | 'customers'
   | 'financials'
   | 'archive'
   | 'rules'
@@ -60,10 +62,8 @@ export const SUB_PAGES: Record<string, AdminSubPageItem[]> = {
   ],
 
   // Group 2 — Clients, Billing & Fleet
-  customers: [
-    { key: 'directory', label: 'Passengers' },
-    { key: 'corporate', label: 'Corporate Directory' },
-  ],
+  passengers: [],
+  corporate: [],
   invoicing: [
     { key: 'ledger', label: 'Invoices & AR Ledger' },
     { key: 'accounts', label: 'Corporate Billing' },
@@ -133,7 +133,8 @@ export const CANONICAL_ADMIN_TABS: readonly AdminPrimaryTabKey[] = [
   'dashboard',
   'trips',
   'automation',
-  'customers',
+  'passengers',
+  'corporate',
   'invoicing',
   'rates',
   'vehicles',
@@ -251,6 +252,18 @@ export function resolveAdminTabAndSub(
   }
 
   // 5. Legacy Primary Tab Aliases
+  if (tabInput === 'customers') {
+    if (subInput === 'corporate') {
+      return {
+        tab: 'corporate',
+        sub: '',
+      };
+    }
+    return {
+      tab: 'passengers',
+      sub: '',
+    };
+  }
   if (tabInput === 'rules') {
     return {
       tab: 'automation',

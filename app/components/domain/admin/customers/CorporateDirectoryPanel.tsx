@@ -34,6 +34,14 @@ import {
   CorporateImportJsonModal,
 } from '../corporate/CorporateAccountModals';
 import { CorporateGovernanceCard } from './CorporateGovernanceCard';
+import { CorporateDirectoryTable } from './CorporateDirectoryTable';
+import { DirectoryToolbar } from './DirectoryToolbar';
+import {
+  CORPORATE_SORT_OPTIONS,
+  CORPORATE_VIEW_STORAGE_KEY,
+  filterAndSortCorporateAccounts,
+} from './customer-directory.util';
+import type { CorporatePoFilter, CorporateSortField, DirectoryViewMode } from './types';
 
 const CORP_PAGE_SIZE = 30;
 
@@ -68,7 +76,9 @@ export function CorporateDirectoryPanel({
 }: CorporateDirectoryPanelProps) {
   const [corpSearchTerm, setCorpSearchTerm] = useState('');
   const deferredCorpSearch = useDeferredValue(corpSearchTerm);
-  const [corpFilter, setCorpFilter] = useState<'all' | 'po_enforced' | 'po_disabled'>('all');
+  const [corpFilter, setCorpFilter] = useState<CorporatePoFilter>('all');
+  const [sortOptionId, setSortOptionId] = useState<string>(CORPORATE_SORT_OPTIONS[0].id);
+  const [viewMode, setViewMode] = useState<DirectoryViewMode>('table');
   const [corpPage, setCorpPage] = useState(1);
   const [copiedPoId, setCopiedPoId] = useState<string | null>(null);
   const [selectedPoAccount, setSelectedPoAccount] = useState<CorporateAccountConfig | null>(null);
@@ -81,6 +91,52 @@ export function CorporateDirectoryPanel({
   const [archiveExposure, setArchiveExposure] = useState<CorporateArchivalExposure | null>(null);
   const [isCheckingExposure, setIsCheckingExposure] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+
+  // Hydrate persisted view preference on client mount (SSR-safe)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = window.localStorage.getItem(CORPORATE_VIEW_STORAGE_KEY);
+      if (saved === 'cards' || saved === 'table') {
+        setViewMode(saved);
+      }
+    } catch {
+      // Ignore storage read errors
+    }
+  }, []);
+
+  const handleSetViewMode = (mode: DirectoryViewMode) => {
+    setViewMode(mode);
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(CORPORATE_VIEW_STORAGE_KEY, mode);
+    } catch {
+      // Ignore storage write errors
+    }
+  };
+
+  const activeSortOption = useMemo(
+    () => CORPORATE_SORT_OPTIONS.find((opt) => opt.id === sortOptionId) ?? CORPORATE_SORT_OPTIONS[0],
+    [sortOptionId]
+  );
+
+  const handleSortColumn = (field: CorporateSortField) => {
+    const nextDirection =
+      activeSortOption.field === field
+        ? activeSortOption.direction === 'asc'
+          ? 'desc'
+          : 'asc'
+        : field === 'companyName' || field === 'accountNumber'
+        ? 'asc'
+        : 'desc';
+    const match = CORPORATE_SORT_OPTIONS.find(
+      (opt) => opt.field === field && opt.direction === nextDirection
+    );
+    if (match) {
+      setSortOptionId(match.id);
+      setCorpPage(1);
+    }
+  };
 
   const openArchiveModal = async (corp: CorporateAccountConfig) => {
     setArchivingCorp(corp);
@@ -144,21 +200,16 @@ export function CorporateDirectoryPanel({
     setTimeout(() => setCopiedPoId(null), 2000);
   };
 
-  const filteredCorp = useMemo(() => {
-    const q = deferredCorpSearch.trim().toLowerCase();
-    return activeCorporateClients.filter((corp) => {
-      if (corpFilter === 'po_enforced' && !corp.poRequired) return false;
-      if (corpFilter === 'po_disabled' && corp.poRequired) return false;
-      if (!q) return true;
-      return (
-        corp.companyName.toLowerCase().includes(q) ||
-        corp.accountNumber.toLowerCase().includes(q) ||
-        Boolean(corp.currentPoNumber && corp.currentPoNumber.toLowerCase().includes(q)) ||
-        Boolean(corp.billingContactEmail && corp.billingContactEmail.toLowerCase().includes(q)) ||
-        Boolean(corp.billingAddress && corp.billingAddress.toLowerCase().includes(q))
-      );
-    });
-  }, [activeCorporateClients, corpFilter, deferredCorpSearch]);
+  const filteredCorp = useMemo(
+    () =>
+      filterAndSortCorporateAccounts(activeCorporateClients, {
+        searchTerm: deferredCorpSearch,
+        filter: corpFilter,
+        sortField: activeSortOption.field,
+        sortDirection: activeSortOption.direction,
+      }),
+    [activeCorporateClients, corpFilter, deferredCorpSearch, activeSortOption.field, activeSortOption.direction]
+  );
 
   const totalCorpPages = Math.max(1, Math.ceil(filteredCorp.length / CORP_PAGE_SIZE));
   const paginatedCorp = useMemo(
@@ -172,84 +223,93 @@ export function CorporateDirectoryPanel({
       <CorporateGovernanceCard settings={settings} onSave={onSave} />
 
       {/* ─── Search & PO Filter Toolbar ─── */}
-      <div className="bg-surface-card p-3 sm:p-4 rounded-2xl border border-border-subtle/90 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-1 min-w-0">
-          <div className="relative w-full sm:w-64 lg:w-80">
-            <input
-              type="text"
-              placeholder={`Search ${activeCorporateClients.length} corporate accounts...`}
-              value={corpSearchTerm}
-              onChange={(e) => {
-                setCorpSearchTerm(e.target.value);
-                setCorpPage(1);
-              }}
-              className="w-full pl-3 pr-8 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs text-fg-strong placeholder-fg-subtle focus:bg-surface-card focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            />
-            {corpSearchTerm && (
-              <button
-                type="button"
-                onClick={() => {
-                  setCorpSearchTerm('');
-                  setCorpPage(1);
-                }}
-                aria-label="Clear corporate search"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-secondary cursor-pointer"
-              >
-                <XIcon className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+      <DirectoryToolbar
+        searchValue={corpSearchTerm}
+        onSearchChange={(val) => {
+          setCorpSearchTerm(val);
+          setCorpPage(1);
+        }}
+        onSearchClear={() => {
+          setCorpSearchTerm('');
+          setCorpPage(1);
+        }}
+        searchPlaceholder={`Search ${activeCorporateClients.length} corporate accounts...`}
+        searchClearLabel="Clear corporate search"
+        filterPills={[
+          { id: 'all', label: 'All', count: activeCorporateClients.length },
+          { id: 'po_enforced', label: 'PO Enforced', count: poEnforcedCount },
+          { id: 'po_disabled', label: 'PO Optional', count: poOptionalCount },
+        ]}
+        activeFilterId={corpFilter}
+        onFilterChange={(id) => {
+          setCorpFilter(id as CorporatePoFilter);
+          setCorpPage(1);
+        }}
+        sortOptions={CORPORATE_SORT_OPTIONS}
+        sortValue={sortOptionId}
+        onSortChange={(id) => {
+          setSortOptionId(id);
+          setCorpPage(1);
+        }}
+        sortAriaLabel="Sort corporate accounts"
+        viewMode={viewMode}
+        onViewModeChange={handleSetViewMode}
+        actions={
+          onSave
+            ? [
+                {
+                  id: 'import-json',
+                  label: 'Import JSON',
+                  variant: 'outline',
+                  icon: <FileTextIcon className="w-4 h-4" />,
+                  onClick: () => setIsImportJsonOpen(true),
+                },
+                {
+                  id: 'add-corporate',
+                  label: 'Add Corporate Account',
+                  variant: 'primary',
+                  icon: <PlusIcon className="w-4 h-4" />,
+                  onClick: onAddNewCorporate,
+                },
+              ]
+            : undefined
+        }
+      />
 
-          <div className="grid grid-cols-3 sm:inline-flex bg-surface-muted p-1 rounded-xl border border-border-subtle text-xs font-semibold w-full sm:w-auto">
-            {(['all', 'po_enforced', 'po_disabled'] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => {
-                  setCorpFilter(mode);
-                  setCorpPage(1);
-                }}
-                className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-colors text-center whitespace-nowrap cursor-pointer ${
-                  corpFilter === mode
-                    ? 'bg-surface-card text-fg-primary shadow-xs font-bold'
-                    : 'text-fg-secondary hover:text-fg-primary'
-                }`}
-              >
-                {mode === 'all' && `All (${activeCorporateClients.length})`}
-                {mode === 'po_enforced' && `PO Enforced (${poEnforcedCount})`}
-                {mode === 'po_disabled' && `PO Optional (${poOptionalCount})`}
-              </button>
-            ))}
-          </div>
+      {/* ─── Corporate Directory Content (Table or Cards) ─── */}
+      {filteredCorp.length === 0 ? (
+        <div className="py-12 text-center bg-surface-card rounded-2xl border border-border-subtle">
+          <p className="text-fg-subtle font-medium text-xs">
+            No corporate accounts found matching &ldquo;{corpSearchTerm}&rdquo;.
+          </p>
         </div>
-
-        {onSave && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto shrink-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              leftIcon={<FileTextIcon className="w-4 h-4" />}
-              onClick={() => setIsImportJsonOpen(true)}
-              className="text-xs font-bold justify-center"
-            >
-              Import JSON
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              leftIcon={<PlusIcon className="w-4 h-4" />}
-              onClick={onAddNewCorporate}
-              className="text-xs font-bold justify-center"
-            >
-              Add Corporate Account
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* ─── Corporate Directory Grid (Identity, PO Security & Portal Access Only) ─── */}
+      ) : viewMode === 'table' ? (
+        <CorporateDirectoryTable
+          accounts={paginatedCorp}
+          sortField={activeSortOption.field}
+          sortDirection={activeSortOption.direction}
+          onSortColumn={handleSortColumn}
+          canEdit={Boolean(onSave)}
+          copiedPoId={copiedPoId}
+          onCopyPo={handleCopyPo}
+          onEditCorporate={onEditCorporate}
+          onOpenProvisionModal={onOpenProvisionModal}
+          onTogglePoRequired={onTogglePoRequired}
+          onOpenRegeneratePo={(corp) => {
+            setSelectedPoAccount(corp);
+            setIsRegeneratePoOpen(true);
+          }}
+          onOpenPoHistory={(corp) => {
+            setSelectedPoAccount(corp);
+            setIsPoHistoryOpen(true);
+          }}
+          onOpenBookingPin={(corp) => {
+            setSelectedPoAccount(corp);
+            setIsBookingPinOpen(true);
+          }}
+          onOpenArchiveModal={onArchiveCorporate ? (corp) => void openArchiveModal(corp) : undefined}
+        />
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {paginatedCorp.map((corp) => {
           const riderCount = (corp.authorizedRiders || []).length;
@@ -473,14 +533,8 @@ export function CorporateDirectoryPanel({
           );
         })}
 
-        {filteredCorp.length === 0 && (
-          <div className="col-span-full py-12 text-center bg-surface-card rounded-2xl border border-border-subtle">
-            <p className="text-fg-subtle font-medium text-xs">
-              No corporate accounts found matching &ldquo;{corpSearchTerm}&rdquo;.
-            </p>
-          </div>
-        )}
       </div>
+      )}
 
       {/* Pagination */}
       {totalCorpPages > 1 && (

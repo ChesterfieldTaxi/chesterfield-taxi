@@ -89,6 +89,7 @@ import {
 } from '../core/utils/admin-nav.util';
 import {
   CarIcon,
+  BuildingIcon,
   SpinnerIcon,
   BarChartIcon,
   HistoryIcon,
@@ -154,10 +155,16 @@ const PRIMARY_TABS: TabItem[] = [
     description: 'Auto-Pilot lead windows, booking intake rules, conflict guard, and standing defaults',
   },
   {
-    key: 'customers',
-    label: 'Clients & Corporate',
+    key: 'passengers',
+    label: 'Passengers',
     icon: UsersIcon,
-    description: 'Passenger directory, corporate accounts, and VIP profiles',
+    description: 'Passenger directory, reliability scores, and VIP profiles',
+  },
+  {
+    key: 'corporate',
+    label: 'Corporate',
+    icon: BuildingIcon,
+    description: 'Corporate accounts, PO enforcement, and portal managers',
   },
   {
     key: 'invoicing',
@@ -770,11 +777,19 @@ export default function AdminLayout() {
               />
             )}
 
-            {normalizedTab === 'customers' && (
+            {normalizedTab === 'passengers' && (
               <AdminCustomersSubpage
                 settings={settings}
                 onSave={handleSaveSettings}
-                initialSubTab={effectiveSub as any}
+                mode="passengers"
+              />
+            )}
+
+            {normalizedTab === 'corporate' && (
+              <AdminCustomersSubpage
+                settings={settings}
+                onSave={handleSaveSettings}
+                mode="corporate"
               />
             )}
 
@@ -849,7 +864,7 @@ export default function AdminLayout() {
               { key: 'dashboard' as AdminTabKey, label: 'Overview', Icon: BarChartIcon },
               { key: 'trips' as AdminTabKey, label: 'Trips', Icon: HistoryIcon },
               { key: 'rates' as AdminTabKey, label: 'Rates', Icon: DollarSignIcon },
-              { key: 'customers' as AdminTabKey, label: 'Clients', Icon: UsersIcon },
+              { key: 'passengers' as AdminTabKey, label: 'Passengers', Icon: UsersIcon },
             ] as const
           ).map(({ key, label, Icon }) => {
             const isActive = normalizedTab === key;
@@ -876,14 +891,14 @@ export default function AdminLayout() {
             type="button"
             onClick={() => setIsMobileSidebarOpen(true)}
             className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
-              !['dashboard', 'trips', 'rates', 'customers'].includes(normalizedTab)
+              !['dashboard', 'trips', 'rates', 'passengers'].includes(normalizedTab)
                 ? 'text-blue-600 font-extrabold'
                 : 'text-fg-muted hover:text-fg-strong font-medium'
             }`}
           >
             <div
               className={`px-3 py-1 rounded-full transition-colors ${
-                !['dashboard', 'trips', 'rates', 'customers'].includes(normalizedTab)
+                !['dashboard', 'trips', 'rates', 'passengers'].includes(normalizedTab)
                   ? 'bg-status-info-bg text-blue-600'
                   : ''
               }`}

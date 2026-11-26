@@ -6,6 +6,7 @@ import type { AdminUser } from '../../../../core/services/auth/admin-auth.servic
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import {
   BarChartIcon,
+  BuildingIcon,
   HistoryIcon,
   CreditCardIcon,
   UsersIcon,
@@ -66,10 +67,16 @@ export const ADMIN_NAV_GROUPS: NavGroupConfig[] = [
     title: 'Clients, Billing & Fleet',
     items: [
       {
-        key: 'customers',
-        label: 'Clients & Corporate',
+        key: 'passengers',
+        label: 'Passengers',
         icon: UsersIcon,
-        subHint: 'Passenger & Corporate Directory',
+        subHint: 'Passenger Directory & VIPs',
+      },
+      {
+        key: 'corporate',
+        label: 'Corporate',
+        icon: BuildingIcon,
+        subHint: 'Corporate Accounts & PO Policy',
       },
       {
         key: 'invoicing',
