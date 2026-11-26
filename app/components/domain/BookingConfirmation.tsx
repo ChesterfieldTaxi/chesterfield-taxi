@@ -214,10 +214,10 @@ export function BookingConfirmation({
   };
 
   return (
-    <Card variant="elevated" className={`printable-receipt max-w-2xl mx-auto overflow-hidden ${isUnconfirmed ? 'border-amber-200 shadow-lg' : 'border-blue-200/80 shadow-lg'} ${className}`}>
+    <Card variant="elevated" className={`printable-receipt max-w-2xl mx-auto overflow-hidden ${isUnconfirmed ? 'border-status-warning-border shadow-lg' : 'border-status-info-border/80 shadow-lg'} ${className}`}>
       {/* Top Banner */}
       <div className={`${isUnconfirmed ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white' : 'bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 text-white'} px-6 py-8 text-center relative`}>
-        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md ${isUnconfirmed ? 'bg-amber-100 text-amber-600' : 'bg-white text-blue-600'}`}>
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md ${isUnconfirmed ? 'bg-status-warning-bg-strong text-amber-600' : 'bg-surface-card text-blue-600'}`}>
           {isUnconfirmed ? <ClockIcon className="w-8 h-8 stroke-[3]" /> : <CheckIcon className="w-8 h-8 stroke-[3]" />}
         </div>
         <h2 className="text-2xl font-extrabold tracking-tight">
@@ -255,9 +255,9 @@ export function BookingConfirmation({
 
       <CardContent className="p-6 sm:p-8 space-y-6">
         {/* Quick Action Bar (Print, Calendar, Copy) */}
-        <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-surface-subtle border border-border-subtle/80 rounded-xl">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status:</span>
+            <span className="text-xs font-semibold text-fg-muted uppercase tracking-wider">Status:</span>
             <Badge variant={isUnconfirmed ? 'warning' : 'info'} size="sm">
               {isUnconfirmed ? 'Review Pending' : 'Confirmed'}
             </Badge>
@@ -266,7 +266,7 @@ export function BookingConfirmation({
             <button
               type="button"
               onClick={handleDownloadCalendar}
-              className="text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+              className="text-xs font-semibold text-fg-secondary bg-surface-card border border-border-strong hover:bg-surface-muted px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
             >
               <CalendarIcon className="w-3.5 h-3.5 text-blue-600" />
               <span>Add to Calendar</span>
@@ -274,9 +274,9 @@ export function BookingConfirmation({
             <button
               type="button"
               onClick={handlePrint}
-              className="text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+              className="text-xs font-semibold text-fg-secondary bg-surface-card border border-border-strong hover:bg-surface-muted px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
             >
-              <FileTextIcon className="w-3.5 h-3.5 text-slate-500" />
+              <FileTextIcon className="w-3.5 h-3.5 text-fg-muted" />
               <span>Print Receipt</span>
             </button>
           </div>
@@ -291,36 +291,36 @@ export function BookingConfirmation({
         )}
 
         {/* "What Happens Next?" 3-Step Lifecycle Timeline */}
-        <div className="p-4 bg-gradient-to-br from-blue-50/70 via-slate-50 to-indigo-50/50 rounded-xl border border-blue-100 space-y-3">
-          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+        <div className="p-4 bg-gradient-to-br from-status-info-bg/70 via-surface-subtle to-status-staged-bg/50 rounded-xl border border-blue-100 space-y-3">
+          <h3 className="text-xs font-bold text-fg-strong uppercase tracking-wider flex items-center gap-1.5">
             <SparklesIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
             <span>What Happens Next?</span>
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="bg-white/80 backdrop-blur p-3 rounded-lg border border-slate-200/80 space-y-1">
-              <div className="flex items-center gap-1.5 text-blue-700 font-bold text-xs">
-                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-extrabold">1</span>
+            <div className="bg-surface-card/80 backdrop-blur p-3 rounded-lg border border-border-subtle/80 space-y-1">
+              <div className="flex items-center gap-1.5 text-status-info-fg font-bold text-xs">
+                <span className="w-5 h-5 rounded-full bg-status-info-bg-strong text-status-info-fg flex items-center justify-center text-[10px] font-extrabold">1</span>
                 <span>Dispatch Review</span>
               </div>
-              <p className="text-[11px] text-slate-600 leading-tight">
+              <p className="text-[11px] text-fg-secondary leading-tight">
                 Our 24/7 team reviews your route and assigns a driver.
               </p>
             </div>
-            <div className="bg-white/80 backdrop-blur p-3 rounded-lg border border-slate-200/80 space-y-1">
-              <div className="flex items-center gap-1.5 text-blue-700 font-bold text-xs">
-                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-extrabold">2</span>
+            <div className="bg-surface-card/80 backdrop-blur p-3 rounded-lg border border-border-subtle/80 space-y-1">
+              <div className="flex items-center gap-1.5 text-status-info-fg font-bold text-xs">
+                <span className="w-5 h-5 rounded-full bg-status-info-bg-strong text-status-info-fg flex items-center justify-center text-[10px] font-extrabold">2</span>
                 <span>Driver Assigned</span>
               </div>
-              <p className="text-[11px] text-slate-600 leading-tight">
+              <p className="text-[11px] text-fg-secondary leading-tight">
                 You get a text alert with your driver&apos;s name and car details.
               </p>
             </div>
-            <div className="bg-white/80 backdrop-blur p-3 rounded-lg border border-slate-200/80 space-y-1">
-              <div className="flex items-center gap-1.5 text-blue-700 font-bold text-xs">
-                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-extrabold">3</span>
+            <div className="bg-surface-card/80 backdrop-blur p-3 rounded-lg border border-border-subtle/80 space-y-1">
+              <div className="flex items-center gap-1.5 text-status-info-fg font-bold text-xs">
+                <span className="w-5 h-5 rounded-full bg-status-info-bg-strong text-status-info-fg flex items-center justify-center text-[10px] font-extrabold">3</span>
                 <span>Live Ride Tracking</span>
               </div>
-              <p className="text-[11px] text-slate-600 leading-tight">
+              <p className="text-[11px] text-fg-secondary leading-tight">
                 Live driver tracking starts 30 minutes before pickup.
               </p>
             </div>
@@ -333,13 +333,13 @@ export function BookingConfirmation({
             className={`p-3.5 rounded-xl border flex items-start gap-3 text-xs ${
               emailDelivery.status === 'sent'
                 ? isUnconfirmed
-                  ? 'bg-amber-50/90 border-amber-200 text-amber-950'
-                  : 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
+                  ? 'bg-status-warning-bg/90 border-status-warning-border text-status-warning-fg'
+                  : 'bg-status-success-bg/90 border-status-success-border text-status-success-fg'
                 : emailDelivery.status === 'failed'
-                ? 'bg-amber-50/90 border-amber-200 text-amber-950'
+                ? 'bg-status-warning-bg/90 border-status-warning-border text-status-warning-fg'
                 : emailDelivery.status === 'simulated'
-                ? 'bg-blue-50/90 border-blue-200 text-blue-950'
-                : 'bg-slate-50 border-slate-200 text-slate-800'
+                ? 'bg-status-info-bg/90 border-status-info-border text-status-info-fg'
+                : 'bg-surface-subtle border-border-subtle text-fg-strong'
             }`}
           >
             <div className="mt-0.5 shrink-0">
@@ -368,7 +368,7 @@ export function BookingConfirmation({
                   )}
                 </span>
                 {emailDelivery.messageId && (
-                  <span className="font-mono text-[10px] text-slate-500 font-normal">
+                  <span className="font-mono text-[10px] text-fg-muted font-normal">
                     ID: {emailDelivery.messageId}
                   </span>
                 )}
@@ -396,16 +396,16 @@ export function BookingConfirmation({
 
         {/* Lambert Airport Curbside Instructions Callout */}
         {isPickupLambert && (
-          <div className="bg-blue-50/90 border border-blue-200 rounded-xl p-4 flex items-start gap-3.5">
+          <div className="bg-status-info-bg/90 border border-status-info-border rounded-xl p-4 flex items-start gap-3.5">
             <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
               <PlaneLandingIcon className="w-4 h-4" />
             </div>
             <div className="flex-1">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-blue-900 mb-1 flex items-center gap-1.5">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-status-info-fg mb-1 flex items-center gap-1.5">
                 <PlaneIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                 <span>STL Lambert Curbside Pickup Instructions</span>
               </h4>
-              <p className="text-xs text-blue-950 leading-relaxed font-medium">
+              <p className="text-xs text-status-info-fg leading-relaxed font-medium">
                 {lambertInstructions}
               </p>
             </div>
@@ -414,60 +414,60 @@ export function BookingConfirmation({
 
         {/* Route Details */}
         <div className="space-y-3">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-fg-subtle">
             Trip Route
           </h4>
 
-          <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+          <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-surface-emphasis">
             {/* Pickup */}
             <div className="relative">
               <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center text-white">
                 <MapPinIcon className="w-2.5 h-2.5" />
               </div>
-              <p className="text-xs font-semibold text-slate-500">Pickup Location</p>
-              <p className="text-sm font-bold text-slate-900">{trip.pickupLocation.address}</p>
+              <p className="text-xs font-semibold text-fg-muted">Pickup Location</p>
+              <p className="text-sm font-bold text-fg-primary">{trip.pickupLocation.address}</p>
               {trip.pickupLocation.notes && (
-                <p className="text-xs text-slate-500 mt-0.5">Note: {trip.pickupLocation.notes}</p>
+                <p className="text-xs text-fg-muted mt-0.5">Note: {trip.pickupLocation.notes}</p>
               )}
             </div>
 
             {/* Intermediate Stops */}
             {trip.intermediateStops && trip.intermediateStops.length > 0 && trip.intermediateStops.map((stop, idx) => (
               <div key={idx} className="relative">
-                <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-slate-500 flex items-center justify-center text-white">
+                <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-fg-muted flex items-center justify-center text-white">
                   <span className="text-[9px] font-bold">{idx + 1}</span>
                 </div>
-                <p className="text-xs font-semibold text-slate-500">Intermediate Stop {trip.intermediateStops && trip.intermediateStops.length > 1 ? idx + 1 : ''}</p>
-                <p className="text-sm font-bold text-slate-900">{stop.address}</p>
+                <p className="text-xs font-semibold text-fg-muted">Intermediate Stop {trip.intermediateStops && trip.intermediateStops.length > 1 ? idx + 1 : ''}</p>
+                <p className="text-sm font-bold text-fg-primary">{stop.address}</p>
                 {stop.notes && (
-                  <p className="text-xs text-slate-500 mt-0.5">Note: {stop.notes}</p>
+                  <p className="text-xs text-fg-muted mt-0.5">Note: {stop.notes}</p>
                 )}
               </div>
             ))}
 
             {/* Dropoff */}
             <div className="relative">
-              <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center text-white">
+              <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-surface-header-elevated flex items-center justify-center text-white">
                 <FlagIcon className="w-2.5 h-2.5" />
               </div>
-              <p className="text-xs font-semibold text-slate-500">Dropoff Destination</p>
-              <p className="text-sm font-bold text-slate-900">{trip.dropoffLocation.address}</p>
+              <p className="text-xs font-semibold text-fg-muted">Dropoff Destination</p>
+              <p className="text-sm font-bold text-fg-primary">{trip.dropoffLocation.address}</p>
               {trip.dropoffLocation.notes && (
-                <p className="text-xs text-slate-500 mt-0.5">Note: {trip.dropoffLocation.notes}</p>
+                <p className="text-xs text-fg-muted mt-0.5">Note: {trip.dropoffLocation.notes}</p>
               )}
             </div>
           </div>
         </div>
 
         {/* Schedule & Vehicle */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border-faint">
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-600">
+            <div className="w-9 h-9 rounded-xl bg-surface-muted flex items-center justify-center shrink-0 text-fg-secondary">
               <ClockIcon className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-xs font-medium text-slate-500 block">Pickup Timing</span>
-              <span className="text-sm font-bold text-slate-900">
+              <span className="text-xs font-medium text-fg-muted block">Pickup Timing</span>
+              <span className="text-sm font-bold text-fg-primary">
                 {isScheduled && trip.scheduledPickupTime
                   ? new Date(trip.scheduledPickupTime).toLocaleString()
                   : 'Immediate Ride (ASAP)'}
@@ -476,12 +476,12 @@ export function BookingConfirmation({
           </div>
 
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-600">
+            <div className="w-9 h-9 rounded-xl bg-surface-muted flex items-center justify-center shrink-0 text-fg-secondary">
               <CarIcon className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-xs font-medium text-slate-500 block">Vehicle</span>
-              <span className="text-sm font-bold text-slate-900">
+              <span className="text-xs font-medium text-fg-muted block">Vehicle</span>
+              <span className="text-sm font-bold text-fg-primary">
                 {resolvedVehicleDisplayName}
               </span>
             </div>
@@ -489,24 +489,24 @@ export function BookingConfirmation({
         </div>
 
         {/* Passenger & Fare Receipt */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border-faint">
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-600">
+            <div className="w-9 h-9 rounded-xl bg-surface-muted flex items-center justify-center shrink-0 text-fg-secondary">
               <UserIcon className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-xs font-medium text-slate-500 block">Passenger</span>
-              <span className="text-sm font-bold text-slate-900">
+              <span className="text-xs font-medium text-fg-muted block">Passenger</span>
+              <span className="text-sm font-bold text-fg-primary">
                 {trip.passenger.firstName} {trip.passenger.lastName}
               </span>
-              <span className="text-xs text-slate-500 block mt-0.5">
+              <span className="text-xs text-fg-muted block mt-0.5">
                 {trip.passenger.phone} • {trip.passenger.passengerCount} passenger(s)
               </span>
             </div>
           </div>
 
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-600">
+            <div className="w-9 h-9 rounded-xl bg-surface-muted flex items-center justify-center shrink-0 text-fg-secondary">
               {trip.payment.method === 'cash' ? (
                 <CashIcon className="w-4 h-4" />
               ) : (
@@ -514,13 +514,13 @@ export function BookingConfirmation({
               )}
             </div>
             <div>
-              <span className="text-xs font-medium text-slate-500 block">
+              <span className="text-xs font-medium text-fg-muted block">
                 {hasReturnTrip ? 'Estimated Round-Trip Total' : 'Estimated Fare & Payment'}
               </span>
-              <span className="text-base font-extrabold text-slate-950">
+              <span className="text-base font-extrabold text-fg-primary">
                 ${combinedTotalFare.toFixed(2)}
               </span>
-              <span className="text-xs text-slate-500 block mt-0.5">
+              <span className="text-xs text-fg-muted block mt-0.5">
                 {paymentMethodLabel}
                 {hasReturnTrip ? ` ($${trip.pricing.totalFare.toFixed(2)} out + $${returnLegFare.toFixed(2)} return)` : ''}
               </span>
@@ -530,7 +530,7 @@ export function BookingConfirmation({
 
         {/* Canonical Itemized Fare Breakdown */}
         {trip.pricing && (
-          <div className="pt-4 border-t border-slate-100">
+          <div className="pt-4 border-t border-border-faint">
             <PriceBreakdownPanel
               outboundPricing={trip.pricing}
               outboundDisplayFare={trip.pricing.totalFare}
@@ -548,13 +548,13 @@ export function BookingConfirmation({
             meta.carSeatsCount > 0 ||
             meta.customExtrasSummary
         ) && (
-          <div className="pt-4 border-t border-slate-100">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1.5 text-xs">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-800 block">
+          <div className="pt-4 border-t border-border-faint">
+            <div className="bg-surface-subtle border border-border-subtle rounded-xl p-3.5 space-y-1.5 text-xs">
+              <span className="text-xs font-bold uppercase tracking-wider text-fg-strong block">
                 Selected Equipment &amp; Extras
               </span>
               {Boolean(meta.carSeatsBreakdown?.total > 0 || meta.carSeatsCount > 0) && (
-                <p className="text-slate-700">
+                <p className="text-fg-secondary">
                   <strong>Child Safety Seats:</strong>{' '}
                   {[
                     meta.carSeatsBreakdown?.rearFacing ? `${meta.carSeatsBreakdown.rearFacing} Rear-Facing` : null,
@@ -566,7 +566,7 @@ export function BookingConfirmation({
                 </p>
               )}
               {Boolean(meta.customExtrasSummary) && (
-                <p className="text-slate-700">
+                <p className="text-fg-secondary">
                   <strong>Booked Extras:</strong> {String(meta.customExtrasSummary)}
                 </p>
               )}
@@ -582,10 +582,10 @@ export function BookingConfirmation({
             trip.metadata?.tailNumber ||
             trip.metadata?.fboFacility
         ) ? (
-          <div className="pt-4 border-t border-slate-100">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
+          <div className="pt-4 border-t border-border-faint">
+            <div className="bg-surface-subtle border border-border-subtle rounded-xl p-3.5 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-fg-strong flex items-center gap-1.5">
                   <PlaneLandingIcon className="w-4 h-4 text-blue-600" />
                   {trip.metadata?.isPrivateAviation || trip.metadata?.tailNumber
                     ? 'Private Aviation (FBO / Tail #)'
@@ -601,43 +601,43 @@ export function BookingConfirmation({
               {trip.metadata?.isPrivateAviation || trip.metadata?.tailNumber || trip.metadata?.fboFacility ? (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
                   <div>
-                    <span className="text-slate-500 block font-medium">Tail Number</span>
-                    <span className="font-bold text-slate-800">{String(trip.metadata?.tailNumber || 'N/A')}</span>
+                    <span className="text-fg-muted block font-medium">Tail Number</span>
+                    <span className="font-bold text-fg-strong">{String(trip.metadata?.tailNumber || 'N/A')}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 block font-medium">FBO Facility</span>
-                    <span className="font-bold text-slate-800">{String(trip.metadata?.fboFacility || 'N/A')}</span>
+                    <span className="text-fg-muted block font-medium">FBO Facility</span>
+                    <span className="font-bold text-fg-strong">{String(trip.metadata?.fboFacility || 'N/A')}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 block font-medium">Checked Bags</span>
-                    <span className="font-bold text-slate-800">{trip.metadata?.hasCheckedLuggage ? 'Yes' : 'No'}</span>
+                    <span className="text-fg-muted block font-medium">Checked Bags</span>
+                    <span className="font-bold text-fg-strong">{trip.metadata?.hasCheckedLuggage ? 'Yes' : 'No'}</span>
                   </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
                   <div>
-                    <span className="text-slate-500 block font-medium">Airline</span>
-                    <span className="font-bold text-slate-800">
+                    <span className="text-fg-muted block font-medium">Airline</span>
+                    <span className="font-bold text-fg-strong">
                       {String(trip.metadata?.airlineName || trip.metadata?.airline || trip.metadata?.airlineCode || 'N/A')}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-500 block font-medium">Flight Number</span>
-                    <span className="font-bold text-slate-800">
+                    <span className="text-fg-muted block font-medium">Flight Number</span>
+                    <span className="font-bold text-fg-strong">
                       {String(trip.metadata?.flightNumber || 'N/A')}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-500 block font-medium">Origin</span>
-                    <span className="font-bold text-slate-800 truncate block">
+                    <span className="text-fg-muted block font-medium">Origin</span>
+                    <span className="font-bold text-fg-strong truncate block">
                       {trip.metadata?.flightOrigin || trip.metadata?.departureAirport
                         ? String(trip.metadata.flightOrigin || trip.metadata.departureAirport).toUpperCase()
                         : 'N/A'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-500 block font-medium">Checked Bags</span>
-                    <span className="font-bold text-slate-800">
+                    <span className="text-fg-muted block font-medium">Checked Bags</span>
+                    <span className="font-bold text-fg-strong">
                       {trip.metadata?.hasCheckedLuggage ? 'Yes' : 'No'}
                     </span>
                   </div>
@@ -649,16 +649,16 @@ export function BookingConfirmation({
 
         {/* Linked Return Leg Summary (if booked as round trip) */}
         {Boolean(meta.hasReturnTrip) && (
-          <div className="pt-4 border-t border-slate-100">
-            <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3.5 space-y-3">
+          <div className="pt-4 border-t border-border-faint">
+            <div className="bg-status-staged-bg/70 border border-status-staged-border rounded-xl p-3.5 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-status-staged-fg flex items-center gap-1.5">
                   <RepeatIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
               <span>Return Trip Scheduled</span>
                   {Boolean(meta.returnTripId) && (
                     <Link
                       to={`/track/${encodeURIComponent(String(meta.returnTripTrackingToken || meta.returnTripId))}`}
-                      className="font-mono text-[10px] text-indigo-700 hover:underline font-bold"
+                      className="font-mono text-[10px] text-status-staged-fg hover:underline font-bold"
                     >
                       (Track #{String(meta.returnTripId)} &rarr;)
                     </Link>
@@ -671,69 +671,69 @@ export function BookingConfirmation({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 <div>
-                  <span className="text-slate-500 block font-medium">Return Pickup</span>
-                  <span className="font-bold text-slate-800 block truncate">
+                  <span className="text-fg-muted block font-medium">Return Pickup</span>
+                  <span className="font-bold text-fg-strong block truncate">
                     {String(meta.returnPickupAddress || 'N/A')}
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block font-medium">Return Dropoff</span>
-                  <span className="font-bold text-slate-800 block truncate">
+                  <span className="text-fg-muted block font-medium">Return Dropoff</span>
+                  <span className="font-bold text-fg-strong block truncate">
                     {String(meta.returnDropoffAddress || 'N/A')}
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block font-medium">Date & Time</span>
-                  <span className="font-bold text-slate-800">
+                  <span className="text-fg-muted block font-medium">Date & Time</span>
+                  <span className="font-bold text-fg-strong">
                     {meta.returnDate ? `${meta.returnDate} at ${meta.returnTime || 'TBD'}` : 'Scheduled Return'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block font-medium">Return Fare</span>
-                  <span className="font-bold text-slate-800">
+                  <span className="text-fg-muted block font-medium">Return Fare</span>
+                  <span className="font-bold text-fg-strong">
                     ${Number(meta.returnFare || 0).toFixed(2)}
                   </span>
                 </div>
               </div>
 
               {Boolean(meta.returnFlightNumber || meta.returnAirline || meta.returnTailNumber || meta.returnFboFacility) && (
-                <div className="pt-2 border-t border-indigo-200/60 bg-white/80 p-2.5 rounded-lg text-xs space-y-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1">
+                <div className="pt-2 border-t border-status-staged-border/60 bg-surface-card/80 p-2.5 rounded-lg text-xs space-y-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-status-staged-fg flex items-center gap-1">
                     <PlaneLandingIcon className="w-3.5 h-3.5 text-indigo-600" />
                     {meta.returnTailNumber || meta.returnFboFacility ? 'Return Private Aviation' : 'Return Flight Information'}
                   </span>
                   {meta.returnTailNumber || meta.returnFboFacility ? (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
                       <div>
-                        <span className="text-slate-500 block font-medium">Tail #</span>
-                        <span className="font-bold text-slate-800">{String(meta.returnTailNumber || 'N/A')}</span>
+                        <span className="text-fg-muted block font-medium">Tail #</span>
+                        <span className="font-bold text-fg-strong">{String(meta.returnTailNumber || 'N/A')}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block font-medium">FBO Facility</span>
-                        <span className="font-bold text-slate-800">{String(meta.returnFboFacility || 'N/A')}</span>
+                        <span className="text-fg-muted block font-medium">FBO Facility</span>
+                        <span className="font-bold text-fg-strong">{String(meta.returnFboFacility || 'N/A')}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block font-medium">Checked Bags</span>
-                        <span className="font-bold text-slate-800">{meta.returnHasCheckedLuggage ? 'Yes' : 'No'}</span>
+                        <span className="text-fg-muted block font-medium">Checked Bags</span>
+                        <span className="font-bold text-fg-strong">{meta.returnHasCheckedLuggage ? 'Yes' : 'No'}</span>
                       </div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
                       <div>
-                        <span className="text-slate-500 block font-medium">Airline</span>
-                        <span className="font-bold text-slate-800">{String(meta.returnAirline || 'N/A')}</span>
+                        <span className="text-fg-muted block font-medium">Airline</span>
+                        <span className="font-bold text-fg-strong">{String(meta.returnAirline || 'N/A')}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block font-medium">Flight #</span>
-                        <span className="font-bold text-slate-800">{String(meta.returnFlightNumber || 'N/A')}</span>
+                        <span className="text-fg-muted block font-medium">Flight #</span>
+                        <span className="font-bold text-fg-strong">{String(meta.returnFlightNumber || 'N/A')}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block font-medium">Origin</span>
-                        <span className="font-bold text-slate-800">{String(meta.returnFlightOrigin || 'N/A')}</span>
+                        <span className="text-fg-muted block font-medium">Origin</span>
+                        <span className="font-bold text-fg-strong">{String(meta.returnFlightOrigin || 'N/A')}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500 block font-medium">Checked Bags</span>
-                        <span className="font-bold text-slate-800">{meta.returnHasCheckedLuggage ? 'Yes' : 'No'}</span>
+                        <span className="text-fg-muted block font-medium">Checked Bags</span>
+                        <span className="font-bold text-fg-strong">{meta.returnHasCheckedLuggage ? 'Yes' : 'No'}</span>
                       </div>
                     </div>
                   )}
@@ -745,22 +745,22 @@ export function BookingConfirmation({
 
         {/* Oversized Items Breakdown */}
         {Boolean(trip.metadata?.hasOversizedLuggage || trip.metadata?.oversizedItemsSummary) && (
-          <div className="pt-4 border-t border-slate-100">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1.5">
+          <div className="pt-4 border-t border-border-faint">
+            <div className="bg-surface-subtle border border-border-subtle rounded-xl p-3.5 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-fg-strong flex items-center gap-1.5">
                   <LuggageIcon className="w-4 h-4 text-blue-600" />
                   Oversized Items
                 </span>
-                <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded">
+                <span className="text-[10px] bg-status-info-bg-strong text-status-info-fg font-bold px-2 py-0.5 rounded">
                   Extra Space
                 </span>
               </div>
-              <p className="text-xs text-slate-800 font-semibold">
+              <p className="text-xs text-fg-strong font-semibold">
                 {String(trip.metadata?.oversizedItemsSummary || 'Oversized Items')}
               </p>
               {Boolean(trip.metadata?.oversizedLuggageNotes) && (
-                <p className="text-xs text-slate-500 italic">
+                <p className="text-xs text-fg-muted italic">
                   Note: {String(trip.metadata?.oversizedLuggageNotes)}
                 </p>
               )}
@@ -770,24 +770,24 @@ export function BookingConfirmation({
 
         {/* Driver Notes, Gate Code & Preferences */}
         {(trip.driverNotes || meta.gateCode || trip.passenger.specialRequests) && (
-          <div className="pt-4 border-t border-slate-100 space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          <div className="pt-4 border-t border-border-faint space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-fg-subtle">
               Driver Notes &amp; Preferences
             </h4>
-            <div className="text-xs text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
+            <div className="text-xs text-fg-secondary bg-surface-subtle p-3 rounded-lg border border-border-subtle space-y-1.5">
               {Boolean(meta.gateCode) && (
                 <p>
-                  <strong className="text-slate-900">Gate / Access Code:</strong> {String(meta.gateCode)}
+                  <strong className="text-fg-primary">Gate / Access Code:</strong> {String(meta.gateCode)}
                 </p>
               )}
               {trip.passenger.specialRequests && (
                 <p>
-                  <strong className="text-slate-900">Ride Preferences:</strong> {trip.passenger.specialRequests}
+                  <strong className="text-fg-primary">Ride Preferences:</strong> {trip.passenger.specialRequests}
                 </p>
               )}
               {trip.driverNotes && (
                 <p className="whitespace-pre-line">
-                  <strong className="text-slate-900">Notes for Driver:</strong> {trip.driverNotes}
+                  <strong className="text-fg-primary">Notes for Driver:</strong> {trip.driverNotes}
                 </p>
               )}
             </div>
@@ -795,17 +795,17 @@ export function BookingConfirmation({
         )}
       </CardContent>
 
-      <CardFooter className="bg-slate-50/70 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden">
-        <span className="text-xs text-slate-500 text-center sm:text-left">
+      <CardFooter className="bg-surface-subtle/70 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden">
+        <span className="text-xs text-fg-muted text-center sm:text-left">
           Questions about your ride? Call 24/7 Dispatch at{' '}
           <a
             href={`tel:${(companyConfig?.phone || COMPANY_CONFIG.phone.primaryRaw).replace(/[^\d+]/g, '')}`}
-            className="font-bold text-blue-600 hover:text-blue-800 underline"
+            className="font-bold text-blue-600 hover:text-status-info-fg underline"
           >
             {companyConfig?.phone || COMPANY_CONFIG.phone.dispatch}
           </a>
           {companyConfig?.address ? (
-            <span className="block sm:inline sm:before:content-['•'] sm:before:mx-1.5 text-slate-400">
+            <span className="block sm:inline sm:before:content-['•'] sm:before:mx-1.5 text-fg-subtle">
               {companyConfig.address}
             </span>
           ) : null}
@@ -823,7 +823,7 @@ export function BookingConfirmation({
             ) : (
               <Link
                 to={trackPath}
-                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
+                className="px-4 py-2.5 bg-surface-header hover:bg-surface-header-elevated text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
               >
                 {isUnconfirmed ? 'Track Request Status' : 'Track Live Ride'}
               </Link>

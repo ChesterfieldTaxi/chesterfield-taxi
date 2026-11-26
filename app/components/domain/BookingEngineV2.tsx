@@ -1085,16 +1085,16 @@ export function BookingEngineV2({
         {/* Optional Live Dispatch Banner (honors hideDispatchBanner) */}
         {!hideDispatchBanner && (
           <div className="mb-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xs text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-surface-header text-white px-4 py-2.5 rounded-xl shadow-xs text-xs">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="font-bold tracking-wide">24/7 Live Chesterfield Dispatch</span>
               </div>
               <div className="flex items-center gap-3 text-[11px] text-slate-300">
                 <span>No Surprise Surge</span>
-                <span className="hidden sm:inline text-slate-600">&bull;</span>
+                <span className="hidden sm:inline text-fg-secondary">&bull;</span>
                 <span className="hidden sm:inline">Live STL Flight Tracking</span>
-                <span className="hidden sm:inline text-slate-600">&bull;</span>
+                <span className="hidden sm:inline text-fg-secondary">&bull;</span>
                 <span className="hidden md:inline">Free Cancellation (2h+)</span>
               </div>
             </div>
@@ -1110,13 +1110,13 @@ export function BookingEngineV2({
           {/* Left Column: Reordered 4-Section Single-Page Progression */}
           <div className="lg:col-span-8 space-y-3 sm:space-y-4">
             {editingTripId && (
-              <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs font-semibold flex items-center justify-between gap-2">
+              <div className="p-3.5 bg-status-info-bg border border-status-info-border rounded-xl text-status-info-fg text-xs font-semibold flex items-center justify-between gap-2">
                 <span>Editing Existing Reservation #{editingTripId}</span>
                 {onCancelEdit && (
                   <button
                     type="button"
                     onClick={onCancelEdit}
-                    className="px-3 py-1.5 bg-white border border-blue-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                    className="px-3 py-1.5 bg-surface-card border border-status-info-border rounded-lg text-xs font-bold text-fg-secondary hover:bg-surface-subtle cursor-pointer"
                   >
                     Cancel Edit
                   </button>
@@ -1126,7 +1126,7 @@ export function BookingEngineV2({
             {submitError && (
               <div
                 role="alert"
-                className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold flex items-center gap-2"
+                className="p-3.5 bg-status-danger-bg border border-status-danger-border rounded-xl text-status-danger-fg text-xs font-semibold flex items-center gap-2"
               >
                 <AlertTriangleIcon className="w-4 h-4 text-red-600 shrink-0" />
                 <span>{submitError}</span>

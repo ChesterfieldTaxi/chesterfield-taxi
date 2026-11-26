@@ -103,7 +103,10 @@ async function runTests() {
   assert.equal(isDarkModeRoutePath('/'), false);
   assert.equal(isDarkModeRoutePath('/app/admin'), true);
   assert.equal(isDarkModeRoutePath('/admin'), true);
-  assert.equal(isDarkModeRoutePath('/app/passenger'), false);
+  assert.equal(isDarkModeRoutePath('/app/passenger'), true);
+  assert.equal(isDarkModeRoutePath('/app/login'), true);
+  assert.equal(isDarkModeRoutePath('/app/register'), true);
+  assert.equal(isDarkModeRoutePath('/app/hub'), true);
   assert.equal(isDarkModeRoutePath('/app/corporate'), false);
   assert.equal(isDarkModeRoutePath('/app/driver'), false);
 
@@ -153,7 +156,7 @@ async function runTests() {
   applyResolvedTheme('dark', {
     rootElement: root,
     enforceRouteScope: true,
-    getPathname: () => '/app/passenger',
+    getPathname: () => '/app/corporate',
   });
   assert.equal(root.classes.has('dark'), false);
 
@@ -252,6 +255,24 @@ async function runTests() {
   assert.deepEqual(
     runPreHydrationInSandbox({
       pathname: '/app/passenger',
+      storedValue: 'dark',
+      systemDark: true,
+    }),
+    { isDark: true, colorScheme: 'dark' },
+    'Passenger routes must apply dark pre-hydration in Phase 94'
+  );
+  assert.deepEqual(
+    runPreHydrationInSandbox({
+      pathname: '/app/login',
+      storedValue: 'dark',
+      systemDark: true,
+    }),
+    { isDark: true, colorScheme: 'dark' },
+    'Client login route must apply dark pre-hydration in Phase 94'
+  );
+  assert.deepEqual(
+    runPreHydrationInSandbox({
+      pathname: '/app/corporate',
       storedValue: 'dark',
       systemDark: true,
       startWithDarkClass: true,

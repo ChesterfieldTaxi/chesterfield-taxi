@@ -75,16 +75,16 @@ export function CustomerPaymentSection({
   return (
     <div
       data-field="paymentMethod"
-      className="bg-white border border-slate-200/90 rounded-2xl shadow-xs p-3 sm:p-5 space-y-3 sm:space-y-4"
+      className="bg-surface-card border border-border-subtle/90 rounded-2xl shadow-xs p-3 sm:p-5 space-y-3 sm:space-y-4"
     >
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+      <div className="flex items-center justify-between border-b border-border-faint pb-2.5">
         <div className="flex items-center gap-2">
           <span className="w-6 h-6 rounded-lg bg-blue-600 text-white text-xs font-black flex items-center justify-center">
             4
           </span>
-          <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">Payment Method</h2>
+          <h2 className="text-sm font-extrabold text-fg-primary tracking-tight">Payment Method</h2>
         </div>
-        <span className="text-[11px] text-slate-500 font-medium">
+        <span className="text-[11px] text-fg-muted font-medium">
           {corporatePortalContext
             ? 'Corporate Direct Bill'
             : stripeOnlineEnabled
@@ -95,7 +95,7 @@ export function CustomerPaymentSection({
 
       {!corporatePortalContext && (
         <div className="space-y-2">
-          <div className={`grid ${colClass} gap-1.5 p-1 bg-slate-100 border border-slate-200 rounded-xl`}>
+          <div className={`grid ${colClass} gap-1.5 p-1 bg-surface-muted border border-border-subtle rounded-xl`}>
             {methodsToRender.map((m) => (
               <button
                 key={m.key}
@@ -118,7 +118,7 @@ export function CustomerPaymentSection({
                 className={`py-2.5 px-2 text-center rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                   form.paymentMethod === m.key
                     ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
+                    : 'text-fg-secondary hover:text-fg-primary hover:bg-surface-card/70'
                 }`}
               >
                 <m.Icon className="w-4 h-4 shrink-0" />
@@ -128,14 +128,14 @@ export function CustomerPaymentSection({
           </div>
 
           {!publicCorporateEnabled && (
-            <div className="flex flex-wrap items-center justify-between gap-1.5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-600">
+            <div className="flex flex-wrap items-center justify-between gap-1.5 px-3 py-2 rounded-xl bg-surface-subtle border border-border-subtle/80 text-[11px] text-fg-secondary">
               <span className="inline-flex items-center gap-1.5 font-medium">
                 <BuildingIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                 <span>Booking on a company account?</span>
               </span>
               <Link
                 to="/app/corporate"
-                className="font-extrabold text-indigo-700 hover:text-indigo-900 hover:underline whitespace-nowrap"
+                className="font-extrabold text-status-staged-fg hover:text-status-staged-fg hover:underline whitespace-nowrap"
               >
                 Sign in to the Corporate Portal &rarr;
               </Link>
@@ -165,8 +165,8 @@ export function CustomerPaymentSection({
                   }
                   className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer ${
                     form.cardPaymentType === 'terminal'
-                      ? 'bg-blue-50 border-blue-500 text-blue-950'
-                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'
+                      ? 'bg-status-info-bg border-blue-500 text-status-info-fg'
+                      : 'bg-surface-subtle border-border-subtle text-fg-secondary hover:bg-surface-card'
                   }`}
                 >
                   Pay Driver in Car
@@ -181,8 +181,8 @@ export function CustomerPaymentSection({
                   }
                   className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer ${
                     form.cardPaymentType === 'manual'
-                      ? 'bg-blue-50 border-blue-500 text-blue-950'
-                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'
+                      ? 'bg-status-info-bg border-blue-500 text-status-info-fg'
+                      : 'bg-surface-subtle border-border-subtle text-fg-secondary hover:bg-surface-card'
                   }`}
                 >
                   Pay Online by Card
@@ -220,16 +220,16 @@ export function CustomerPaymentSection({
                   )}
                 </div>
               ) : (
-                <div className="text-xs text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex items-start gap-2.5">
+                <div className="text-xs text-fg-secondary bg-surface-subtle p-3.5 rounded-xl border border-border-subtle flex items-start gap-2.5">
                   <ShieldCheckIcon className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <div className="space-y-1">
-                    <div className="font-bold text-slate-900 flex flex-wrap items-center gap-2">
+                    <div className="font-bold text-fg-primary flex flex-wrap items-center gap-2">
                       <span>Pay Driver in Car (Tap, Chip, or Swipe)</span>
-                      <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] font-semibold bg-status-success-bg-strong text-status-success-fg px-2 py-0.5 rounded-full">
                         No Upfront Charge
                       </span>
                     </div>
-                    <p className="text-slate-600 text-[11px] leading-relaxed">
+                    <p className="text-fg-secondary text-[11px] leading-relaxed">
                       Pay inside the car using Apple Pay, Google Pay, or any major card. Nothing is
                       charged upfront.
                     </p>
@@ -238,16 +238,16 @@ export function CustomerPaymentSection({
               )}
             </div>
           ) : (
-            <div className="text-xs text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex items-start gap-2.5">
+            <div className="text-xs text-fg-secondary bg-surface-subtle p-3.5 rounded-xl border border-border-subtle flex items-start gap-2.5">
               <ShieldCheckIcon className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <div className="font-bold text-slate-900 flex flex-wrap items-center gap-2">
+                <div className="font-bold text-fg-primary flex flex-wrap items-center gap-2">
                   <span>Pay Driver in Car (Tap, Chip, or Swipe)</span>
-                  <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-semibold bg-status-success-bg-strong text-status-success-fg px-2 py-0.5 rounded-full">
                     No Upfront Charge
                   </span>
                 </div>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
+                <p className="text-fg-secondary text-[11px] leading-relaxed">
                   Pay securely inside the car using Apple Pay, Google Pay, or any major credit or
                   debit card. Nothing is charged upfront.
                 </p>
@@ -260,16 +260,16 @@ export function CustomerPaymentSection({
       {/* Cash Sub-panel */}
       {!corporatePortalContext && form.paymentMethod === 'cash' && (
         <div className="space-y-2.5 animate-in fade-in duration-150">
-          <div className="text-xs text-slate-700 bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex items-start gap-2.5">
+          <div className="text-xs text-fg-secondary bg-surface-subtle p-3.5 rounded-xl border border-border-subtle flex items-start gap-2.5">
             <DollarSignIcon className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <div className="font-bold text-slate-900 flex flex-wrap items-center gap-2">
+              <div className="font-bold text-fg-primary flex flex-wrap items-center gap-2">
                 <span>Pay Driver in Cash at Dropoff</span>
-                <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-semibold bg-status-success-bg-strong text-status-success-fg px-2 py-0.5 rounded-full">
                   No Upfront Charge
                 </span>
               </div>
-              <p className="text-slate-600 text-[11px] leading-relaxed">
+              <p className="text-fg-secondary text-[11px] leading-relaxed">
                 Pay cash directly to your driver at the end of your ride. Exact change is
                 appreciated.
               </p>
@@ -283,14 +283,14 @@ export function CustomerPaymentSection({
         <div
           className={`p-3.5 rounded-xl space-y-3 animate-in fade-in duration-150 ${
             corporatePortalContext
-              ? 'bg-indigo-50/80 border border-indigo-200'
-              : 'bg-amber-50/80 border border-amber-300'
+              ? 'bg-status-staged-bg/80 border border-status-staged-border'
+              : 'bg-status-warning-bg/80 border border-status-warning-border'
           }`}
         >
           <div className="flex items-center justify-between gap-2">
             <span
               className={`text-[11px] font-bold uppercase tracking-wide flex items-center gap-1.5 ${
-                corporatePortalContext ? 'text-indigo-950' : 'text-amber-900'
+                corporatePortalContext ? 'text-status-staged-fg' : 'text-status-warning-fg'
               }`}
             >
               <BuildingIcon className="w-3.5 h-3.5" />
@@ -301,7 +301,7 @@ export function CustomerPaymentSection({
               </span>
             </span>
             {corporatePortalContext && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-status-success-bg-strong text-status-success-fg border border-status-success-border">
                 <ShieldCheckIcon className="w-3 h-3" />
                 Verified • {corporatePortalContext.accountNumber}
               </span>
@@ -309,8 +309,8 @@ export function CustomerPaymentSection({
           </div>
 
           {!corporatePortalContext && (
-            <div className="text-[11px] bg-white p-3 rounded-xl border border-amber-200 text-amber-900 flex items-start gap-2 shadow-2xs">
-              <PhoneIcon className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+            <div className="text-[11px] bg-surface-card p-3 rounded-xl border border-status-warning-border text-status-warning-fg flex items-start gap-2 shadow-2xs">
+              <PhoneIcon className="w-3.5 h-3.5 text-status-warning-fg shrink-0 mt-0.5" />
               <div className="leading-relaxed">
                 <span className="font-semibold">Need account assistance?</span> Call 24/7 Dispatch
                 at{' '}
@@ -319,7 +319,7 @@ export function CustomerPaymentSection({
                     /[^\d+]/g,
                     ''
                   )}`}
-                  className="font-bold underline text-amber-950 hover:text-blue-700"
+                  className="font-bold underline text-status-warning-fg hover:text-status-info-fg"
                 >
                   {COMPANY_CONFIG.phone?.dispatch ||
                     COMPANY_CONFIG.phone?.primary ||
@@ -352,10 +352,10 @@ export function CustomerPaymentSection({
                 required={form.paymentMethod === 'account'}
                 className={`w-full px-3 py-2.5 border ${
                   corporatePortalContext
-                    ? 'bg-slate-100 border-indigo-200 text-slate-700 font-semibold cursor-not-allowed'
+                    ? 'bg-surface-muted border-status-staged-border text-fg-secondary font-semibold cursor-not-allowed'
                     : errors.corporateOrgName
-                    ? 'bg-white border-red-400'
-                    : 'bg-white border-amber-300'
+                    ? 'bg-surface-card border-red-400'
+                    : 'bg-surface-card border-status-warning-border'
                 } rounded-xl text-base sm:text-sm`}
               />
               {errors.corporateOrgName && (
@@ -382,10 +382,10 @@ export function CustomerPaymentSection({
                 }}
                 className={`w-full px-3 py-2.5 border ${
                   corporatePortalContext
-                    ? 'bg-slate-100 border-indigo-200 text-indigo-900 font-mono font-bold cursor-not-allowed'
+                    ? 'bg-surface-muted border-status-staged-border text-status-staged-fg font-mono font-bold cursor-not-allowed'
                     : errors.corporateAccountNumber
-                    ? 'bg-white border-red-400'
-                    : 'bg-white border-amber-300'
+                    ? 'bg-surface-card border-red-400'
+                    : 'bg-surface-card border-status-warning-border'
                 } rounded-xl text-base sm:text-sm`}
               />
               {errors.corporateAccountNumber && (
@@ -405,10 +405,10 @@ export function CustomerPaymentSection({
               }
               value={form.billingPo}
               onChange={(e) => setForm((prev) => ({ ...prev, billingPo: e.target.value }))}
-              className={`w-full px-3 py-2.5 bg-white border ${
+              className={`w-full px-3 py-2.5 bg-surface-card border ${
                 corporatePortalContext
-                  ? 'border-indigo-200 font-mono font-semibold'
-                  : 'border-amber-300'
+                  ? 'border-status-staged-border font-mono font-semibold'
+                  : 'border-status-warning-border'
               } rounded-xl text-base sm:text-sm`}
             />
             <input
@@ -416,8 +416,8 @@ export function CustomerPaymentSection({
               placeholder="Authorized By (Manager Name)"
               value={form.authorizedBy}
               onChange={(e) => setForm((prev) => ({ ...prev, authorizedBy: e.target.value }))}
-              className={`w-full px-3 py-2.5 bg-white border ${
-                corporatePortalContext ? 'border-indigo-200' : 'border-amber-300'
+              className={`w-full px-3 py-2.5 bg-surface-card border ${
+                corporatePortalContext ? 'border-status-staged-border' : 'border-status-warning-border'
               } rounded-xl text-base sm:text-sm`}
             />
           </div>
@@ -428,7 +428,7 @@ export function CustomerPaymentSection({
                 placeholder="Department / Cost Center Tag (e.g. EXEC-100)"
                 value={form.costCenter}
                 onChange={(e) => setForm((prev) => ({ ...prev, costCenter: e.target.value }))}
-                className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-xl text-xs font-semibold text-slate-800"
+                className="w-full px-3 py-2 bg-surface-card border border-status-staged-border rounded-xl text-xs font-semibold text-fg-strong"
               />
             </div>
           )}
@@ -490,11 +490,11 @@ export function CustomerTripSummaryCard({
   return (
     <div
       id="trip-summary-card"
-      className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3 sm:p-5 space-y-3 sm:space-y-4"
+      className="bg-surface-card border border-border-subtle rounded-2xl shadow-sm p-3 sm:p-5 space-y-3 sm:space-y-4"
     >
-      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <h3 className="font-extrabold text-slate-900 text-base">Trip Summary</h3>
-        <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full">
+      <div className="flex items-center justify-between border-b border-border-faint pb-3">
+        <h3 className="font-extrabold text-fg-primary text-base">Trip Summary</h3>
+        <span className="text-[10px] font-bold uppercase tracking-wider bg-status-info-bg text-status-info-fg border border-status-info-border px-2.5 py-0.5 rounded-full">
           {editingTripId ? 'Editing Trip' : 'Estimated Quote'}
         </span>
       </div>
@@ -502,12 +502,12 @@ export function CustomerTripSummaryCard({
       {/* Itinerary Preview */}
       <div className="space-y-2.5 text-xs">
         <div className="flex items-start gap-2">
-          <ClockIcon className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+          <ClockIcon className="w-3.5 h-3.5 text-fg-subtle mt-0.5 shrink-0" />
           <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase block">
+            <span className="text-[10px] text-fg-subtle font-bold uppercase block">
               Pickup Time
             </span>
-            <span className="font-semibold text-slate-800">
+            <span className="font-semibold text-fg-strong">
               {form.timingType === 'later'
                 ? form.scheduledDate && form.scheduledTime
                   ? `${form.scheduledDate} at ${formatTime12h(form.scheduledTime)}`
@@ -518,11 +518,11 @@ export function CustomerTripSummaryCard({
         </div>
 
         <div className="flex items-start gap-2">
-          <MapPinIcon className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+          <MapPinIcon className="w-3.5 h-3.5 text-fg-subtle mt-0.5 shrink-0" />
           <div className="flex-1 overflow-hidden">
-            <span className="text-[10px] text-slate-400 font-bold uppercase block">Route</span>
+            <span className="text-[10px] text-fg-subtle font-bold uppercase block">Route</span>
             <p
-              className="font-semibold text-slate-800 truncate"
+              className="font-semibold text-fg-strong truncate"
               title={form.pickupAddress || 'Enter pickup'}
             >
               {form.pickupAddress || 'Select Pickup Location'}
@@ -533,7 +533,7 @@ export function CustomerTripSummaryCard({
               </p>
             )}
             <p
-              className="font-semibold text-slate-800 truncate mt-0.5"
+              className="font-semibold text-fg-strong truncate mt-0.5"
               title={form.dropoffAddress || 'Enter dropoff'}
             >
               &darr; {form.dropoffAddress || 'Select Dropoff Location'}
@@ -542,10 +542,10 @@ export function CustomerTripSummaryCard({
         </div>
 
         <div className="flex items-start gap-2">
-          <CarIcon className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+          <CarIcon className="w-3.5 h-3.5 text-fg-subtle mt-0.5 shrink-0" />
           <div>
-            <span className="text-[10px] text-slate-400 font-bold uppercase block">Vehicle</span>
-            <span className="font-semibold text-slate-800">
+            <span className="text-[10px] text-fg-subtle font-bold uppercase block">Vehicle</span>
+            <span className="font-semibold text-fg-strong">
               {bookingConfig.allowMultiVehicle && form.selectedVehicles.length > 1
                 ? `${form.selectedVehicles.length} Vehicles (${form.selectedVehicles
                     .map((v) => getFriendlyVehicleName(v))
@@ -567,7 +567,7 @@ export function CustomerTripSummaryCard({
                 <span className="text-[10px] text-indigo-600 font-bold uppercase block">
                   Return Pickup
                 </span>
-                <span className="font-semibold text-slate-800">
+                <span className="font-semibold text-fg-strong">
                   {form.returnDate && form.returnTime
                     ? `${form.returnDate} at ${formatTime12h(form.returnTime)}`
                     : 'Select return date & time'}
@@ -582,7 +582,7 @@ export function CustomerTripSummaryCard({
                   Return Route
                 </span>
                 <p
-                  className="font-semibold text-slate-800 truncate"
+                  className="font-semibold text-fg-strong truncate"
                   title={form.returnPickupAddress || 'Return pickup'}
                 >
                   {form.returnPickupAddress || form.dropoffAddress || 'Select Return Pickup'}
@@ -594,7 +594,7 @@ export function CustomerTripSummaryCard({
                   </p>
                 )}
                 <p
-                  className="font-semibold text-slate-800 truncate mt-0.5"
+                  className="font-semibold text-fg-strong truncate mt-0.5"
                   title={form.returnDropoffAddress || 'Return dropoff'}
                 >
                   &darr;{' '}
@@ -609,7 +609,7 @@ export function CustomerTripSummaryCard({
                 <span className="text-[10px] text-indigo-600 font-bold uppercase block">
                   Return Vehicle
                 </span>
-                <span className="font-semibold text-slate-800">
+                <span className="font-semibold text-fg-strong">
                   {bookingConfig.allowMultiVehicle && form.returnSelectedVehicles.length > 1
                     ? `${form.returnSelectedVehicles.length} Vehicles (${form.returnSelectedVehicles
                         .map((v) => getFriendlyVehicleName(v))
@@ -629,10 +629,10 @@ export function CustomerTripSummaryCard({
               <div className="flex items-start gap-2">
                 <ShieldCheckIcon className="w-3.5 h-3.5 text-indigo-600 mt-0.5 shrink-0" />
                 <div>
-                  <span className="text-[10px] text-indigo-700 font-bold uppercase block">
+                  <span className="text-[10px] text-status-staged-fg font-bold uppercase block">
                     Return Child Seats
                   </span>
-                  <span className="font-semibold text-slate-800">
+                  <span className="font-semibold text-fg-strong">
                     {returnTotalCarSeats} Seat(s) Requested
                   </span>
                 </div>
@@ -644,10 +644,10 @@ export function CustomerTripSummaryCard({
                 <div className="flex items-start gap-2">
                   <LuggageIcon className="w-3.5 h-3.5 text-indigo-600 mt-0.5 shrink-0" />
                   <div>
-                    <span className="text-[10px] text-indigo-700 font-bold uppercase block">
+                    <span className="text-[10px] text-status-staged-fg font-bold uppercase block">
                       Return Oversized Items
                     </span>
-                    <span className="font-semibold text-slate-800">
+                    <span className="font-semibold text-fg-strong">
                       {returnOversizedItemsSummary || 'Oversized Items'}
                       {form.returnOversizedLuggageNotes
                         ? ` (${form.returnOversizedLuggageNotes})`
@@ -663,10 +663,10 @@ export function CustomerTripSummaryCard({
           <div className="flex items-start gap-2">
             <ShieldCheckIcon className="w-3.5 h-3.5 text-blue-600 mt-0.5 shrink-0" />
             <div>
-              <span className="text-[10px] text-blue-700 font-bold uppercase block">
+              <span className="text-[10px] text-status-info-fg font-bold uppercase block">
                 Child Safety Seats
               </span>
-              <span className="font-semibold text-slate-800">
+              <span className="font-semibold text-fg-strong">
                 {totalCarSeats} Seat(s) Requested
               </span>
             </div>
@@ -677,10 +677,10 @@ export function CustomerTripSummaryCard({
           <div className="flex items-start gap-2">
             <LuggageIcon className="w-3.5 h-3.5 text-blue-600 mt-0.5 shrink-0" />
             <div>
-              <span className="text-[10px] text-blue-700 font-bold uppercase block">
+              <span className="text-[10px] text-status-info-fg font-bold uppercase block">
                 Oversized Items
               </span>
-              <span className="font-semibold text-slate-800">
+              <span className="font-semibold text-fg-strong">
                 {oversizedItemsSummary || 'Oversized Items'}
                 {form.oversizedLuggageNotes ? ` (${form.oversizedLuggageNotes})` : ''}
               </span>
@@ -690,13 +690,13 @@ export function CustomerTripSummaryCard({
       </div>
 
       {/* Total Estimated Fare (desktop only; mobile uses the sticky bar) + Interactive Price Breakdown */}
-      <div className="pt-3 border-t border-slate-200 space-y-2.5">
+      <div className="pt-3 border-t border-border-subtle space-y-2.5">
         <div className="hidden lg:flex items-baseline justify-between gap-2">
           <div>
-            <span className="text-xs text-slate-600 font-extrabold uppercase block">
+            <span className="text-xs text-fg-secondary font-extrabold uppercase block">
               {form.returnTrip ? 'Estimated Round-Trip' : 'Estimated Fare'}
             </span>
-            <span className="text-[11px] text-slate-500 font-medium">
+            <span className="text-[11px] text-fg-muted font-medium">
               Final fare confirmed by dispatch
             </span>
           </div>
@@ -707,11 +707,11 @@ export function CustomerTripSummaryCard({
                 <span>Calculating...</span>
               </div>
             ) : totalDisplayFare !== null ? (
-              <span className="text-2xl font-mono font-black text-slate-950">
+              <span className="text-2xl font-mono font-black text-fg-primary">
                 ${totalDisplayFare.toFixed(2)}
               </span>
             ) : (
-              <span className="text-xl font-mono font-bold text-slate-400">$--</span>
+              <span className="text-xl font-mono font-bold text-fg-subtle">$--</span>
             )}
           </div>
         </div>
@@ -722,7 +722,7 @@ export function CustomerTripSummaryCard({
           onClick={() => setShowPriceBreakdown((prev) => !prev)}
           disabled={!quote && !isQuoteLoading}
           aria-expanded={showPriceBreakdown}
-          className="w-full py-2 px-3 rounded-xl text-xs font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/80 border border-blue-200/80 flex items-center justify-between transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          className="w-full py-2 px-3 rounded-xl text-xs font-bold text-status-info-fg bg-status-info-bg/80 hover:bg-status-info-bg-strong/80 border border-status-info-border/80 flex items-center justify-between transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           <span>{showPriceBreakdown ? 'Hide Price Breakdown' : 'View Price Breakdown'}</span>
           <ChevronDownIcon
@@ -745,15 +745,15 @@ export function CustomerTripSummaryCard({
       </div>
 
       {/* Agreements: SMS, Terms & Privacy */}
-      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/90 space-y-2.5 text-xs text-slate-600">
+      <div className="p-3 bg-surface-subtle rounded-xl border border-border-subtle/90 space-y-2.5 text-xs text-fg-secondary">
         <label className="flex items-start gap-2 cursor-pointer group">
           <input
             type="checkbox"
             checked={form.smsConsent}
             onChange={(e) => setForm((prev) => ({ ...prev, smsConsent: e.target.checked }))}
-            className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
+            className="mt-0.5 w-4 h-4 rounded border-border-strong text-blue-600 focus:ring-blue-500 shrink-0"
           />
-          <span className="text-[11px] text-slate-600 leading-tight group-hover:text-slate-900">
+          <span className="text-[11px] text-fg-secondary leading-tight group-hover:text-fg-primary">
             Send me text updates when my driver is on the way and arrives.
           </span>
         </label>
@@ -763,14 +763,14 @@ export function CustomerTripSummaryCard({
             type="checkbox"
             required
             defaultChecked
-            className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
+            className="mt-0.5 w-4 h-4 rounded border-border-strong text-blue-600 focus:ring-blue-500 shrink-0"
           />
-          <span className="text-[11px] text-slate-600 leading-tight group-hover:text-slate-900">
+          <span className="text-[11px] text-fg-secondary leading-tight group-hover:text-fg-primary">
             I agree to the{' '}
             <Link
               to="/terms"
               target="_blank"
-              className="font-semibold text-blue-600 underline hover:text-blue-800"
+              className="font-semibold text-blue-600 underline hover:text-status-info-fg"
             >
               Terms and Conditions
             </Link>{' '}
@@ -778,7 +778,7 @@ export function CustomerTripSummaryCard({
             <Link
               to="/privacy"
               target="_blank"
-              className="font-semibold text-blue-600 underline hover:text-blue-800"
+              className="font-semibold text-blue-600 underline hover:text-status-info-fg"
             >
               Privacy Policy
             </Link>
@@ -791,7 +791,7 @@ export function CustomerTripSummaryCard({
       {validationErrorCount > 0 && (
         <div
           role="alert"
-          className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-semibold"
+          className="p-3 bg-status-danger-bg border border-status-danger-border rounded-xl text-xs text-status-danger-fg font-semibold"
         >
           Please review {validationErrorCount} highlighted field
           {validationErrorCount > 1 ? 's' : ''} above before submitting.
@@ -842,20 +842,20 @@ export function CustomerMobileSubmitBar({
 }: CustomerMobileSubmitBarProps) {
   return (
     <div
-      className={`fixed left-0 right-0 z-30 lg:hidden bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-4 py-2.5 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] flex items-center justify-between gap-3 ${
+      className={`fixed left-0 right-0 z-30 lg:hidden bg-surface-card/95 backdrop-blur-md border-t border-border-subtle/90 px-4 py-2.5 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] flex items-center justify-between gap-3 ${
         embeddedInApp ? 'bottom-[64px] md:bottom-[72px]' : 'bottom-0'
       }`}
     >
       <div className="flex flex-col min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider truncate">
+          <span className="text-[10px] uppercase font-bold text-fg-muted tracking-wider truncate">
             {returnTrip ? 'Est. Round-Trip' : 'Estimated Fare'}
           </span>
           {totalDisplayFare !== null && !isQuoteLoading && (
             <button
               type="button"
               onClick={onOpenBreakdownFromMobile}
-              className="text-[10px] font-bold text-blue-600 underline hover:text-blue-800 cursor-pointer shrink-0"
+              className="text-[10px] font-bold text-blue-600 underline hover:text-status-info-fg cursor-pointer shrink-0"
             >
               Breakdown
             </button>
@@ -869,13 +869,13 @@ export function CustomerMobileSubmitBar({
             </span>
           ) : totalDisplayFare !== null ? (
             <>
-              <span className="text-lg font-mono font-black text-slate-950">
+              <span className="text-lg font-mono font-black text-fg-primary">
                 ${totalDisplayFare.toFixed(2)}
               </span>
-              <span className="text-[10px] text-slate-500 font-medium">est.</span>
+              <span className="text-[10px] text-fg-muted font-medium">est.</span>
             </>
           ) : (
-            <span className="text-xs font-semibold text-slate-500">Enter route for estimate</span>
+            <span className="text-xs font-semibold text-fg-muted">Enter route for estimate</span>
           )}
         </div>
       </div>

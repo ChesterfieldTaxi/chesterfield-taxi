@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
+import { useTheme } from '../hooks/useTheme';
 import { isFirebaseConfigured } from '../core/services/firebase';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { claimGuestTripsForUser, parseClaimTripIds } from '../core/utils/guest-trip-claim.util';
@@ -18,6 +19,7 @@ export function meta() {
 }
 
 export default function UnifiedAppRegisterRoute() {
+  useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState(() => searchParams.get('email') || '');
@@ -130,7 +132,7 @@ export default function UnifiedAppRegisterRoute() {
   const loginHref = `/app/login${loginParams.toString() ? `?${loginParams.toString()}` : ''}`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/40 flex flex-col justify-center items-center px-4 py-10">
+    <div className="min-h-screen bg-gradient-to-br from-surface-subtle via-surface-card to-status-info-bg/40 flex flex-col justify-center items-center px-4 py-10">
       <div className="w-full max-w-md">
         <div className="text-center mb-7">
           <Link
@@ -139,15 +141,15 @@ export default function UnifiedAppRegisterRoute() {
           >
             <CarIcon className="w-8 h-8" />
           </Link>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Create Your Account</h1>
-          <p className="text-sm text-slate-500 mt-1.5">
+          <h1 className="text-2xl font-extrabold text-fg-primary tracking-tight">Create Your Account</h1>
+          <p className="text-sm text-fg-muted mt-1.5">
             Save favorite pickup spots, view trip receipts, and rebook in seconds
           </p>
         </div>
 
-        <Card className="shadow-xl border-slate-200/90 rounded-2xl overflow-hidden">
+        <Card className="shadow-xl border-border-subtle/90 rounded-2xl overflow-hidden">
           <form onSubmit={handleSubmit}>
-            <CardContent className="p-6 space-y-4 bg-white">
+            <CardContent className="p-6 space-y-4 bg-surface-card">
               {parsedClaimTripIds.length > 0 && (
                 <Alert variant="info" title="Link Your Trip">
                   Create your account to attach{' '}
@@ -162,11 +164,11 @@ export default function UnifiedAppRegisterRoute() {
               )}
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-fg-secondary mb-1.5">
                   Full Name
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-fg-subtle">
                     <UserIcon className="w-4 h-4" />
                   </div>
                   <input
@@ -176,17 +178,17 @@ export default function UnifiedAppRegisterRoute() {
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Jane Doe"
                     required
-                    className="w-full pl-9 pr-3 py-2.5 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-9 pr-3 py-2.5 text-sm bg-surface-card border border-border-strong rounded-xl text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-fg-secondary mb-1.5">
                   Email Address
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-fg-subtle">
                     <MailIcon className="w-4 h-4" />
                   </div>
                   <input
@@ -196,17 +198,17 @@ export default function UnifiedAppRegisterRoute() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
                     required
-                    className="w-full pl-9 pr-3 py-2.5 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-9 pr-3 py-2.5 text-sm bg-surface-card border border-border-strong rounded-xl text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-fg-secondary mb-1.5">
                   Password
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-fg-subtle">
                     <LockIcon className="w-4 h-4" />
                   </div>
                   <input
@@ -217,7 +219,7 @@ export default function UnifiedAppRegisterRoute() {
                     placeholder="At least 6 characters"
                     required
                     minLength={6}
-                    className="w-full pl-9 pr-3 py-2.5 text-sm bg-white border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-9 pr-3 py-2.5 text-sm bg-surface-card border border-border-strong rounded-xl text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -238,10 +240,10 @@ export default function UnifiedAppRegisterRoute() {
                 <>
                   <div className="relative my-5">
                     <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-slate-200" />
+                      <div className="w-full border-t border-border-subtle" />
                     </div>
                     <div className="relative flex justify-center text-xs">
-                      <span className="px-2.5 bg-white text-slate-500 font-medium">Or sign up with</span>
+                      <span className="px-2.5 bg-surface-card text-fg-muted font-medium">Or sign up with</span>
                     </div>
                   </div>
 
@@ -251,7 +253,7 @@ export default function UnifiedAppRegisterRoute() {
                       variant="outline"
                       onClick={handleGoogleSignIn}
                       disabled={isLoading}
-                      className="w-full flex items-center justify-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50"
+                      className="w-full flex items-center justify-center gap-2 border-border-strong text-fg-secondary hover:bg-surface-subtle"
                     >
                       <svg viewBox="0 0 24 24" className="w-4 h-4">
                         <path fill="currentColor" d="M21.35 11.1H12v2.83h5.36c-.23 1.25-.94 2.31-1.95 3.01v2.5h3.16c1.85-1.7 2.92-4.21 2.92-7.18 0-.4-.04-.79-.14-1.16z" />
@@ -266,7 +268,7 @@ export default function UnifiedAppRegisterRoute() {
                       variant="outline"
                       onClick={handleFacebookSignIn}
                       disabled={isLoading}
-                      className="w-full flex items-center justify-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50"
+                      className="w-full flex items-center justify-center gap-2 border-border-strong text-fg-secondary hover:bg-surface-subtle"
                     >
                       <svg viewBox="0 0 24 24" className="w-4 h-4 text-blue-600">
                         <path fill="currentColor" d="M14 13.5h2.5l1-4H14v-2c0-1.03.74-1.5 1.5-1.5h2v-3.5c-.32-.05-1.3-.2-2.5-.2-2.8 0-4.5 1.6-4.5 4.5v2.7H8v4h2.5V22h3.5v-8.5z" />
@@ -278,16 +280,16 @@ export default function UnifiedAppRegisterRoute() {
               )}
             </CardContent>
 
-            <CardFooter className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex flex-col gap-2 items-center text-center">
-              <p className="text-xs sm:text-sm text-slate-600">
+            <CardFooter className="bg-surface-subtle px-6 py-4 border-t border-border-faint flex flex-col gap-2 items-center text-center">
+              <p className="text-xs sm:text-sm text-fg-secondary">
                 Already have an account?{' '}
                 <Link to={loginHref} className="font-bold text-blue-600 hover:underline">
                   Sign in
                 </Link>
               </p>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-fg-muted">
                 Interested in driving for us?{' '}
-                <Link to="/apply" className="font-semibold text-slate-700 hover:text-blue-600 underline">
+                <Link to="/apply" className="font-semibold text-fg-secondary hover:text-blue-600 underline">
                   Apply to Join the Fleet
                 </Link>
               </p>

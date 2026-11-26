@@ -49,7 +49,7 @@ export const APPEARANCE_OPTIONS: readonly AppearanceOption[] = [
  * Surfaces where semantic dark mode is currently enabled.
  * Future phases extend this list as each portal is converted:
  * - Phase 93: `/app/admin`, `/admin`
- * - Phase 94: `/app/passenger`
+ * - Phase 94: `/app/passenger`, `/app/login`, `/app/register`, `/app/hub`
  * - Phase 95: `/app/corporate`, `/corporate`
  * - Phase 96: `/` (public live site via brand `darkTokens`)
  */
@@ -58,6 +58,10 @@ export const DARK_MODE_ENABLED_PATH_PREFIXES = [
   '/dispatch',
   '/app/admin',
   '/admin',
+  '/app/passenger',
+  '/app/login',
+  '/app/register',
+  '/app/hub',
 ] as const;
 
 export function isDarkModeRoutePath(pathname: string): boolean {

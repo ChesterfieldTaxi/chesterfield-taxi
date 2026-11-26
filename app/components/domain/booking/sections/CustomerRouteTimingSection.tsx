@@ -62,17 +62,17 @@ export function CustomerRouteTimingSection({
   onRemoveStop,
 }: CustomerRouteTimingSectionProps) {
   return (
-    <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs p-3 sm:p-5 space-y-3 sm:space-y-4">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+    <div className="bg-surface-card border border-border-subtle/90 rounded-2xl shadow-xs p-3 sm:p-5 space-y-3 sm:space-y-4">
+      <div className="flex items-center justify-between border-b border-border-faint pb-2.5">
         <div className="flex items-center gap-2">
           <span className="w-6 h-6 rounded-lg bg-blue-600 text-white text-xs font-black flex items-center justify-center">
             1
           </span>
-          <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">
+          <h2 className="text-sm font-extrabold text-fg-primary tracking-tight">
             Pickup Time &amp; Route
           </h2>
         </div>
-        <span className="text-[11px] text-slate-500 font-medium">
+        <span className="text-[11px] text-fg-muted font-medium">
           {form.timingType === 'later' ? 'Scheduled Ride' : 'On-Demand Dispatch'}
         </span>
       </div>
@@ -80,14 +80,14 @@ export function CustomerRouteTimingSection({
       {/* Segmented Timing Switcher */}
       <div className="space-y-2.5">
         {bookingConfig.allowImmediateAsap ? (
-          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 border border-slate-200 rounded-xl">
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-surface-muted border border-border-subtle rounded-xl">
             <button
               type="button"
               onClick={() => setForm((prev) => ({ ...prev, timingType: 'asap' }))}
               className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 ${
                 form.timingType === 'asap'
-                  ? 'bg-white text-blue-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-surface-card text-status-info-fg shadow-xs'
+                  : 'text-fg-secondary hover:text-fg-primary'
               }`}
             >
               <BoltIcon className="w-3.5 h-3.5 shrink-0" />
@@ -98,8 +98,8 @@ export function CustomerRouteTimingSection({
               onClick={() => setForm((prev) => ({ ...prev, timingType: 'later' }))}
               className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 ${
                 form.timingType === 'later'
-                  ? 'bg-white text-blue-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-surface-card text-status-info-fg shadow-xs'
+                  : 'text-fg-secondary hover:text-fg-primary'
               }`}
             >
               <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
@@ -107,7 +107,7 @@ export function CustomerRouteTimingSection({
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 text-slate-700 text-xs font-bold">
+          <div className="flex items-center gap-1.5 text-fg-secondary text-xs font-bold">
             <ClockIcon className="w-4 h-4 text-blue-600" />
             <span>Advance Scheduled Pickup</span>
           </div>
@@ -118,7 +118,7 @@ export function CustomerRouteTimingSection({
             <div>
               <label
                 htmlFor="scheduledDate"
-                className="block text-[11px] font-semibold text-slate-600 mb-1"
+                className="block text-[11px] font-semibold text-fg-secondary mb-1"
               >
                 Pickup Date
               </label>
@@ -148,7 +148,7 @@ export function CustomerRouteTimingSection({
             <div>
               <label
                 htmlFor="scheduledTime"
-                className="block text-[11px] font-semibold text-slate-600 mb-1"
+                className="block text-[11px] font-semibold text-fg-secondary mb-1"
               >
                 Pickup Time
               </label>
@@ -175,12 +175,12 @@ export function CustomerRouteTimingSection({
             </div>
           </div>
         ) : (
-          <div className="px-3.5 py-2.5 bg-blue-50 border border-blue-200/80 rounded-xl text-blue-900 text-xs font-semibold flex flex-wrap items-center justify-between gap-2">
+          <div className="px-3.5 py-2.5 bg-status-info-bg border border-status-info-border/80 rounded-xl text-status-info-fg text-xs font-semibold flex flex-wrap items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5">
               <BoltIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span>Immediate Dispatch (Nearest Available Vehicle)</span>
             </span>
-            <span className="text-[11px] text-blue-700 font-medium">
+            <span className="text-[11px] text-status-info-fg font-medium">
               Typical arrival 15–25 mins
             </span>
           </div>
@@ -192,14 +192,14 @@ export function CustomerRouteTimingSection({
       </div>
 
       {/* Route & Stops Container */}
-      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+      <div className="p-3 bg-surface-subtle border border-border-subtle rounded-xl space-y-2.5">
         <div className="relative flex items-center gap-2">
           <button
             type="button"
             title="Swap Pickup and Dropoff"
             aria-label="Swap Pickup and Dropoff"
             onClick={onSwapRoute}
-            className="w-9 h-9 flex items-center justify-center text-slate-500 hover:text-blue-700 bg-white hover:bg-blue-50 border border-slate-200 rounded-xl transition-colors self-center text-sm font-bold shrink-0 shadow-2xs cursor-pointer"
+            className="w-9 h-9 flex items-center justify-center text-fg-muted hover:text-status-info-fg bg-surface-card hover:bg-status-info-bg border border-border-subtle rounded-xl transition-colors self-center text-sm font-bold shrink-0 shadow-2xs cursor-pointer"
           >
             ↕
           </button>
@@ -276,7 +276,7 @@ export function CustomerRouteTimingSection({
                 <button
                   type="button"
                   onClick={() => onRemoveStop(stop.id)}
-                  className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer shrink-0"
+                  className="w-9 h-9 flex items-center justify-center text-fg-subtle hover:text-red-600 hover:bg-status-danger-bg rounded-xl transition-colors cursor-pointer shrink-0"
                   title="Remove stop"
                   aria-label={`Remove stop ${idx + 1}`}
                 >
@@ -336,7 +336,7 @@ export function CustomerRouteTimingSection({
         </div>
 
         {/* Route Stats, Quote Error & Add Stop Action */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200 text-xs text-slate-500 font-medium">
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border-subtle text-xs text-fg-muted font-medium">
           <div className="flex items-center gap-1.5">
             {isQuoteLoading ? (
               <div className="flex items-center gap-1.5 text-blue-600 font-semibold">
@@ -344,15 +344,15 @@ export function CustomerRouteTimingSection({
                 <span>Calculating route estimate...</span>
               </div>
             ) : quoteError ? (
-              <span className="text-amber-700 font-semibold">{quoteError}</span>
+              <span className="text-status-warning-fg font-semibold">{quoteError}</span>
             ) : quote ? (
               <div>
                 Est. Route:{' '}
-                <span className="font-bold text-slate-800">
+                <span className="font-bold text-fg-strong">
                   {quote.pricing.durationMinutes} min
                 </span>{' '}
                 &bull;{' '}
-                <span className="font-bold text-slate-800">
+                <span className="font-bold text-fg-strong">
                   {quote.pricing.distanceMiles.toFixed(1)} mi
                 </span>
               </div>
@@ -365,7 +365,7 @@ export function CustomerRouteTimingSection({
             <button
               type="button"
               onClick={onAddStop}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 font-bold text-xs border border-blue-200 shadow-2xs active:scale-95 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-card hover:bg-status-info-bg text-status-info-fg font-bold text-xs border border-status-info-border shadow-2xs active:scale-95 transition-all cursor-pointer"
             >
               <PlusIcon className="w-3.5 h-3.5 text-blue-600" />
               <span>Add Stop</span>

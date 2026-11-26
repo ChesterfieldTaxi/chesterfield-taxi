@@ -50,6 +50,8 @@ import { BookingEngineV2, type BookingEngineV2InitialValues } from '../component
 import { PriceBreakdownPanel } from '../components/domain/booking/PriceBreakdownPanel';
 import { DispatchLocationInput } from '../components/domain/dispatch/DispatchLocationInput';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
+import { AppearanceToggle } from '../components/ui/AppearanceToggle';
+import { useTheme } from '../hooks/useTheme';
 import { formatVehicleTierDisplay } from '../core/utils/vehicle-tier-format.util';
 
 export function meta() {
@@ -115,6 +117,7 @@ export default function PassengerAppRoute() {
   const passengerService = getPassengerService();
 
   const [authUserUid, setAuthUserUid] = useState<string | null>(null);
+  const [authUserThemePreference, setAuthUserThemePreference] = useState<'light' | 'dark' | 'system' | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [account, setAccount] = useState<PassengerAccount>(() =>
     passengerService.getCachedAccount()
@@ -126,6 +129,11 @@ export default function PassengerAppRoute() {
   const [editingTripId, setEditingTripId] = useState<string | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>(['customer']);
 
+  const { preference: themePreference, setPreference: setThemePreference } = useTheme({
+    uid: authUserUid,
+    profilePreference: authUserThemePreference,
+  });
+
   // Auth guard + bind real authenticated Firebase UID to PassengerService
   useEffect(() => {
     const authService = getAdminAuthService();
@@ -133,6 +141,7 @@ export default function PassengerAppRoute() {
       if (!currentUser) {
         passengerService.bindToAuthUser(null);
         setAuthUserUid(null);
+        setAuthUserThemePreference(null);
         navigate('/app/login?message=unauthenticated&redirect=/app/passenger', { replace: true });
       } else {
         const roles: string[] = currentUser.roles || (currentUser.role ? [currentUser.role] : ['customer']);
@@ -147,6 +156,7 @@ export default function PassengerAppRoute() {
           phone: currentUser.phone,
         });
         setAuthUserUid(currentUser.uid);
+        setAuthUserThemePreference(currentUser.themePreference ?? null);
         setUserRoles(roles);
         setIsAuthChecking(false);
       }
@@ -337,9 +347,9 @@ export default function PassengerAppRoute() {
 
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-surface-subtle flex flex-col items-center justify-center p-6 text-center">
         <SpinnerIcon className="w-9 h-9 text-blue-600 animate-spin mb-3" />
-        <p className="text-sm font-bold text-slate-700">Loading your account...</p>
+        <p className="text-sm font-bold text-fg-secondary">Loading your account...</p>
       </div>
     );
   }
@@ -601,7 +611,7 @@ export default function PassengerAppRoute() {
     switch (status) {
       case 'completed':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-status-success-bg-strong text-status-success-fg border border-status-success-border">
             <CheckIcon className="w-3 h-3" /> Completed
           </span>
         );
@@ -609,52 +619,52 @@ export default function PassengerAppRoute() {
       case 'DECLINED':
       case 'declined':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-status-danger-bg-strong text-status-danger-fg border border-status-danger-border">
             Cancelled
           </span>
         );
       case 'UNCONFIRMED':
       case 'unconfirmed':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border animate-pulse">
             Requested (Unconfirmed)
           </span>
         );
       case 'CONFIRMED':
       case 'confirmed':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-status-info-bg-strong text-status-info-fg border border-status-info-border">
             Confirmed
           </span>
         );
       case 'assigned':
       case 'accepted':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border">
             Driver Assigned
           </span>
         );
       case 'en_route':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border">
             Driver En Route
           </span>
         );
       case 'arrived':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-teal-100 text-teal-800 border border-teal-200 animate-bounce">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-status-success-bg-strong text-status-success-fg border border-status-success-border animate-bounce">
             Driver Arrived
           </span>
         );
       case 'in_progress':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-status-success-bg-strong text-status-success-fg border border-status-success-border">
             On Trip
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-800">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-surface-muted text-fg-strong">
             {status}
           </span>
         );
@@ -666,7 +676,7 @@ export default function PassengerAppRoute() {
       case 'home':
         return <HomeModernIcon className="w-4 h-4 text-blue-600" />;
       case 'work':
-        return <BuildingIcon className="w-4 h-4 text-slate-600" />;
+        return <BuildingIcon className="w-4 h-4 text-fg-secondary" />;
       case 'airport':
         return <PlaneIcon className="w-4 h-4 text-sky-600" />;
       case 'medical':
@@ -674,7 +684,7 @@ export default function PassengerAppRoute() {
       case 'favorite':
         return <SparklesIcon className="w-4 h-4 text-indigo-600" />;
       default:
-        return <MapPinIcon className="w-4 h-4 text-slate-500" />;
+        return <MapPinIcon className="w-4 h-4 text-fg-muted" />;
     }
   };
 
@@ -699,7 +709,7 @@ export default function PassengerAppRoute() {
 
   return (
     <div
-      className="min-h-screen bg-slate-100 text-slate-900 pb-24 md:pb-12 flex flex-col font-sans"
+      className="min-h-screen bg-surface-muted text-fg-primary pb-24 md:pb-12 flex flex-col font-sans"
       style={{
         '--brand-primary': brandPrimary || '#2563eb',
         '--btn-primary-bg': brandPrimary || '#2563eb',
@@ -719,14 +729,14 @@ export default function PassengerAppRoute() {
 
       {/* Toast Notification (offset above mobile Help FAB) */}
       {toastMessage && (
-        <div className="fixed bottom-36 md:bottom-20 right-4 left-4 sm:left-auto sm:right-6 sm:w-96 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-5 print:hidden">
+        <div className="fixed bottom-36 md:bottom-20 right-4 left-4 sm:left-auto sm:right-6 sm:w-96 z-50 bg-surface-header text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-border-header animate-in fade-in slide-in-from-bottom-5 print:hidden">
           <ShieldCheckIcon className="w-5 h-5 text-emerald-400 shrink-0" />
           <p className="text-sm font-semibold">{toastMessage}</p>
         </div>
       )}
 
       {/* Sticky Mobile-First Frosted Top App Bar */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80 print:hidden">
+      <header className="sticky top-0 z-30 bg-surface-card/90 backdrop-blur-md border-b border-border-subtle/80 print:hidden">
         <div className="max-w-3xl mx-auto px-3.5 sm:px-4 h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <div
@@ -736,10 +746,10 @@ export default function PassengerAppRoute() {
               <CarIcon className="w-5 h-5 text-white" />
             </div>
             <div className="min-w-0">
-              <span className="font-extrabold text-slate-950 text-sm tracking-tight leading-none block truncate">
+              <span className="font-extrabold text-fg-primary text-sm tracking-tight leading-none block truncate">
                 {displayCompanyName}
               </span>
-              <p className="text-[11px] text-slate-500 font-medium leading-none mt-1 truncate">
+              <p className="text-[11px] text-fg-muted font-medium leading-none mt-1 truncate">
                 Hi, {account.firstName || fullName || 'there'}
               </p>
             </div>
@@ -749,7 +759,7 @@ export default function PassengerAppRoute() {
             <button
               type="button"
               onClick={() => setIsHelpMenuOpen(true)}
-              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200/80 active:scale-95 text-slate-700 flex items-center justify-center transition-all cursor-pointer"
+              className="w-9 h-9 rounded-xl bg-surface-muted hover:bg-surface-emphasis/80 active:scale-95 text-fg-secondary flex items-center justify-center transition-all cursor-pointer"
               aria-label="Help and 24/7 Dispatch"
               title="Help & 24/7 Dispatch"
             >
@@ -823,7 +833,7 @@ export default function PassengerAppRoute() {
 
               <Link
                 to={`/track/${encodeURIComponent(activeTrip.trackingToken || activeTrip.id)}`}
-                className="px-4 py-2 bg-white text-blue-900 font-extrabold text-xs rounded-xl shadow-md hover:bg-blue-50 transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 bg-surface-card text-status-info-fg font-extrabold text-xs rounded-xl shadow-md hover:bg-status-info-bg transition-colors flex items-center gap-1.5"
               >
                 <span>Track Live on Map</span>
                 <ExternalLinkIcon className="w-3.5 h-3.5" />
@@ -839,14 +849,14 @@ export default function PassengerAppRoute() {
             {account.savedPlaces.length > 0 && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between px-1">
-                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-fg-muted flex items-center gap-1">
                     <MapPinIcon className="w-3.5 h-3.5 text-blue-600" />
                     <span>Quick Destinations</span>
                   </span>
                   <button
                     type="button"
                     onClick={() => setActiveTab('places')}
-                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                    className="text-[11px] font-bold text-blue-600 hover:text-status-info-fg cursor-pointer"
                   >
                     Manage →
                   </button>
@@ -858,7 +868,7 @@ export default function PassengerAppRoute() {
                       key={place.id}
                       type="button"
                       onClick={() => handleSelectChip(place)}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-white hover:bg-blue-50 hover:border-blue-300 text-slate-800 text-xs font-bold border border-slate-200/90 transition-all active:scale-95 shadow-2xs shrink-0 cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-surface-card hover:bg-status-info-bg hover:border-status-info-border text-fg-strong text-xs font-bold border border-border-subtle/90 transition-all active:scale-95 shadow-2xs shrink-0 cursor-pointer"
                     >
                       <span className="shrink-0">{getCategoryIcon(place.category)}</span>
                       <span className="whitespace-nowrap">{place.label}</span>
@@ -867,7 +877,7 @@ export default function PassengerAppRoute() {
                   <button
                     type="button"
                     onClick={() => handleOpenPlaceModal()}
-                    className="inline-flex items-center gap-1 px-3 py-2 rounded-2xl bg-white hover:bg-slate-50 text-blue-600 text-xs font-bold border border-dashed border-blue-300 transition-colors shrink-0 cursor-pointer"
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-2xl bg-surface-card hover:bg-surface-subtle text-blue-600 text-xs font-bold border border-dashed border-status-info-border transition-colors shrink-0 cursor-pointer"
                   >
                     <PlusIcon className="w-3.5 h-3.5" />
                     <span className="whitespace-nowrap">Add</span>
@@ -911,21 +921,21 @@ export default function PassengerAppRoute() {
         {/* Tab 2: My Trips (Ride History & Digital Receipts) */}
         {activeTab === 'trips' && (
           <div className="space-y-4">
-            <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80">
+            <div className="bg-surface-card rounded-3xl p-5 shadow-sm border border-border-subtle/80">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-extrabold text-slate-900">
+                <h2 className="text-base font-extrabold text-fg-primary">
                   Trips
                 </h2>
 
                 {/* Filter Pills */}
-                <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-xl text-xs">
+                <div className="flex items-center gap-1 p-0.5 bg-surface-muted rounded-xl text-xs">
                   <button
                     type="button"
                     onClick={() => setHistoryFilter('upcoming')}
                     className={`px-2.5 py-1 rounded-lg font-bold transition-colors ${
                       historyFilter === 'upcoming'
-                        ? 'bg-white text-slate-900 shadow-2xs'
-                        : 'text-slate-500'
+                        ? 'bg-surface-card text-fg-primary shadow-2xs'
+                        : 'text-fg-muted'
                     }`}
                   >
                     Upcoming
@@ -935,8 +945,8 @@ export default function PassengerAppRoute() {
                     onClick={() => setHistoryFilter('history')}
                     className={`px-2.5 py-1 rounded-lg font-bold transition-colors ${
                       historyFilter === 'history'
-                        ? 'bg-white text-slate-900 shadow-2xs'
-                        : 'text-slate-500'
+                        ? 'bg-surface-card text-fg-primary shadow-2xs'
+                        : 'text-fg-muted'
                     }`}
                   >
                     History
@@ -946,8 +956,8 @@ export default function PassengerAppRoute() {
                     onClick={() => setHistoryFilter('all')}
                     className={`px-2.5 py-1 rounded-lg font-bold transition-colors ${
                       historyFilter === 'all'
-                        ? 'bg-white text-slate-900 shadow-2xs'
-                        : 'text-slate-500'
+                        ? 'bg-surface-card text-fg-primary shadow-2xs'
+                        : 'text-fg-muted'
                     }`}
                   >
                     All
@@ -958,13 +968,13 @@ export default function PassengerAppRoute() {
               {isLoadingTrips ? (
                 <div className="py-12 text-center">
                   <SpinnerIcon className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-2" />
-                  <p className="text-xs text-slate-500">Loading trip history...</p>
+                  <p className="text-xs text-fg-muted">Loading trip history...</p>
                 </div>
               ) : filteredTrips.length === 0 ? (
-                <div className="py-12 text-center border-2 border-dashed border-slate-200 rounded-2xl">
-                  <ClockIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="text-sm font-bold text-slate-700">No trips recorded yet</p>
-                  <p className="text-xs text-slate-500 mt-1 mb-4">
+                <div className="py-12 text-center border-2 border-dashed border-border-subtle rounded-2xl">
+                  <ClockIcon className="w-8 h-8 text-fg-faint mx-auto mb-2" />
+                  <p className="text-sm font-bold text-fg-secondary">No trips recorded yet</p>
+                  <p className="text-xs text-fg-muted mt-1 mb-4">
                     Book your first ride with Chesterfield Taxi today!
                   </p>
                   <button
@@ -1002,8 +1012,8 @@ export default function PassengerAppRoute() {
                         onTouchMove={handleTripCardTouchMove}
                         onTouchEnd={cancelTripCardLongPress}
                         onTouchCancel={cancelTripCardLongPress}
-                        className={`p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 shadow-2xs transition-all space-y-3 overflow-hidden select-none ${
-                          isPressing ? 'scale-[0.985] border-blue-400 bg-blue-50/30' : ''
+                        className={`p-3.5 sm:p-4 rounded-2xl border border-border-subtle bg-surface-card hover:border-border-strong shadow-2xs transition-all space-y-3 overflow-hidden select-none ${
+                          isPressing ? 'scale-[0.985] border-blue-400 bg-status-info-bg/30' : ''
                         }`}
                       >
                         {/* Top row: Pickup Date/Time First & Prominent, Trip ID Secondary */}
@@ -1011,62 +1021,62 @@ export default function PassengerAppRoute() {
                           <div className="space-y-1 min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 min-w-0">
                               <ClockIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                              <span className="text-xs sm:text-sm font-extrabold text-slate-900 truncate">
+                              <span className="text-xs sm:text-sm font-extrabold text-fg-primary truncate">
                                 {dateFormatted}
                               </span>
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5">
                               {getStatusBadge(trip.status)}
                               <span
-                                className="font-mono text-[10.5px] font-semibold text-slate-400 truncate"
+                                className="font-mono text-[10.5px] font-semibold text-fg-subtle truncate"
                                 title={trip.id}
                               >
                                 #{trip.id.length > 16 ? `${trip.id.slice(0, 8)}...${trip.id.slice(-4)}` : trip.id}
                               </span>
                               {tripIndex === 0 && (
-                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200 shrink-0">
+                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-status-info-bg-strong text-status-info-fg border border-status-info-border shrink-0">
                                   Most Recent
                                 </span>
                               )}
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="text-base font-extrabold text-slate-900 leading-tight">
+                            <div className="text-base font-extrabold text-fg-primary leading-tight">
                               ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                             </div>
-                            <div className="text-[10px] text-slate-400 font-semibold uppercase">
+                            <div className="text-[10px] text-fg-subtle font-semibold uppercase">
                               {trip.payment?.method || 'card'}
                             </div>
                           </div>
                         </div>
 
                         {/* Vehicle Tier */}
-                        <div className="text-xs font-semibold text-slate-500 flex items-center justify-between gap-2">
-                          <span className="inline-flex items-center gap-1 font-bold text-slate-700 truncate">
-                            <CarIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <div className="text-xs font-semibold text-fg-muted flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1 font-bold text-fg-secondary truncate">
+                            <CarIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
                             <span className="truncate">{resolveTripVehicleName(trip)}</span>
                           </span>
                         </div>
 
                         {/* Route Timeline */}
-                        <div className="text-xs space-y-1.5 pl-1 border-l-2 border-slate-100 ml-1 py-0.5">
+                        <div className="text-xs space-y-1.5 pl-1 border-l-2 border-border-faint ml-1 py-0.5">
                           <div className="flex items-start gap-2">
                             <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
-                            <p className="text-slate-800 font-medium leading-tight truncate">
+                            <p className="text-fg-strong font-medium leading-tight truncate">
                               {trip.pickupLocation?.address || 'Pickup'}
                             </p>
                           </div>
                           {Array.isArray(trip.intermediateStops) && trip.intermediateStops.length > 0 && (
                             <div className="flex items-start gap-2">
                               <div className="w-2 h-2 rounded-full bg-amber-400 mt-1 shrink-0" />
-                              <p className="text-slate-500 font-medium leading-tight truncate">
+                              <p className="text-fg-muted font-medium leading-tight truncate">
                                 +{trip.intermediateStops.length} stop{trip.intermediateStops.length > 1 ? 's' : ''}
                               </p>
                             </div>
                           )}
                           <div className="flex items-start gap-2">
                             <div className="w-2 h-2 rounded-full bg-rose-500 mt-1 shrink-0" />
-                            <p className="text-slate-800 font-medium leading-tight truncate">
+                            <p className="text-fg-strong font-medium leading-tight truncate">
                               {trip.dropoffLocation?.address || 'Dropoff'}
                             </p>
                           </div>
@@ -1074,9 +1084,9 @@ export default function PassengerAppRoute() {
 
                         {/* Driver & Car Details */}
                         {Boolean(trip.metadata?.assignedDriverName || trip.metadata?.driverName || trip.assignedDriverId) && (
-                          <div className="text-[11px] bg-slate-50 px-3 py-1.5 rounded-xl text-slate-600 flex items-center justify-between">
+                          <div className="text-[11px] bg-surface-subtle px-3 py-1.5 rounded-xl text-fg-secondary flex items-center justify-between">
                             <span>Driver: {resolveTripDriverName(trip)}</span>
-                            <span className="font-semibold text-slate-700">
+                            <span className="font-semibold text-fg-secondary">
                               {String(trip.metadata?.vehicleUnit || 'Assigned Car')}
                             </span>
                           </div>
@@ -1084,11 +1094,11 @@ export default function PassengerAppRoute() {
 
                         {/* Action Buttons (Clean 2-button mobile footer + ⋮ sheet trigger; full buttons on sm+) */}
                         {!isPastTrip ? (
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2">
+                          <div className="pt-2 border-t border-border-faint flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2">
                             <div className="flex items-center gap-1.5 sm:gap-2 flex-1 sm:flex-none">
                               <Link
                                 to={`/track/${encodeURIComponent(trip.trackingToken || trip.id)}`}
-                                className="flex-1 sm:flex-none justify-center px-3 py-2 sm:py-1.5 rounded-xl bg-emerald-600 sm:bg-emerald-50 text-white sm:text-emerald-700 border border-emerald-600 sm:border-emerald-200 hover:bg-emerald-500 sm:hover:bg-emerald-100 text-xs font-extrabold transition-colors whitespace-nowrap flex items-center gap-1 shadow-2xs sm:shadow-none"
+                                className="flex-1 sm:flex-none justify-center px-3 py-2 sm:py-1.5 rounded-xl bg-emerald-600 sm:bg-status-success-bg text-white sm:text-status-success-fg border border-emerald-600 sm:border-status-success-border hover:bg-emerald-500 sm:hover:bg-status-success-bg-strong text-xs font-extrabold transition-colors whitespace-nowrap flex items-center gap-1 shadow-2xs sm:shadow-none"
                               >
                                 <span>Track Live</span>
                                 <ExternalLinkIcon className="w-3 h-3" />
@@ -1096,7 +1106,7 @@ export default function PassengerAppRoute() {
                               <button
                                 type="button"
                                 onClick={() => setSelectedReceiptTrip(trip)}
-                                className="px-3 py-2 sm:py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap cursor-pointer"
+                                className="px-3 py-2 sm:py-1.5 rounded-xl border border-border-subtle text-xs font-bold text-fg-secondary hover:bg-surface-subtle transition-colors whitespace-nowrap cursor-pointer"
                               >
                                 Details
                               </button>
@@ -1106,7 +1116,7 @@ export default function PassengerAppRoute() {
                             <button
                               type="button"
                               onClick={() => setTripActionSheetTrip(trip)}
-                              className="sm:hidden w-9 h-9 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 active:bg-slate-100 flex items-center justify-center shrink-0 cursor-pointer"
+                              className="sm:hidden w-9 h-9 rounded-xl border border-border-subtle bg-surface-subtle text-fg-secondary active:bg-surface-muted flex items-center justify-center shrink-0 cursor-pointer"
                               aria-label="More trip actions"
                             >
                               <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
@@ -1122,14 +1132,14 @@ export default function PassengerAppRoute() {
                                 <button
                                   type="button"
                                   onClick={() => handleEditTrip(trip)}
-                                  className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap cursor-pointer"
+                                  className="px-3 py-1.5 rounded-xl bg-status-info-bg text-status-info-fg border border-status-info-border hover:bg-status-info-bg-strong text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap cursor-pointer"
                                 >
                                   Edit
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => handleCancelTrip(trip)}
-                                  className="px-3 py-1.5 rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap cursor-pointer"
+                                  className="px-3 py-1.5 rounded-xl bg-status-danger-bg text-status-danger-fg border border-status-danger-border hover:bg-status-danger-bg-strong text-xs font-extrabold transition-all active:scale-95 whitespace-nowrap cursor-pointer"
                                 >
                                   Cancel
                                 </button>
@@ -1137,12 +1147,12 @@ export default function PassengerAppRoute() {
                             )}
                           </div>
                         ) : (
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2">
+                          <div className="pt-2 border-t border-border-faint flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2">
                             <div className="flex items-center gap-1.5 sm:gap-2 flex-1 sm:flex-none">
                               <button
                                 type="button"
                                 onClick={() => handleRebookTrip(trip)}
-                                className="flex-1 sm:flex-none justify-center px-3 py-2 sm:py-1.5 rounded-xl bg-blue-600 sm:bg-blue-50 text-white sm:text-blue-700 border border-blue-600 sm:border-blue-200 hover:bg-blue-500 sm:hover:bg-blue-100 text-xs font-extrabold transition-all active:scale-95 flex items-center gap-1 whitespace-nowrap cursor-pointer"
+                                className="flex-1 sm:flex-none justify-center px-3 py-2 sm:py-1.5 rounded-xl bg-blue-600 sm:bg-status-info-bg text-white sm:text-status-info-fg border border-blue-600 sm:border-status-info-border hover:bg-blue-500 sm:hover:bg-status-info-bg-strong text-xs font-extrabold transition-all active:scale-95 flex items-center gap-1 whitespace-nowrap cursor-pointer"
                                 title="Rebook the same pickup and dropoff"
                               >
                                 <CarIcon className="w-3.5 h-3.5 shrink-0" />
@@ -1151,7 +1161,7 @@ export default function PassengerAppRoute() {
                               <button
                                 type="button"
                                 onClick={() => setSelectedReceiptTrip(trip)}
-                                className="px-3 py-2 sm:py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors whitespace-nowrap cursor-pointer"
+                                className="px-3 py-2 sm:py-1.5 rounded-xl border border-border-subtle text-xs font-bold text-fg-secondary hover:bg-surface-subtle transition-colors whitespace-nowrap cursor-pointer"
                               >
                                 Receipt
                               </button>
@@ -1160,7 +1170,7 @@ export default function PassengerAppRoute() {
                             <button
                               type="button"
                               onClick={() => setTripActionSheetTrip(trip)}
-                              className="sm:hidden w-9 h-9 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 active:bg-slate-100 flex items-center justify-center shrink-0 cursor-pointer"
+                              className="sm:hidden w-9 h-9 rounded-xl border border-border-subtle bg-surface-subtle text-fg-secondary active:bg-surface-muted flex items-center justify-center shrink-0 cursor-pointer"
                               aria-label="More trip actions"
                             >
                               <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
@@ -1173,7 +1183,7 @@ export default function PassengerAppRoute() {
                             <button
                               type="button"
                               onClick={() => handleBookReturnTrip(trip)}
-                              className="hidden sm:flex px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 text-xs font-extrabold transition-all active:scale-95 items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
+                              className="hidden sm:flex px-3 py-1.5 rounded-xl bg-status-staged-bg text-status-staged-fg border border-status-staged-border hover:bg-status-staged-bg-strong text-xs font-extrabold transition-all active:scale-95 items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
                               title="Book return ride swapping pickup and dropoff"
                             >
                               <ArrowLeftRightIcon className="w-3.5 h-3.5 shrink-0" />
@@ -1193,13 +1203,13 @@ export default function PassengerAppRoute() {
         {/* Tab 3: Saved Places Manager */}
         {activeTab === 'places' && (
           <div className="space-y-4">
-            <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80">
+            <div className="bg-surface-card rounded-3xl p-5 shadow-sm border border-border-subtle/80">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-base font-extrabold text-slate-900">
+                  <h2 className="text-base font-extrabold text-fg-primary">
                     Saved Places &amp; Frequent Routes
                   </h2>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-fg-muted">
                     Add custom labels and pickup instructions
                   </p>
                 </div>
@@ -1217,27 +1227,27 @@ export default function PassengerAppRoute() {
                 {account.savedPlaces.map((place) => (
                   <div
                     key={place.id}
-                    className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition-all space-y-3 shadow-2xs"
+                    className="p-3.5 sm:p-4 rounded-2xl border border-border-subtle bg-surface-card hover:border-border-strong transition-all space-y-3 shadow-2xs"
                   >
                     <div className="flex items-start justify-between gap-2.5">
                       <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                        <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100">
+                        <div className="w-10 h-10 rounded-2xl bg-surface-subtle flex items-center justify-center shrink-0 border border-border-faint">
                           {getCategoryIcon(place.category)}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <h4 className="text-sm font-extrabold text-slate-950 truncate">
+                            <h4 className="text-sm font-extrabold text-fg-primary truncate">
                               {place.label}
                             </h4>
-                            <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full shrink-0">
+                            <span className="text-[10px] uppercase font-bold text-fg-subtle bg-surface-muted px-2 py-0.5 rounded-full shrink-0">
                               {place.category}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-600 mt-0.5 font-medium leading-snug">
+                          <p className="text-xs text-fg-secondary mt-0.5 font-medium leading-snug">
                             {place.address}
                           </p>
                           {place.notes && (
-                            <p className="text-[11px] text-slate-500 mt-1 italic leading-snug">
+                            <p className="text-[11px] text-fg-muted mt-1 italic leading-snug">
                               &quot;{place.notes}&quot;
                             </p>
                           )}
@@ -1248,7 +1258,7 @@ export default function PassengerAppRoute() {
                         <button
                           type="button"
                           onClick={() => handleOpenPlaceModal(place)}
-                          className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+                          className="w-8 h-8 rounded-xl bg-surface-subtle hover:bg-surface-muted text-fg-muted hover:text-fg-strong flex items-center justify-center transition-colors cursor-pointer"
                           title="Edit Place"
                           aria-label={`Edit ${place.label}`}
                         >
@@ -1257,7 +1267,7 @@ export default function PassengerAppRoute() {
                         <button
                           type="button"
                           onClick={() => handleDeletePlace(place.id, place.label)}
-                          className="w-8 h-8 rounded-xl bg-rose-50/70 hover:bg-rose-100 text-rose-500 hover:text-rose-700 flex items-center justify-center transition-colors cursor-pointer"
+                          className="w-8 h-8 rounded-xl bg-status-danger-bg/70 hover:bg-status-danger-bg-strong text-rose-500 hover:text-status-danger-fg flex items-center justify-center transition-colors cursor-pointer"
                           title="Remove Place"
                           aria-label={`Delete ${place.label}`}
                         >
@@ -1267,18 +1277,18 @@ export default function PassengerAppRoute() {
                     </div>
 
                     {/* Full-width 2-column 1-Tap Ride Buttons */}
-                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border-faint">
                       <button
                         type="button"
                         onClick={() => handleRideToPlace(place)}
-                        className="py-2 px-3 rounded-xl bg-blue-600 sm:bg-blue-50 text-white sm:text-blue-700 hover:bg-blue-500 sm:hover:bg-blue-100 text-xs font-extrabold transition-all active:scale-[0.98] cursor-pointer text-center"
+                        className="py-2 px-3 rounded-xl bg-blue-600 sm:bg-status-info-bg text-white sm:text-status-info-fg hover:bg-blue-500 sm:hover:bg-status-info-bg-strong text-xs font-extrabold transition-all active:scale-[0.98] cursor-pointer text-center"
                       >
                         Ride To Here
                       </button>
                       <button
                         type="button"
                         onClick={() => handleRideFromPlace(place)}
-                        className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold transition-all active:scale-[0.98] cursor-pointer text-center"
+                        className="py-2 px-3 rounded-xl bg-surface-muted hover:bg-surface-emphasis/80 text-fg-secondary text-xs font-bold transition-all active:scale-[0.98] cursor-pointer text-center"
                       >
                         Ride From Here
                       </button>
@@ -1295,13 +1305,13 @@ export default function PassengerAppRoute() {
           <div className="space-y-4">
             <form
               onSubmit={handleSaveProfile}
-              className="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 space-y-4"
+              className="bg-surface-card rounded-3xl p-5 shadow-sm border border-border-subtle/80 space-y-4"
             >
               <div>
-                <h2 className="text-base font-extrabold text-slate-900">
+                <h2 className="text-base font-extrabold text-fg-primary">
                   Profile &amp; Preferences
                 </h2>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-fg-muted">
                   Manage contact info, driver notes, and ride notifications
                 </p>
               </div>
@@ -1309,7 +1319,7 @@ export default function PassengerAppRoute() {
               {/* Name Fields */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-fg-secondary mb-1">
                     First Name
                   </label>
                   <input
@@ -1317,11 +1327,11 @@ export default function PassengerAppRoute() {
                     value={profileFirstName}
                     onChange={(e) => setProfileFirstName(e.target.value)}
                     required
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-fg-secondary mb-1">
                     Last Name
                   </label>
                   <input
@@ -1329,7 +1339,7 @@ export default function PassengerAppRoute() {
                     value={profileLastName}
                     onChange={(e) => setProfileLastName(e.target.value)}
                     required
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -1337,7 +1347,7 @@ export default function PassengerAppRoute() {
               {/* Contact Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-fg-secondary mb-1">
                     Mobile Phone (for text updates)
                   </label>
                   <input
@@ -1345,11 +1355,11 @@ export default function PassengerAppRoute() {
                     value={profilePhone}
                     onChange={(e) => setProfilePhone(e.target.value)}
                     required
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-fg-secondary mb-1">
                     Email Address (for receipts)
                   </label>
                   <input
@@ -1357,14 +1367,14 @@ export default function PassengerAppRoute() {
                     value={profileEmail}
                     onChange={(e) => setProfileEmail(e.target.value)}
                     required
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
               {/* Default Vehicle Tier */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-fg-secondary mb-1">
                   Preferred Vehicle
                 </label>
                 <Select
@@ -1394,7 +1404,7 @@ export default function PassengerAppRoute() {
 
               {/* Permanent Driver Notes */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-fg-secondary mb-1">
                   Default Pickup Instructions &amp; Gate Codes
                 </label>
                 <textarea
@@ -1402,16 +1412,16 @@ export default function PassengerAppRoute() {
                   value={profileNotes}
                   onChange={(e) => setProfileNotes(e.target.value)}
                   placeholder="e.g. Side porch door; gate code #4421; please call upon arrival."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">
+                <p className="text-[11px] text-fg-muted mt-1">
                   Automatically added to your bookings for your driver.
                 </p>
               </div>
 
               {/* Communication Preferences */}
-              <div className="pt-2 border-t border-slate-100">
-                <label className="block text-xs font-bold text-slate-800 mb-2">
+              <div className="pt-2 border-t border-border-faint">
+                <label className="block text-xs font-bold text-fg-strong mb-2">
                   Notifications
                 </label>
                 <div className="space-y-2.5">
@@ -1420,9 +1430,9 @@ export default function PassengerAppRoute() {
                       type="checkbox"
                       checked={profileSms}
                       onChange={(e) => setProfileSms(e.target.checked)}
-                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-border-strong"
                     />
-                    <span className="text-xs font-semibold text-slate-700">
+                    <span className="text-xs font-semibold text-fg-secondary">
                       Text message updates when my driver is on the way and arrives
                     </span>
                   </label>
@@ -1431,9 +1441,9 @@ export default function PassengerAppRoute() {
                       type="checkbox"
                       checked={profileEmailReceipts}
                       onChange={(e) => setProfileEmailReceipts(e.target.checked)}
-                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-border-strong"
                     />
-                    <span className="text-xs font-semibold text-slate-700">
+                    <span className="text-xs font-semibold text-fg-secondary">
                       Email me trip receipts automatically
                     </span>
                   </label>
@@ -1442,13 +1452,32 @@ export default function PassengerAppRoute() {
                       type="checkbox"
                       checked={profileCalls}
                       onChange={(e) => setProfileCalls(e.target.checked)}
-                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-border-strong"
                     />
-                    <span className="text-xs font-semibold text-slate-700">
+                    <span className="text-xs font-semibold text-fg-secondary">
                       Phone call when my driver arrives
                     </span>
                   </label>
                 </div>
+              </div>
+
+              {/* Appearance */}
+              <div className="pt-3 border-t border-border-faint">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <label className="block text-xs font-bold text-fg-strong">
+                      Appearance
+                    </label>
+                    <p className="text-[11px] text-fg-muted">
+                      Choose Light, Dark, or match your device setting
+                    </p>
+                  </div>
+                </div>
+                <AppearanceToggle
+                  variant="selector"
+                  preference={themePreference}
+                  onChange={setThemePreference}
+                />
               </div>
 
               {/* Submit Button */}
@@ -1464,74 +1493,74 @@ export default function PassengerAppRoute() {
 
             {/* Workspace Switcher (Restricted to Staff & Drivers) */}
             {hasAnyStaffOrDriverRole && (
-              <div className="mt-6 pt-5 border-t border-slate-100 space-y-3">
-                <span className="text-slate-400 font-semibold block uppercase tracking-wider text-[10px]">
+              <div className="mt-6 pt-5 border-t border-border-faint space-y-3">
+                <span className="text-fg-subtle font-semibold block uppercase tracking-wider text-[10px]">
                   Switch Workspace
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {(userRoles.includes('dispatcher') || userRoles.includes('admin')) && (
                     <Link
                       to="/app/dispatch"
-                      className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/50 transition-all group"
+                      className="flex items-center justify-between p-3 rounded-2xl border border-border-subtle bg-surface-card hover:border-blue-400 hover:bg-status-info-bg/50 transition-all group"
                     >
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-xl bg-status-info-bg-strong text-status-info-fg flex items-center justify-center shrink-0">
                           <RadioIcon className="w-4 h-4" />
                         </div>
                         <div>
-                          <span className="text-xs font-bold text-slate-900 group-hover:text-blue-700 block">
+                          <span className="text-xs font-bold text-fg-primary group-hover:text-status-info-fg block">
                             Dispatch
                           </span>
-                          <span className="text-[10px] text-slate-500 block">
+                          <span className="text-[10px] text-fg-muted block">
                             Trips &amp; Booking
                           </span>
                         </div>
                       </div>
-                      <ChevronRightIcon className="w-4 h-4 text-slate-300 group-hover:text-blue-600 transition-transform group-hover:translate-x-0.5" />
+                      <ChevronRightIcon className="w-4 h-4 text-fg-faint group-hover:text-blue-600 transition-transform group-hover:translate-x-0.5" />
                     </Link>
                   )}
 
                   {(userRoles.includes('driver') || userRoles.includes('admin')) && (
                     <Link
                       to="/app/driver"
-                      className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/50 transition-all group"
+                      className="flex items-center justify-between p-3 rounded-2xl border border-border-subtle bg-surface-card hover:border-emerald-400 hover:bg-status-success-bg/50 transition-all group"
                     >
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-xl bg-status-success-bg-strong text-status-success-fg flex items-center justify-center shrink-0">
                           <CarIcon className="w-4 h-4" />
                         </div>
                         <div>
-                          <span className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 block">
+                          <span className="text-xs font-bold text-fg-primary group-hover:text-status-success-fg block">
                             Driver App
                           </span>
-                          <span className="text-[10px] text-slate-500 block">
+                          <span className="text-[10px] text-fg-muted block">
                             Shifts &amp; Trips
                           </span>
                         </div>
                       </div>
-                      <ChevronRightIcon className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 transition-transform group-hover:translate-x-0.5" />
+                      <ChevronRightIcon className="w-4 h-4 text-fg-faint group-hover:text-emerald-600 transition-transform group-hover:translate-x-0.5" />
                     </Link>
                   )}
 
                   {userRoles.includes('admin') && (
                     <Link
                       to="/app/admin"
-                      className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-white hover:border-purple-400 hover:bg-purple-50/50 transition-all group"
+                      className="flex items-center justify-between p-3 rounded-2xl border border-border-subtle bg-surface-card hover:border-purple-400 hover:bg-status-staged-bg/50 transition-all group"
                     >
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-xl bg-status-staged-bg-strong text-purple-700 flex items-center justify-center shrink-0">
                           <ShieldCheckIcon className="w-4 h-4" />
                         </div>
                         <div>
-                          <span className="text-xs font-bold text-slate-900 group-hover:text-purple-700 block">
+                          <span className="text-xs font-bold text-fg-primary group-hover:text-purple-700 block">
                             Admin
                           </span>
-                          <span className="text-[10px] text-slate-500 block">
+                          <span className="text-[10px] text-fg-muted block">
                             Settings &amp; Billing
                           </span>
                         </div>
                       </div>
-                      <ChevronRightIcon className="w-4 h-4 text-slate-300 group-hover:text-purple-600 transition-transform group-hover:translate-x-0.5" />
+                      <ChevronRightIcon className="w-4 h-4 text-fg-faint group-hover:text-purple-600 transition-transform group-hover:translate-x-0.5" />
                     </Link>
                   )}
                 </div>
@@ -1539,22 +1568,22 @@ export default function PassengerAppRoute() {
             )}
 
             {/* Portal Account Actions */}
-            <div className="mt-6 pt-5 border-t border-slate-100 space-y-3">
-              <span className="text-slate-400 font-semibold block uppercase tracking-wider text-[10px]">
+            <div className="mt-6 pt-5 border-t border-border-faint space-y-3">
+              <span className="text-fg-subtle font-semibold block uppercase tracking-wider text-[10px]">
                 Account
               </span>
               <div>
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-rose-200 bg-rose-50/60 hover:bg-rose-50 hover:border-rose-300 text-rose-800 transition-all group text-left"
+                  className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-status-danger-border bg-status-danger-bg/60 hover:bg-status-danger-bg hover:border-status-danger-border text-status-danger-fg transition-all group text-left"
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-status-danger-bg-strong text-status-danger-fg flex items-center justify-center shrink-0">
                       <XIcon className="w-4 h-4" />
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-rose-900 block">
+                      <span className="text-xs font-bold text-status-danger-fg block">
                         Sign Out
                       </span>
                       <span className="text-[10px] text-rose-500 block">
@@ -1575,39 +1604,39 @@ export default function PassengerAppRoute() {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in"
+          className="fixed inset-0 z-50 bg-surface-overlay/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in"
           onClick={(e) => {
             if (e.target === e.currentTarget) setIsPlaceModalOpen(false);
           }}
         >
           <div
             style={placeSheetDrag.sheetStyle}
-            className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full max-h-[90dvh] flex flex-col overflow-hidden shadow-2xl border-t sm:border border-slate-200 relative animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-0"
+            className="bg-surface-card rounded-t-3xl sm:rounded-3xl max-w-md w-full max-h-[90dvh] flex flex-col overflow-hidden shadow-2xl border-t sm:border border-border-subtle relative animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-0"
           >
             <div
               {...placeSheetDrag.dragHandlers}
-              className="px-5 pt-2.5 sm:pt-5 pb-3 border-b border-slate-100 shrink-0 touch-none relative"
+              className="px-5 pt-2.5 sm:pt-5 pb-3 border-b border-border-faint shrink-0 touch-none relative"
             >
-              <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="w-10 h-1 rounded-full bg-surface-strong mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
               <button
                 type="button"
                 onClick={() => setIsPlaceModalOpen(false)}
                 aria-label="Close modal"
-                className="absolute top-3.5 sm:top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                className="absolute top-3.5 sm:top-4 right-4 p-1.5 text-fg-subtle hover:text-fg-secondary hover:bg-surface-muted rounded-xl transition-colors cursor-pointer"
               >
                 <XIcon className="w-4 h-4" />
               </button>
-              <h3 className="text-base font-extrabold text-slate-950 mb-0.5 pr-8">
+              <h3 className="text-base font-extrabold text-fg-primary mb-0.5 pr-8">
                 {editingPlaceId ? 'Edit Saved Place' : 'Add New Saved Place'}
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-fg-muted">
                 Save your address for 1-tap booking shortcuts
               </p>
             </div>
 
             <form onSubmit={handleSavePlace} className="p-5 overflow-y-auto space-y-3.5">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-fg-secondary mb-1">
                   Place Label (e.g. Home, Work, Gym, Doctor)
                 </label>
                 <input
@@ -1616,12 +1645,12 @@ export default function PassengerAppRoute() {
                   onChange={(e) => setPlaceLabel(e.target.value)}
                   placeholder="e.g. Home or Bayer West"
                   required
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-fg-secondary mb-1">
                   Category
                 </label>
                 <Select
@@ -1639,7 +1668,7 @@ export default function PassengerAppRoute() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-fg-secondary mb-1">
                   Full Street Address
                 </label>
                 <DispatchLocationInput
@@ -1660,7 +1689,7 @@ export default function PassengerAppRoute() {
                   required
                 />
                 {placeCoordinates && (
-                  <p className="text-[10px] text-emerald-700 font-semibold mt-1 inline-flex items-center gap-1">
+                  <p className="text-[10px] text-status-success-fg font-semibold mt-1 inline-flex items-center gap-1">
                     <CheckIcon className="w-3 h-3 shrink-0" />
                     <span>GPS coordinates verified for accurate fare quoting</span>
                   </p>
@@ -1668,7 +1697,7 @@ export default function PassengerAppRoute() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-fg-secondary mb-1">
                   Pickup Instructions / Unit / Door Notes
                 </label>
                 <input
@@ -1676,7 +1705,7 @@ export default function PassengerAppRoute() {
                   value={placeNotes}
                   onChange={(e) => setPlaceNotes(e.target.value)}
                   placeholder="e.g. Front circle drive, Gate code #1234"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -1684,7 +1713,7 @@ export default function PassengerAppRoute() {
                 <button
                   type="button"
                   onClick={() => setIsPlaceModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-200 transition-colors"
+                  className="px-4 py-2 bg-surface-muted text-fg-secondary font-bold text-xs rounded-xl hover:bg-surface-emphasis transition-colors"
                 >
                   Cancel
                 </button>
@@ -1742,58 +1771,58 @@ export default function PassengerAppRoute() {
             role="dialog"
             aria-modal="true"
             aria-label="Official Trip Receipt"
-            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-in fade-in"
+            className="fixed inset-0 z-50 bg-surface-overlay/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-in fade-in"
             onClick={(e) => {
               if (e.target === e.currentTarget) setSelectedReceiptTrip(null);
             }}
           >
             <div
               style={receiptSheetDrag.sheetStyle}
-              className="printable-receipt sm:my-auto bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[92dvh] sm:max-h-none overflow-y-auto p-5 sm:p-8 shadow-2xl border-t sm:border border-slate-200 relative animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-8 print:shadow-none print:border-none print:m-0 print:p-0 print:max-h-none"
+              className="printable-receipt sm:my-auto bg-surface-card rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[92dvh] sm:max-h-none overflow-y-auto p-5 sm:p-8 shadow-2xl border-t sm:border border-border-subtle relative animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-8 print:shadow-none print:border-none print:m-0 print:p-0 print:max-h-none"
             >
               {/* Drag-down Handle + Header */}
               <div {...receiptSheetDrag.dragHandlers} className="touch-none print:hidden">
-                <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-3 sm:hidden" aria-hidden="true" />
+                <div className="w-10 h-1 rounded-full bg-surface-strong mx-auto mb-3 sm:hidden" aria-hidden="true" />
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedReceiptTrip(null)}
                 aria-label="Close receipt"
-                className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer print:hidden"
+                className="absolute top-4 right-4 p-1.5 text-fg-subtle hover:text-fg-secondary hover:bg-surface-muted rounded-xl transition-colors cursor-pointer print:hidden"
               >
                 <XIcon className="w-5 h-5" />
               </button>
 
               {/* Header / Brand */}
-              <div className="text-center pb-4 border-b border-slate-200">
+              <div className="text-center pb-4 border-b border-border-subtle">
                 <div
                   className="inline-flex items-center justify-center w-10 h-10 rounded-2xl text-white mb-2 shadow-sm"
                   style={{ backgroundColor: 'var(--brand-primary, #2563eb)' }}
                 >
                   <CarIcon className="w-5 h-5" />
                 </div>
-                <h3 className="text-lg font-extrabold text-slate-950 tracking-tight">
+                <h3 className="text-lg font-extrabold text-fg-primary tracking-tight">
                   {displayCompanyName}
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-fg-muted">
                   {displayCompanyAddress}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-fg-muted">
                   24/7 Dispatch Hotline: {displayCompanyPhone} • {displayCompanyEmail}
                 </p>
               </div>
 
               {/* Receipt Meta */}
-              <div className="py-4 border-b border-slate-100 flex items-center justify-between text-xs">
+              <div className="py-4 border-b border-border-faint flex items-center justify-between text-xs">
                 <div>
-                  <span className="text-slate-400 font-semibold block">RECEIPT ID</span>
-                  <span className="font-mono font-bold text-slate-900 text-sm">
+                  <span className="text-fg-subtle font-semibold block">RECEIPT ID</span>
+                  <span className="font-mono font-bold text-fg-primary text-sm">
                     #{selectedReceiptTrip.id}
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-slate-400 font-semibold block">DATE / TIME</span>
-                  <span className="font-semibold text-slate-800">
+                  <span className="text-fg-subtle font-semibold block">DATE / TIME</span>
+                  <span className="font-semibold text-fg-strong">
                     {new Date(
                       selectedReceiptTrip.actualPickupTime ||
                         selectedReceiptTrip.scheduledPickupTime ||
@@ -1810,20 +1839,20 @@ export default function PassengerAppRoute() {
               </div>
 
               {/* Passenger & Vehicle Info */}
-              <div className="py-3 border-b border-slate-100 grid grid-cols-2 gap-2 text-xs">
+              <div className="py-3 border-b border-border-faint grid grid-cols-2 gap-2 text-xs">
                 <div>
-                  <span className="text-slate-400 font-semibold block">PASSENGER</span>
-                  <span className="font-bold text-slate-800">
+                  <span className="text-fg-subtle font-semibold block">PASSENGER</span>
+                  <span className="font-bold text-fg-strong">
                     {selectedReceiptTrip.passenger.firstName} {selectedReceiptTrip.passenger.lastName}
                   </span>
-                  <span className="text-slate-500 block">{selectedReceiptTrip.passenger.phone}</span>
+                  <span className="text-fg-muted block">{selectedReceiptTrip.passenger.phone}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-slate-400 font-semibold block">DRIVER &amp; CAR</span>
-                  <span className="font-bold text-slate-800">
+                  <span className="text-fg-subtle font-semibold block">DRIVER &amp; CAR</span>
+                  <span className="font-bold text-fg-strong">
                     {resolveTripDriverName(selectedReceiptTrip)}
                   </span>
-                  <span className="text-slate-500 block">
+                  <span className="text-fg-muted block">
                     {selectedReceiptTrip.metadata?.vehicleUnit ? `${String(selectedReceiptTrip.metadata.vehicleUnit).replace(/^Cab\s*#?/i, 'Car #')} • ` : ''}
                     {resolveTripVehicleName(selectedReceiptTrip)}
                   </span>
@@ -1831,13 +1860,13 @@ export default function PassengerAppRoute() {
               </div>
 
               {/* Route Summary */}
-              <div className="py-3 border-b border-slate-100 text-xs space-y-1.5">
-                <span className="text-slate-400 font-semibold block">ROUTE</span>
+              <div className="py-3 border-b border-border-faint text-xs space-y-1.5">
+                <span className="text-fg-subtle font-semibold block">ROUTE</span>
                 <div className="flex items-start gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0" />
                   <div>
-                    <span className="text-slate-400 font-medium">From: </span>
-                    <span className="font-semibold text-slate-900">
+                    <span className="text-fg-subtle font-medium">From: </span>
+                    <span className="font-semibold text-fg-primary">
                       {selectedReceiptTrip.pickupLocation.address}
                     </span>
                   </div>
@@ -1847,22 +1876,22 @@ export default function PassengerAppRoute() {
                     <div key={idx} className="flex items-start gap-2">
                       <span className="w-2 h-2 rounded-full bg-amber-400 mt-1 shrink-0" />
                       <div>
-                        <span className="text-slate-400 font-medium">Stop {idx + 1}: </span>
-                        <span className="font-semibold text-slate-800">{stop.address}</span>
+                        <span className="text-fg-subtle font-medium">Stop {idx + 1}: </span>
+                        <span className="font-semibold text-fg-strong">{stop.address}</span>
                       </div>
                     </div>
                   ))}
                 <div className="flex items-start gap-2">
                   <span className="w-2 h-2 rounded-full bg-rose-500 mt-1 shrink-0" />
                   <div>
-                    <span className="text-slate-400 font-medium">To: </span>
-                    <span className="font-semibold text-slate-900">
+                    <span className="text-fg-subtle font-medium">To: </span>
+                    <span className="font-semibold text-fg-primary">
                       {selectedReceiptTrip.dropoffLocation.address}
                     </span>
                   </div>
                 </div>
                 {Boolean(selectedReceiptTrip.pricing?.distanceMiles) && (
-                  <div className="pt-1 text-[11px] text-slate-500 flex items-center justify-between">
+                  <div className="pt-1 text-[11px] text-fg-muted flex items-center justify-between">
                     <span>Distance: {selectedReceiptTrip.pricing.distanceMiles!.toFixed(1)} miles</span>
                     {Boolean(selectedReceiptTrip.pricing?.durationMinutes) && (
                       <span>Duration: ~{Math.round(selectedReceiptTrip.pricing.durationMinutes!)} mins</span>
@@ -1872,7 +1901,7 @@ export default function PassengerAppRoute() {
               </div>
 
               {/* Canonical Itemized Breakdown */}
-              <div className="py-3 border-b border-slate-200 space-y-2.5">
+              <div className="py-3 border-b border-border-subtle space-y-2.5">
                 {selectedReceiptTrip.pricing && (
                   <PriceBreakdownPanel
                     outboundPricing={selectedReceiptTrip.pricing}
@@ -1885,25 +1914,25 @@ export default function PassengerAppRoute() {
                 )}
 
                 {tipAmount > 0 && (
-                  <div className="flex justify-between text-xs text-slate-700 px-1">
+                  <div className="flex justify-between text-xs text-fg-secondary px-1">
                     <span>Driver Tip</span>
                     <span className="font-bold tabular-nums">${tipAmount.toFixed(2)}</span>
                   </div>
                 )}
 
-                <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-sm font-extrabold text-slate-950">
+                <div className="pt-2 border-t border-border-subtle flex justify-between items-center text-sm font-extrabold text-fg-primary">
                   <span>{totalLabel}</span>
-                  <span className="text-base text-blue-700 tabular-nums">
+                  <span className="text-base text-status-info-fg tabular-nums">
                     ${grandTotal.toFixed(2)}
                   </span>
                 </div>
               </div>
 
               {/* Payment Details */}
-              <div className="py-3 text-xs text-slate-500 flex items-center justify-between gap-2 flex-wrap">
+              <div className="py-3 text-xs text-fg-muted flex items-center justify-between gap-2 flex-wrap">
                 <span>
                   Payment:{' '}
-                  <span className="font-bold text-slate-800">
+                  <span className="font-bold text-fg-strong">
                     {(() => {
                       const raw = (selectedReceiptTrip.payment?.method || 'pay_in_cab').toLowerCase();
                       if (raw === 'pay_in_cab' || raw === 'card_terminal') return 'Pay in Car';
@@ -1924,11 +1953,11 @@ export default function PassengerAppRoute() {
               </div>
 
               {/* Buttons (Hidden on Print) */}
-              <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-2 print:hidden">
+              <div className="pt-4 border-t border-border-subtle flex items-center justify-end gap-2 print:hidden">
                 <button
                   type="button"
                   onClick={() => setSelectedReceiptTrip(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
+                  className="px-4 py-2 bg-surface-muted hover:bg-surface-emphasis text-fg-secondary font-bold text-xs rounded-xl transition-colors"
                 >
                   Close
                 </button>
@@ -1948,7 +1977,7 @@ export default function PassengerAppRoute() {
       {/* Bottom Sticky / Dock Navigation Bar (Safe-area aware, clean badge pills) */}
       <nav
         aria-label="Bottom Navigation"
-        className="fixed bottom-0 md:bottom-3 inset-x-0 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:w-[460px] z-40 bg-white/95 backdrop-blur-md border-t md:border border-slate-200/90 md:rounded-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.06)] md:shadow-xl px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] md:py-1.5 flex items-center justify-around print:hidden"
+        className="fixed bottom-0 md:bottom-3 inset-x-0 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:w-[460px] z-40 bg-surface-card/95 backdrop-blur-md border-t md:border border-border-subtle/90 md:rounded-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.06)] md:shadow-xl px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] md:py-1.5 flex items-center justify-around print:hidden"
       >
         <button
           type="button"
@@ -1956,10 +1985,10 @@ export default function PassengerAppRoute() {
           className={`flex-1 py-1 flex flex-col items-center justify-center gap-1 rounded-xl transition-all cursor-pointer ${
             activeTab === 'book'
               ? 'text-blue-600 font-extrabold'
-              : 'text-slate-500 hover:text-slate-800 font-medium'
+              : 'text-fg-muted hover:text-fg-strong font-medium'
           }`}
         >
-          <div className={`px-3 py-1 rounded-full transition-colors ${activeTab === 'book' ? 'bg-blue-50 text-blue-600' : ''}`}>
+          <div className={`px-3 py-1 rounded-full transition-colors ${activeTab === 'book' ? 'bg-status-info-bg text-blue-600' : ''}`}>
             <CarIcon className="w-5 h-5" />
           </div>
           <span className="text-[10px] tracking-tight leading-none">Book</span>
@@ -1971,15 +2000,15 @@ export default function PassengerAppRoute() {
           className={`flex-1 py-1 flex flex-col items-center justify-center gap-1 rounded-xl transition-all relative cursor-pointer ${
             activeTab === 'trips'
               ? 'text-blue-600 font-extrabold'
-              : 'text-slate-500 hover:text-slate-800 font-medium'
+              : 'text-fg-muted hover:text-fg-strong font-medium'
           }`}
         >
-          <div className={`px-3 py-1 rounded-full transition-colors relative ${activeTab === 'trips' ? 'bg-blue-50 text-blue-600' : ''}`}>
+          <div className={`px-3 py-1 rounded-full transition-colors relative ${activeTab === 'trips' ? 'bg-status-info-bg text-blue-600' : ''}`}>
             <ClockIcon className="w-5 h-5" />
             {activeTrip ? (
               <span className="absolute top-0.5 right-1.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white animate-ping" />
             ) : trips.length > 0 ? (
-              <span className="absolute -top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-slate-900 text-white text-[9px] font-black flex items-center justify-center">
+              <span className="absolute -top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-surface-header text-white text-[9px] font-black flex items-center justify-center">
                 {trips.length > 99 ? '99+' : trips.length}
               </span>
             ) : null}
@@ -1993,10 +2022,10 @@ export default function PassengerAppRoute() {
           className={`flex-1 py-1 flex flex-col items-center justify-center gap-1 rounded-xl transition-all cursor-pointer ${
             activeTab === 'places'
               ? 'text-blue-600 font-extrabold'
-              : 'text-slate-500 hover:text-slate-800 font-medium'
+              : 'text-fg-muted hover:text-fg-strong font-medium'
           }`}
         >
-          <div className={`px-3 py-1 rounded-full transition-colors relative ${activeTab === 'places' ? 'bg-blue-50 text-blue-600' : ''}`}>
+          <div className={`px-3 py-1 rounded-full transition-colors relative ${activeTab === 'places' ? 'bg-status-info-bg text-blue-600' : ''}`}>
             <MapPinIcon className="w-5 h-5" />
             {account.savedPlaces.length > 0 && (
               <span className="absolute -top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-blue-600 text-white text-[9px] font-black flex items-center justify-center">
@@ -2013,10 +2042,10 @@ export default function PassengerAppRoute() {
           className={`flex-1 py-1 flex flex-col items-center justify-center gap-1 rounded-xl transition-all cursor-pointer ${
             activeTab === 'profile'
               ? 'text-blue-600 font-extrabold'
-              : 'text-slate-500 hover:text-slate-800 font-medium'
+              : 'text-fg-muted hover:text-fg-strong font-medium'
           }`}
         >
-          <div className={`px-3 py-1 rounded-full transition-colors ${activeTab === 'profile' ? 'bg-blue-50 text-blue-600' : ''}`}>
+          <div className={`px-3 py-1 rounded-full transition-colors ${activeTab === 'profile' ? 'bg-status-info-bg text-blue-600' : ''}`}>
             <UserIcon className="w-5 h-5" />
           </div>
           <span className="text-[10px] tracking-tight leading-none">Profile</span>
@@ -2046,33 +2075,33 @@ export default function PassengerAppRoute() {
           <div
             role="dialog"
             aria-modal="true"
-            className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in print:hidden"
+            className="fixed inset-0 z-50 bg-surface-overlay/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in print:hidden"
             onClick={dismissTripActionSheet}
           >
             <div
               style={tripActionSheetDrag.sheetStyle}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border-t sm:border border-slate-200 animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0"
+              className="bg-surface-card rounded-t-3xl sm:rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border-t sm:border border-border-subtle animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0"
             >
               <div
                 {...tripActionSheetDrag.dragHandlers}
-                className="bg-slate-900 text-white px-4 pt-2.5 pb-3.5 touch-none"
+                className="bg-surface-header text-white px-4 pt-2.5 pb-3.5 touch-none"
               >
-                <div className="w-10 h-1 rounded-full bg-slate-600/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+                <div className="w-10 h-1 rounded-full bg-surface-strong/80 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 text-sm font-extrabold text-white">
                       <ClockIcon className="w-4 h-4 text-blue-400 shrink-0" />
                       <span className="truncate">{sheetDate}</span>
                     </div>
-                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                    <p className="text-[11px] text-fg-subtle truncate mt-0.5">
                       #{t.id} · ${t.pricing?.totalFare?.toFixed(2) || '0.00'}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={dismissTripActionSheet}
-                    className="p-1.5 rounded-full bg-slate-800 text-slate-300 hover:text-white cursor-pointer shrink-0"
+                    className="p-1.5 rounded-full bg-surface-header-elevated text-slate-300 hover:text-white cursor-pointer shrink-0"
                     aria-label="Close trip actions"
                   >
                     <XIcon className="w-4 h-4" />
@@ -2099,7 +2128,7 @@ export default function PassengerAppRoute() {
                       setTripActionSheetTrip(null);
                       setSelectedReceiptTrip(t);
                     }}
-                    className="py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="py-2.5 px-3 rounded-xl bg-surface-subtle border border-border-subtle text-fg-strong font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <span>{isPast ? 'View Receipt' : 'Trip Details'}</span>
                   </button>
@@ -2109,7 +2138,7 @@ export default function PassengerAppRoute() {
                       setTripActionSheetTrip(null);
                       handleRebookTrip(t);
                     }}
-                    className="py-2.5 px-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="py-2.5 px-3 rounded-xl bg-status-info-bg border border-status-info-border text-status-info-fg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <CarIcon className="w-4 h-4" />
                     <span>Rebook Ride</span>
@@ -2120,7 +2149,7 @@ export default function PassengerAppRoute() {
                       setTripActionSheetTrip(null);
                       handleBookReturnTrip(t);
                     }}
-                    className="py-2.5 px-3 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="py-2.5 px-3 rounded-xl bg-status-staged-bg border border-status-staged-border text-status-staged-fg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <ArrowLeftRightIcon className="w-4 h-4" />
                     <span>Book Return</span>
@@ -2132,7 +2161,7 @@ export default function PassengerAppRoute() {
                         setTripActionSheetTrip(null);
                         handleEditTrip(t);
                       }}
-                      className="py-2.5 px-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="py-2.5 px-3 rounded-xl bg-status-warning-bg border border-status-warning-border text-status-warning-fg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <PencilIcon className="w-3.5 h-3.5" />
                       <span>Edit Ride</span>
@@ -2147,7 +2176,7 @@ export default function PassengerAppRoute() {
                       setTripActionSheetTrip(null);
                       handleCancelTrip(t);
                     }}
-                    className="w-full py-2.5 px-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full py-2.5 px-3 rounded-xl bg-status-danger-bg border border-status-danger-border text-status-danger-fg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <XIcon className="w-4 h-4" />
                     <span>Cancel Reservation</span>
@@ -2164,32 +2193,32 @@ export default function PassengerAppRoute() {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in print:hidden"
+          className="fixed inset-0 z-50 bg-surface-overlay/50 backdrop-blur-[2px] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in print:hidden"
           onClick={dismissHelpSheet}
         >
           <div
             style={helpSheetDrag.sheetStyle}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t sm:border border-slate-200/90 overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0"
+            className="w-full max-w-md bg-surface-card rounded-t-3xl sm:rounded-3xl shadow-2xl border-t sm:border border-border-subtle/90 overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0"
           >
             <div
               {...helpSheetDrag.dragHandlers}
-              className="px-4 pt-2.5 sm:pt-4 pb-3 border-b border-slate-100 touch-none"
+              className="px-4 pt-2.5 sm:pt-4 pb-3 border-b border-border-faint touch-none"
             >
-              <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="w-10 h-1 rounded-full bg-surface-strong mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-xl bg-status-info-bg text-blue-600 flex items-center justify-center">
                     <InfoIcon className="w-4 h-4" />
                   </div>
-                  <span className="font-extrabold text-slate-900 text-sm">
+                  <span className="font-extrabold text-fg-primary text-sm">
                     Passenger Assistance
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={dismissHelpSheet}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 cursor-pointer"
+                  className="p-1.5 text-fg-subtle hover:text-fg-secondary rounded-xl hover:bg-surface-muted cursor-pointer"
                   aria-label="Close menu"
                 >
                   <XIcon className="w-4 h-4" />
@@ -2201,14 +2230,14 @@ export default function PassengerAppRoute() {
               {/* 24/7 Dispatch Hotline */}
               <a
                 href={`tel:${displayCompanyPhoneRaw}`}
-                className="w-full p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-900 flex items-center gap-3 transition-colors"
+                className="w-full p-3 rounded-2xl bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg flex items-center gap-3 transition-colors"
               >
                 <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                   <PhoneIcon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="text-xs font-extrabold text-blue-950">Call 24/7 Dispatch Desk</p>
-                  <p className="text-[11px] text-blue-700 font-semibold">{displayCompanyPhone}</p>
+                  <p className="text-xs font-extrabold text-status-info-fg">Call 24/7 Dispatch Desk</p>
+                  <p className="text-[11px] text-status-info-fg font-semibold">{displayCompanyPhone}</p>
                 </div>
               </a>
 
@@ -2219,39 +2248,39 @@ export default function PassengerAppRoute() {
                   setIsHelpMenuOpen(false);
                   setIsFaqModalOpen(true);
                 }}
-                className="w-full p-3 rounded-2xl hover:bg-slate-50 text-slate-700 flex items-center gap-3 transition-colors border border-slate-200/80 cursor-pointer"
+                className="w-full p-3 rounded-2xl hover:bg-surface-subtle text-fg-secondary flex items-center gap-3 transition-colors border border-border-subtle/80 cursor-pointer"
               >
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-status-success-bg text-emerald-600 flex items-center justify-center shrink-0">
                   <InfoIcon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="text-xs font-bold text-slate-900">Help Center &amp; FAQ</p>
-                  <p className="text-[11px] text-slate-500">Airports, Car Seats &amp; Policies</p>
+                  <p className="text-xs font-bold text-fg-primary">Help Center &amp; FAQ</p>
+                  <p className="text-[11px] text-fg-muted">Airports, Car Seats &amp; Policies</p>
                 </div>
               </button>
 
               {/* Email Support */}
               <a
                 href={`mailto:${displayCompanyEmail}`}
-                className="w-full p-3 rounded-2xl hover:bg-slate-50 text-slate-700 flex items-center gap-3 transition-colors border border-slate-200/80"
+                className="w-full p-3 rounded-2xl hover:bg-surface-subtle text-fg-secondary flex items-center gap-3 transition-colors border border-border-subtle/80"
               >
-                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-status-staged-bg text-purple-600 flex items-center justify-center shrink-0">
                   <MailIcon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 text-left min-w-0">
-                  <p className="text-xs font-bold text-slate-900">Email Dispatch Support</p>
-                  <p className="text-[11px] text-slate-500 truncate">{displayCompanyEmail}</p>
+                  <p className="text-xs font-bold text-fg-primary">Email Dispatch Support</p>
+                  <p className="text-[11px] text-fg-muted truncate">{displayCompanyEmail}</p>
                 </div>
               </a>
 
-              <div className="pt-2 border-t border-slate-100">
+              <div className="pt-2 border-t border-border-faint">
                 <button
                   type="button"
                   onClick={() => {
                     setIsHelpMenuOpen(false);
                     void handleSignOut();
                   }}
-                  className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-rose-600 hover:bg-status-danger-bg flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <XIcon className="w-3.5 h-3.5 text-rose-500" />
                   <span>Sign Out</span>
@@ -2265,35 +2294,35 @@ export default function PassengerAppRoute() {
       {/* Help Center & Passenger FAQ Modal (Drag-down-to-close sheet on mobile) */}
       {isFaqModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface-overlay/60 backdrop-blur-xs animate-in fade-in"
           onClick={(e) => {
             if (e.target === e.currentTarget) setIsFaqModalOpen(false);
           }}
         >
           <div
             style={faqSheetDrag.sheetStyle}
-            className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[90dvh] flex flex-col shadow-2xl border-t sm:border border-slate-200 overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0"
+            className="bg-surface-card rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[90dvh] flex flex-col shadow-2xl border-t sm:border border-border-subtle overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0"
           >
             {/* Header */}
             <div
               {...faqSheetDrag.dragHandlers}
-              className="px-5 pt-2.5 sm:pt-5 pb-4 border-b border-slate-100 bg-slate-50 shrink-0 touch-none"
+              className="px-5 pt-2.5 sm:pt-5 pb-4 border-b border-border-faint bg-surface-subtle shrink-0 touch-none"
             >
-              <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="w-10 h-1 rounded-full bg-surface-strong mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shrink-0">
                     <InfoIcon className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-extrabold text-slate-950">Help &amp; Passenger FAQ</h3>
-                    <p className="text-xs text-slate-500">Policies, Flight Tracking &amp; FAQs</p>
+                    <h3 className="text-base font-extrabold text-fg-primary">Help &amp; Passenger FAQ</h3>
+                    <p className="text-xs text-fg-muted">Policies, Flight Tracking &amp; FAQs</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsFaqModalOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-200/50 cursor-pointer"
+                  className="p-1.5 text-fg-subtle hover:text-fg-secondary rounded-xl hover:bg-surface-emphasis/50 cursor-pointer"
                 >
                   <XIcon className="w-5 h-5" />
                 </button>
@@ -2301,43 +2330,43 @@ export default function PassengerAppRoute() {
             </div>
 
             {/* Content Body */}
-            <div className="p-5 overflow-y-auto space-y-4 text-xs text-slate-700">
-              <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-100">
-                <h4 className="font-extrabold text-blue-950 mb-1 flex items-center gap-1.5 text-xs">
+            <div className="p-5 overflow-y-auto space-y-4 text-xs text-fg-secondary">
+              <div className="p-3.5 rounded-2xl bg-status-info-bg/70 border border-blue-100">
+                <h4 className="font-extrabold text-status-info-fg mb-1 flex items-center gap-1.5 text-xs">
                   <PlaneLandingIcon className="w-4 h-4 text-blue-600" />
                   <span>Airport Pickups &amp; Flight Monitoring (STL)</span>
                 </h4>
-                <p className="text-slate-600 leading-relaxed">
+                <p className="text-fg-secondary leading-relaxed">
                   We monitor all scheduled domestic and international arrivals into St. Louis Lambert Airport in real time and automatically adjust pickup times for flight delays. As a general policy, we wait as long as it takes so your driver is ready when you land.
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
-                <h4 className="font-extrabold text-slate-900 mb-1 flex items-center gap-1.5 text-xs">
+              <div className="p-3.5 rounded-2xl bg-surface-subtle border border-border-subtle">
+                <h4 className="font-extrabold text-fg-primary mb-1 flex items-center gap-1.5 text-xs">
                   <ShieldCheckIcon className="w-4 h-4 text-emerald-600" />
                   <span>Child Car Seats Available</span>
                 </h4>
-                <p className="text-slate-600 leading-relaxed">
+                <p className="text-fg-secondary leading-relaxed">
                   Safety is our priority. Rear-facing infant, forward-facing toddler, and booster seats can be added directly on the booking form when choosing passengers and bags.
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
-                <h4 className="font-extrabold text-slate-900 mb-1 flex items-center gap-1.5 text-xs">
+              <div className="p-3.5 rounded-2xl bg-surface-subtle border border-border-subtle">
+                <h4 className="font-extrabold text-fg-primary mb-1 flex items-center gap-1.5 text-xs">
                   <LuggageIcon className="w-4 h-4 text-purple-600" />
                   <span>Luggage &amp; Vehicle Capacities</span>
                 </h4>
-                <p className="text-slate-600 leading-relaxed">
+                <p className="text-fg-secondary leading-relaxed">
                   Sedans comfortably fit up to 4 passengers with 3 standard suitcases. For groups or extra luggage, our SUVs and Minivans fit up to 6 passengers with 6+ large bags.
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
-                <h4 className="font-extrabold text-slate-900 mb-1 flex items-center gap-1.5 text-xs">
+              <div className="p-3.5 rounded-2xl bg-surface-subtle border border-border-subtle">
+                <h4 className="font-extrabold text-fg-primary mb-1 flex items-center gap-1.5 text-xs">
                   <ClockIcon className="w-4 h-4 text-amber-600" />
                   <span>Cancellation &amp; Changes Policy</span>
                 </h4>
-                <p className="text-slate-600 leading-relaxed">
+                <p className="text-fg-secondary leading-relaxed">
                   Bookings can be changed or cancelled at no charge up to 2 hours before scheduled pickup. For last-minute updates, call our 24/7 dispatch desk directly.
                 </p>
               </div>
@@ -2350,7 +2379,7 @@ export default function PassengerAppRoute() {
                 </div>
                 <a
                   href={`tel:${displayCompanyPhoneRaw}`}
-                  className="px-3.5 py-2 bg-white text-blue-900 font-extrabold text-xs rounded-xl shadow-md hover:bg-blue-50 transition-colors shrink-0"
+                  className="px-3.5 py-2 bg-surface-card text-status-info-fg font-extrabold text-xs rounded-xl shadow-md hover:bg-status-info-bg transition-colors shrink-0"
                 >
                   Call Now
                 </a>
@@ -2358,11 +2387,11 @@ export default function PassengerAppRoute() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <div className="p-4 border-t border-border-faint bg-surface-subtle flex justify-end">
               <button
                 type="button"
                 onClick={() => setIsFaqModalOpen(false)}
-                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-colors"
+                className="px-5 py-2.5 bg-surface-header hover:bg-surface-header-elevated text-white font-bold text-xs rounded-xl transition-colors"
               >
                 Close Help Center
               </button>

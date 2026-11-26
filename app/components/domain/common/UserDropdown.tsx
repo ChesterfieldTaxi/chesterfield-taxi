@@ -132,8 +132,8 @@ export function UserDropdown({
             : 'gap-2 w-full justify-between px-2.5 py-1.5 rounded-xl'
         } ${
           variant === 'dark'
-            ? 'border-slate-700/80 bg-slate-800/80 hover:bg-slate-800 text-slate-100 hover:text-white'
-            : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 shadow-2xs'
+            ? 'border-border-header/80 bg-surface-header-elevated/80 hover:bg-surface-header-elevated text-fg-on-header hover:text-white'
+            : 'border-border-subtle bg-surface-card hover:bg-surface-subtle text-fg-secondary hover:text-fg-primary shadow-2xs'
         }`}
         title={
           hasMultipleWorkspaces
@@ -153,7 +153,7 @@ export function UserDropdown({
         </div>
         {!collapsed && (
           <ChevronDownIcon
-            className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${
+            className={`w-3.5 h-3.5 text-fg-subtle shrink-0 transition-transform ${
               dropUp && isOpen ? 'rotate-180' : ''
             }`}
           />
@@ -164,7 +164,7 @@ export function UserDropdown({
         <div
           className={`absolute ${
             dropUp ? 'bottom-full mb-2 left-0' : 'right-0 mt-2'
-          } w-64 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100`}
+          } w-64 bg-surface-card border border-border-subtle rounded-2xl shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 divide-y divide-border-faint`}
         >
           {/* User Header */}
           <div className="px-3.5 py-2.5 flex items-center gap-2.5">
@@ -174,19 +174,19 @@ export function UserDropdown({
             <div className="min-w-0 flex-1">
               {displayName && displayName.toLowerCase() !== displayEmail.toLowerCase() ? (
                 <>
-                  <div className="text-xs font-bold text-slate-900 truncate" title={displayName}>
+                  <div className="text-xs font-bold text-fg-primary truncate" title={displayName}>
                     {displayName}
                   </div>
-                  <div className="text-[11px] text-slate-500 truncate" title={displayEmail}>
+                  <div className="text-[11px] text-fg-muted truncate" title={displayEmail}>
                     {displayEmail}
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                  <div className="text-[10px] text-fg-subtle font-semibold uppercase tracking-wider">
                     Signed in
                   </div>
-                  <div className="text-xs font-bold text-slate-900 truncate" title={displayEmail}>
+                  <div className="text-xs font-bold text-fg-primary truncate" title={displayEmail}>
                     {displayEmail}
                   </div>
                 </>
@@ -198,13 +198,13 @@ export function UserDropdown({
           {hasMultipleWorkspaces ? (
             <div className="p-1.5">
               <div className="px-2.5 py-1 flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
                   Workspaces
                 </span>
                 <button
                   type="button"
                   onClick={() => handleNavigateView('/app?choose=1')}
-                  className="text-[10px] font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                  className="text-[10px] font-semibold text-blue-600 hover:text-status-info-fg hover:underline cursor-pointer"
                 >
                   All Apps
                 </button>
@@ -216,22 +216,22 @@ export function UserDropdown({
                     onClick={() => handleNavigateView('/app/admin')}
                     className={`group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
                       currentPath === 'admin'
-                        ? 'bg-purple-50 text-purple-900 font-semibold'
-                        : 'text-slate-700 hover:bg-slate-50'
+                        ? 'bg-status-staged-bg text-status-staged-fg font-semibold'
+                        : 'text-fg-secondary hover:bg-surface-subtle'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded-lg bg-purple-100/80 flex items-center justify-center shrink-0">
+                      <div className="w-6 h-6 rounded-lg bg-status-staged-bg-strong/80 flex items-center justify-center shrink-0">
                         <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-700" />
                       </div>
                       <span>Admin</span>
                     </div>
                     {currentPath === 'admin' ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-status-staged-bg-strong text-status-staged-fg">
                         Active
                       </span>
                     ) : (
-                      <ChevronRightIcon className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+                      <ChevronRightIcon className="w-3.5 h-3.5 text-fg-faint group-hover:text-fg-muted transition-colors" />
                     )}
                   </button>
                 )}
@@ -242,22 +242,22 @@ export function UserDropdown({
                     onClick={() => handleNavigateView('/app/dispatch')}
                     className={`group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
                       currentPath === 'dispatch'
-                        ? 'bg-blue-50 text-blue-900 font-semibold'
-                        : 'text-slate-700 hover:bg-slate-50'
+                        ? 'bg-status-info-bg text-status-info-fg font-semibold'
+                        : 'text-fg-secondary hover:bg-surface-subtle'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded-lg bg-blue-100/80 flex items-center justify-center shrink-0">
-                        <RadioIcon className="w-3.5 h-3.5 text-blue-700" />
+                      <div className="w-6 h-6 rounded-lg bg-status-info-bg-strong/80 flex items-center justify-center shrink-0">
+                        <RadioIcon className="w-3.5 h-3.5 text-status-info-fg" />
                       </div>
                       <span>Dispatch</span>
                     </div>
                     {currentPath === 'dispatch' ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-status-info-bg-strong text-status-info-fg">
                         Active
                       </span>
                     ) : (
-                      <ChevronRightIcon className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+                      <ChevronRightIcon className="w-3.5 h-3.5 text-fg-faint group-hover:text-fg-muted transition-colors" />
                     )}
                   </button>
                 )}
@@ -268,22 +268,22 @@ export function UserDropdown({
                     onClick={() => handleNavigateView('/app/driver')}
                     className={`group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
                       currentPath === 'driver'
-                        ? 'bg-amber-50 text-amber-900 font-semibold'
-                        : 'text-slate-700 hover:bg-slate-50'
+                        ? 'bg-status-warning-bg text-status-warning-fg font-semibold'
+                        : 'text-fg-secondary hover:bg-surface-subtle'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded-lg bg-amber-100/80 flex items-center justify-center shrink-0">
-                        <CarIcon className="w-3.5 h-3.5 text-amber-700" />
+                      <div className="w-6 h-6 rounded-lg bg-status-warning-bg-strong/80 flex items-center justify-center shrink-0">
+                        <CarIcon className="w-3.5 h-3.5 text-status-warning-fg" />
                       </div>
                       <span>Driver App</span>
                     </div>
                     {currentPath === 'driver' ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-status-warning-bg-strong text-status-warning-fg">
                         Active
                       </span>
                     ) : (
-                      <ChevronRightIcon className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+                      <ChevronRightIcon className="w-3.5 h-3.5 text-fg-faint group-hover:text-fg-muted transition-colors" />
                     )}
                   </button>
                 )}
@@ -294,22 +294,22 @@ export function UserDropdown({
                     onClick={() => handleNavigateView('/app/corporate')}
                     className={`group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
                       currentPath === 'corporate'
-                        ? 'bg-indigo-50 text-indigo-900 font-semibold'
-                        : 'text-slate-700 hover:bg-slate-50'
+                        ? 'bg-status-staged-bg text-status-staged-fg font-semibold'
+                        : 'text-fg-secondary hover:bg-surface-subtle'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded-lg bg-indigo-100/80 flex items-center justify-center shrink-0">
-                        <BuildingIcon className="w-3.5 h-3.5 text-indigo-700" />
+                      <div className="w-6 h-6 rounded-lg bg-status-staged-bg-strong/80 flex items-center justify-center shrink-0">
+                        <BuildingIcon className="w-3.5 h-3.5 text-status-staged-fg" />
                       </div>
                       <span>Corporate Portal</span>
                     </div>
                     {currentPath === 'corporate' ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-status-staged-bg-strong text-status-staged-fg">
                         Active
                       </span>
                     ) : (
-                      <ChevronRightIcon className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+                      <ChevronRightIcon className="w-3.5 h-3.5 text-fg-faint group-hover:text-fg-muted transition-colors" />
                     )}
                   </button>
                 )}
@@ -320,22 +320,22 @@ export function UserDropdown({
                     onClick={() => handleNavigateView('/app/passenger')}
                     className={`group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
                       currentPath === 'app' || currentPath === 'customer'
-                        ? 'bg-emerald-50 text-emerald-900 font-semibold'
-                        : 'text-slate-700 hover:bg-slate-50'
+                        ? 'bg-status-success-bg text-status-success-fg font-semibold'
+                        : 'text-fg-secondary hover:bg-surface-subtle'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded-lg bg-emerald-100/80 flex items-center justify-center shrink-0">
-                        <UserIcon className="w-3.5 h-3.5 text-emerald-700" />
+                      <div className="w-6 h-6 rounded-lg bg-status-success-bg-strong/80 flex items-center justify-center shrink-0">
+                        <UserIcon className="w-3.5 h-3.5 text-status-success-fg" />
                       </div>
                       <span>Client Portal</span>
                     </div>
                     {currentPath === 'app' || currentPath === 'customer' ? (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-status-success-bg-strong text-status-success-fg">
                         Active
                       </span>
                     ) : (
-                      <ChevronRightIcon className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+                      <ChevronRightIcon className="w-3.5 h-3.5 text-fg-faint group-hover:text-fg-muted transition-colors" />
                     )}
                   </button>
                 )}
@@ -346,15 +346,15 @@ export function UserDropdown({
               <button
                 type="button"
                 onClick={() => handleNavigateView(singleWorkspace.path)}
-                className="group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer text-left"
+                className="group w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold text-fg-secondary hover:bg-surface-subtle transition-colors cursor-pointer text-left"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                  <div className="w-6 h-6 rounded-lg bg-status-info-bg flex items-center justify-center shrink-0">
                     <UserIcon className="w-3.5 h-3.5 text-blue-600" />
                   </div>
                   <span>Open {singleWorkspace.label}</span>
                 </div>
-                <ChevronRightIcon className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                <ChevronRightIcon className="w-3.5 h-3.5 text-fg-subtle group-hover:text-blue-600 transition-colors" />
               </button>
             </div>
           ) : null}
@@ -367,7 +367,7 @@ export function UserDropdown({
                 setIsOpen(false);
                 onSignOut();
               }}
-              className="group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors cursor-pointer text-left"
+              className="group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-red-600 hover:bg-status-danger-bg hover:text-status-danger-fg transition-colors cursor-pointer text-left"
             >
               <LogOutIcon className="w-4 h-4 text-red-500 group-hover:text-red-600 shrink-0 transition-colors" />
               <span>Sign out</span>

@@ -44,7 +44,7 @@ export function AirportCityCombobox({
   placeholder = 'e.g. YYZ, ORD, ATL',
   size = 'md',
   preferPrivateFbo = false,
-  borderClassName = 'border-blue-200',
+  borderClassName = 'border-status-info-border',
   disabled = false,
   ariaLabel = 'Airport or city',
 }: AirportCityComboboxProps) {
@@ -192,7 +192,7 @@ export function AirportCityCombobox({
           onBlur={handleBlur}
           onChange={(e) => { setIsDirtySinceFocus(true); onChange(e.target.value); setActiveIndex(0); if (!isOpen) openDropdown(); }}
           onKeyDown={handleKeyDown}
-          className={`w-full bg-white border ${borderClassName} ${sizeClass} font-mono font-bold text-slate-900 placeholder:font-sans placeholder:text-slate-400 placeholder:font-normal transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/25 disabled:opacity-50`}
+          className={`w-full bg-surface-card border ${borderClassName} ${sizeClass} font-mono font-bold text-fg-primary placeholder:font-sans placeholder:text-fg-subtle placeholder:font-normal transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/25 disabled:opacity-50`}
         />
         <span className="absolute inset-y-0 right-1.5 flex items-center gap-0.5">
           {value && !disabled && (
@@ -201,7 +201,7 @@ export function AirportCityCombobox({
               tabIndex={-1}
               title="Clear airport"
               onMouseDown={(e) => { e.preventDefault(); setIsDirtySinceFocus(false); onChange(''); setActiveIndex(0); inputRef.current?.focus(); }}
-              className="text-slate-400 hover:text-slate-700 px-1 py-0.5 text-[11px] font-bold leading-none cursor-pointer"
+              className="text-fg-subtle hover:text-fg-secondary px-1 py-0.5 text-[11px] font-bold leading-none cursor-pointer"
             >
               ✕
             </button>
@@ -216,7 +216,7 @@ export function AirportCityCombobox({
               if (isOpen) closeDropdown();
               else { inputRef.current?.focus(); openDropdown(); }
             }}
-            className="p-0.5 text-slate-400 hover:text-slate-600 cursor-pointer disabled:pointer-events-none"
+            className="p-0.5 text-fg-subtle hover:text-fg-secondary cursor-pointer disabled:pointer-events-none"
           >
             <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : ''}`} />
           </button>
@@ -232,7 +232,7 @@ export function AirportCityCombobox({
               position: 'fixed', top: coords.top, left: coords.left, width: coords.width,
               transformOrigin: coords.openUpward ? 'bottom left' : 'top left',
             }}
-            className="bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none z-[99999]"
+            className="bg-surface-card rounded-xl shadow-xl border border-border-subtle/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-border-faint select-none z-[99999]"
           >
             <div className="max-h-56 overflow-y-auto custom-scrollbar py-0.5">
               {matches.map((entry, idx) => {
@@ -245,7 +245,7 @@ export function AirportCityCombobox({
                     onMouseEnter={() => setActiveIndex(idx)}
                     onMouseDown={(e) => { e.preventDefault(); handleSelectEntry(entry); }}
                     className={`w-full px-3 py-1.5 flex items-center justify-between gap-2 text-left transition-colors cursor-pointer ${
-                      isSelected ? 'bg-blue-50/80 text-blue-700 font-bold' : isHighlighted ? 'bg-blue-50/80 text-blue-700' : 'text-slate-700 hover:bg-blue-50/80 hover:text-blue-700'
+                      isSelected ? 'bg-status-info-bg/80 text-status-info-fg font-bold' : isHighlighted ? 'bg-status-info-bg/80 text-status-info-fg' : 'text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg'
                     }`}
                   >
                     <div className="min-w-0 flex-1">
@@ -253,18 +253,18 @@ export function AirportCityCombobox({
                         <span className="font-mono font-extrabold text-[11px]">{entry.iata}</span>
                         <span className="truncate font-semibold">{entry.city}</span>
                         {entry.isPrivateFbo && (
-                          <span className="px-1 rounded bg-slate-100 text-slate-600 text-[9px] font-bold shrink-0">FBO</span>
+                          <span className="px-1 rounded bg-surface-muted text-fg-secondary text-[9px] font-bold shrink-0">FBO</span>
                         )}
                       </div>
-                      <div className="text-[10px] text-slate-400 truncate">{entry.name}</div>
+                      <div className="text-[10px] text-fg-subtle truncate">{entry.name}</div>
                     </div>
                     {isSelected && <CheckIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
                   </button>
                 );
               })}
               {matches.length === 0 && (
-                <div className="px-3 py-2.5 text-center text-[11px] text-slate-500">
-                  Press Tab or continue typing to keep custom airport <strong className="font-semibold text-slate-800">{value.trim()}</strong>
+                <div className="px-3 py-2.5 text-center text-[11px] text-fg-muted">
+                  Press Tab or continue typing to keep custom airport <strong className="font-semibold text-fg-strong">{value.trim()}</strong>
                 </div>
               )}
             </div>

@@ -156,21 +156,21 @@ export function FlightTelemetryCheckPanel({
   const renderStatusPill = (snap: FlightTelemetrySnapshot) => {
     if (snap.status === 'cancelled') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold bg-status-danger-bg-strong text-status-danger-fg border border-status-danger-border">
           Cancelled
         </span>
       );
     }
     if (snap.status === 'diverted') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold bg-status-danger-bg-strong text-status-danger-fg border border-status-danger-border">
           Diverted
         </span>
       );
     }
     if (snap.status === 'landed') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold bg-sky-100 text-sky-800 border border-sky-300">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold bg-status-info-bg-strong text-status-info-fg border border-status-info-border">
           Landed
         </span>
       );
@@ -178,20 +178,20 @@ export function FlightTelemetryCheckPanel({
     if (snap.status === 'delayed' || (snap.delayMinutes || 0) >= 15) {
       const mins = Math.max(15, snap.delayMinutes || 0);
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border">
           Delayed +{mins}m
         </span>
       );
     }
     if (snap.isSimulatedFallback) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold bg-indigo-100 text-indigo-800 border border-indigo-200">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border">
           Terminal Verified
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-extrabold bg-status-success-bg-strong text-status-success-fg border border-status-success-border">
         On Time
       </span>
     );
@@ -216,7 +216,7 @@ export function FlightTelemetryCheckPanel({
       {/* Instant STL Terminal & Exit Door Guidance Row + Staff-Only Live Check Pill */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         {terminalResolution && terminalResolution.terminal && (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-blue-200 text-[11px] font-bold text-slate-800 shadow-2xs">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-card border border-status-info-border text-[11px] font-bold text-fg-strong shadow-2xs">
             <span className="px-1.5 py-0.2 rounded bg-blue-600 text-white text-[10px] font-black">
               {terminalResolution.shortTerminal}
             </span>
@@ -266,18 +266,18 @@ export function FlightTelemetryCheckPanel({
               }
               className={`inline-flex items-center gap-1.5 ${
                 compact ? 'px-2.5 py-1 text-[10.5px]' : 'px-3 py-1.5 text-xs'
-              } rounded-full font-bold bg-slate-100 text-slate-600 border border-slate-300 cursor-not-allowed opacity-90`}
+              } rounded-full font-bold bg-surface-muted text-fg-secondary border border-border-strong cursor-not-allowed opacity-90`}
             >
               {eligibility.reason === 'outside_24h_window' ? (
                 <>
-                  <ClockIcon className="w-3 h-3 text-slate-500 shrink-0" />
+                  <ClockIcon className="w-3 h-3 text-fg-muted shrink-0" />
                   <span>
                     Unlocks 24h before pickup{unlockTimeLabel ? ` (${unlockTimeLabel})` : ''}
                   </span>
                 </>
               ) : (
                 <>
-                  <LockIcon className="w-3 h-3 text-slate-500 shrink-0" />
+                  <LockIcon className="w-3 h-3 text-fg-muted shrink-0" />
                   <span>
                     {eligibility.reason === 'past_window'
                       ? 'Pickup window passed (>12h)'
@@ -291,22 +291,22 @@ export function FlightTelemetryCheckPanel({
       </div>
 
       {checkError && (
-        <div className="text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5 font-semibold">
+        <div className="text-[11px] text-status-danger-fg bg-status-danger-bg border border-status-danger-border rounded-lg px-2.5 py-1.5 font-semibold">
           {checkError}
         </div>
       )}
 
       {/* Checked Telemetry Inline Banner */}
       {activeTelemetry && (
-        <div className="bg-white border border-blue-200 rounded-xl p-2.5 space-y-1.5 shadow-2xs text-xs">
+        <div className="bg-surface-card border border-status-info-border rounded-xl p-2.5 space-y-1.5 shadow-2xs text-xs">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-mono font-black text-slate-900">
+              <span className="font-mono font-black text-fg-primary">
                 {activeTelemetry.flightIdent}
               </span>
               {renderStatusPill(activeTelemetry)}
               {activeTelemetry.originIata && (
-                <span className="text-[11px] font-semibold text-slate-600">
+                <span className="text-[11px] font-semibold text-fg-secondary">
                   {activeTelemetry.originIata}
                   {activeTelemetry.originCity ? ` (${activeTelemetry.originCity})` : ''} &rarr;{' '}
                   {activeTelemetry.destinationIata || airportIataCode}
@@ -315,9 +315,9 @@ export function FlightTelemetryCheckPanel({
             </div>
 
             {(activeTelemetry.estimatedArrivalIso || activeTelemetry.scheduledArrivalIso) && (
-              <span className="text-[11px] font-bold text-slate-700">
+              <span className="text-[11px] font-bold text-fg-secondary">
                 Est. Arrival:{' '}
-                <span className="font-mono text-slate-900">
+                <span className="font-mono text-fg-primary">
                   {new Date(
                     (activeTelemetry.estimatedArrivalIso || activeTelemetry.scheduledArrivalIso)!
                   ).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
@@ -326,25 +326,25 @@ export function FlightTelemetryCheckPanel({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-700">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fg-secondary">
             {activeTelemetry.terminal && (
               <span>
-                <strong className="text-slate-900">Terminal:</strong> {activeTelemetry.terminal}
+                <strong className="text-fg-primary">Terminal:</strong> {activeTelemetry.terminal}
               </span>
             )}
             {activeTelemetry.gate && (
               <span>
-                <strong className="text-slate-900">Gate:</strong> {activeTelemetry.gate}
+                <strong className="text-fg-primary">Gate:</strong> {activeTelemetry.gate}
               </span>
             )}
             {activeTelemetry.baggageClaim && (
               <span>
-                <strong className="text-slate-900">Baggage Belt:</strong>{' '}
+                <strong className="text-fg-primary">Baggage Belt:</strong>{' '}
                 {activeTelemetry.baggageClaim}
               </span>
             )}
             {activeTelemetry.pickupDoorGuidance && isPickupAirport && (
-              <span className="text-blue-800 font-semibold">
+              <span className="text-status-info-fg font-semibold">
                 Meet Driver: {activeTelemetry.pickupDoorGuidance}
               </span>
             )}
@@ -357,12 +357,12 @@ export function FlightTelemetryCheckPanel({
         <div
           className={`rounded-xl border p-2.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
             alignment.conflict === 'flight_cancelled'
-              ? 'bg-rose-50 border-rose-300 text-rose-900'
-              : 'bg-amber-50 border-amber-300 text-amber-950'
+              ? 'bg-status-danger-bg border-status-danger-border text-status-danger-fg'
+              : 'bg-status-warning-bg border-status-warning-border text-status-warning-fg'
           }`}
         >
           <div className="flex items-start gap-1.5">
-            <AlertTriangleIcon className="w-4 h-4 shrink-0 mt-0.5 text-amber-700" />
+            <AlertTriangleIcon className="w-4 h-4 shrink-0 mt-0.5 text-status-warning-fg" />
             <div className="text-[11px] leading-snug">
               <span className="font-extrabold block">
                 {alignment.conflict === 'pickup_before_arrival'
@@ -461,13 +461,13 @@ export function FlightAssistanceCard({
   const tailFieldName = isReturn ? 'returnTailNumber' : 'tailNumber';
 
   const containerColors = isReturn
-    ? 'bg-white/95 border-indigo-200'
-    : 'bg-blue-50/70 border-blue-200';
-  const inputBorder = isReturn ? 'border-indigo-200' : 'border-blue-200';
-  const accentText = isReturn ? 'text-indigo-950' : 'text-blue-950';
+    ? 'bg-surface-card/95 border-status-staged-border'
+    : 'bg-status-info-bg/70 border-status-info-border';
+  const inputBorder = isReturn ? 'border-status-staged-border' : 'border-status-info-border';
+  const accentText = isReturn ? 'text-status-staged-fg' : 'text-status-info-fg';
   const badgeStyle = isReturn
-    ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
-    : 'bg-blue-200/80 text-blue-900';
+    ? 'bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border'
+    : 'bg-blue-200/80 text-status-info-fg';
 
   const handleAirlineSelect = (val: string) => {
     onAirlineChange(val);
@@ -507,12 +507,12 @@ export function FlightAssistanceCard({
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-fg-strong bg-surface-card px-2.5 py-1 rounded-lg border border-border-subtle shadow-2xs">
             <input
               type="checkbox"
               checked={provideFlightInfo}
               onChange={(e) => onToggleProvideFlightInfo(e.target.checked)}
-              className="rounded border-blue-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+              className="rounded border-status-info-border text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
             />
             <span>
               {detection.isPickupAirport
@@ -533,8 +533,8 @@ export function FlightAssistanceCard({
       </div>
 
       {detection.isDropoffAirport && (
-        <div className="text-[11px] text-amber-900 bg-amber-50/90 border border-amber-200 rounded-lg p-2.5 flex items-start gap-1.5">
-          <span className="font-bold text-amber-800 shrink-0">Note:</span>
+        <div className="text-[11px] text-status-warning-fg bg-status-warning-bg/90 border border-status-warning-border rounded-lg p-2.5 flex items-start gap-1.5">
+          <span className="font-bold text-status-warning-fg shrink-0">Note:</span>
           <span>
             Your driver arrives at your scheduled pickup time. Departing flights are not monitored for pickup adjustments.
           </span>
@@ -546,7 +546,7 @@ export function FlightAssistanceCard({
           {detection.isPrivateAviation ? (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div>
-                <label className="block text-[11px] text-slate-700 font-semibold mb-1">
+                <label className="block text-[11px] text-fg-secondary font-semibold mb-1">
                   FBO Facility / Terminal
                 </label>
                 <input
@@ -555,7 +555,7 @@ export function FlightAssistanceCard({
                   placeholder="e.g. Signature Aviation, TAC Air..."
                   value={fboFacility || ''}
                   onChange={(e) => onFboFacilityChange(e.target.value)}
-                  className={`w-full px-3 py-2 bg-white border ${inputBorder} rounded-lg text-base sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/25`}
+                  className={`w-full px-3 py-2 bg-surface-card border ${inputBorder} rounded-lg text-base sm:text-sm text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500/25`}
                 />
                 <datalist id={datalistId}>
                   {fboFacilities.map((fbo) => (
@@ -565,7 +565,7 @@ export function FlightAssistanceCard({
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-700 font-semibold mb-1">
+                <label className="block text-[11px] text-fg-secondary font-semibold mb-1">
                   Aircraft Tail # {detection.isPickupAirport ? '(Required)' : '(Optional)'}
                 </label>
                 <input
@@ -574,9 +574,9 @@ export function FlightAssistanceCard({
                   placeholder="e.g. N12345"
                   value={tailNumber || ''}
                   onChange={(e) => onTailNumberChange(e.target.value.toUpperCase())}
-                  className={`w-full px-3 py-2 bg-white border ${
-                    tailNumberError ? 'border-red-400 bg-red-50/40' : inputBorder
-                  } rounded-lg text-base sm:text-sm uppercase font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/25`}
+                  className={`w-full px-3 py-2 bg-surface-card border ${
+                    tailNumberError ? 'border-red-400 bg-status-danger-bg/40' : inputBorder
+                  } rounded-lg text-base sm:text-sm uppercase font-mono font-bold text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500/25`}
                 />
                 {tailNumberError && (
                   <p className="text-[11px] text-red-600 font-semibold mt-1">{tailNumberError}</p>
@@ -584,7 +584,7 @@ export function FlightAssistanceCard({
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-700 font-semibold mb-1">
+                <label className="block text-[11px] text-fg-secondary font-semibold mb-1">
                   {detection.isPickupAirport ? 'Origin Airport (Optional)' : 'Destination (Optional)'}
                 </label>
                 <AirportCityCombobox
@@ -600,7 +600,7 @@ export function FlightAssistanceCard({
             <>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
-                  <label className="block text-[11px] text-slate-700 font-semibold mb-1">
+                  <label className="block text-[11px] text-fg-secondary font-semibold mb-1">
                     Airline {detection.isDropoffAirport ? '(Terminal Door)' : ''}
                   </label>
                   <Select
@@ -622,7 +622,7 @@ export function FlightAssistanceCard({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] text-slate-700 font-semibold mb-1">
+                  <label className="block text-[11px] text-fg-secondary font-semibold mb-1">
                     {detection.isPickupAirport ? 'Flight # (1–4 digits)' : 'Flight # (Optional)'}
                   </label>
                   <input
@@ -634,9 +634,9 @@ export function FlightAssistanceCard({
                     placeholder="e.g. 1234"
                     value={flightNumber}
                     onChange={(e) => handleFlightNumInput(e.target.value)}
-                    className={`w-full px-3 py-2 bg-white border ${
-                      flightNumberError ? 'border-red-400 bg-red-50/40' : inputBorder
-                    } rounded-lg text-base sm:text-sm font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/25`}
+                    className={`w-full px-3 py-2 bg-surface-card border ${
+                      flightNumberError ? 'border-red-400 bg-status-danger-bg/40' : inputBorder
+                    } rounded-lg text-base sm:text-sm font-mono font-bold text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500/25`}
                   />
                   {flightNumberError && (
                     <p className="text-[11px] text-red-600 font-semibold mt-1">{flightNumberError}</p>
@@ -644,7 +644,7 @@ export function FlightAssistanceCard({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] text-slate-700 font-semibold mb-1">
+                  <label className="block text-[11px] text-fg-secondary font-semibold mb-1">
                     {detection.isPickupAirport ? 'Departing From (Origin)' : 'Destination (Optional)'}
                   </label>
                   <AirportCityCombobox
@@ -676,13 +676,13 @@ export function FlightAssistanceCard({
             </>
           )}
 
-          <div className="pt-1.5 border-t border-blue-200/60 text-xs text-slate-800">
+          <div className="pt-1.5 border-t border-status-info-border/60 text-xs text-fg-strong">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={hasCheckedLuggage}
                 onChange={(e) => onHasCheckedLuggageChange(e.target.checked)}
-                className="w-4 h-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                className="w-4 h-4 rounded border-status-info-border text-blue-600 focus:ring-blue-500"
               />
               <span>
                 {detection.isPickupAirport
@@ -692,17 +692,17 @@ export function FlightAssistanceCard({
             </label>
           </div>
 
-          <div className="text-[11px] text-slate-600 bg-white/85 p-2.5 rounded-lg border border-blue-100 leading-relaxed">
+          <div className="text-[11px] text-fg-secondary bg-surface-card/85 p-2.5 rounded-lg border border-blue-100 leading-relaxed">
             {detection.isPrivateAviation ? (
               <>
-                <span className="font-bold text-slate-800">Private Aviation FBO Pickup: </span>
+                <span className="font-bold text-fg-strong">Private Aviation FBO Pickup: </span>
                 <span>
                   Your driver coordinates directly with the FBO front desk for ramp-side or lobby pickup.
                 </span>
               </>
             ) : detection.isPickupAirport ? (
               <>
-                <span className="font-bold text-slate-800">STL Curbside Pickup: </span>
+                <span className="font-bold text-fg-strong">STL Curbside Pickup: </span>
                 <span>
                   {lambertPickupInstructions ||
                     'Terminal 1: Lower Level Exit Door 6 / Door 12 • Terminal 2 (Southwest / Lufthansa): Baggage Claim Exit Door 12. We monitor your flight in real time.'}
@@ -710,7 +710,7 @@ export function FlightAssistanceCard({
               </>
             ) : (
               <>
-                <span className="font-bold text-slate-800">STL Departures Tip: </span>
+                <span className="font-bold text-fg-strong">STL Departures Tip: </span>
                 <span>
                   Terminal 1: American, Delta, United, Air Canada, Spirit, Frontier • Terminal 2: Southwest &amp; Lufthansa.
                 </span>
