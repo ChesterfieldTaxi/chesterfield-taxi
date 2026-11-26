@@ -234,13 +234,13 @@ export function AdminVehiclesTab({
             </Alert>
           )}
 
-          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4 bg-surface-card p-4 sm:p-5 rounded-2xl border border-border-subtle/80 shadow-xs">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600 font-bold text-sm shrink-0"><CarIcon className="w-4 h-4" /></span>
-                <h3 className="text-sm sm:text-base font-extrabold text-slate-900">Vehicle Types (Service Classes)</h3>
+                <span className="p-1.5 rounded-lg bg-status-info-bg text-blue-600 font-bold text-sm shrink-0"><CarIcon className="w-4 h-4" /></span>
+                <h3 className="text-sm sm:text-base font-extrabold text-fg-primary">Vehicle Types (Service Classes)</h3>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-fg-muted mt-1">
                 Define vehicle categories in service (e.g. Compact SUV, Midsize SUV, Minivan), capacities, and client photos. Vehicle upgrade fees and tariffs are managed in <strong>Rates &amp; Tariffs</strong>.
               </p>
             </div>
@@ -301,17 +301,17 @@ export function AdminVehiclesTab({
             }
           >
             <form id="add-vehicle-type-form" onSubmit={handleAddNewTier} className="space-y-5">
-              <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+              <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
                   <CarIcon className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
                     Class Identity
                   </h3>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label className="block text-xs font-semibold text-fg-secondary mb-1">
                       Internal Type ID <span className="text-rose-500">*</span>
                     </label>
                     <Input
@@ -320,11 +320,11 @@ export function AdminVehiclesTab({
                       onChange={(e) => setNewTier({ ...newTier, id: e.target.value })}
                       required
                     />
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">Unique system key</span>
+                    <span className="text-[10px] text-fg-subtle mt-0.5 block">Unique system key</span>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label className="block text-xs font-semibold text-fg-secondary mb-1">
                       Display Name <span className="text-rose-500">*</span>
                     </label>
                     <Input
@@ -338,7 +338,7 @@ export function AdminVehiclesTab({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label className="block text-xs font-semibold text-fg-secondary mb-1">
                       Marketing Badge
                     </label>
                     <Input
@@ -349,7 +349,7 @@ export function AdminVehiclesTab({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label className="block text-xs font-semibold text-fg-secondary mb-1">
                       Icon Silhouette
                     </label>
                     <Select
@@ -368,17 +368,17 @@ export function AdminVehiclesTab({
                 </div>
               </section>
 
-              <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+              <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
                   <UserIcon className="w-4 h-4 text-emerald-600" />
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
                     Capacities &amp; Description
                   </h3>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label className="block text-xs font-semibold text-fg-secondary mb-1">
                       Max Passengers
                     </label>
                     <Input
@@ -394,7 +394,7 @@ export function AdminVehiclesTab({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label className="block text-xs font-semibold text-fg-secondary mb-1">
                       Max Luggage
                     </label>
                     <Input
@@ -411,12 +411,12 @@ export function AdminVehiclesTab({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">
                     Client Description
                   </label>
                   <textarea
                     rows={3}
-                    className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-hidden"
+                    className="w-full rounded-xl border border-border-strong bg-surface-card p-2.5 text-xs text-fg-strong placeholder-fg-subtle focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-hidden"
                     placeholder="e.g. Spacious premium sedan offering exceptional legroom and trunk space."
                     value={newTier.description || ''}
                     onChange={(e) => setNewTier({ ...newTier, description: e.target.value })}
@@ -424,7 +424,7 @@ export function AdminVehiclesTab({
                 </div>
               </section>
 
-              <section className="bg-white rounded-2xl border border-slate-200/90 p-4">
+              <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4">
                 <VehicleImagePicker
                   value={newTier.imageUrl || ''}
                   onChange={(url) => setNewTier({ ...newTier, imageUrl: url })}
@@ -435,15 +435,15 @@ export function AdminVehiclesTab({
           </AdminSlideOverDrawer>
 
           {/* Vehicle Types Filter Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 pb-2 border-b border-slate-200">
-            <div className="grid grid-cols-3 sm:inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 pb-2 border-b border-border-subtle">
+            <div className="grid grid-cols-3 sm:inline-flex items-center gap-1 bg-surface-muted p-1 rounded-xl w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setVehicleFilter('active')}
                 className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-center whitespace-nowrap cursor-pointer ${
                   vehicleFilter === 'active'
-                    ? 'bg-white text-blue-600 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-surface-card text-blue-600 shadow-xs'
+                    : 'text-fg-secondary hover:text-fg-primary'
                 }`}
               >
                 Active ({vehicles.filter((v) => !v.isArchived).length})
@@ -453,8 +453,8 @@ export function AdminVehiclesTab({
                 onClick={() => setVehicleFilter('archived')}
                 className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-center whitespace-nowrap cursor-pointer ${
                   vehicleFilter === 'archived'
-                    ? 'bg-amber-100 text-amber-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-status-warning-bg-strong text-status-warning-fg shadow-xs'
+                    : 'text-fg-secondary hover:text-fg-primary'
                 }`}
               >
                 Archived ({vehicles.filter((v) => !!v.isArchived).length})
@@ -464,14 +464,14 @@ export function AdminVehiclesTab({
                 onClick={() => setVehicleFilter('all')}
                 className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-center whitespace-nowrap cursor-pointer ${
                   vehicleFilter === 'all'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-surface-card text-fg-primary shadow-xs'
+                    : 'text-fg-secondary hover:text-fg-primary'
                 }`}
               >
                 All ({vehicles.length})
               </button>
             </div>
-            <div className="text-xs text-slate-500 font-medium">
+            <div className="text-xs text-fg-muted font-medium">
               Archived vehicle classes are hidden from the client booking wizard.
             </div>
           </div>
@@ -490,10 +490,10 @@ export function AdminVehiclesTab({
               <Card
                 key={v.id}
                 variant="elevated"
-                className="border-slate-200/90 shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between overflow-hidden"
+                className="border-border-subtle/90 shadow-xs hover:border-border-strong transition-all flex flex-col justify-between overflow-hidden"
               >
                 {v.imageUrl && (
-                  <div className="relative w-full h-36 bg-slate-100 overflow-hidden border-b border-slate-100">
+                  <div className="relative w-full h-36 bg-surface-muted overflow-hidden border-b border-border-faint">
                     <img
                       src={v.imageUrl}
                       alt={v.name}
@@ -509,9 +509,9 @@ export function AdminVehiclesTab({
                   </div>
                 )}
 
-                <CardHeader className="p-4 pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+                <CardHeader className="p-4 pb-3 border-b border-border-faint flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-status-info-bg text-blue-600 flex items-center justify-center shrink-0">
                       {v.iconType === 'premium' ? (
                         <SparklesIcon className="w-5 h-5" />
                       ) : (
@@ -520,7 +520,7 @@ export function AdminVehiclesTab({
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <CardTitle className="text-sm font-bold text-slate-900 truncate">{v.name}</CardTitle>
+                        <CardTitle className="text-sm font-bold text-fg-primary truncate">{v.name}</CardTitle>
                         {v.badge && !v.imageUrl && (
                           <Badge variant="warning" size="sm" className="text-[10px] py-0 px-1.5">
                             {v.badge}
@@ -528,9 +528,9 @@ export function AdminVehiclesTab({
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        <span className="text-[10px] font-mono text-slate-400">ID: {v.id}</span>
+                        <span className="text-[10px] font-mono text-fg-subtle">ID: {v.id}</span>
                         {v.isArchived && (
-                          <span className="inline-block text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                          <span className="inline-block text-[9px] font-bold px-1.5 py-0.2 rounded bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border">
                             ARCHIVED
                           </span>
                         )}
@@ -542,7 +542,7 @@ export function AdminVehiclesTab({
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(index)}
-                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-status-info-border bg-status-info-bg text-status-info-fg hover:bg-status-info-bg-strong transition-colors"
                       title="Edit All Vehicle Class Details"
                     >
                       Edit
@@ -552,8 +552,8 @@ export function AdminVehiclesTab({
                       onClick={() => handleToggleArchive(index)}
                       className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition-colors ${
                         v.isArchived
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200'
+                          ? 'bg-status-success-bg text-status-success-fg border-status-success-border hover:bg-status-success-bg-strong'
+                          : 'bg-surface-subtle text-fg-secondary border-border-subtle hover:bg-status-warning-bg hover:text-status-warning-fg hover:border-status-warning-border'
                       }`}
                       title={v.isArchived ? 'Restore Vehicle Type' : 'Archive Vehicle Type'}
                     >
@@ -562,7 +562,7 @@ export function AdminVehiclesTab({
                     <button
                       type="button"
                       onClick={() => handleDeleteVehicle(index)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-1.5 text-fg-subtle hover:text-red-600 hover:bg-status-danger-bg rounded-lg transition-colors"
                       title="Remove Vehicle Type"
                     >
                       <TrashIcon className="w-4 h-4" />
@@ -572,8 +572,8 @@ export function AdminVehiclesTab({
 
                 <CardContent className="p-4 space-y-4 flex-1">
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Passengers</span>
+                    <div className="bg-surface-subtle p-2.5 rounded-xl border border-border-faint text-center">
+                      <span className="text-[10px] font-bold text-fg-muted uppercase block mb-1">Passengers</span>
                       <div className="flex items-center justify-center gap-1">
                         <Input
                           type="number"
@@ -585,12 +585,12 @@ export function AdminVehiclesTab({
                           }
                           className="w-14 h-7 text-xs text-center font-bold"
                         />
-                        <span className="text-xs font-semibold text-slate-500">passengers</span>
+                        <span className="text-xs font-semibold text-fg-muted">passengers</span>
                       </div>
                     </div>
 
-                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Luggage</span>
+                    <div className="bg-surface-subtle p-2.5 rounded-xl border border-border-faint text-center">
+                      <span className="text-[10px] font-bold text-fg-muted uppercase block mb-1">Luggage</span>
                       <div className="flex items-center justify-center gap-1">
                         <Input
                           type="number"
@@ -602,16 +602,16 @@ export function AdminVehiclesTab({
                           }
                           className="w-14 h-7 text-xs text-center font-bold"
                         />
-                        <span className="text-xs font-semibold text-slate-500">bags</span>
+                        <span className="text-xs font-semibold text-fg-muted">bags</span>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Description / Features</label>
+                    <label className="block text-[11px] font-bold text-fg-secondary mb-1">Description / Features</label>
                     <textarea
                       rows={2}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                      className="w-full rounded-xl border border-border-subtle bg-surface-subtle/50 p-2 text-xs text-fg-strong placeholder-fg-subtle focus:bg-surface-card focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
                       value={v.description || ''}
                       onChange={(e) => handleUpdateVehicle(index, { description: e.target.value })}
                       placeholder="Details shown to customer when selecting vehicle..."
@@ -624,10 +624,10 @@ export function AdminVehiclesTab({
           </div>
 
           {/* Floating Save Actions Bar */}
-          <div className="sticky bottom-16 lg:bottom-4 bg-white/95 backdrop-blur-sm p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-20">
+          <div className="sticky bottom-16 lg:bottom-4 bg-surface-card/95 backdrop-blur-sm p-3.5 sm:p-4 rounded-2xl border border-border-subtle shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-20">
             <div className="flex items-center gap-2 min-w-0">
               <SparklesIcon className="w-4 h-4 text-amber-500 shrink-0" />
-              <span className="text-xs text-slate-600">
+              <span className="text-xs text-fg-secondary">
                 {vehicles.length} vehicle types configured. Changes apply to new quotes.
               </span>
             </div>
@@ -674,17 +674,17 @@ export function AdminVehiclesTab({
       >
         {editingIndex !== null && editForm && (
           <form id="edit-vehicle-type-form" onSubmit={handleSaveEdit} className="space-y-5">
-            <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+            <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
                 <CarIcon className="w-4 h-4 text-blue-600" />
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
                   Class Identity
                 </h3>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">
                     Display Name <span className="text-rose-500">*</span>
                   </label>
                   <Input
@@ -694,7 +694,7 @@ export function AdminVehiclesTab({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">
                     Marketing Badge
                   </label>
                   <Input
@@ -706,7 +706,7 @@ export function AdminVehiclesTab({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">
                   Icon Silhouette
                 </label>
                 <Select
@@ -724,17 +724,17 @@ export function AdminVehiclesTab({
               </div>
             </section>
 
-            <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+            <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
                 <UserIcon className="w-4 h-4 text-emerald-600" />
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
                   Capacities &amp; Description
                 </h3>
               </div>
 
               <div className="grid grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">
                     Max Passengers
                   </label>
                   <Input
@@ -749,7 +749,7 @@ export function AdminVehiclesTab({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">
                     Max Luggage
                   </label>
                   <Input
@@ -766,12 +766,12 @@ export function AdminVehiclesTab({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">
                   Client Description
                 </label>
                 <textarea
                   rows={3}
-                  className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-hidden"
+                  className="w-full rounded-xl border border-border-strong bg-surface-card p-2.5 text-xs text-fg-strong placeholder-fg-subtle focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-hidden"
                   value={editForm.description || ''}
                   onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                   placeholder="Details displayed to clients..."
@@ -779,7 +779,7 @@ export function AdminVehiclesTab({
               </div>
             </section>
 
-            <section className="bg-white rounded-2xl border border-slate-200/90 p-4">
+            <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4">
               <VehicleImagePicker
                 value={editForm.imageUrl || ''}
                 onChange={(url) => setEditForm({ ...editForm, imageUrl: url })}

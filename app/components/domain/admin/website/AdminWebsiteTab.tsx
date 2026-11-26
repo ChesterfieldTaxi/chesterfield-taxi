@@ -118,16 +118,16 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
 
       {/* 4. HOMEPAGE SECTION CANVAS */}
       {activeSubTab === 'layout' && (
-        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-slate-200 space-y-5 sm:space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-slate-100 pb-4">
+        <div className="bg-surface-card p-4 sm:p-6 rounded-2xl shadow-xs border border-border-subtle space-y-5 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-border-faint pb-4">
             <div className="min-w-0">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
                 Visual Section Pipeline
               </span>
-              <h2 className="text-base sm:text-lg font-extrabold text-slate-900 mt-0.5">
+              <h2 className="text-base sm:text-lg font-extrabold text-fg-primary mt-0.5">
                 Homepage Layout Reordering Canvas
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-fg-muted mt-0.5">
                 Drag and drop section blocks to restructure the flow of the homepage.
               </p>
             </div>
@@ -162,19 +162,19 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
                           {...provided.dragHandleProps}
                           className={`flex items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl border transition-all ${
                             snapshot.isDragging
-                              ? 'bg-blue-50 border-blue-400 shadow-md ring-2 ring-blue-500'
-                              : 'bg-slate-50/70 border-slate-200 hover:bg-slate-100/70'
+                              ? 'bg-status-info-bg border-blue-400 shadow-md ring-2 ring-blue-500'
+                              : 'bg-surface-subtle/70 border-border-subtle hover:bg-surface-muted/70'
                           }`}
                         >
                           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                            <span className="cursor-grab text-slate-400 font-mono text-xs font-bold shrink-0">
+                            <span className="cursor-grab text-fg-subtle font-mono text-xs font-bold shrink-0">
                               #{index + 1}
                             </span>
                             <div className="min-w-0">
-                              <span className="font-bold text-slate-900 text-sm block truncate">
+                              <span className="font-bold text-fg-primary text-sm block truncate">
                                 {item.type}
                               </span>
-                              <span className="text-[11px] text-slate-500 block leading-snug">
+                              <span className="text-[11px] text-fg-muted block leading-snug">
                                 {item.type === 'HeroBanner' && 'High-impact value proposition & quick CTAs'}
                                 {item.type === 'QuickBookingCard' && 'Instant quote calculation & pickup inputs'}
                                 {item.type === 'FleetShowcase' && 'Vehicle service tiers, amenities & capacities'}
@@ -192,8 +192,8 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
                               onClick={() => toggleSectionEnable(item.id)}
                               className={`text-xs px-3 py-1 rounded-full font-bold transition-colors cursor-pointer ${
                                 item.isEnabled
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                  : 'bg-slate-200 text-slate-600'
+                                  ? 'bg-status-success-bg-strong text-status-success-fg border border-status-success-border'
+                                  : 'bg-surface-emphasis text-fg-secondary'
                               }`}
                             >
                               {item.isEnabled ? 'Active' : 'Hidden'}
@@ -231,16 +231,16 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
 
       {/* 7. MONACO CSS EDITOR */}
       {activeSubTab === 'css' && (
-        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-slate-200 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-slate-100 pb-4">
+        <div className="bg-surface-card p-4 sm:p-6 rounded-2xl shadow-xs border border-border-subtle space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-border-faint pb-4">
             <div className="min-w-0">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
                 Developer Customization
               </span>
-              <h2 className="text-lg font-extrabold text-slate-900 mt-0.5">
+              <h2 className="text-lg font-extrabold text-fg-primary mt-0.5">
                 Monaco Custom CSS Style Editor
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-fg-muted mt-0.5">
                 Inject custom CSS rules and override styles directly into the live HTML head.
               </p>
             </div>
@@ -254,10 +254,10 @@ export const AdminWebsiteTab: React.FC<AdminWebsiteTabProps> = ({
             </button>
           </div>
 
-          <div className="border border-slate-200 rounded-xl overflow-hidden h-[340px] sm:h-[540px]">
+          <div className="border border-border-subtle rounded-xl overflow-hidden h-[340px] sm:h-[540px]">
             <Suspense
               fallback={
-                <div className="h-full flex items-center justify-center bg-slate-900 text-slate-400 text-xs font-mono">
+                <div className="h-full flex items-center justify-center bg-surface-header text-fg-subtle text-xs font-mono">
                   <span className="inline-block w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2"></span>
                   Loading Monaco CSS Editor...
                 </div>

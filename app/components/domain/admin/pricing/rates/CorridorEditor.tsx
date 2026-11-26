@@ -86,17 +86,17 @@ export function CorridorEditor({
   };
 
   return (
-    <div className="p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+    <div className="p-4.5 rounded-xl bg-surface-card border border-border-subtle shadow-2xs space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-faint pb-3">
         <div className="flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
+          <div className="p-2 rounded-lg bg-status-staged-bg text-status-staged-fg border border-status-staged-border">
             <MapPinIcon className="w-4 h-4" />
           </div>
           <div>
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+            <h4 className="text-xs font-bold text-fg-primary uppercase tracking-wider">
               Fixed Zone-to-Zone Corridors ({corridors.length})
             </h4>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-fg-muted">
               Override mileage with a guaranteed flat fare whenever a trip travels between two service zones.
             </p>
           </div>
@@ -118,11 +118,11 @@ export function CorridorEditor({
       {isAdding && !readOnly && (
         <form
           onSubmit={handleAdd}
-          className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-200 space-y-3 text-xs"
+          className="p-4 rounded-xl bg-status-staged-bg/50 border border-status-staged-border space-y-3 text-xs"
         >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+              <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                 Origin Zone
               </label>
               <Select
@@ -139,7 +139,7 @@ export function CorridorEditor({
               </Select>
             </div>
             <div>
-              <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+              <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                 Destination Zone
               </label>
               <Select
@@ -156,7 +156,7 @@ export function CorridorEditor({
               </Select>
             </div>
             <div>
-              <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+              <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                 Flat Base Price ($)
               </label>
               <Input
@@ -166,14 +166,14 @@ export function CorridorEditor({
                 required
                 value={flatPrice}
                 onChange={(e) => setFlatPrice(parseFloat(e.target.value) || 0)}
-                className="h-8 text-xs bg-white border-slate-300 font-bold"
+                className="h-8 text-xs bg-surface-card border-border-strong font-bold"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
             <div>
-              <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+              <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                 Corridor Label (Optional)
               </label>
               <Input
@@ -181,27 +181,27 @@ export function CorridorEditor({
                 placeholder="e.g. Chesterfield Valley ↔ Lambert STL"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="h-8 text-xs bg-white border-slate-300"
+                className="h-8 text-xs bg-surface-card border-border-strong"
               />
             </div>
-            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 pt-1 md:pt-4">
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-fg-secondary pt-1 md:pt-4">
               <input
                 type="checkbox"
                 checked={allowReturn}
                 onChange={(e) => setAllowReturn(e.target.checked)}
-                className="rounded border-slate-300 text-indigo-600 shrink-0"
+                className="rounded border-border-strong text-indigo-600 shrink-0"
               />
               <span>Bidirectional (applies in both directions)</span>
             </label>
           </div>
 
-          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-indigo-200/70">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-status-staged-border/70">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => setIsAdding(false)}
-              className="w-full sm:w-auto justify-center text-xs bg-white"
+              className="w-full sm:w-auto justify-center text-xs bg-surface-card"
             >
               Cancel
             </Button>
@@ -218,7 +218,7 @@ export function CorridorEditor({
       )}
 
       {corridors.length === 0 ? (
-        <div className="p-5 text-center text-xs text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+        <div className="p-5 text-center text-xs text-fg-subtle bg-surface-subtle rounded-lg border border-dashed border-border-subtle">
           No fixed corridors configured. Click &ldquo;+ Add Corridor&rdquo; to set a flat zone-to-zone fare.
         </div>
       ) : (
@@ -226,11 +226,11 @@ export function CorridorEditor({
           {corridors.map((c) => (
             <div
               key={c.id}
-              className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+              className="p-3 rounded-lg bg-surface-subtle border border-border-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
             >
               <div className="space-y-0.5 min-w-0">
-                <div className="font-bold text-slate-900 truncate">{c.name}</div>
-                <div className="text-[11px] text-slate-600 flex items-center gap-1.5 flex-wrap">
+                <div className="font-bold text-fg-primary truncate">{c.name}</div>
+                <div className="text-[11px] text-fg-secondary flex items-center gap-1.5 flex-wrap">
                   <span className="font-medium">{getZoneName(c.fromZoneId)}</span>
                   <span className="text-indigo-600 font-bold">{c.allowReturn ? '↔' : '→'}</span>
                   <span className="font-medium">{getZoneName(c.toZoneId)}</span>
@@ -238,19 +238,19 @@ export function CorridorEditor({
               </div>
 
               <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 shrink-0">
-                <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer">
+                <label className="flex items-center gap-1 text-[11px] text-fg-secondary cursor-pointer">
                   <input
                     type="checkbox"
                     disabled={readOnly}
                     checked={Boolean(c.allowReturn)}
                     onChange={() => handleToggleReturn(c.id)}
-                    className="rounded border-slate-300 text-indigo-600"
+                    className="rounded border-border-strong text-indigo-600"
                   />
                   <span>2-Way</span>
                 </label>
 
                 <div className="relative w-24">
-                  <span className="absolute left-2 top-1.5 text-slate-400 font-bold">$</span>
+                  <span className="absolute left-2 top-1.5 text-fg-subtle font-bold">$</span>
                   <Input
                     type="number"
                     step="1"
@@ -258,7 +258,7 @@ export function CorridorEditor({
                     disabled={readOnly}
                     value={c.flatPrice}
                     onChange={(e) => handleUpdatePrice(c.id, parseFloat(e.target.value) || 0)}
-                    className="h-7 pl-5 text-xs font-mono font-bold bg-white border-slate-300 text-emerald-700"
+                    className="h-7 pl-5 text-xs font-mono font-bold bg-surface-card border-border-strong text-status-success-fg"
                   />
                 </div>
 
@@ -266,7 +266,7 @@ export function CorridorEditor({
                   <button
                     type="button"
                     onClick={() => handleDelete(c.id)}
-                    className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                    className="p-1.5 rounded text-fg-subtle hover:text-rose-600 hover:bg-status-danger-bg transition-colors cursor-pointer"
                     title="Delete corridor"
                   >
                     <TrashIcon className="w-3.5 h-3.5" />

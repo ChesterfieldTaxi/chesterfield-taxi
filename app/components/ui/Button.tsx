@@ -18,11 +18,11 @@ const variantStyles: Record<ButtonVariant, string> = {
   blue:
     'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold shadow-xs hover:shadow focus-visible:ring-blue-500 border border-blue-600 transition-all',
   secondary:
-    'bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-900 hover:text-black font-semibold shadow-2xs border border-slate-300 hover:border-slate-400 focus-visible:ring-slate-400 transition-all',
+    'bg-surface-muted hover:bg-surface-emphasis active:bg-surface-strong text-fg-primary hover:text-black font-semibold shadow-2xs border border-border-strong hover:border-border-emphasis focus-visible:ring-border-emphasis transition-all',
   outline:
-    'bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-800 hover:text-slate-950 font-semibold border border-slate-300 hover:border-slate-400 shadow-2xs focus-visible:ring-slate-400 transition-all',
+    'bg-surface-card hover:bg-surface-muted active:bg-surface-emphasis text-fg-strong hover:text-fg-primary font-semibold border border-border-strong hover:border-border-emphasis shadow-2xs focus-visible:ring-border-emphasis transition-all',
   ghost:
-    'bg-transparent hover:bg-slate-100 active:bg-slate-200 text-slate-700 hover:text-slate-950 font-semibold focus-visible:ring-slate-400',
+    'bg-transparent hover:bg-surface-muted active:bg-surface-emphasis text-fg-secondary hover:text-fg-primary font-semibold focus-visible:ring-border-emphasis',
   danger:
     'bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold shadow-xs focus-visible:ring-red-500 border border-red-700',
 };

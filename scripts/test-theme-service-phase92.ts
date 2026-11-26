@@ -101,7 +101,8 @@ async function runTests() {
   assert.equal(isDarkModeRoutePath('/app/dispatch/popout'), true);
   assert.equal(isDarkModeRoutePath('/dispatch'), true);
   assert.equal(isDarkModeRoutePath('/'), false);
-  assert.equal(isDarkModeRoutePath('/app/admin'), false);
+  assert.equal(isDarkModeRoutePath('/app/admin'), true);
+  assert.equal(isDarkModeRoutePath('/admin'), true);
   assert.equal(isDarkModeRoutePath('/app/passenger'), false);
   assert.equal(isDarkModeRoutePath('/app/corporate'), false);
   assert.equal(isDarkModeRoutePath('/app/driver'), false);
@@ -148,11 +149,11 @@ async function runTests() {
   assert.equal(root.classes.has('dark'), false);
   assert.equal(root.style.colorScheme, 'light');
 
-  // Route scope enforcement keeps non-dispatch portals light
+  // Route scope enforcement keeps non-enabled portals light
   applyResolvedTheme('dark', {
     rootElement: root,
     enforceRouteScope: true,
-    getPathname: () => '/app/admin',
+    getPathname: () => '/app/passenger',
   });
   assert.equal(root.classes.has('dark'), false);
 
@@ -244,10 +245,19 @@ async function runTests() {
       pathname: '/app/admin',
       storedValue: 'dark',
       systemDark: true,
+    }),
+    { isDark: true, colorScheme: 'dark' },
+    'Admin routes must apply dark pre-hydration in Phase 93'
+  );
+  assert.deepEqual(
+    runPreHydrationInSandbox({
+      pathname: '/app/passenger',
+      storedValue: 'dark',
+      systemDark: true,
       startWithDarkClass: true,
     }),
     { isDark: false, colorScheme: 'light' },
-    'Admin/non-dispatch routes must stay visually unchanged in Phase 92'
+    'Non-enabled routes must stay visually unchanged'
   );
 
   // 7. Static wiring verification
@@ -262,7 +272,12 @@ async function runTests() {
   );
   assert.ok(topHeader.includes('Dispatch Settings'));
   assert.ok(!topHeader.includes('Console &amp; Map Settings'));
-  assert.ok(topHeader.includes('APPEARANCE_OPTIONS'));
+  assert.ok(topHeader.includes('AppearanceToggle'));
+  const appearanceToggle = fs.readFileSync(
+    path.resolve('app/components/ui/AppearanceToggle.tsx'),
+    'utf8'
+  );
+  assert.ok(appearanceToggle.includes('APPEARANCE_OPTIONS'));
 
   const presets = fs.readFileSync(
     path.resolve('app/components/domain/admin/website/theme-presets.ts'),

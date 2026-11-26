@@ -86,7 +86,7 @@ export function AdminTripsTablePanel({
         {ex.hasPendingRiderChangeRequest && (
           <span
             title={ex.riderChangeSummary || 'Pending rider edit request on /track'}
-            className="px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-950 border border-violet-400 text-[10px] font-extrabold"
+            className="px-1.5 py-0.5 rounded-full bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border text-[10px] font-extrabold"
           >
             📝 Rider Edit Req
           </span>
@@ -94,13 +94,13 @@ export function AdminTripsTablePanel({
         {ex.hasUnacknowledgedDriverAck && (
           <span
             title={ex.driverAckSummary.join(' • ') || 'Awaiting driver acknowledgement'}
-            className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-400 text-[10px] font-extrabold"
+            className="px-1.5 py-0.5 rounded-full bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border text-[10px] font-extrabold"
           >
             ⏳ Awaiting Driver Ack
           </span>
         )}
         {ex.slaLevel && (
-          <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-300 text-[10px] font-extrabold uppercase">
+          <span className="px-1.5 py-0.5 rounded-full bg-status-danger-bg-strong text-status-danger-fg border border-status-danger-border text-[10px] font-extrabold uppercase">
             SLA {ex.slaLevel}
           </span>
         )}
@@ -111,11 +111,11 @@ export function AdminTripsTablePanel({
   const renderDriverControl = (trip: Trip, fullWidth = false) => {
     if (isTerminalStatus(trip.status)) {
       return trip.assignedDriverId ? (
-        <span className="text-[11px] font-semibold text-slate-700">
+        <span className="text-[11px] font-semibold text-fg-secondary">
           Driver: {(trip.metadata as any)?.assignedDriverName || trip.assignedDriverId}
         </span>
       ) : (
-        <span className="text-[11px] text-slate-400">—</span>
+        <span className="text-[11px] text-fg-subtle">—</span>
       );
     }
 
@@ -166,12 +166,12 @@ export function AdminTripsTablePanel({
             disabled={actionLoadingId === trip.id}
             onClick={() => onToggleArchive(trip, archived)}
             title={archived ? 'Restore from Archive' : 'Move to Archive'}
-            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 cursor-pointer"
+            className="p-1.5 rounded-lg border border-border-subtle hover:bg-surface-muted text-fg-secondary cursor-pointer"
           >
             {archived ? (
               <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
             ) : (
-              <ArchiveBoxIcon className="w-3.5 h-3.5 text-slate-500" />
+              <ArchiveBoxIcon className="w-3.5 h-3.5 text-fg-muted" />
             )}
           </button>
         )}
@@ -205,24 +205,24 @@ export function AdminTripsTablePanel({
   };
 
   return (
-    <Card variant="elevated" className="border-slate-200/80 bg-white shadow-xs overflow-hidden">
+    <Card variant="elevated" className="border-border-subtle/80 bg-surface-card shadow-xs overflow-hidden">
       {isLoading ? (
-        <div className="p-12 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
+        <div className="p-12 text-center text-fg-subtle flex flex-col items-center justify-center gap-2">
           <SpinnerIcon className="w-6 h-6 animate-spin text-blue-600" />
           <p className="text-xs font-medium">Streaming dispatch operations...</p>
         </div>
       ) : trips.length === 0 ? (
-        <div className="p-12 text-center text-slate-400">
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+        <div className="p-12 text-center text-fg-subtle">
+          <div className="w-12 h-12 rounded-2xl bg-surface-muted text-fg-subtle flex items-center justify-center mx-auto mb-3">
             <CarIcon className="w-6 h-6" />
           </div>
-          <p className="text-sm font-bold text-slate-700">No trips matching this view</p>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-sm font-bold text-fg-secondary">No trips matching this view</p>
+          <p className="text-xs text-fg-muted mt-1">
             {searchTerm ? 'Try adjusting your search query' : 'Dispatch queue is currently clear.'}
           </p>
         </div>
       ) : displayLayout === 'cards' ? (
-        <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-slate-50/50">
+        <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-surface-subtle/50">
           {trips.map((trip) => {
             const isSelected = selectedTripId === trip.id;
             const passengerFullName =
@@ -241,36 +241,36 @@ export function AdminTripsTablePanel({
               <div
                 key={trip.id}
                 onClick={() => onSelectTrip(trip)}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer bg-white flex flex-col justify-between shadow-2xs ${
+                className={`p-4 rounded-2xl border transition-all cursor-pointer bg-surface-card flex flex-col justify-between shadow-2xs ${
                   isSelected
                     ? 'border-blue-500 ring-2 ring-blue-400'
-                    : 'border-slate-200 hover:border-slate-300'
+                    : 'border-border-subtle hover:border-border-strong'
                 }`}
               >
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1 text-xs font-extrabold text-slate-900 truncate">
+                    <span className="inline-flex items-center gap-1 text-xs font-extrabold text-fg-primary truncate">
                       <ClockIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                       <span>{pickupTimeStr}</span>
-                      <span className="font-mono text-[10.5px] text-slate-400">
+                      <span className="font-mono text-[10.5px] text-fg-subtle">
                         #{trip.id.slice(-6).toUpperCase()}
                       </span>
                     </span>
                     <DispatchStatusBadge status={trip.status} trip={trip} nowMs={nowMs} compact />
                   </div>
                   <div>
-                    <div className="font-bold text-xs text-slate-900">{passengerFullName}</div>
-                    <div className="text-[11px] text-slate-500 font-mono">{trip.passenger?.phone || 'No phone'}</div>
+                    <div className="font-bold text-xs text-fg-primary">{passengerFullName}</div>
+                    <div className="text-[11px] text-fg-muted font-mono">{trip.passenger?.phone || 'No phone'}</div>
                     {renderExceptionPills(trip)}
                   </div>
-                  <div className="space-y-1 text-xs text-slate-700 bg-slate-50 p-2.5 rounded-xl">
+                  <div className="space-y-1 text-xs text-fg-secondary bg-surface-subtle p-2.5 rounded-xl">
                     <div className="truncate font-medium">● {trip.pickupLocation?.address || 'Pickup'}</div>
-                    <div className="truncate font-medium text-slate-600">■ {trip.dropoffLocation?.address || 'Dropoff'}</div>
+                    <div className="truncate font-medium text-fg-secondary">■ {trip.dropoffLocation?.address || 'Dropoff'}</div>
                   </div>
                   <div onClick={(e) => e.stopPropagation()}>{renderDriverControl(trip, true)}</div>
                 </div>
-                <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <span className="font-black text-slate-900 text-sm font-mono">
+                <div className="pt-3 mt-3 border-t border-border-faint flex items-center justify-between gap-2">
+                  <span className="font-black text-fg-primary text-sm font-mono">
                     ${Number(trip.pricing?.totalFare || trip.payment?.amount || 0).toFixed(2)}
                   </span>
                   {renderActionMenu(trip)}
@@ -280,7 +280,7 @@ export function AdminTripsTablePanel({
           })}
         </div>
       ) : displayLayout === 'compact' ? (
-        <div className="divide-y divide-slate-100 text-xs">
+        <div className="divide-y divide-border-faint text-xs">
           {trips.map((trip) => {
             const isSelected = selectedTripId === trip.id;
             const passengerFullName =
@@ -291,23 +291,23 @@ export function AdminTripsTablePanel({
                 key={trip.id}
                 onClick={() => onSelectTrip(trip)}
                 className={`py-2 px-4 flex items-center justify-between gap-3 cursor-pointer ${
-                  isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'
+                  isSelected ? 'bg-status-info-bg' : 'hover:bg-surface-subtle'
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="font-mono font-bold text-slate-800 text-[11px] w-14 shrink-0">
+                  <span className="font-mono font-bold text-fg-strong text-[11px] w-14 shrink-0">
                     #{trip.id.slice(-6).toUpperCase()}
                   </span>
-                  <span className="font-bold text-slate-900 truncate max-w-[140px]">
+                  <span className="font-bold text-fg-primary truncate max-w-[140px]">
                     {passengerFullName}
                   </span>
-                  <span className="text-slate-500 truncate max-w-[220px]">
+                  <span className="text-fg-muted truncate max-w-[220px]">
                     {trip.pickupLocation?.address} → {trip.dropoffLocation?.address}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                   {renderDriverControl(trip)}
-                  <span className="font-bold font-mono text-slate-900">
+                  <span className="font-bold font-mono text-fg-primary">
                     ${Number(trip.pricing?.totalFare || 0).toFixed(2)}
                   </span>
                   <DispatchStatusBadge status={trip.status} trip={trip} nowMs={nowMs} compact />
@@ -321,7 +321,7 @@ export function AdminTripsTablePanel({
         <div className="overflow-x-auto custom-scrollbar min-w-full">
           <table className="w-full text-left border-collapse text-xs min-w-[920px]">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+              <tr className="border-b border-border-subtle bg-surface-subtle text-fg-muted font-bold uppercase tracking-wider text-[10px]">
                 <th className="px-4 py-3">Trip &amp; Pickup</th>
                 <th className="px-4 py-3">Passenger</th>
                 <th className="px-4 py-3">Itinerary</th>
@@ -331,7 +331,7 @@ export function AdminTripsTablePanel({
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border-faint">
               {trips.map((trip) => {
                 const isSelected = selectedTripId === trip.id;
                 const passengerFullName =
@@ -341,16 +341,16 @@ export function AdminTripsTablePanel({
                   <tr
                     key={trip.id}
                     onClick={() => onSelectTrip(trip)}
-                    className={`hover:bg-blue-50/40 transition-colors cursor-pointer ${
-                      isSelected ? 'bg-blue-50/70' : ''
+                    className={`hover:bg-status-info-bg/40 transition-colors cursor-pointer ${
+                      isSelected ? 'bg-status-info-bg/70' : ''
                     }`}
                   >
                     <td className="px-4 py-3 align-top whitespace-nowrap">
-                      <span className="font-mono font-bold text-slate-900 block">
+                      <span className="font-mono font-bold text-fg-primary block">
                         #{trip.id.slice(-6).toUpperCase()}
                       </span>
-                      <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                        <ClockIcon className="w-3 h-3 text-slate-400" />
+                      <span className="text-[11px] text-fg-muted flex items-center gap-1 mt-0.5">
+                        <ClockIcon className="w-3 h-3 text-fg-subtle" />
                         {trip.bookingType === 'scheduled' && trip.scheduledPickupTime
                           ? new Date(trip.scheduledPickupTime).toLocaleDateString([], {
                               month: 'short',
@@ -362,17 +362,17 @@ export function AdminTripsTablePanel({
                       </span>
                     </td>
                     <td className="px-4 py-3 align-top whitespace-nowrap">
-                      <span className="font-bold text-slate-800 block">{passengerFullName}</span>
-                      <span className="text-[11px] text-slate-500 font-mono block">
+                      <span className="font-bold text-fg-strong block">{passengerFullName}</span>
+                      <span className="text-[11px] text-fg-muted font-mono block">
                         {trip.passenger?.phone || 'No phone'}
                       </span>
                     </td>
                     <td className="px-4 py-3 align-top min-w-[220px]">
-                      <div className="text-slate-800 font-medium line-clamp-1">
+                      <div className="text-fg-strong font-medium line-clamp-1">
                         <span className="text-emerald-600 mr-1">●</span>
                         {trip.pickupLocation?.address || 'Pickup'}
                       </div>
-                      <div className="text-slate-700 font-medium line-clamp-1 mt-0.5">
+                      <div className="text-fg-secondary font-medium line-clamp-1 mt-0.5">
                         <span className="text-rose-500 mr-1">■</span>
                         {trip.dropoffLocation?.address || 'Dropoff'}
                       </div>
@@ -390,10 +390,10 @@ export function AdminTripsTablePanel({
                       {renderExceptionPills(trip)}
                     </td>
                     <td className="px-4 py-3 align-top whitespace-nowrap">
-                      <span className="font-black text-slate-900 font-mono block">
+                      <span className="font-black text-fg-primary font-mono block">
                         ${Number(trip.pricing?.totalFare || trip.payment?.amount || 0).toFixed(2)}
                       </span>
-                      <span className="text-[10px] text-slate-500 font-semibold block">
+                      <span className="text-[10px] text-fg-muted font-semibold block">
                         {formatTripVehicleColumnDisplay(trip, vehicles, drivers, fleetCars)} · {trip.payment?.method || 'card'}
                       </span>
                     </td>

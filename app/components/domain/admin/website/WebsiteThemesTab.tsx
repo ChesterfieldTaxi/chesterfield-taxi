@@ -102,7 +102,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Unified Studio Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:px-5 sm:py-4 rounded-2xl border border-slate-200/80 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-card p-4 sm:px-5 sm:py-4 rounded-2xl border border-border-subtle/80 shadow-xs">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
@@ -120,7 +120,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
               </Badge>
             )}
           </div>
-          <h2 className="text-base sm:text-lg font-extrabold text-slate-900 mt-0.5">
+          <h2 className="text-base sm:text-lg font-extrabold text-fg-primary mt-0.5">
             Themes, Colors, Typography &amp; Logo
           </h2>
         </div>
@@ -145,7 +145,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
       </div>
 
       {saveMessage && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2">
+        <div className="p-3.5 bg-status-success-bg border border-status-success-border text-status-success-fg rounded-xl text-xs font-bold flex items-center gap-2">
           <CheckIcon className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>{saveMessage}</span>
         </div>
@@ -153,7 +153,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
 
       {/* Curated Presets Grid */}
       <div className="space-y-3">
-        <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+        <h3 className="text-xs font-extrabold text-fg-strong uppercase tracking-wider flex items-center gap-2">
           <PaletteIcon className="w-4 h-4 text-blue-600 shrink-0" />
           <span>Curated Brand Presets ({THEME_PRESETS.length})</span>
         </h3>
@@ -170,24 +170,24 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                 onClick={() => handleApplyPreset(preset)}
                 className={`cursor-pointer p-4 rounded-2xl border transition-all text-left flex flex-col justify-between group ${
                   isSelected
-                    ? 'border-blue-600 bg-blue-50/40 ring-2 ring-blue-600 shadow-xs'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
+                    ? 'border-blue-600 bg-status-info-bg/40 ring-2 ring-blue-600 shadow-xs'
+                    : 'border-border-subtle bg-surface-card hover:border-border-strong'
                 }`}
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <span className="text-xs font-extrabold text-slate-900 group-hover:text-blue-600">
+                    <span className="text-xs font-extrabold text-fg-primary group-hover:text-blue-600">
                       {preset.name}
                     </span>
                     {preset.badge && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-muted text-fg-secondary border border-border-subtle shrink-0">
                         {preset.badge}
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500 leading-snug mb-3">{preset.description}</p>
+                  <p className="text-[11px] text-fg-muted leading-snug mb-3">{preset.description}</p>
                 </div>
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between pt-2 border-t border-border-faint">
                   <div className="flex items-center gap-1.5">
                     {preset.previewColors.map((hex, i) => (
                       <span
@@ -210,16 +210,16 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
       {/* Side-by-Side Granular Token Controls + Live Preview Canvas */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left: Granular Tokens (6 cols) */}
-        <div className="lg:col-span-6 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-5 text-xs">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="lg:col-span-6 bg-surface-card p-4 sm:p-5 rounded-2xl border border-border-subtle shadow-xs space-y-5 text-xs">
+          <div className="flex items-center justify-between border-b border-border-faint pb-3">
             <div>
-              <h3 className="text-sm font-extrabold text-slate-900">Granular Brand Tokens</h3>
-              <p className="text-[11px] text-slate-500">Typography, corner radius, colors &amp; logo URL</p>
+              <h3 className="text-sm font-extrabold text-fg-primary">Granular Brand Tokens</h3>
+              <p className="text-[11px] text-fg-muted">Typography, corner radius, colors &amp; logo URL</p>
             </div>
             <button
               type="button"
               onClick={handleResetDefaults}
-              className="text-[11px] font-bold text-slate-500 hover:text-blue-600 cursor-pointer"
+              className="text-[11px] font-bold text-fg-muted hover:text-blue-600 cursor-pointer"
             >
               Reset Defaults
             </button>
@@ -228,7 +228,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
           {/* Fonts */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="font-bold text-slate-700 block mb-1">Heading Font</label>
+              <label className="font-bold text-fg-secondary block mb-1">Heading Font</label>
               <Select
                 size="sm"
                 value={draftBranding.headingFont || 'Inter'}
@@ -242,7 +242,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
               </Select>
             </div>
             <div>
-              <label className="font-bold text-slate-700 block mb-1">Body Font</label>
+              <label className="font-bold text-fg-secondary block mb-1">Body Font</label>
               <Select
                 size="sm"
                 value={draftBranding.bodyFont || 'Inter'}
@@ -260,7 +260,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
           {/* Button Border Radius */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="font-bold text-slate-700">Button Corner Radius</span>
+              <span className="font-bold text-fg-secondary">Button Corner Radius</span>
               <span className="font-mono font-bold text-blue-600">{draftBranding.btnBorderRadius}</span>
             </div>
             <div className="grid grid-cols-6 gap-1.5">
@@ -272,7 +272,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                   className={`py-1.5 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
                     draftBranding.btnBorderRadius === opt
                       ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      : 'bg-surface-subtle text-fg-secondary border-border-subtle hover:bg-surface-muted'
                   }`}
                 >
                   {opt === '9999px' ? 'Pill' : opt}
@@ -282,12 +282,12 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
           </div>
 
           {/* Color Tokens Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-border-faint">
             {colorPickers.map(({ key, label, syncKey }) => {
               const val = (draftBranding[key] as string) || '#0f172a';
               return (
-                <div key={key} className="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <label className="text-[11px] font-bold text-slate-700 block mb-1">{label}</label>
+                <div key={key} className="p-2.5 bg-surface-subtle rounded-xl border border-border-subtle">
+                  <label className="text-[11px] font-bold text-fg-secondary block mb-1">{label}</label>
                   <div className="flex items-center gap-1.5">
                     <input
                       type="color"
@@ -298,7 +298,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                           ...(syncKey ? { [syncKey]: e.target.value } : {}),
                         })
                       }
-                      className="w-8 h-8 rounded-lg border border-slate-300 cursor-pointer p-0.5 bg-white shrink-0"
+                      className="w-8 h-8 rounded-lg border border-border-strong cursor-pointer p-0.5 bg-surface-card shrink-0"
                     />
                     <Input
                       value={val}
@@ -308,7 +308,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
                           ...(syncKey ? { [syncKey]: e.target.value } : {}),
                         })
                       }
-                      className="h-8 font-mono text-[11px] uppercase min-w-0 bg-white"
+                      className="h-8 font-mono text-[11px] uppercase min-w-0 bg-surface-card"
                     />
                   </div>
                 </div>
@@ -317,7 +317,7 @@ export function WebsiteThemesTab({ settings, onSave, isLoading }: WebsiteThemesT
           </div>
 
           {/* Custom Logo URL */}
-          <div className="pt-1 border-t border-slate-100">
+          <div className="pt-1 border-t border-border-faint">
             <Input
               label="Custom Brand Logo URL (Optional)"
               type="url"

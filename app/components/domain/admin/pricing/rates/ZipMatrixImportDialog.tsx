@@ -177,16 +177,16 @@ export function ZipMatrixImportDialog({
   const stepIndex = STEPS.findIndex((s) => s.id === step);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <div className="rounded-xl border border-border-subtle bg-surface-card shadow-sm overflow-hidden">
       {/* Header & Stepper */}
-      <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+      <div className="px-4 py-3 bg-surface-subtle/80 border-b border-border-subtle flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+          <div className="w-7 h-7 rounded-lg bg-status-success-bg-strong text-status-success-fg flex items-center justify-center shrink-0">
             <DocumentTextIcon className="w-4 h-4" />
           </div>
           <div>
-            <h4 className="text-xs font-bold text-slate-900 leading-tight">Import Zip Matrix CSV</h4>
-            <p className="text-[11px] text-slate-500 leading-tight">
+            <h4 className="text-xs font-bold text-fg-primary leading-tight">Import Zip Matrix CSV</h4>
+            <p className="text-[11px] text-fg-muted leading-tight">
               {fileName ? `${fileName} · ${totalCsvRows} data row${totalCsvRows === 1 ? '' : 's'}` : 'Header row proposes columns'}
             </p>
           </div>
@@ -202,10 +202,10 @@ export function ZipMatrixImportDialog({
                   <span
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
                       isCurrent
-                        ? 'bg-slate-900 text-white'
+                        ? 'bg-surface-header text-white'
                         : isDone
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-white text-slate-400 border border-slate-200'
+                          ? 'bg-status-success-bg text-status-success-fg border border-status-success-border'
+                          : 'bg-surface-card text-fg-subtle border border-border-subtle'
                     }`}
                   >
                     <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-black/10">
@@ -222,7 +222,7 @@ export function ZipMatrixImportDialog({
           <button
             type="button"
             onClick={close}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-fg-subtle hover:text-fg-secondary hover:bg-surface-emphasis/60 transition-colors cursor-pointer"
             title="Close import"
             aria-label="Close import"
           >
@@ -232,9 +232,9 @@ export function ZipMatrixImportDialog({
       </div>
 
       {/* Body */}
-      <div className="p-4 space-y-3 text-xs text-slate-700">
+      <div className="p-4 space-y-3 text-xs text-fg-secondary">
         {error && (
-          <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 flex items-center gap-2">
+          <div className="p-2.5 rounded-lg bg-status-danger-bg border border-status-danger-border text-status-danger-fg flex items-center gap-2">
             <AlertCircleIcon className="w-4 h-4 shrink-0 text-rose-600" />
             <span>{error}</span>
           </div>
@@ -267,17 +267,17 @@ export function ZipMatrixImportDialog({
               onDrop={handleDrop}
               className={`rounded-xl border-2 border-dashed p-8 text-center transition-all cursor-pointer ${
                 isDragging
-                  ? 'border-emerald-500 bg-emerald-50/70'
-                  : 'border-slate-300 bg-slate-50/60 hover:border-slate-400 hover:bg-slate-50'
+                  ? 'border-emerald-500 bg-status-success-bg/70'
+                  : 'border-border-strong bg-surface-subtle/60 hover:border-border-emphasis hover:bg-surface-subtle'
               }`}
             >
-              <div className="w-11 h-11 rounded-full bg-white border border-slate-200 shadow-2xs flex items-center justify-center mx-auto mb-3 text-emerald-600">
+              <div className="w-11 h-11 rounded-full bg-surface-card border border-border-subtle shadow-2xs flex items-center justify-center mx-auto mb-3 text-emerald-600">
                 <DocumentTextIcon className="w-5 h-5" />
               </div>
-              <p className="text-sm font-semibold text-slate-900">
-                Drop your <span className="font-mono text-emerald-700">.csv</span> file here, or click to browse
+              <p className="text-sm font-semibold text-fg-primary">
+                Drop your <span className="font-mono text-status-success-fg">.csv</span> file here, or click to browse
               </p>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-fg-muted mt-1">
                 The first row proposes your columns. You&apos;ll map types/roles and preview rows before applying.
               </p>
               <div className="mt-4">
@@ -289,7 +289,7 @@ export function ZipMatrixImportDialog({
                     e.stopPropagation();
                     fileInputRef.current?.click();
                   }}
-                  className="bg-white border-slate-300 text-slate-700"
+                  className="bg-surface-card border-border-strong text-fg-secondary"
                 >
                   Select CSV File
                 </Button>
@@ -301,13 +301,13 @@ export function ZipMatrixImportDialog({
         {step === 'map' && (
           <div className="space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-slate-600">
+              <p className="text-fg-secondary">
                 Map each CSV header to a new or existing column, or skip it.
               </p>
               <button
                 type="button"
                 onClick={() => setStep('upload')}
-                className="text-xs font-medium text-emerald-700 hover:text-emerald-800 underline underline-offset-2 cursor-pointer"
+                className="text-xs font-medium text-status-success-fg hover:text-status-success-fg underline underline-offset-2 cursor-pointer"
               >
                 Choose different file
               </button>
@@ -318,21 +318,21 @@ export function ZipMatrixImportDialog({
                 <div
                   key={m.csvIndex}
                   className={`border rounded-lg p-2.5 space-y-2 transition-colors ${
-                    m.action === 'skip' ? 'bg-slate-50/70 border-slate-200 opacity-70' : 'bg-white border-slate-200'
+                    m.action === 'skip' ? 'bg-surface-subtle/70 border-border-subtle opacity-70' : 'bg-surface-card border-border-subtle'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-semibold text-slate-900 truncate">
+                      <span className="font-semibold text-fg-primary truncate">
                         {m.header || `Column ${m.csvIndex + 1}`}
                       </span>
                       {sampleRow[m.csvIndex] !== undefined && sampleRow[m.csvIndex] !== '' && (
-                        <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded truncate max-w-[180px]">
+                        <span className="text-[11px] font-mono text-fg-muted bg-surface-muted px-1.5 py-0.5 rounded truncate max-w-[180px]">
                           e.g. {sampleRow[m.csvIndex]}
                         </span>
                       )}
                       {m.action === 'new' && m.column?.role && (
-                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] uppercase">
+                        <Badge variant="outline" className="bg-status-success-bg text-status-success-fg border-status-success-border text-[10px] uppercase">
                           {m.column.role}
                         </Badge>
                       )}
@@ -342,7 +342,7 @@ export function ZipMatrixImportDialog({
                         type="button"
                         disabled={i === 0}
                         onClick={() => move(i, -1)}
-                        className="p-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 cursor-pointer disabled:cursor-default"
+                        className="p-1 rounded border border-border-subtle text-fg-secondary hover:bg-surface-subtle disabled:opacity-30 cursor-pointer disabled:cursor-default"
                         title="Move up"
                       >
                         <ChevronDownIcon className="w-3 h-3 rotate-180" />
@@ -351,7 +351,7 @@ export function ZipMatrixImportDialog({
                         type="button"
                         disabled={i === mapping.length - 1}
                         onClick={() => move(i, 1)}
-                        className="p-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 cursor-pointer disabled:cursor-default"
+                        className="p-1 rounded border border-border-subtle text-fg-secondary hover:bg-surface-subtle disabled:opacity-30 cursor-pointer disabled:cursor-default"
                         title="Move down"
                       >
                         <ChevronDownIcon className="w-3 h-3" />
@@ -372,7 +372,7 @@ export function ZipMatrixImportDialog({
                           aria-label="Column label"
                           value={m.column.label}
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => patchColumn(i, { label: e.target.value })}
-                          className="h-7 text-xs bg-white border-slate-300"
+                          className="h-7 text-xs bg-surface-card border-border-strong"
                         />
                         <Select
                           size="xs"
@@ -408,17 +408,17 @@ export function ZipMatrixImportDialog({
                     onClick={() => setMode(k)}
                     className={`text-left p-2.5 rounded-lg border transition-all cursor-pointer ${
                       active
-                        ? 'border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-500/30'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
+                        ? 'border-emerald-500 bg-status-success-bg/60 ring-1 ring-emerald-500/30'
+                        : 'border-border-subtle bg-surface-card hover:border-border-strong'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className={`font-semibold text-xs ${active ? 'text-emerald-900' : 'text-slate-800'}`}>
+                      <span className={`font-semibold text-xs ${active ? 'text-status-success-fg' : 'text-fg-strong'}`}>
                         {MODE_META[k].label}
                       </span>
                       {active && <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />}
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{MODE_META[k].desc}</p>
+                    <p className="text-[11px] text-fg-muted mt-0.5">{MODE_META[k].desc}</p>
                   </button>
                 );
               })}
@@ -427,16 +427,16 @@ export function ZipMatrixImportDialog({
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
               {(
                 [
-                  ['Added', preview.summary.added, 'text-emerald-700 bg-emerald-50/50 border-emerald-200'],
-                  ['Updated', preview.summary.updated, 'text-blue-700 bg-blue-50/50 border-blue-200'],
-                  ['Unchanged', preview.summary.unchanged, 'text-slate-700 bg-slate-50 border-slate-200'],
-                  ['Removed', preview.summary.removed, 'text-amber-700 bg-amber-50/50 border-amber-200'],
+                  ['Added', preview.summary.added, 'text-status-success-fg bg-status-success-bg/50 border-status-success-border'],
+                  ['Updated', preview.summary.updated, 'text-status-info-fg bg-status-info-bg/50 border-status-info-border'],
+                  ['Unchanged', preview.summary.unchanged, 'text-fg-secondary bg-surface-subtle border-border-subtle'],
+                  ['Removed', preview.summary.removed, 'text-status-warning-fg bg-status-warning-bg/50 border-status-warning-border'],
                   [
                     'Errors',
                     preview.summary.invalid,
                     preview.summary.invalid > 0
-                      ? 'text-rose-700 bg-rose-50 border-rose-200'
-                      : 'text-slate-500 bg-slate-50 border-slate-200',
+                      ? 'text-status-danger-fg bg-status-danger-bg border-status-danger-border'
+                      : 'text-fg-muted bg-surface-subtle border-border-subtle',
                   ],
                 ] as const
               ).map(([label, n, tone]) => (
@@ -448,7 +448,7 @@ export function ZipMatrixImportDialog({
             </div>
 
             {preview.errors.length > 0 && (
-              <div className="max-h-32 overflow-auto p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 space-y-0.5">
+              <div className="max-h-32 overflow-auto p-2.5 rounded-lg bg-status-danger-bg border border-status-danger-border text-status-danger-fg space-y-0.5">
                 {preview.errors.slice(0, 100).map((er, i) => (
                   <div key={i}>
                     {er.line > 0 ? `Line ${er.line}: ` : ''}
@@ -459,9 +459,9 @@ export function ZipMatrixImportDialog({
               </div>
             )}
 
-            <div className="max-h-60 overflow-auto border border-slate-200 rounded-lg custom-scrollbar">
+            <div className="max-h-60 overflow-auto border border-border-subtle rounded-lg custom-scrollbar">
               <table className="w-full text-left text-[11px]">
-                <thead className="bg-slate-50 text-slate-600 sticky top-0 border-b border-slate-200">
+                <thead className="bg-surface-subtle text-fg-secondary sticky top-0 border-b border-border-subtle">
                   <tr>
                     {previewColumns.map((c) => (
                       <th key={c.key} className="py-1.5 px-2.5 font-semibold">
@@ -470,9 +470,9 @@ export function ZipMatrixImportDialog({
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 font-mono">
+                <tbody className="divide-y divide-border-faint font-mono">
                   {preview.rows.slice(0, 20).map((r) => (
-                    <tr key={r.id} className="hover:bg-slate-50/70">
+                    <tr key={r.id} className="hover:bg-surface-subtle/70">
                       {previewColumns.map((c) => (
                         <td key={c.key} className="py-1.5 px-2.5">
                           {formatCellValue(c, r.values[c.key])}
@@ -483,7 +483,7 @@ export function ZipMatrixImportDialog({
                 </tbody>
               </table>
             </div>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-fg-muted">
               Showing first {Math.min(20, preview.rows.length)} of {preview.rows.length} resulting rows.
             </p>
           </div>
@@ -491,7 +491,7 @@ export function ZipMatrixImportDialog({
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-200 flex items-center justify-between gap-2">
+      <div className="px-4 py-3 bg-surface-subtle/80 border-t border-border-subtle flex items-center justify-between gap-2">
         <Button type="button" variant="outline" size="sm" onClick={close}>
           Cancel
         </Button>

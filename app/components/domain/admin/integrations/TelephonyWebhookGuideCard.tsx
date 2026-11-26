@@ -88,15 +88,15 @@ export function TelephonyWebhookGuideCard({
   };
 
   return (
-    <Card className="rounded-2xl border-slate-200">
-      <CardHeader className="border-b border-slate-100 pb-4">
+    <Card className="rounded-2xl border-border-subtle">
+      <CardHeader className="border-b border-border-faint pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <CardTitle className="text-base font-extrabold text-fg-primary flex items-center gap-2">
               <LinkIcon className="w-4 h-4 text-blue-600 shrink-0" />
               <span>Nextiva Hybrid &amp; Twilio Webhook Setup Guide</span>
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
+            <CardDescription className="text-xs text-fg-muted">
               Copy-ready production webhooks and local Dispatch screen-pop verification before enabling live Nextiva Simultaneous Ring.
             </CardDescription>
           </div>
@@ -111,41 +111,41 @@ export function TelephonyWebhookGuideCard({
 
       <CardContent className="p-4 sm:p-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-          <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/70">
-            <span className="font-bold text-slate-700 block">Verified Outbound Caller ID</span>
-            <code className="font-mono text-slate-900 font-semibold">{outboundCallerId?.trim() || '+13147380100'}</code>
-            <p className="text-[11px] text-slate-500 mt-0.5">Shown to customers on outbound WebRTC calls (verify in Twilio Verified Caller IDs).</p>
+          <div className="p-3 rounded-xl border border-border-subtle bg-surface-subtle/70">
+            <span className="font-bold text-fg-secondary block">Verified Outbound Caller ID</span>
+            <code className="font-mono text-fg-primary font-semibold">{outboundCallerId?.trim() || '+13147380100'}</code>
+            <p className="text-[11px] text-fg-muted mt-0.5">Shown to customers on outbound WebRTC calls (verify in Twilio Verified Caller IDs).</p>
           </div>
-          <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/70">
-            <span className="font-bold text-slate-700 block">Twilio Inbound Bridge Number</span>
-            <code className="font-mono text-slate-900 font-semibold">{bridgePhoneNumber?.trim() || '+13142281454'}</code>
-            <p className="text-[11px] text-slate-500 mt-0.5">Add this Twilio number as a Nextiva Simultaneous Ring target alongside desk/mobile phones.</p>
+          <div className="p-3 rounded-xl border border-border-subtle bg-surface-subtle/70">
+            <span className="font-bold text-fg-secondary block">Twilio Inbound Bridge Number</span>
+            <code className="font-mono text-fg-primary font-semibold">{bridgePhoneNumber?.trim() || '+13142281454'}</code>
+            <p className="text-[11px] text-fg-muted mt-0.5">Add this Twilio number as a Nextiva Simultaneous Ring target alongside desk/mobile phones.</p>
           </div>
         </div>
 
         <div className="space-y-2.5">
           {webhookRows.map((row) => (
-            <div key={row.key} className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div key={row.key} className="p-3 rounded-xl border border-border-subtle bg-surface-subtle/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div className="min-w-0 space-y-0.5">
-                <span className="text-xs font-extrabold text-slate-800 block">{row.label}</span>
-                <code className="block text-[11px] font-mono text-blue-800 bg-white px-2 py-1 rounded-lg border border-slate-200 select-all break-all">{row.url}</code>
-                <p className="text-[11px] text-slate-500">{row.hint}</p>
+                <span className="text-xs font-extrabold text-fg-strong block">{row.label}</span>
+                <code className="block text-[11px] font-mono text-status-info-fg bg-surface-card px-2 py-1 rounded-lg border border-border-subtle select-all break-all">{row.url}</code>
+                <p className="text-[11px] text-fg-muted">{row.hint}</p>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => handleCopy(row.key, row.url, row.label)} className="text-xs font-bold shrink-0 bg-white cursor-pointer">
-                {copiedKey === row.key ? <CheckIcon className="w-3.5 h-3.5 mr-1 text-emerald-700" /> : <CopyIcon className="w-3.5 h-3.5 mr-1" />}
+              <Button type="button" variant="outline" size="sm" onClick={() => handleCopy(row.key, row.url, row.label)} className="text-xs font-bold shrink-0 bg-surface-card cursor-pointer">
+                {copiedKey === row.key ? <CheckIcon className="w-3.5 h-3.5 mr-1 text-status-success-fg" /> : <CopyIcon className="w-3.5 h-3.5 mr-1" />}
                 {copiedKey === row.key ? 'Copied' : 'Copy'}
               </Button>
             </div>
           ))}
         </div>
 
-        <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/40 space-y-2.5">
+        <div className="p-3.5 rounded-xl border border-status-info-border bg-status-info-bg/40 space-y-2.5">
           <div>
-            <span className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+            <span className="text-xs font-extrabold text-fg-primary flex items-center gap-1.5">
               <BellIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
               <span>Local Incoming-Ring &amp; Screen-Pop Simulator</span>
             </span>
-            <p className="text-[11px] text-slate-600">
+            <p className="text-[11px] text-fg-secondary">
               Publishes <code className="font-mono">INCOMING_CALL</code> on <code className="font-mono">WorkspaceBus</code> to test the Dispatch softphone ring banner &amp; <code className="font-mono">ClientProfileWindow</code> screen-pop (default VIP caller <code className="font-mono">+13145550199</code>).
             </p>
           </div>
@@ -156,19 +156,19 @@ export function TelephonyWebhookGuideCard({
               onChange={(e) => setSimCallerPhone(e.target.value)}
               placeholder="+13145550199"
               aria-label="Simulated caller phone number"
-              className="w-44 px-3 py-1.5 text-xs font-mono rounded-lg border border-slate-300 bg-white"
+              className="w-44 px-3 py-1.5 text-xs font-mono rounded-lg border border-border-strong bg-surface-card"
             />
             <Button type="button" onClick={handleSimulateIncomingRing} className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg cursor-pointer">
               <PhoneIcon className="w-3.5 h-3.5 mr-1.5" />
               Simulate Incoming Ring (Local Test)
             </Button>
             {lastSimNotice && (
-              <Button type="button" variant="outline" size="sm" onClick={handleDismissSimulatedRing} className="text-xs font-semibold bg-white cursor-pointer">
+              <Button type="button" variant="outline" size="sm" onClick={handleDismissSimulatedRing} className="text-xs font-semibold bg-surface-card cursor-pointer">
                 Dismiss Ring
               </Button>
             )}
           </div>
-          {lastSimNotice && <p className="text-[11px] font-medium text-blue-800">{lastSimNotice}</p>}
+          {lastSimNotice && <p className="text-[11px] font-medium text-status-info-fg">{lastSimNotice}</p>}
         </div>
       </CardContent>
     </Card>

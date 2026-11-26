@@ -132,15 +132,15 @@ export function CannedSmsTemplatesEditorCard({
   };
 
   return (
-    <Card className="rounded-2xl border-slate-200">
-      <CardHeader className="border-b border-slate-100 pb-4">
+    <Card className="rounded-2xl border-border-subtle">
+      <CardHeader className="border-b border-border-faint pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <CardTitle className="text-base font-extrabold text-fg-primary flex items-center gap-2">
               <ChatBubbleLeftRightIcon className="w-5 h-5 text-blue-600 shrink-0" />
               <span>Canned Dispatch SMS Templates ({resolvedTemplates.filter((t) => t.enabled).length} Active)</span>
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
+            <CardDescription className="text-xs text-fg-muted">
               Customize 1-click SMS chips in Dispatch CommsHub with live STL/SUS curbside door &amp; tracking interpolation.
             </CardDescription>
           </div>
@@ -148,7 +148,7 @@ export function CannedSmsTemplatesEditorCard({
             <Button type="button" variant="outline" size="sm" onClick={() => setSmsConfig(DEFAULT_CANNED_SMS_TEMPLATES_CONFIG)} className="text-xs font-bold">
               <RefreshCwIcon className="w-3.5 h-3.5 mr-1" /> Reset Defaults
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={handleAddCustomTemplate} className="text-xs font-bold text-blue-700 border-blue-200 hover:bg-blue-50">
+            <Button type="button" variant="outline" size="sm" onClick={handleAddCustomTemplate} className="text-xs font-bold text-status-info-fg border-status-info-border hover:bg-status-info-bg">
               <PlusIcon className="w-3.5 h-3.5 mr-1" /> Add Template
             </Button>
             <Button type="button" size="sm" onClick={handleSaveSmsTemplates} disabled={isSavingSms || isLoading} className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold">
@@ -159,14 +159,14 @@ export function CannedSmsTemplatesEditorCard({
       </CardHeader>
 
       <CardContent className="p-4 sm:p-6 space-y-4">
-        <div className="p-3 rounded-xl border border-blue-100 bg-blue-50/40 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-bold text-slate-700 mr-1">Insert Variable:</span>
+        <div className="p-3 rounded-xl border border-blue-100 bg-status-info-bg/40 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-bold text-fg-secondary mr-1">Insert Variable:</span>
           {VARIABLE_TOKENS.map((token) => (
             <button
               key={token}
               type="button"
               onClick={() => handleInsertVariable(token)}
-              className="px-2 py-0.5 rounded-md bg-white border border-blue-200 text-[11px] font-mono font-semibold text-blue-800 hover:bg-blue-100 cursor-pointer"
+              className="px-2 py-0.5 rounded-md bg-surface-card border border-status-info-border text-[11px] font-mono font-semibold text-status-info-fg hover:bg-status-info-bg-strong cursor-pointer"
             >
               {token}
             </button>
@@ -182,7 +182,7 @@ export function CannedSmsTemplatesEditorCard({
                 key={tpl.id}
                 onClick={() => setSelectedTemplateId(tpl.id)}
                 className={`p-3.5 rounded-xl border transition-all space-y-2.5 ${
-                  isSelected ? 'border-blue-400 bg-blue-50/20 ring-1 ring-blue-300' : 'border-slate-200 bg-slate-50/40'
+                  isSelected ? 'border-blue-400 bg-status-info-bg/20 ring-1 ring-status-info-border' : 'border-border-subtle bg-surface-subtle/40'
                 }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -192,11 +192,11 @@ export function CannedSmsTemplatesEditorCard({
                       type="text"
                       value={tpl.label}
                       onChange={(e) => updateTemplateItem(tpl.id, tpl.isBuiltIn, { label: e.target.value })}
-                      className="flex-1 max-w-xs text-xs font-extrabold text-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 bg-white"
+                      className="flex-1 max-w-xs text-xs font-extrabold text-fg-primary px-2.5 py-1 rounded-lg border border-border-subtle bg-surface-card"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <label className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer">
+                    <label className="inline-flex items-center gap-1.5 text-xs font-bold text-fg-secondary cursor-pointer">
                       <input
                         type="checkbox"
                         checked={tpl.enabled}
@@ -215,7 +215,7 @@ export function CannedSmsTemplatesEditorCard({
                             customTemplates: prev.customTemplates.filter((c) => c.id !== tpl.id),
                           }));
                         }}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 cursor-pointer"
+                        className="p-1.5 text-fg-subtle hover:text-rose-600 cursor-pointer"
                         title="Delete Custom Template"
                       >
                         <TrashIcon className="w-3.5 h-3.5" />
@@ -229,11 +229,11 @@ export function CannedSmsTemplatesEditorCard({
                   value={tpl.bodyTemplate}
                   onFocus={() => setSelectedTemplateId(tpl.id)}
                   onChange={(e) => updateTemplateItem(tpl.id, tpl.isBuiltIn, { bodyTemplate: e.target.value })}
-                  className="w-full text-xs font-mono p-2.5 rounded-lg border border-slate-200 bg-white"
+                  className="w-full text-xs font-mono p-2.5 rounded-lg border border-border-subtle bg-surface-card"
                 />
 
-                <div className="text-[11px] text-slate-600 bg-white/80 px-2.5 py-1.5 rounded-lg border border-slate-100">
-                  <strong className="text-slate-800">Live Preview:</strong> {previewText}
+                <div className="text-[11px] text-fg-secondary bg-surface-card/80 px-2.5 py-1.5 rounded-lg border border-border-faint">
+                  <strong className="text-fg-strong">Live Preview:</strong> {previewText}
                 </div>
               </div>
             );

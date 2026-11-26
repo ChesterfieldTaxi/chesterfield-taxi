@@ -314,26 +314,26 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
 
       {/* Header and Quick Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
-        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs min-w-0">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block truncate">Total Fleet</span>
-          <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1 tabular-nums">{fleet.length} <span className="text-[11px] sm:text-xs font-semibold text-slate-500">cars</span></div>
+        <div className="bg-surface-card p-3 sm:p-4 rounded-2xl border border-border-subtle/80 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wide block truncate">Total Fleet</span>
+          <div className="text-xl sm:text-2xl font-black text-fg-primary mt-1 tabular-nums">{fleet.length} <span className="text-[11px] sm:text-xs font-semibold text-fg-muted">cars</span></div>
         </div>
-        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs min-w-0">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block truncate">Active</span>
-          <div className="text-xl sm:text-2xl font-black text-emerald-600 mt-1 tabular-nums">{activeCount} <span className="text-[11px] sm:text-xs font-semibold text-slate-500">ready</span></div>
+        <div className="bg-surface-card p-3 sm:p-4 rounded-2xl border border-border-subtle/80 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wide block truncate">Active</span>
+          <div className="text-xl sm:text-2xl font-black text-emerald-600 mt-1 tabular-nums">{activeCount} <span className="text-[11px] sm:text-xs font-semibold text-fg-muted">ready</span></div>
         </div>
-        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs min-w-0">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block truncate">Maintenance</span>
-          <div className="text-xl sm:text-2xl font-black text-amber-600 mt-1 tabular-nums">{maintenanceCount} <span className="text-[11px] sm:text-xs font-semibold text-slate-500">shop</span></div>
+        <div className="bg-surface-card p-3 sm:p-4 rounded-2xl border border-border-subtle/80 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wide block truncate">Maintenance</span>
+          <div className="text-xl sm:text-2xl font-black text-amber-600 mt-1 tabular-nums">{maintenanceCount} <span className="text-[11px] sm:text-xs font-semibold text-fg-muted">shop</span></div>
         </div>
-        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs min-w-0">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block truncate">Avg Odometer</span>
-          <div className="text-xl sm:text-2xl font-black text-blue-600 mt-1 tabular-nums truncate">{avgMileage.toLocaleString()} <span className="text-[11px] sm:text-xs font-semibold text-slate-500">mi</span></div>
+        <div className="bg-surface-card p-3 sm:p-4 rounded-2xl border border-border-subtle/80 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wide block truncate">Avg Odometer</span>
+          <div className="text-xl sm:text-2xl font-black text-blue-600 mt-1 tabular-nums truncate">{avgMileage.toLocaleString()} <span className="text-[11px] sm:text-xs font-semibold text-fg-muted">mi</span></div>
         </div>
       </div>
 
       {/* Control bar: Filters & Add Car */}
-      <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+      <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 bg-surface-card p-3 sm:p-4 rounded-2xl border border-border-subtle/80 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
           <div className="relative w-full sm:w-56">
             <Input
@@ -385,7 +385,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               setShiftHistoryVehicleId(undefined);
               setShowShiftHistory(true);
             }}
-            className="flex items-center justify-center gap-1.5 border-slate-300 font-bold whitespace-nowrap px-3 text-slate-700 hover:bg-slate-50"
+            className="flex items-center justify-center gap-1.5 border-border-strong font-bold whitespace-nowrap px-3 text-fg-secondary hover:bg-surface-subtle"
           >
             <HistoryIcon className="w-4 h-4 text-blue-600 shrink-0" />
             <span>Shift Search</span>
@@ -435,17 +435,17 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
         }
       >
         <form id="add-fleet-car-form" onSubmit={handleAddNewCar} className="space-y-5">
-          <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+          <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
               <CarIcon className="w-4 h-4 text-blue-600" />
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
                 Vehicle Identity &amp; Class
               </h3>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">
                   Car Number <span className="text-rose-500">*</span>
                 </label>
                 <Input
@@ -457,7 +457,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">
                   Vehicle Type Class <span className="text-rose-500">*</span>
                 </label>
                 <Select
@@ -476,7 +476,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">
                   Make <span className="text-rose-500">*</span>
                 </label>
                 <Input
@@ -488,7 +488,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">
                   Model <span className="text-rose-500">*</span>
                 </label>
                 <Input
@@ -502,7 +502,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Year</label>
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">Year</label>
                 <Input
                   type="number"
                   value={newCar.year}
@@ -511,7 +511,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Color</label>
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">Color</label>
                 <Input
                   placeholder="e.g. Silver, Black"
                   value={newCar.color}
@@ -520,7 +520,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">Status</label>
                 <Select
                   size="md"
                   value={newCar.status}
@@ -535,17 +535,17 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
             </div>
           </section>
 
-          <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+          <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
               <UserIcon className="w-4 h-4 text-emerald-600" />
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
                 Registration, Insurance &amp; Assignment
               </h3>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">License Plate</label>
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">License Plate</label>
                 <Input
                   placeholder="e.g. MO-7TX91"
                   value={newCar.licensePlate}
@@ -554,7 +554,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">VIN</label>
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">VIN</label>
                 <Input
                   placeholder="17-character VIN"
                   value={newCar.vin}
@@ -565,7 +565,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Assigned Driver</label>
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">Assigned Driver</label>
                 <Input
                   placeholder="e.g. Mike T."
                   value={newCar.assignedDriverName || ''}
@@ -574,7 +574,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Odometer (mi)</label>
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">Odometer (mi)</label>
                 <Input
                   type="number"
                   placeholder="e.g. 45000"
@@ -584,7 +584,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Insurance Policy</label>
+                <label className="block text-xs font-semibold text-fg-secondary mb-1">Insurance Policy</label>
                 <Input
                   placeholder="e.g. ST-902348-COMM"
                   value={newCar.insurancePolicy || ''}
@@ -594,7 +594,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
             </div>
           </section>
 
-          <section className="bg-white rounded-2xl border border-slate-200/90 p-4">
+          <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4">
             <VehicleImagePicker
               value={newCar.imageUrl || ''}
               onChange={(url: string) => setNewCar({ ...newCar, imageUrl: url })}
@@ -609,12 +609,12 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
       {/* Fleet Cars List */}
       <div className="space-y-4">
         {filteredFleet.length === 0 ? (
-          <div className="bg-white p-12 text-center rounded-2xl border border-slate-200 text-slate-500">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+          <div className="bg-surface-card p-12 text-center rounded-2xl border border-border-subtle text-fg-muted">
+            <div className="w-12 h-12 rounded-2xl bg-surface-muted text-fg-subtle flex items-center justify-center mx-auto mb-3">
               <CarIcon className="w-6 h-6" />
             </div>
-            <p className="font-bold text-slate-800">No fleet cars match your criteria.</p>
-            <p className="text-xs text-slate-400 mt-1">Try clearing filters or adding a new car to the fleet.</p>
+            <p className="font-bold text-fg-strong">No fleet cars match your criteria.</p>
+            <p className="text-xs text-fg-subtle mt-1">Try clearing filters or adding a new car to the fleet.</p>
           </div>
         ) : (
           filteredFleet.map((car) => {
@@ -622,12 +622,12 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
             return (
               <div
                 key={car.id}
-                className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-sm transition-all p-3.5 sm:p-5 space-y-3.5 sm:space-y-4"
+                className="bg-surface-card rounded-2xl border border-border-subtle/90 shadow-2xs hover:shadow-sm transition-all p-3.5 sm:p-5 space-y-3.5 sm:space-y-4"
               >
-                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 pb-3 border-b border-border-faint">
                   <div className="flex items-center gap-3 min-w-0">
                     {car.imageUrl ? (
-                      <div className="w-14 h-12 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 shadow-2xs">
+                      <div className="w-14 h-12 rounded-xl bg-surface-muted overflow-hidden shrink-0 border border-border-subtle shadow-2xs">
                         <img
                           src={car.imageUrl}
                           alt={car.unitNumber}
@@ -635,14 +635,14 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                         />
                       </div>
                     ) : (
-                      <div className="w-10 h-10 rounded-xl bg-slate-900 text-amber-400 flex items-center justify-center shadow-xs shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-surface-header text-amber-400 flex items-center justify-center shadow-xs shrink-0">
                         <CarIcon className="w-5 h-5" />
                       </div>
                     )}
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                        <h4 className="text-sm sm:text-base font-extrabold text-slate-900">{car.unitNumber}</h4>
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                        <h4 className="text-sm sm:text-base font-extrabold text-fg-primary">{car.unitNumber}</h4>
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-status-info-bg-strong text-status-info-fg">
                           {getVehicleTypeName(car.vehicleTypeId)}
                         </span>
                         {car.status === 'active' && !car.isBlacklisted && <Badge variant="success">Active</Badge>}
@@ -652,8 +652,8 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                         {car.isBlacklisted && <Badge variant="error">GROUNDED</Badge>}
                         {car.isArchived && <Badge variant="neutral">ARCHIVED</Badge>}
                       </div>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {car.year} {car.make} {car.model} · <span className="font-mono text-slate-700">{car.color}</span>
+                      <p className="text-xs text-fg-muted mt-0.5">
+                        {car.year} {car.make} {car.model} · <span className="font-mono text-fg-secondary">{car.color}</span>
                         {car.blacklistReason && <span className="text-rose-600 font-bold ml-2">Reason: {car.blacklistReason}</span>}
                       </p>
                     </div>
@@ -697,8 +697,8 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                       }}
                       className={`text-xs h-8 flex items-center gap-1.5 cursor-pointer ${
                         car.isBlacklisted
-                          ? 'text-emerald-700 border-emerald-200 hover:bg-emerald-50'
-                          : 'text-rose-600 border-rose-200 hover:bg-rose-50'
+                          ? 'text-status-success-fg border-status-success-border hover:bg-status-success-bg'
+                          : 'text-rose-600 border-status-danger-border hover:bg-status-danger-bg'
                       }`}
                     >
                       {car.isBlacklisted ? (
@@ -719,7 +719,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                       variant="outline"
                       size="sm"
                       onClick={() => setEditingCar({ ...car })}
-                      className="text-xs h-8 flex items-center gap-1.5 border-blue-200 text-blue-700 bg-blue-50/60 hover:bg-blue-100 font-semibold"
+                      className="text-xs h-8 flex items-center gap-1.5 border-status-info-border text-status-info-fg bg-status-info-bg/60 hover:bg-status-info-bg-strong font-semibold"
                       title="Edit vehicle details, driver, status, and photo"
                     >
                       <EditIcon className="w-3.5 h-3.5" />
@@ -742,9 +742,9 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                       }}
                       className="text-xs h-8 flex items-center gap-1.5"
                     >
-                      <WrenchIcon className="w-3.5 h-3.5 text-slate-500" />
+                      <WrenchIcon className="w-3.5 h-3.5 text-fg-muted" />
                       <span>Service Log</span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600">
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-surface-muted text-fg-secondary">
                         {historyCount}
                       </span>
                     </Button>
@@ -757,7 +757,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                         setShiftHistoryVehicleId(car.id);
                         setShowShiftHistory(true);
                       }}
-                      className="text-xs h-8 flex items-center gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
+                      className="text-xs h-8 flex items-center gap-1.5 text-blue-600 border-status-info-border hover:bg-status-info-bg"
                     >
                       <HistoryIcon className="w-3.5 h-3.5" />
                       <span>Shift History</span>
@@ -766,7 +766,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                     <button
                       type="button"
                       onClick={() => handleDeleteCar(car.id)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                      className="p-1.5 text-fg-subtle hover:text-red-600 rounded-lg hover:bg-status-danger-bg transition-colors cursor-pointer"
                       title="Delete car from fleet"
                     >
                       <TrashIcon className="w-4 h-4" />
@@ -775,13 +775,13 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                 </div>
 
                 {groundingCarId === car.id && !car.isBlacklisted && (
-                  <div className="p-3 rounded-xl bg-rose-50/80 border border-rose-200 flex flex-col sm:flex-row sm:items-center gap-2 animate-in fade-in duration-150">
+                  <div className="p-3 rounded-xl bg-status-danger-bg/80 border border-status-danger-border flex flex-col sm:flex-row sm:items-center gap-2 animate-in fade-in duration-150">
                     <input
                       type="text"
                       value={groundReasonDraft}
                       onChange={(e) => setGroundReasonDraft(e.target.value)}
                       placeholder={`Reason to ground / blacklist ${car.unitNumber}...`}
-                      className="flex-1 px-3 py-1.5 text-xs bg-white border border-rose-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                      className="flex-1 px-3 py-1.5 text-xs bg-surface-card border border-status-danger-border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
                     />
                     <div className="flex items-center justify-end gap-1.5 shrink-0">
                       <Button
@@ -820,15 +820,15 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
 
                 {/* Grid of Car Specs and Tracking */}
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
-                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">License Plate</span>
-                    <span className="font-mono font-bold text-slate-900 mt-0.5 block truncate">
+                  <div className="bg-surface-subtle p-2.5 rounded-xl border border-border-faint">
+                    <span className="text-[10px] font-bold text-fg-subtle uppercase block">License Plate</span>
+                    <span className="font-mono font-bold text-fg-primary mt-0.5 block truncate">
                       {car.licensePlate || 'N/A'}
                     </span>
                   </div>
 
-                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Odometer</span>
+                  <div className="bg-surface-subtle p-2.5 rounded-xl border border-border-faint">
+                    <span className="text-[10px] font-bold text-fg-subtle uppercase block">Odometer</span>
                     <div className="flex items-center gap-1 mt-0.5">
                       <Input
                         type="number"
@@ -836,12 +836,12 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                         onChange={(e) => handleUpdateCar(car.id, { mileage: parseInt(e.target.value) || 0 })}
                         className="h-6 text-xs font-mono font-bold w-20 px-1"
                       />
-                      <span className="text-[10px] text-slate-500 font-bold">mi</span>
+                      <span className="text-[10px] text-fg-muted font-bold">mi</span>
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Assigned Driver</span>
+                  <div className="bg-surface-subtle p-2.5 rounded-xl border border-border-faint">
+                    <span className="text-[10px] font-bold text-fg-subtle uppercase block">Assigned Driver</span>
                     <Input
                       placeholder="Unassigned"
                       value={car.assignedDriverName || ''}
@@ -850,16 +850,16 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                     />
                   </div>
 
-                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">VIN</span>
-                    <span className="font-mono text-[11px] text-slate-700 mt-0.5 block truncate" title={car.vin}>
+                  <div className="bg-surface-subtle p-2.5 rounded-xl border border-border-faint">
+                    <span className="text-[10px] font-bold text-fg-subtle uppercase block">VIN</span>
+                    <span className="font-mono text-[11px] text-fg-secondary mt-0.5 block truncate" title={car.vin}>
                       {car.vin || 'N/A'}
                     </span>
                   </div>
 
-                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Insurance</span>
-                    <span className="text-[11px] font-semibold text-slate-700 mt-0.5 block truncate" title={car.insurancePolicy}>
+                  <div className="bg-surface-subtle p-2.5 rounded-xl border border-border-faint">
+                    <span className="text-[10px] font-bold text-fg-subtle uppercase block">Insurance</span>
+                    <span className="text-[11px] font-semibold text-fg-secondary mt-0.5 block truncate" title={car.insurancePolicy}>
                       {car.insurancePolicy || 'Commercial Policy'}
                     </span>
                   </div>
@@ -900,17 +900,17 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
           <div className="space-y-5">
             <form
               onSubmit={handleAddMaintenanceRecord}
-              className="p-4 rounded-2xl bg-white border border-slate-200/90 space-y-3.5"
+              className="p-4 rounded-2xl bg-surface-card border border-border-subtle/90 space-y-3.5"
             >
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
                 <WrenchIcon className="w-4 h-4 text-blue-600" />
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
                   Log Service Event
                 </h3>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Date</label>
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">Date</label>
                   <Input
                     type="date"
                     value={newMaintenanceRecord.date}
@@ -921,7 +921,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">
                     Odometer (mi)
                   </label>
                   <Input
@@ -937,7 +937,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Cost ($)</label>
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">Cost ($)</label>
                   <Input
                     type="number"
                     step="0.01"
@@ -953,7 +953,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">
                     Service Performed
                   </label>
                   <Input
@@ -969,7 +969,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">
                     Shop / Technician
                   </label>
                   <Input
@@ -997,44 +997,44 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               </div>
             </form>
 
-            <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-2.5">
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+            <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-2.5">
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-muted">
                 Past Service Logs
               </h3>
               {!selectedCarForMaintenance.maintenanceHistory ||
               selectedCarForMaintenance.maintenanceHistory.length === 0 ? (
-                <p className="text-xs text-slate-400 italic py-4 text-center">
+                <p className="text-xs text-fg-subtle italic py-4 text-center">
                   No service records logged yet for this vehicle.
                 </p>
               ) : (
                 selectedCarForMaintenance.maintenanceHistory.map((rec) => (
                   <div
                     key={rec.id}
-                    className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 flex items-start justify-between gap-3 text-xs"
+                    className="p-3 rounded-xl border border-border-subtle bg-surface-subtle/50 flex items-start justify-between gap-3 text-xs"
                   >
                     <div className="min-w-0">
-                      <div className="font-bold text-slate-900">{rec.description}</div>
-                      <div className="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-3">
+                      <div className="font-bold text-fg-primary">{rec.description}</div>
+                      <div className="text-[11px] text-fg-muted mt-0.5 flex flex-wrap items-center gap-3">
                         <span className="inline-flex items-center gap-1">
-                          <CalendarIcon className="w-3 h-3 text-slate-400" />
+                          <CalendarIcon className="w-3 h-3 text-fg-subtle" />
                           {rec.date}
                         </span>
                         {rec.odometer && (
                           <span className="inline-flex items-center gap-1">
-                            <ActivityIcon className="w-3 h-3 text-slate-400" />
+                            <ActivityIcon className="w-3 h-3 text-fg-subtle" />
                             {rec.odometer.toLocaleString()} mi
                           </span>
                         )}
                         {rec.performedBy && (
                           <span className="inline-flex items-center gap-1">
-                            <BuildingIcon className="w-3 h-3 text-slate-400" />
+                            <BuildingIcon className="w-3 h-3 text-fg-subtle" />
                             {rec.performedBy}
                           </span>
                         )}
                       </div>
                     </div>
                     {rec.cost !== undefined && (
-                      <div className="font-mono font-bold text-slate-900 text-sm shrink-0">
+                      <div className="font-mono font-bold text-fg-primary text-sm shrink-0">
                         ${rec.cost.toFixed(2)}
                       </div>
                     )}
@@ -1047,10 +1047,10 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
       </AdminSlideOverDrawer>
 
       {/* Floating Save Actions Bar */}
-      <div className="sticky bottom-16 lg:bottom-4 bg-white/95 backdrop-blur-sm p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-20">
+      <div className="sticky bottom-16 lg:bottom-4 bg-surface-card/95 backdrop-blur-sm p-3.5 sm:p-4 rounded-2xl border border-border-subtle shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-20">
         <div className="flex items-center gap-2 min-w-0">
           <SparklesIcon className="w-4 h-4 text-amber-500 shrink-0" />
-          <span className="text-xs text-slate-600">
+          <span className="text-xs text-fg-secondary">
             {fleet.length} fleet cars registered. Syncs to dispatch and fleet database.
           </span>
         </div>
@@ -1100,17 +1100,17 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
       >
         {editingCar && (
           <form id="edit-fleet-car-form" onSubmit={handleSaveEditingCar} className="space-y-5">
-            <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+            <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
                 <CarIcon className="w-4 h-4 text-blue-600" />
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
                   Vehicle Identity &amp; Class
                 </h3>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">
                     Unit / Cab Number <span className="text-rose-500">*</span>
                   </label>
                   <Input
@@ -1122,7 +1122,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Vehicle Class</label>
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">Vehicle Class</label>
                   <Select
                     size="md"
                     value={editingCar.vehicleTypeId}
@@ -1137,7 +1137,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">Status</label>
                   <Select
                     size="md"
                     value={editingCar.status}
@@ -1153,7 +1153,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">
                     Make <span className="text-rose-500">*</span>
                   </label>
                   <Input
@@ -1165,7 +1165,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">
                     Model <span className="text-rose-500">*</span>
                   </label>
                   <Input
@@ -1177,7 +1177,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Year</label>
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">Year</label>
                   <Input
                     type="number"
                     value={editingCar.year}
@@ -1186,7 +1186,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Color</label>
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">Color</label>
                   <Input
                     placeholder="e.g. Silver"
                     value={editingCar.color}
@@ -1196,17 +1196,17 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               </div>
             </section>
 
-            <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+            <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
                 <UserIcon className="w-4 h-4 text-emerald-600" />
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
                   Registration, Insurance &amp; Assignment
                 </h3>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">License Plate</label>
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">License Plate</label>
                   <Input
                     placeholder="e.g. 7XYZ99"
                     value={editingCar.licensePlate}
@@ -1215,7 +1215,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">VIN Number</label>
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">VIN Number</label>
                   <Input
                     placeholder="17-character VIN"
                     value={editingCar.vin}
@@ -1224,7 +1224,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Odometer (mi)</label>
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">Odometer (mi)</label>
                   <Input
                     type="number"
                     value={editingCar.mileage}
@@ -1235,7 +1235,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Assigned Driver</label>
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">Assigned Driver</label>
                   <Input
                     placeholder="Driver name"
                     value={editingCar.assignedDriverName || ''}
@@ -1244,7 +1244,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Insurance Policy</label>
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">Insurance Policy</label>
                   <Input
                     placeholder="Policy number"
                     value={editingCar.insurancePolicy || ''}
@@ -1253,7 +1253,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Insurance Expiry</label>
+                  <label className="block text-xs font-semibold text-fg-secondary mb-1">Insurance Expiry</label>
                   <Input
                     type="date"
                     value={editingCar.insuranceExpiry || ''}
@@ -1263,7 +1263,7 @@ export function AdminFleetTab({ settings, onSave, isLoading = false }: AdminFlee
               </div>
             </section>
 
-            <section className="bg-white rounded-2xl border border-slate-200/90 p-4">
+            <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4">
               <VehicleImagePicker
                 value={editingCar.imageUrl || ''}
                 onChange={(url: string) => setEditingCar({ ...editingCar, imageUrl: url })}

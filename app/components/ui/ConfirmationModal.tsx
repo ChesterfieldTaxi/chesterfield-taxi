@@ -74,14 +74,14 @@ export function ConfirmationModal({
       isMaximizable={false}
       zIndex={zIndex}
       footer={
-        <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <div className="px-5 py-3 bg-surface-subtle border-t border-border-faint flex items-center justify-end gap-2.5">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={onCancel}
             disabled={isLoading}
-            className="border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold px-4 cursor-pointer"
+            className="border-border-strong text-fg-secondary hover:bg-surface-muted font-semibold px-4 cursor-pointer"
           >
             {cancelText}
           </Button>
@@ -107,17 +107,17 @@ export function ConfirmationModal({
         <div
           className={`p-2.5 rounded-xl shrink-0 ${
             confirmVariant === 'danger'
-              ? 'bg-red-50 text-red-600 border border-red-100'
+              ? 'bg-status-danger-bg text-red-600 border border-red-100'
               : confirmVariant === 'warning'
-              ? 'bg-amber-50 text-amber-600 border border-amber-100'
-              : 'bg-blue-50 text-blue-600 border border-blue-100'
+              ? 'bg-status-warning-bg text-amber-600 border border-amber-100'
+              : 'bg-status-info-bg text-blue-600 border border-blue-100'
           }`}
         >
           <AlertCircleIcon className="w-6 h-6" />
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="text-sm text-slate-700 leading-relaxed font-medium">
+          <div className="text-sm text-fg-secondary leading-relaxed font-medium">
             {message}
           </div>
         </div>

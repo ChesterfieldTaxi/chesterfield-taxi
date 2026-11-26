@@ -53,7 +53,12 @@ export const APPEARANCE_OPTIONS: readonly AppearanceOption[] = [
  * - Phase 95: `/app/corporate`, `/corporate`
  * - Phase 96: `/` (public live site via brand `darkTokens`)
  */
-export const DARK_MODE_ENABLED_PATH_PREFIXES = ['/app/dispatch', '/dispatch'] as const;
+export const DARK_MODE_ENABLED_PATH_PREFIXES = [
+  '/app/dispatch',
+  '/dispatch',
+  '/app/admin',
+  '/admin',
+] as const;
 
 export function isDarkModeRoutePath(pathname: string): boolean {
   if (!pathname) return false;

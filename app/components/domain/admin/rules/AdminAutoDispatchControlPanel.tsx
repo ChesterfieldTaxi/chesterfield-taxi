@@ -134,18 +134,18 @@ export function AdminAutoDispatchControlPanel({
       : `AUTO-PILOT: ${config.dispatchMode.replace(/_/g, ' ').toUpperCase()}`;
 
   return (
-    <Card className="border-2 border-blue-200 shadow-xs overflow-hidden bg-white">
+    <Card className="border-2 border-status-info-border shadow-xs overflow-hidden bg-surface-card">
       {/* Control Center Header */}
-      <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-50 via-indigo-50/60 to-slate-50 border-b border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="p-4 sm:p-5 bg-gradient-to-r from-status-info-bg via-status-staged-bg/60 to-surface-subtle border-b border-status-info-border/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="p-2.5 bg-blue-600 text-white rounded-xl shrink-0 shadow-xs">
             <BoltIcon className="w-5 h-5" />
           </span>
           <div>
-            <h3 className="text-sm sm:text-base font-black text-slate-900">
+            <h3 className="text-sm sm:text-base font-black text-fg-primary">
               Intelligent Auto-Dispatch Control Center &amp; Pre-Pickup Lead Window
             </h3>
-            <p className="text-xs text-slate-600 font-medium">
+            <p className="text-xs text-fg-secondary font-medium">
               Configure 4 assignment modes, Pre-Pickup Lead-Window gating, authorized dispatcher overrides, candidate guardrails, and live dry-run simulation.
             </p>
           </div>
@@ -163,7 +163,7 @@ export function AdminAutoDispatchControlPanel({
               }
               className={`px-3 py-1 rounded-full text-[11px] font-extrabold border transition-colors cursor-pointer ${
                 config.isPaused
-                  ? 'bg-amber-100 text-amber-950 border-amber-300 hover:bg-amber-200'
+                  ? 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border hover:bg-status-warning-bg-strong'
                   : 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-500'
               }`}
             >
@@ -190,10 +190,10 @@ export function AdminAutoDispatchControlPanel({
         {/* 1. 4 Assignment Mode Selector Cards */}
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-800">
+            <span className="text-xs font-black uppercase tracking-wider text-fg-strong">
               1. Primary Dispatch Assignment Mode
             </span>
-            <span className="text-[11px] text-slate-500 font-medium">
+            <span className="text-[11px] text-fg-muted font-medium">
               Unconfirmed Tier-2 rides are never auto-dispatched until human review confirms them.
             </span>
           </div>
@@ -203,12 +203,12 @@ export function AdminAutoDispatchControlPanel({
               const isSelected = config.dispatchMode === card.mode;
               const activeBorder =
                 card.accent === 'emerald'
-                  ? 'border-emerald-600 bg-emerald-50/60'
+                  ? 'border-emerald-600 bg-status-success-bg/60'
                   : card.accent === 'indigo'
-                  ? 'border-indigo-600 bg-indigo-50/60'
+                  ? 'border-indigo-600 bg-status-staged-bg/60'
                   : card.accent === 'amber'
-                  ? 'border-amber-500 bg-amber-50/60'
-                  : 'border-blue-600 bg-blue-50/60';
+                  ? 'border-amber-500 bg-status-warning-bg/60'
+                  : 'border-blue-600 bg-status-info-bg/60';
               const activePill =
                 card.accent === 'emerald'
                   ? 'bg-emerald-600 text-white'
@@ -229,20 +229,20 @@ export function AdminAutoDispatchControlPanel({
                     })
                   }
                   className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
-                    isSelected ? `${activeBorder} shadow-2xs` : 'border-slate-200 bg-white hover:bg-slate-50'
+                    isSelected ? `${activeBorder} shadow-2xs` : 'border-border-subtle bg-surface-card hover:bg-surface-subtle'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-black text-slate-900">{card.title}</span>
+                    <span className="text-xs font-black text-fg-primary">{card.title}</span>
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        isSelected ? activePill : 'bg-slate-100 text-slate-600'
+                        isSelected ? activePill : 'bg-surface-muted text-fg-secondary'
                       }`}
                     >
                       {isSelected ? 'Active' : card.badge}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">
+                  <p className="text-[11px] text-fg-secondary mt-1.5 leading-relaxed">
                     {card.description}
                   </p>
                 </button>
@@ -252,12 +252,12 @@ export function AdminAutoDispatchControlPanel({
 
           {/* Sweep Execution Mode Selector when 1-Tap Manual is active */}
           {config.dispatchMode === 'manual_1tap' && (
-            <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="p-3.5 rounded-xl border border-status-info-border bg-status-info-bg/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <span className="text-xs font-extrabold text-slate-900 block">
+                <span className="text-xs font-extrabold text-fg-primary block">
                   On-Demand &ldquo;⚡ Auto-Dispatch Ready (N)&rdquo; Sweep Strategy
                 </span>
-                <span className="text-[11px] text-slate-600">
+                <span className="text-[11px] text-fg-secondary">
                   Choose which execution strategy runs when a dispatcher clicks the 1-click Ready Sweep button in Trips Queue.
                 </span>
               </div>
@@ -280,15 +280,15 @@ export function AdminAutoDispatchControlPanel({
 
         {/* 2. Pre-Pickup Lead Window, Staged Release & Authorized Dispatcher RBAC */}
         <div className="space-y-3">
-          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-800">
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-fg-strong">
             <ClockIcon className="w-4 h-4 text-blue-600" />
             <span>2. Pre-Pickup Lead Window &amp; Authorized Dispatcher Permissions</span>
           </div>
 
-          <div className="p-4 rounded-xl border border-blue-200/80 bg-blue-50/25 space-y-4">
+          <div className="p-4 rounded-xl border border-status-info-border/80 bg-status-info-bg/25 space-y-4">
             {/* ASAP & Scheduled Eligibility Toggles */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <label className="p-3 rounded-xl bg-white border border-slate-200 flex items-start gap-2.5 cursor-pointer">
+              <label className="p-3 rounded-xl bg-surface-card border border-border-subtle flex items-start gap-2.5 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={config.autoDispatchAsapRides}
@@ -296,16 +296,16 @@ export function AdminAutoDispatchControlPanel({
                   className="mt-0.5 rounded text-blue-600"
                 />
                 <div>
-                  <span className="text-xs font-extrabold text-slate-900 block">
+                  <span className="text-xs font-extrabold text-fg-primary block">
                     Auto-Dispatch ASAP Rides
                   </span>
-                  <span className="text-[11px] text-slate-500">
+                  <span className="text-[11px] text-fg-muted">
                     Immediate rides enter dispatch immediately upon confirmation.
                   </span>
                 </div>
               </label>
 
-              <label className="p-3 rounded-xl bg-white border border-slate-200 flex items-start gap-2.5 cursor-pointer">
+              <label className="p-3 rounded-xl bg-surface-card border border-border-subtle flex items-start gap-2.5 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={config.autoDispatchScheduledRides}
@@ -313,16 +313,16 @@ export function AdminAutoDispatchControlPanel({
                   className="mt-0.5 rounded text-blue-600"
                 />
                 <div>
-                  <span className="text-xs font-extrabold text-slate-900 block">
+                  <span className="text-xs font-extrabold text-fg-primary block">
                     Auto-Dispatch Scheduled Rides
                   </span>
-                  <span className="text-[11px] text-slate-500">
+                  <span className="text-[11px] text-fg-muted">
                     Held in CONFIRMED until T &minus; Lead Window arrives.
                   </span>
                 </div>
               </label>
 
-              <label className="p-3 rounded-xl bg-white border border-slate-200 flex items-start gap-2.5 cursor-pointer">
+              <label className="p-3 rounded-xl bg-surface-card border border-border-subtle flex items-start gap-2.5 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={config.autoReleaseStagedDrivers}
@@ -330,10 +330,10 @@ export function AdminAutoDispatchControlPanel({
                   className="mt-0.5 rounded text-blue-600"
                 />
                 <div>
-                  <span className="text-xs font-extrabold text-slate-900 block">
+                  <span className="text-xs font-extrabold text-fg-primary block">
                     Auto-Release Staged Drivers
                   </span>
-                  <span className="text-[11px] text-slate-500">
+                  <span className="text-[11px] text-fg-muted">
                     Automatically release pre-planned drivers inside release window.
                   </span>
                 </div>
@@ -342,12 +342,12 @@ export function AdminAutoDispatchControlPanel({
 
             {/* Lead Window Sliders & Inputs */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
+              <div className="p-3 rounded-xl bg-surface-card border border-border-subtle space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <label className="text-xs font-bold text-slate-800">
+                  <label className="text-xs font-bold text-fg-strong">
                     Pre-Pickup Lead Window (15–240m)
                   </label>
-                  <span className="font-mono text-xs font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                  <span className="font-mono text-xs font-black text-status-info-fg bg-status-info-bg px-2 py-0.5 rounded">
                     {config.scheduledDispatchLeadMinutes}m
                   </span>
                 </div>
@@ -359,15 +359,15 @@ export function AdminAutoDispatchControlPanel({
                 <Input
                   type="number" min="15" max="240" value={config.scheduledDispatchLeadMinutes}
                   onChange={(e) => update({ scheduledDispatchLeadMinutes: parseInt(e.target.value, 10) || 45 })}
-                  className="text-xs h-8 bg-slate-50"
+                  className="text-xs h-8 bg-surface-subtle"
                 />
-                <span className="text-[10px] text-slate-500 block leading-snug">
+                <span className="text-[10px] text-fg-muted block leading-snug">
                   Rides hours, days, weeks, or months ahead stay untouched in CONFIRMED until T &minus; {config.scheduledDispatchLeadMinutes}m.
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
-                <label className="text-xs font-bold text-blue-900 flex items-center gap-1">
+              <div className="p-3 rounded-xl bg-surface-card border border-border-subtle space-y-2">
+                <label className="text-xs font-bold text-status-info-fg flex items-center gap-1">
                   <PlaneIcon className="w-3.5 h-3.5 text-blue-600" />
                   <span>Airport Extra Lead Buffer (0–180m)</span>
                 </label>
@@ -381,23 +381,23 @@ export function AdminAutoDispatchControlPanel({
                       airportExtraLeadMinutes: Math.max(0, parseInt(e.target.value, 10) || 0),
                     })
                   }
-                  className="text-xs h-8 bg-slate-50"
+                  className="text-xs h-8 bg-surface-subtle"
                 />
-                <span className="text-[10px] text-slate-500 block leading-snug">
+                <span className="text-[10px] text-fg-muted block leading-snug">
                   STL / SUS / CPS airport rides enter dispatch at{' '}
-                  <strong className="text-slate-800">
+                  <strong className="text-fg-strong">
                     T &minus; {config.scheduledDispatchLeadMinutes + config.airportExtraLeadMinutes}m
                   </strong>
                   .
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-2">
+              <div className="p-3 rounded-xl bg-surface-card border border-border-subtle space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <label className="text-xs font-bold text-slate-800">
+                  <label className="text-xs font-bold text-fg-strong">
                     Staged Driver Release (15–240m)
                   </label>
-                  <span className="font-mono text-xs font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
+                  <span className="font-mono text-xs font-black text-status-staged-fg bg-status-staged-bg px-2 py-0.5 rounded">
                     {config.stagedAutoReleaseLeadMinutes}m
                   </span>
                 </div>
@@ -420,35 +420,35 @@ export function AdminAutoDispatchControlPanel({
                   onChange={(e) =>
                     update({ stagedAutoReleaseLeadMinutes: parseInt(e.target.value, 10) || 45 })
                   }
-                  className="text-xs h-8 bg-slate-50"
+                  className="text-xs h-8 bg-surface-subtle"
                 />
-                <span className="text-[10px] text-slate-500 block leading-snug">
+                <span className="text-[10px] text-fg-muted block leading-snug">
                   Lead minutes prior to pickup when pre-planned drivers receive their live dispatch offer/assignment.
                 </span>
               </div>
             </div>
 
             {/* Authorized Dispatchers Checklist */}
-            <div className="p-3.5 rounded-xl bg-white border border-slate-200 space-y-2.5">
+            <div className="p-3.5 rounded-xl bg-surface-card border border-border-subtle space-y-2.5">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <UsersIcon className="w-4 h-4 text-indigo-600 shrink-0" />
                   <div>
-                    <span className="text-xs font-extrabold text-slate-900 block">
+                    <span className="text-xs font-extrabold text-fg-primary block">
                       Authorized Dispatchers (Lead-Window Control)
                     </span>
-                    <span className="text-[11px] text-slate-500">
+                    <span className="text-[11px] text-fg-muted">
                       Administrators always have access. Grant specific dispatchers permission to adjust Lead Windows from the Dispatch Console ⚙️ menu.
                     </span>
                   </div>
                 </div>
-                <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200">
+                <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-status-staged-bg text-status-staged-fg border border-status-staged-border">
                   {config.authorizedLeadWindowDispatcherIds.length} Dispatcher(s) Authorized
                 </span>
               </div>
 
               {staffLeadWindowOperators.length === 0 ? (
-                <p className="text-[11px] text-slate-500 italic">
+                <p className="text-[11px] text-fg-muted italic">
                   No active administrator or dispatcher operator profiles found.
                 </p>
               ) : (
@@ -466,15 +466,15 @@ export function AdminAutoDispatchControlPanel({
                       return (
                         <div
                           key={op.uid}
-                          className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/50 text-purple-950 flex items-center justify-between gap-2"
+                          className="p-2.5 rounded-xl border border-status-staged-border bg-status-staged-bg/50 text-status-staged-fg flex items-center justify-between gap-2"
                         >
                           <div className="min-w-0">
                             <span className="text-xs font-bold block truncate">{nameLabel}</span>
-                            <span className="text-[10px] text-purple-700/80 block truncate">
+                            <span className="text-[10px] text-status-staged-fg/80 block truncate">
                               {op.email}
                             </span>
                           </div>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-300 text-[10px] font-bold whitespace-nowrap shrink-0">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border text-[10px] font-bold whitespace-nowrap shrink-0">
                             ✓ Always Authorized (Admin)
                           </span>
                         </div>
@@ -486,8 +486,8 @@ export function AdminAutoDispatchControlPanel({
                         key={op.uid}
                         className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition-colors ${
                           checked
-                            ? 'border-indigo-400 bg-indigo-50/60 text-indigo-950'
-                            : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 text-slate-700'
+                            ? 'border-indigo-400 bg-status-staged-bg/60 text-status-staged-fg'
+                            : 'border-border-subtle bg-surface-subtle/50 hover:bg-surface-subtle text-fg-secondary'
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
@@ -499,7 +499,7 @@ export function AdminAutoDispatchControlPanel({
                           />
                           <div className="min-w-0">
                             <span className="text-xs font-bold block truncate">{nameLabel}</span>
-                            <span className="text-[10px] text-slate-500 block truncate">
+                            <span className="text-[10px] text-fg-muted block truncate">
                               {op.email}
                             </span>
                           </div>
@@ -518,14 +518,14 @@ export function AdminAutoDispatchControlPanel({
 
         {/* 3. Candidate Guardrails, Cascade/Pool Timing & Operating Schedule */}
         <div className="space-y-3">
-          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-800">
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-fg-strong">
             <SlidersIcon className="w-4 h-4 text-emerald-600" />
             <span>3. Candidate Guardrails, Pool/Cascade Timing &amp; Operating Schedule</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 p-4 rounded-xl border border-border-subtle bg-surface-subtle/50">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">
+              <label className="text-xs font-bold text-fg-secondary block">
                 Candidate Ranking Strategy
               </label>
               <Select
@@ -539,7 +539,7 @@ export function AdminAutoDispatchControlPanel({
                 <option value="longest_idle_in_zone">Longest Idle (Fair Queue)</option>
                 <option value="highest_driver_score">Highest Driver Score</option>
               </Select>
-              <label className="flex items-center gap-1.5 pt-1 text-[11px] font-semibold text-slate-700 cursor-pointer">
+              <label className="flex items-center gap-1.5 pt-1 text-[11px] font-semibold text-fg-secondary cursor-pointer">
                 <input
                   type="checkbox"
                   checked={config.strictZoneFirst}
@@ -551,7 +551,7 @@ export function AdminAutoDispatchControlPanel({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">
+              <label className="text-xs font-bold text-fg-secondary block">
                 Max Pickup Radius (0 = Unlimited)
               </label>
               <Input
@@ -562,9 +562,9 @@ export function AdminAutoDispatchControlPanel({
                 onChange={(e) =>
                   update({ maxPickupRadiusMiles: Math.max(0, parseInt(e.target.value, 10) || 0) })
                 }
-                className="text-xs h-9 bg-white"
+                className="text-xs h-9 bg-surface-card"
               />
-              <span className="text-[10px] text-slate-500 block">
+              <span className="text-[10px] text-fg-muted block">
                 {config.maxPickupRadiusMiles === 0
                   ? 'Unlimited distance radius'
                   : `Excludes drivers > ${config.maxPickupRadiusMiles} mi away`}
@@ -572,7 +572,7 @@ export function AdminAutoDispatchControlPanel({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">
+              <label className="text-xs font-bold text-fg-secondary block">
                 Minimum Driver Score (0–100)
               </label>
               <Input
@@ -583,9 +583,9 @@ export function AdminAutoDispatchControlPanel({
                 onChange={(e) =>
                   update({ minDriverScore: Math.max(0, parseInt(e.target.value, 10) || 0) })
                 }
-                className="text-xs h-9 bg-white"
+                className="text-xs h-9 bg-surface-card"
               />
-              <span className="text-[10px] text-slate-500 block">
+              <span className="text-[10px] text-fg-muted block">
                 {config.minDriverScore === 0
                   ? 'All active non-blacklisted scores eligible'
                   : `Requires score >= ${config.minDriverScore}`}
@@ -593,7 +593,7 @@ export function AdminAutoDispatchControlPanel({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">
+              <label className="text-xs font-bold text-fg-secondary block">
                 Max GPS Stale Seconds (0 = Allow No-GPS)
               </label>
               <Input
@@ -604,9 +604,9 @@ export function AdminAutoDispatchControlPanel({
                 onChange={(e) =>
                   update({ maxGpsStaleSeconds: Math.max(0, parseInt(e.target.value, 10) || 0) })
                 }
-                className="text-xs h-9 bg-white"
+                className="text-xs h-9 bg-surface-card"
               />
-              <span className="text-[10px] text-slate-500 block">
+              <span className="text-[10px] text-fg-muted block">
                 {config.maxGpsStaleSeconds === 0
                   ? 'Allows on-duty drivers without GPS'
                   : `Requires GPS ping within ${config.maxGpsStaleSeconds}s`}
@@ -614,7 +614,7 @@ export function AdminAutoDispatchControlPanel({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">
+              <label className="text-xs font-bold text-fg-secondary block">
                 Offer Timeout per Step (15–180s)
               </label>
               <Input
@@ -625,15 +625,15 @@ export function AdminAutoDispatchControlPanel({
                 onChange={(e) =>
                   update({ offerTimeoutSeconds: parseInt(e.target.value, 10) || 45 })
                 }
-                className="text-xs h-9 bg-white"
+                className="text-xs h-9 bg-surface-card"
               />
-              <span className="text-[10px] text-slate-500 block">
+              <span className="text-[10px] text-fg-muted block">
                 Countdown before rolling over to next driver/batch.
               </span>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">
+              <label className="text-xs font-bold text-fg-secondary block">
                 Max Cascade / Batch Attempts (1–10)
               </label>
               <Input
@@ -644,15 +644,15 @@ export function AdminAutoDispatchControlPanel({
                 onChange={(e) =>
                   update({ maxCascadeAttempts: parseInt(e.target.value, 10) || 3 })
                 }
-                className="text-xs h-9 bg-white"
+                className="text-xs h-9 bg-surface-card"
               />
-              <span className="text-[10px] text-slate-500 block">
+              <span className="text-[10px] text-fg-muted block">
                 Sequential drivers or broadcast batches tried before exhaustion.
               </span>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-indigo-800 block">
+              <label className="text-xs font-bold text-status-staged-fg block">
                 Broadcast Pool Size K (2–8 Cars)
               </label>
               <Input
@@ -663,15 +663,15 @@ export function AdminAutoDispatchControlPanel({
                 onChange={(e) =>
                   update({ broadcastPoolSize: parseInt(e.target.value, 10) || 3 })
                 }
-                className="text-xs h-9 bg-white"
+                className="text-xs h-9 bg-surface-card"
               />
-              <span className="text-[10px] text-slate-500 block">
+              <span className="text-[10px] text-fg-muted block">
                 Simultaneous drivers offered in Top-K Broadcast Pool mode.
               </span>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">
+              <label className="text-xs font-bold text-fg-secondary block">
                 Fallback on Cascade Exhaustion
               </label>
               <Select
@@ -688,7 +688,7 @@ export function AdminAutoDispatchControlPanel({
                   Final Broadcast to All Eligible Drivers
                 </option>
               </Select>
-              <span className="text-[10px] text-slate-500 block">
+              <span className="text-[10px] text-fg-muted block">
                 Action taken if all {config.maxCascadeAttempts} step(s) decline/timeout.
               </span>
             </div>
@@ -696,19 +696,19 @@ export function AdminAutoDispatchControlPanel({
 
           {/* Operating Hours Schedule & SLA Urgency Windows */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2.5">
+            <div className="p-3.5 rounded-xl border border-border-subtle bg-surface-card space-y-2.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-extrabold text-slate-900">
+                <span className="text-xs font-extrabold text-fg-primary">
                   Auto-Pilot Operating Hours Schedule
                 </span>
-                <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100 text-[11px] font-bold">
+                <div className="inline-flex rounded-lg border border-border-subtle p-0.5 bg-surface-muted text-[11px] font-bold">
                   <button
                     type="button"
                     onClick={() => update({ operatingHoursMode: 'always' })}
                     className={`px-2.5 py-1 rounded-md cursor-pointer ${
                       config.operatingHoursMode === 'always'
-                        ? 'bg-white text-blue-700 shadow-2xs'
-                        : 'text-slate-600'
+                        ? 'bg-surface-card text-status-info-fg shadow-2xs'
+                        : 'text-fg-secondary'
                     }`}
                   >
                     24/7 Always
@@ -718,8 +718,8 @@ export function AdminAutoDispatchControlPanel({
                     onClick={() => update({ operatingHoursMode: 'custom_window' })}
                     className={`px-2.5 py-1 rounded-md cursor-pointer ${
                       config.operatingHoursMode === 'custom_window'
-                        ? 'bg-white text-indigo-700 shadow-2xs'
-                        : 'text-slate-600'
+                        ? 'bg-surface-card text-status-staged-fg shadow-2xs'
+                        : 'text-fg-secondary'
                     }`}
                   >
                     Custom Window
@@ -730,7 +730,7 @@ export function AdminAutoDispatchControlPanel({
               {config.operatingHoursMode === 'custom_window' ? (
                 <div className="grid grid-cols-2 gap-3 pt-1">
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600 block">
+                    <label className="text-[11px] font-bold text-fg-secondary block">
                       Window Start Hour
                     </label>
                     <Select
@@ -748,7 +748,7 @@ export function AdminAutoDispatchControlPanel({
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600 block">
+                    <label className="text-[11px] font-bold text-fg-secondary block">
                       Window End Hour
                     </label>
                     <Select
@@ -767,15 +767,15 @@ export function AdminAutoDispatchControlPanel({
                   </div>
                 </div>
               ) : (
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-fg-muted">
                   Auto-Pilot operates continuously 24/7 whenever unpaused. Switch to Custom Window for overnight-only automation (e.g., 22:00–06:00).
                 </p>
               )}
             </div>
 
-            <div className="p-3.5 rounded-xl border border-amber-200/80 bg-amber-50/30 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl border border-status-warning-border/80 bg-status-warning-bg/30 grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-800 block">
+                <label className="text-xs font-bold text-fg-strong block">
                   SLA Warning (Minutes)
                 </label>
                 <Input
@@ -786,15 +786,15 @@ export function AdminAutoDispatchControlPanel({
                   onChange={(e) =>
                     update({ slaWarningMinutes: parseInt(e.target.value, 10) || 60 })
                   }
-                  className="text-xs h-8 bg-white"
+                  className="text-xs h-8 bg-surface-card"
                 />
-                <span className="text-[10px] text-slate-500 block">
+                <span className="text-[10px] text-fg-muted block">
                   Unassigned warning badge (default 60m).
                 </span>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-rose-800 block">
+                <label className="text-xs font-bold text-status-danger-fg block">
                   SLA Critical (Minutes)
                 </label>
                 <Input
@@ -805,15 +805,15 @@ export function AdminAutoDispatchControlPanel({
                   onChange={(e) =>
                     update({ slaCriticalMinutes: parseInt(e.target.value, 10) || 15 })
                   }
-                  className="text-xs h-8 bg-white"
+                  className="text-xs h-8 bg-surface-card"
                 />
-                <span className="text-[10px] text-slate-500 block">
+                <span className="text-[10px] text-fg-muted block">
                   Acoustic + SMS/Email alert (default 15m).
                 </span>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-blue-900 block">
+                <label className="text-xs font-bold text-status-info-fg block">
                   Airport Arrival Buffer (Min)
                 </label>
                 <Input
@@ -826,15 +826,15 @@ export function AdminAutoDispatchControlPanel({
                       airportPickupBufferMinutes: Math.max(0, parseInt(e.target.value, 10) || 0),
                     })
                   }
-                  className="text-xs h-8 bg-white"
+                  className="text-xs h-8 bg-surface-card"
                 />
-                <span className="text-[10px] text-slate-500 block">
+                <span className="text-[10px] text-fg-muted block">
                   Post-arrival buffer (default 30m).
                 </span>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-amber-900 block">
+                <label className="text-xs font-bold text-status-warning-fg block">
                   ASAP Grace (Minutes)
                 </label>
                 <Input
@@ -845,9 +845,9 @@ export function AdminAutoDispatchControlPanel({
                   onChange={(e) =>
                     update({ asapUnassignedGraceMinutes: parseInt(e.target.value, 10) || 15 })
                   }
-                  className="text-xs h-8 bg-white"
+                  className="text-xs h-8 bg-surface-card"
                 />
-                <span className="text-[10px] text-slate-500 block">
+                <span className="text-[10px] text-fg-muted block">
                   Orange before red (default 15m).
                 </span>
               </div>
@@ -859,15 +859,15 @@ export function AdminAutoDispatchControlPanel({
         <AdminAutoDispatchSimulator config={config} zones={zones} />
 
         {/* Save Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-200 text-[11px] text-slate-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border-subtle text-[11px] text-fg-muted">
           <span>
-            Active Lead Window: <strong className="text-slate-800">{config.scheduledDispatchLeadMinutes}m</strong>{' '}
+            Active Lead Window: <strong className="text-fg-strong">{config.scheduledDispatchLeadMinutes}m</strong>{' '}
             standard ·{' '}
-            <strong className="text-blue-700">
+            <strong className="text-status-info-fg">
               {config.scheduledDispatchLeadMinutes + config.airportExtraLeadMinutes}m
             </strong>{' '}
             STL/SUS airport · SLA Critical at{' '}
-            <strong className="text-rose-700">{config.slaCriticalMinutes}m</strong>
+            <strong className="text-status-danger-fg">{config.slaCriticalMinutes}m</strong>
           </span>
           <Button
             size="sm"

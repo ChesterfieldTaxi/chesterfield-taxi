@@ -79,25 +79,25 @@ export function StandingOrderDefaultsPanel({
   return (
     <div className="space-y-6">
       {/* 1. Standing Order Horizon & Preferred Driver Defaults */}
-      <Card className="border border-slate-200 shadow-xs bg-white">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+      <Card className="border border-border-subtle shadow-xs bg-surface-card">
+        <CardHeader className="border-b border-border-faint bg-surface-subtle/50 p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
+              <CardTitle className="text-base font-black text-fg-primary flex items-center gap-2">
                 <RepeatIcon className="w-5 h-5 text-emerald-600" />
                 <span>Standing Order &amp; Staged Preferred Driver Defaults</span>
               </CardTitle>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-fg-muted mt-0.5">
                 Default rolling horizon windows, preferred driver staging mode, and automatic pre-pickup release.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 to="/app/admin?tab=trips&sub=standing-orders"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border-subtle bg-surface-card hover:bg-surface-subtle text-xs font-bold text-fg-secondary transition-colors"
               >
                 <span>Open Standing Orders</span>
-                <ExternalLinkIcon className="w-3.5 h-3.5 text-slate-400" />
+                <ExternalLinkIcon className="w-3.5 h-3.5 text-fg-subtle" />
               </Link>
               <Button
                 variant="primary"
@@ -119,8 +119,8 @@ export function StandingOrderDefaultsPanel({
         <CardContent className="p-6 space-y-5 text-xs">
           {/* Horizon Defaults */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-              <label className="font-extrabold text-slate-900 block">
+            <div className="p-4 bg-surface-subtle border border-border-subtle rounded-xl space-y-2">
+              <label className="font-extrabold text-fg-primary block">
                 Default Generation Horizon
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -134,7 +134,7 @@ export function StandingOrderDefaultsPanel({
                       className={`py-2 px-3 rounded-lg border font-extrabold text-xs transition-all cursor-pointer ${
                         active
                           ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                          : 'bg-surface-card text-fg-secondary border-border-strong hover:bg-surface-muted'
                       }`}
                     >
                       {days} Days
@@ -142,13 +142,13 @@ export function StandingOrderDefaultsPanel({
                   );
                 })}
               </div>
-              <span className="text-[10px] text-slate-500 block">
+              <span className="text-[10px] text-fg-muted block">
                 Default rolling window used when extending a series without an explicit occurrence count.
               </span>
             </div>
 
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-              <label className="font-extrabold text-slate-900 block mb-1">
+            <div className="p-4 bg-surface-subtle border border-border-subtle rounded-xl">
+              <label className="font-extrabold text-fg-primary block mb-1">
                 Max Horizon Ceiling (Days, 7–180)
               </label>
               <Input
@@ -159,9 +159,9 @@ export function StandingOrderDefaultsPanel({
                 onChange={(e) =>
                   updateStanding({ maxHorizonDays: parseInt(e.target.value, 10) || 60 })
                 }
-                className="bg-white h-9 text-xs font-mono"
+                className="bg-surface-card h-9 text-xs font-mono"
               />
-              <span className="text-[10px] text-slate-500 mt-1 block">
+              <span className="text-[10px] text-fg-muted mt-1 block">
                 Upper cap on trips/days generated in a single horizon extension batch (default 60).
               </span>
             </div>
@@ -169,7 +169,7 @@ export function StandingOrderDefaultsPanel({
 
           {/* Default Preferred Driver Mode */}
           <div className="space-y-2">
-            <label className="font-extrabold text-slate-900 block">
+            <label className="font-extrabold text-fg-primary block">
               Default Preferred Driver Assignment Mode
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -178,17 +178,17 @@ export function StandingOrderDefaultsPanel({
                 onClick={() => updateStanding({ defaultAssignmentMode: 'stage_hold' })}
                 className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                   standingConfig.defaultAssignmentMode === 'stage_hold'
-                    ? 'border-indigo-500 bg-indigo-50/70 ring-1 ring-indigo-500/20'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
+                    ? 'border-indigo-500 bg-status-staged-bg/70 ring-1 ring-indigo-500/20'
+                    : 'border-border-subtle bg-surface-card hover:border-border-strong'
                 }`}
               >
-                <div className="font-extrabold text-slate-900 flex items-center justify-between">
+                <div className="font-extrabold text-fg-primary flex items-center justify-between">
                   <span>📌 Stage / Hold in Dispatch (Recommended)</span>
                   {standingConfig.defaultAssignmentMode === 'stage_hold' && (
                     <CheckIcon className="w-4 h-4 text-indigo-600" />
                   )}
                 </div>
-                <p className="text-[11px] text-slate-600 mt-1">
+                <p className="text-[11px] text-fg-secondary mt-1">
                   Reserves the preferred driver on the Dispatch Shift Planner with zero Driver App visibility until inside the auto-release lead window.
                 </p>
               </button>
@@ -198,17 +198,17 @@ export function StandingOrderDefaultsPanel({
                 onClick={() => updateStanding({ defaultAssignmentMode: 'send_to_driver' })}
                 className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                   standingConfig.defaultAssignmentMode === 'send_to_driver'
-                    ? 'border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-500/20'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
+                    ? 'border-emerald-600 bg-status-success-bg/70 ring-1 ring-emerald-500/20'
+                    : 'border-border-subtle bg-surface-card hover:border-border-strong'
                 }`}
               >
-                <div className="font-extrabold text-slate-900 flex items-center justify-between">
+                <div className="font-extrabold text-fg-primary flex items-center justify-between">
                   <span>Send to Driver Immediately</span>
                   {standingConfig.defaultAssignmentMode === 'send_to_driver' && (
                     <CheckIcon className="w-4 h-4 text-emerald-600" />
                   )}
                 </div>
-                <p className="text-[11px] text-slate-600 mt-1">
+                <p className="text-[11px] text-fg-secondary mt-1">
                   Assigns generated future rides directly to the preferred driver&apos;s Scheduled queue immediately.
                 </p>
               </button>
@@ -216,13 +216,13 @@ export function StandingOrderDefaultsPanel({
           </div>
 
           {/* Staged Auto-Release Controls */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
-            <label className="flex items-start justify-between gap-3 p-4 bg-emerald-50/50 border border-emerald-200 rounded-xl cursor-pointer">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-faint">
+            <label className="flex items-start justify-between gap-3 p-4 bg-status-success-bg/50 border border-status-success-border rounded-xl cursor-pointer">
               <div>
-                <span className="font-extrabold text-slate-900 block">
+                <span className="font-extrabold text-fg-primary block">
                   Auto-Release Staged Preferred Drivers
                 </span>
-                <span className="text-[11px] text-slate-600 mt-0.5 block">
+                <span className="text-[11px] text-fg-secondary mt-0.5 block">
                   Automatically send staged recurring/shift trips to their planned driver once inside the lead window.
                 </span>
               </div>
@@ -239,8 +239,8 @@ export function StandingOrderDefaultsPanel({
               />
             </label>
 
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-              <label className="font-extrabold text-slate-900 block mb-1">
+            <div className="p-4 bg-surface-subtle border border-border-subtle rounded-xl">
+              <label className="font-extrabold text-fg-primary block mb-1">
                 Staged Auto-Release Lead Window (Minutes)
               </label>
               <Input
@@ -254,9 +254,9 @@ export function StandingOrderDefaultsPanel({
                     stagedAutoReleaseLeadMinutes: parseInt(e.target.value, 10) || 45,
                   })
                 }
-                className="bg-white h-9 text-xs font-mono"
+                className="bg-surface-card h-9 text-xs font-mono"
               />
-              <span className="text-[10px] text-slate-500 mt-1 block">
+              <span className="text-[10px] text-fg-muted mt-1 block">
                 Clamped 15–240 minutes prior to scheduled pickup (default 45m).
               </span>
             </div>
@@ -265,15 +265,15 @@ export function StandingOrderDefaultsPanel({
       </Card>
 
       {/* 2. Shared Holiday Skip Calendar */}
-      <Card className="border border-slate-200 shadow-xs bg-white">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+      <Card className="border border-border-subtle shadow-xs bg-surface-card">
+        <CardHeader className="border-b border-border-faint bg-surface-subtle/50 p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
+              <CardTitle className="text-base font-black text-fg-primary flex items-center gap-2">
                 <CalendarIcon className="w-5 h-5 text-amber-600" />
                 <span>Shared Holiday Skip Calendar</span>
               </CardTitle>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-fg-muted mt-0.5">
                 Automatically excluded on recurring commute, medical dialysis, and school/corporate shuttle series when Holiday Skip is enabled.
               </p>
             </div>
@@ -282,7 +282,7 @@ export function StandingOrderDefaultsPanel({
               variant="outline"
               size="sm"
               onClick={handleLoadUsFederalHolidays}
-              className="text-xs font-bold bg-white cursor-pointer shrink-0"
+              className="text-xs font-bold bg-surface-card cursor-pointer shrink-0"
             >
               Load US Federal Holidays
             </Button>
@@ -290,12 +290,12 @@ export function StandingOrderDefaultsPanel({
         </CardHeader>
 
         <CardContent className="p-6 space-y-4 text-xs">
-          <label className="flex items-start justify-between gap-3 p-3.5 bg-amber-50/60 border border-amber-200 rounded-xl cursor-pointer">
+          <label className="flex items-start justify-between gap-3 p-3.5 bg-status-warning-bg/60 border border-status-warning-border rounded-xl cursor-pointer">
             <div>
-              <span className="font-extrabold text-slate-900 block">
+              <span className="font-extrabold text-fg-primary block">
                 Exclude Holiday Calendar Dates by Default on New Series
               </span>
-              <span className="text-[11px] text-slate-600 mt-0.5 block">
+              <span className="text-[11px] text-fg-secondary mt-0.5 block">
                 Merges the dates below into <code>skipDates</code> automatically when registering or extending holiday-aware Standing Orders.
               </span>
             </div>
@@ -308,20 +308,20 @@ export function StandingOrderDefaultsPanel({
           </label>
 
           {/* Add Holiday Form */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2.5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2.5 p-3.5 bg-surface-subtle border border-border-subtle rounded-xl">
             <div className="w-full sm:w-44">
-              <label className="font-bold text-slate-700 block mb-1 text-[11px]">
+              <label className="font-bold text-fg-secondary block mb-1 text-[11px]">
                 Holiday Date (YYYY-MM-DD)
               </label>
               <Input
                 type="date"
                 value={newHolidayDate}
                 onChange={(e) => setNewHolidayDate(e.target.value)}
-                className="bg-white h-9 text-xs font-mono"
+                className="bg-surface-card h-9 text-xs font-mono"
               />
             </div>
             <div className="flex-1">
-              <label className="font-bold text-slate-700 block mb-1 text-[11px]">
+              <label className="font-bold text-fg-secondary block mb-1 text-[11px]">
                 Holiday Label
               </label>
               <Input
@@ -329,7 +329,7 @@ export function StandingOrderDefaultsPanel({
                 placeholder="e.g. Thanksgiving Day / Clinic Closure"
                 value={newHolidayName}
                 onChange={(e) => setNewHolidayName(e.target.value)}
-                className="bg-white h-9 text-xs"
+                className="bg-surface-card h-9 text-xs"
               />
             </div>
             <Button
@@ -346,7 +346,7 @@ export function StandingOrderDefaultsPanel({
 
           {/* Holiday Chips / List */}
           {standingConfig.holidayCalendarDates.length === 0 ? (
-            <div className="p-6 text-center text-slate-400 border border-dashed border-slate-200 rounded-xl">
+            <div className="p-6 text-center text-fg-subtle border border-dashed border-border-subtle rounded-xl">
               No shared holiday dates configured. Click &ldquo;Load US Federal Holidays&rdquo; or add a custom date above.
             </div>
           ) : (
@@ -354,18 +354,18 @@ export function StandingOrderDefaultsPanel({
               {standingConfig.holidayCalendarDates.map((item) => (
                 <div
                   key={item.date}
-                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200"
+                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-surface-subtle border border-border-subtle"
                 >
                   <div className="min-w-0">
-                    <div className="font-mono font-extrabold text-xs text-slate-900">
+                    <div className="font-mono font-extrabold text-xs text-fg-primary">
                       {item.date}
                     </div>
-                    <div className="text-[11px] text-slate-600 truncate">{item.name}</div>
+                    <div className="text-[11px] text-fg-secondary truncate">{item.name}</div>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleRemoveHoliday(item.date)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer shrink-0"
+                    className="p-1.5 rounded-lg text-fg-subtle hover:text-rose-600 hover:bg-status-danger-bg transition-colors cursor-pointer shrink-0"
                     title={`Remove ${item.date}`}
                   >
                     <TrashIcon className="w-3.5 h-3.5" />

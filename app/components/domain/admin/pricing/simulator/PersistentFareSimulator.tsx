@@ -279,26 +279,26 @@ export function PersistentFareSimulator({
     : [];
 
   return (
-    <div className={`flex flex-col h-full bg-white lg:border-l border-slate-200 text-slate-900 ${className}`}>
+    <div className={`flex flex-col h-full bg-surface-card lg:border-l border-border-subtle text-fg-primary ${className}`}>
       {/* Simulator Header */}
-      <div className="p-3.5 sm:p-4 border-b border-slate-200 flex items-center justify-between bg-white/95 backdrop-blur sticky top-0 z-10">
+      <div className="p-3.5 sm:p-4 border-b border-border-subtle flex items-center justify-between bg-surface-card/95 backdrop-blur sticky top-0 z-10">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+          <div className="p-1.5 rounded-lg bg-status-success-bg text-status-success-fg border border-status-success-border shrink-0">
             <SparklesIcon className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-sm font-bold text-slate-900 flex flex-wrap items-center gap-1.5">
+            <h3 className="text-sm font-bold text-fg-primary flex flex-wrap items-center gap-1.5">
               <span>Live Fare Preview</span>
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-status-success-bg-strong text-status-success-fg">
                 LIVE
               </span>
               {hasUnsavedDraft && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border">
                   UNSAVED DRAFT
                 </span>
               )}
             </h3>
-            <p className="text-[11px] text-slate-500">Test fares across Rates, Extras, Surcharges &amp; Rules</p>
+            <p className="text-[11px] text-fg-muted">Test fares across Rates, Extras, Surcharges &amp; Rules</p>
           </div>
         </div>
       </div>
@@ -307,23 +307,23 @@ export function PersistentFareSimulator({
         {/* Rate Model Selector */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary block">
               Active Tariff Target
             </label>
-            <span className="text-[10px] text-emerald-700 font-semibold truncate max-w-[160px]">
+            <span className="text-[10px] text-status-success-fg font-semibold truncate max-w-[160px]">
               {simulationTariffMode === 'auto'
                 ? 'Smart Auto Match'
                 : activeTariffs.find((t) => t.id === simulationTariffMode)?.name || simulationTariffMode}
             </span>
           </div>
-          <div className="flex flex-wrap gap-1 p-1 bg-slate-100 rounded-lg border border-slate-200 text-xs font-semibold">
+          <div className="flex flex-wrap gap-1 p-1 bg-surface-muted rounded-lg border border-border-subtle text-xs font-semibold">
             <button
               type="button"
               onClick={() => setSimulationTariffMode('auto')}
               className={`flex-1 min-w-[70px] py-1.5 px-2 rounded-md transition-all text-center truncate cursor-pointer inline-flex items-center justify-center gap-1 ${
                 simulationTariffMode === 'auto'
-                  ? 'bg-slate-800 text-white shadow-xs font-bold'
-                  : 'text-slate-700 hover:text-slate-900 font-medium'
+                  ? 'bg-surface-header-elevated text-white shadow-xs font-bold'
+                  : 'text-fg-secondary hover:text-fg-primary font-medium'
               }`}
             >
               <BoltIcon className="w-3.5 h-3.5 shrink-0" />
@@ -348,7 +348,7 @@ export function PersistentFareSimulator({
                       ? t.id === 'tariff-airport-flat' || t.name.toLowerCase().includes('airport')
                         ? 'bg-emerald-600 text-white shadow-xs font-bold'
                         : 'bg-blue-600 text-white shadow-xs font-bold'
-                      : 'text-slate-700 hover:text-slate-900 font-medium'
+                      : 'text-fg-secondary hover:text-fg-primary font-medium'
                   }`}
                 >
                   {t.name}
@@ -360,14 +360,14 @@ export function PersistentFareSimulator({
 
         {/* Preset Selector */}
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block mb-1.5">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary block mb-1.5">
             Quick Scenarios
           </label>
           <div className="grid grid-cols-2 gap-1.5">
             <button
               type="button"
               onClick={() => applyPreset('airport')}
-              className="px-2.5 py-1.5 text-xs text-left rounded-lg bg-slate-100 hover:bg-slate-200/70 border border-slate-200 text-slate-800 transition-colors flex items-center gap-1.5 truncate cursor-pointer font-medium"
+              className="px-2.5 py-1.5 text-xs text-left rounded-lg bg-surface-muted hover:bg-surface-emphasis/70 border border-border-subtle text-fg-strong transition-colors flex items-center gap-1.5 truncate cursor-pointer font-medium"
             >
               <PlaneIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
               <span className="truncate">Airport STL (20 mi)</span>
@@ -375,15 +375,15 @@ export function PersistentFareSimulator({
             <button
               type="button"
               onClick={() => applyPreset('meter')}
-              className="px-2.5 py-1.5 text-xs text-left rounded-lg bg-slate-100 hover:bg-slate-200/70 border border-slate-200 text-slate-800 transition-colors flex items-center gap-1.5 truncate cursor-pointer font-medium"
+              className="px-2.5 py-1.5 text-xs text-left rounded-lg bg-surface-muted hover:bg-surface-emphasis/70 border border-border-subtle text-fg-strong transition-colors flex items-center gap-1.5 truncate cursor-pointer font-medium"
             >
-              <CarIcon className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+              <CarIcon className="w-3.5 h-3.5 text-fg-secondary shrink-0" />
               <span className="truncate">City METER (10 mi)</span>
             </button>
             <button
               type="button"
               onClick={() => applyPreset('spirit')}
-              className="px-2.5 py-1.5 text-xs text-left rounded-lg bg-slate-100 hover:bg-slate-200/70 border border-slate-200 text-slate-800 transition-colors flex items-center gap-1.5 truncate cursor-pointer font-medium"
+              className="px-2.5 py-1.5 text-xs text-left rounded-lg bg-surface-muted hover:bg-surface-emphasis/70 border border-border-subtle text-fg-strong transition-colors flex items-center gap-1.5 truncate cursor-pointer font-medium"
             >
               <PlaneLandingIcon className="w-3.5 h-3.5 text-sky-600 shrink-0" />
               <span className="truncate">Airport Floor (5.5 mi)</span>
@@ -391,7 +391,7 @@ export function PersistentFareSimulator({
             <button
               type="button"
               onClick={() => applyPreset('medical')}
-              className="px-2.5 py-1.5 text-xs text-left rounded-lg bg-slate-100 hover:bg-slate-200/70 border border-slate-200 text-slate-800 transition-colors flex items-center gap-1.5 truncate cursor-pointer font-medium"
+              className="px-2.5 py-1.5 text-xs text-left rounded-lg bg-surface-muted hover:bg-surface-emphasis/70 border border-border-subtle text-fg-strong transition-colors flex items-center gap-1.5 truncate cursor-pointer font-medium"
             >
               <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span className="truncate">Medical Trip</span>
@@ -400,31 +400,31 @@ export function PersistentFareSimulator({
         </div>
 
         {/* Fare Summary Display Banner */}
-        <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-50 via-teal-50/50 to-white border border-emerald-200 shadow-2xs relative overflow-hidden">
+        <div className="p-4 rounded-xl bg-gradient-to-br from-status-success-bg via-status-success-bg/50 to-surface-card border border-status-success-border shadow-2xs relative overflow-hidden">
           <div className="flex items-baseline justify-between">
-            <span className="text-xs text-emerald-900 font-bold uppercase tracking-wide">
+            <span className="text-xs text-status-success-fg font-bold uppercase tracking-wide">
               Estimated Fare
             </span>
-            <span className="text-2xl font-black tracking-tight text-emerald-900 font-mono">
+            <span className="text-2xl font-black tracking-tight text-status-success-fg font-mono">
               ${pricing ? pricing.totalFare.toFixed(2) : '0.00'}
             </span>
           </div>
 
-          <div className="mt-2.5 pt-2 border-t border-emerald-200/60 flex flex-wrap gap-1.5 items-center">
+          <div className="mt-2.5 pt-2 border-t border-status-success-border/60 flex flex-wrap gap-1.5 items-center">
             {ctx?.tariffProfileName ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-status-info-bg-strong text-status-info-fg border border-status-info-border">
                 <CarIcon className="w-3 h-3" />
                 {ctx.tariffProfileName}
               </span>
             ) : (
-              <span className="text-[11px] text-slate-500">No Tariff Profile</span>
+              <span className="text-[11px] text-fg-muted">No Tariff Profile</span>
             )}
 
             {ctx?.appliedRuleNames &&
               ctx.appliedRuleNames.map((rName: string, idx: number) => (
                 <span
                   key={idx}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800 border border-purple-200"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-status-staged-bg-strong text-status-staged-fg border border-status-staged-border"
                 >
                   <ShieldCheckIcon className="w-2.5 h-2.5" />
                   {rName}
@@ -435,7 +435,7 @@ export function PersistentFareSimulator({
 
         {/* Real Admin Fleet Vehicle Comparison & Selector */}
         <div className="space-y-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-fg-secondary block">
             Fleet Vehicle Price Comparison
           </label>
           <div className="grid grid-cols-2 gap-1.5">
@@ -448,12 +448,12 @@ export function PersistentFareSimulator({
                   onClick={() => setSelectedVehicleId(v.id)}
                   className={`p-2 rounded-lg text-xs border text-left transition-all cursor-pointer flex items-center justify-between gap-1 ${
                     isSelected
-                      ? 'bg-blue-50 text-blue-900 border-blue-500 ring-1 ring-blue-500 font-bold'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 font-medium'
+                      ? 'bg-status-info-bg text-status-info-fg border-blue-500 ring-1 ring-blue-500 font-bold'
+                      : 'bg-surface-card border-border-subtle text-fg-secondary hover:bg-surface-subtle font-medium'
                   }`}
                 >
                   <span className="truncate">{v.label}</span>
-                  <span className="font-mono font-extrabold text-slate-900 shrink-0">
+                  <span className="font-mono font-extrabold text-fg-primary shrink-0">
                     ${v.totalFare.toFixed(0)}
                   </span>
                 </button>
@@ -464,8 +464,8 @@ export function PersistentFareSimulator({
 
         {/* Canonical Customer Price Breakdown (Exact match to /book) */}
         {pricing && (
-          <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 text-xs space-y-1.5 shadow-2xs">
-            <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider block mb-1">
+          <div className="bg-surface-subtle rounded-xl p-3.5 border border-border-subtle text-xs space-y-1.5 shadow-2xs">
+            <span className="text-[11px] font-bold text-fg-strong uppercase tracking-wider block mb-1">
               Customer Price Breakdown
             </span>
             {breakdownItems.map((item) => {
@@ -475,7 +475,7 @@ export function PersistentFareSimulator({
                 <div
                   key={item.id}
                   className={`flex justify-between gap-2 ${
-                    isDiscount ? 'text-rose-700' : isBase ? 'text-slate-900 font-semibold' : 'text-slate-600'
+                    isDiscount ? 'text-status-danger-fg' : isBase ? 'text-fg-primary font-semibold' : 'text-fg-secondary'
                   }`}
                 >
                   <span className="truncate">{isBase ? 'Base Fare' : item.label}</span>
@@ -488,9 +488,9 @@ export function PersistentFareSimulator({
               );
             })}
 
-            <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900">
+            <div className="pt-2 border-t border-border-subtle flex justify-between font-bold text-fg-primary">
               <span>Estimated Total:</span>
-              <span className="text-emerald-800 font-extrabold text-sm font-mono">
+              <span className="text-status-success-fg font-extrabold text-sm font-mono">
                 ${pricing.totalFare.toFixed(2)}
               </span>
             </div>
@@ -498,14 +498,14 @@ export function PersistentFareSimulator({
         )}
 
         {/* Granular Trip Parameters */}
-        <div className="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 shadow-2xs">
-          <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider block">
+        <div className="space-y-3 bg-surface-subtle p-3.5 rounded-xl border border-border-subtle shadow-2xs">
+          <span className="text-[11px] font-bold text-fg-strong uppercase tracking-wider block">
             Trip Inputs
           </span>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-1">Distance (mi)</label>
+              <label className="text-[11px] font-medium text-fg-secondary block mb-1">Distance (mi)</label>
               <Input
                 type="number"
                 step="0.5"
@@ -514,11 +514,11 @@ export function PersistentFareSimulator({
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setDistanceMiles(parseFloat(e.target.value) || 0)
                 }
-                className="h-8 text-xs bg-white border-slate-300 text-slate-900 font-medium"
+                className="h-8 text-xs bg-surface-card border-border-strong text-fg-primary font-medium"
               />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-1">Duration (min)</label>
+              <label className="text-[11px] font-medium text-fg-secondary block mb-1">Duration (min)</label>
               <Input
                 type="number"
                 step="1"
@@ -527,36 +527,36 @@ export function PersistentFareSimulator({
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setDurationMinutes(parseFloat(e.target.value) || 0)
                 }
-                className="h-8 text-xs bg-white border-slate-300 text-slate-900 font-medium"
+                className="h-8 text-xs bg-surface-card border-border-strong text-fg-primary font-medium"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-1">Pickup Zip</label>
+              <label className="text-[11px] font-medium text-fg-secondary block mb-1">Pickup Zip</label>
               <Input
                 type="text"
                 placeholder="e.g. 63005"
                 value={pickupZip}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPickupZip(e.target.value)}
-                className="h-8 text-xs bg-white border-slate-300 text-slate-900 font-mono"
+                className="h-8 text-xs bg-surface-card border-border-strong text-fg-primary font-mono"
               />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-1">Dropoff Zip</label>
+              <label className="text-[11px] font-medium text-fg-secondary block mb-1">Dropoff Zip</label>
               <Input
                 type="text"
                 placeholder="e.g. 63011"
                 value={dropoffZip}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDropoffZip(e.target.value)}
-                className="h-8 text-xs bg-white border-slate-300 text-slate-900 font-mono"
+                className="h-8 text-xs bg-surface-card border-border-strong text-fg-primary font-mono"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-[11px] font-medium text-slate-600 block mb-1">Corporate Account</label>
+            <label className="text-[11px] font-medium text-fg-secondary block mb-1">Corporate Account</label>
             <Select
               size="sm"
               value={corporateAccountId}
@@ -571,13 +571,13 @@ export function PersistentFareSimulator({
             </Select>
           </div>
 
-          <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
-            <label className="text-xs text-slate-700 font-medium flex items-center gap-2 cursor-pointer">
+          <div className="pt-2 border-t border-border-subtle flex flex-wrap items-center justify-between gap-2">
+            <label className="text-xs text-fg-secondary font-medium flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={isHourly}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setIsHourly(e.target.checked)}
-                className="rounded border-slate-300 text-blue-600 focus:ring-0"
+                className="rounded border-border-strong text-blue-600 focus:ring-0"
               />
               Hourly Dedicated Charter
             </label>
@@ -591,16 +591,16 @@ export function PersistentFareSimulator({
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setHourlyHours(parseInt(e.target.value, 10) || 1)
                     }
-                    className="h-7 text-xs bg-white border-slate-300 text-slate-900 text-center font-bold px-1.5"
+                    className="h-7 text-xs bg-surface-card border-border-strong text-fg-primary text-center font-bold px-1.5"
                   />
                 </div>
-                <span className="text-[11px] text-slate-500">hrs</span>
+                <span className="text-[11px] text-fg-muted">hrs</span>
               </div>
             )}
           </div>
 
           <div className="flex items-center justify-between">
-            <label className="text-xs text-slate-700 font-medium flex items-center gap-2 cursor-pointer">
+            <label className="text-xs text-fg-secondary font-medium flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={originZoneId === 'zone-lambert-airport' || isAirportPickup}
@@ -609,19 +609,19 @@ export function PersistentFareSimulator({
                   setIsAirportPickup(checked);
                   setOriginZoneId(checked ? 'zone-lambert-airport' : '');
                 }}
-                className="rounded border-slate-300 text-blue-600 focus:ring-0"
+                className="rounded border-border-strong text-blue-600 focus:ring-0"
               />
               Airport Trip (STL / SUS)
             </label>
           </div>
 
-          <div className="pt-2 border-t border-slate-200 space-y-2">
-            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+          <div className="pt-2 border-t border-border-subtle space-y-2">
+            <span className="text-[10px] font-bold text-fg-secondary uppercase tracking-wider block">
               Universal Extras
             </span>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Passengers</label>
+                <label className="text-[10px] font-medium text-fg-secondary block mb-0.5">Passengers</label>
                 <Input
                   type="number"
                   min="1"
@@ -630,11 +630,11 @@ export function PersistentFareSimulator({
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setPassengers(parseInt(e.target.value, 10) || 1)
                   }
-                  className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-medium"
+                  className="h-7 text-xs bg-surface-card border-border-strong text-fg-primary font-medium"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Stops</label>
+                <label className="text-[10px] font-medium text-fg-secondary block mb-0.5">Stops</label>
                 <Input
                   type="number"
                   min="0"
@@ -642,11 +642,11 @@ export function PersistentFareSimulator({
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setIntermediateStops(parseInt(e.target.value, 10) || 0)
                   }
-                  className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-medium"
+                  className="h-7 text-xs bg-surface-card border-border-strong text-fg-primary font-medium"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Child Seats</label>
+                <label className="text-[10px] font-medium text-fg-secondary block mb-0.5">Child Seats</label>
                 <Input
                   type="number"
                   min="0"
@@ -654,11 +654,11 @@ export function PersistentFareSimulator({
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setCarSeatsCount(parseInt(e.target.value, 10) || 0)
                   }
-                  className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-medium"
+                  className="h-7 text-xs bg-surface-card border-border-strong text-fg-primary font-medium"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Curb Wait (min)</label>
+                <label className="text-[10px] font-medium text-fg-secondary block mb-0.5">Curb Wait (min)</label>
                 <Input
                   type="number"
                   min="0"
@@ -666,11 +666,11 @@ export function PersistentFareSimulator({
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setCurbWaitMinutes(parseInt(e.target.value, 10) || 0)
                   }
-                  className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-medium"
+                  className="h-7 text-xs bg-surface-card border-border-strong text-fg-primary font-medium"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Traffic Delay (min)</label>
+                <label className="text-[10px] font-medium text-fg-secondary block mb-0.5">Traffic Delay (min)</label>
                 <Input
                   type="number"
                   min="0"
@@ -678,29 +678,29 @@ export function PersistentFareSimulator({
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setDelayMinutes(parseInt(e.target.value, 10) || 0)
                   }
-                  className="h-7 text-xs bg-white border-slate-300 text-slate-900 font-medium"
+                  className="h-7 text-xs bg-surface-card border-border-strong text-fg-primary font-medium"
                 />
               </div>
               <div className="col-span-2 sm:col-span-1">
-                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Pickup Date</label>
+                <label className="text-[10px] font-medium text-fg-secondary block mb-0.5">Pickup Date</label>
                 <Input
                   type="date"
                   value={pickupDate}
                   onChange={(e) => setPickupDate(e.target.value)}
-                  className="h-8 text-xs bg-white border-slate-300 text-slate-900 font-mono px-2"
+                  className="h-8 text-xs bg-surface-card border-border-strong text-fg-primary font-mono px-2"
                 />
               </div>
               <div className="col-span-2 sm:col-span-1">
-                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Pickup Time</label>
+                <label className="text-[10px] font-medium text-fg-secondary block mb-0.5">Pickup Time</label>
                 <Input
                   type="time"
                   value={pickupTime}
                   onChange={(e) => setPickupTime(e.target.value)}
-                  className="h-8 text-xs bg-white border-slate-300 text-slate-900 font-mono px-2"
+                  className="h-8 text-xs bg-surface-card border-border-strong text-fg-primary font-mono px-2"
                 />
               </div>
               <div className="col-span-2 sm:col-span-1">
-                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Pickup Zone</label>
+                <label className="text-[10px] font-medium text-fg-secondary block mb-0.5">Pickup Zone</label>
                 <Select
                   size="sm"
                   value={originZoneId}
@@ -713,7 +713,7 @@ export function PersistentFareSimulator({
                 </Select>
               </div>
               <div className="col-span-2 sm:col-span-1">
-                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">Dropoff Zone</label>
+                <label className="text-[10px] font-medium text-fg-secondary block mb-0.5">Dropoff Zone</label>
                 <Select
                   size="sm"
                   value={destinationZoneId}
@@ -735,9 +735,9 @@ export function PersistentFareSimulator({
             <button
               type="button"
               onClick={() => setShowFirewallTrace(!showFirewallTrace)}
-              className="w-full flex items-center justify-between text-xs text-slate-700 hover:text-slate-950 py-2 px-3 rounded-lg bg-blue-50/70 border border-blue-200 transition-colors cursor-pointer"
+              className="w-full flex items-center justify-between text-xs text-fg-secondary hover:text-fg-primary py-2 px-3 rounded-lg bg-status-info-bg/70 border border-status-info-border transition-colors cursor-pointer"
             >
-              <span className="flex items-center gap-1.5 font-bold text-blue-900">
+              <span className="flex items-center gap-1.5 font-bold text-status-info-fg">
                 <ShieldCheckIcon className="w-3.5 h-3.5 text-blue-600" />
                 Applied Rules &amp; Surcharges ({ctx.firewallTrace.ruleDecisions.filter((r) => r.matched).length} matched)
               </span>
@@ -747,22 +747,22 @@ export function PersistentFareSimulator({
             </button>
 
             {showFirewallTrace && (
-              <div className="mt-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] space-y-2.5">
+              <div className="mt-2 p-3 rounded-xl bg-surface-subtle border border-border-subtle text-[11px] space-y-2.5">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-muted block mb-1">
                     Pricing Rules Checked (Top-Down)
                   </span>
                   <div className="space-y-1">
                     {ctx.firewallTrace.ruleDecisions.map((rd) => (
                       <div key={rd.ruleId} className="flex items-start justify-between gap-2 text-[10px]">
-                        <span className={rd.matched ? 'font-bold text-emerald-800' : 'text-slate-500'}>
+                        <span className={rd.matched ? 'font-bold text-status-success-fg' : 'text-fg-muted'}>
                           P{rd.priority} {rd.ruleName}
                         </span>
                         <span
                           className={`shrink-0 px-1.5 py-0.5 rounded font-semibold ${
                             rd.matched
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-slate-200/70 text-slate-500'
+                              ? 'bg-status-success-bg-strong text-status-success-fg'
+                              : 'bg-surface-emphasis/70 text-fg-muted'
                           }`}
                         >
                           {rd.matched ? 'MATCH' : rd.reason}
@@ -772,24 +772,24 @@ export function PersistentFareSimulator({
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-200">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                <div className="pt-2 border-t border-border-subtle">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-muted block mb-1">
                     Surcharges Status
                   </span>
                   <div className="space-y-1">
                     {ctx.firewallTrace.surchargeDecisions.map((sd) => (
                       <div key={sd.surchargeId} className="flex items-start justify-between gap-2 text-[10px]">
                         <div className="min-w-0">
-                          <span className="font-semibold text-slate-800 block truncate">{sd.surchargeName}</span>
-                          <span className="text-[9px] text-slate-500 block">{sd.reason}</span>
+                          <span className="font-semibold text-fg-strong block truncate">{sd.surchargeName}</span>
+                          <span className="text-[9px] text-fg-muted block">{sd.reason}</span>
                         </div>
                         <span
                           className={`shrink-0 px-1.5 py-0.5 rounded font-bold uppercase ${
                             sd.status === 'applied'
-                              ? 'bg-emerald-100 text-emerald-800'
+                              ? 'bg-status-success-bg-strong text-status-success-fg'
                               : sd.status === 'waived'
-                              ? 'bg-rose-100 text-rose-800'
-                              : 'bg-slate-200/70 text-slate-500'
+                              ? 'bg-status-danger-bg-strong text-status-danger-fg'
+                              : 'bg-surface-emphasis/70 text-fg-muted'
                           }`}
                         >
                           {sd.status === 'applied' ? `+$${sd.amount.toFixed(2)}` : sd.status}
@@ -808,10 +808,10 @@ export function PersistentFareSimulator({
           <button
             type="button"
             onClick={() => setShowAuditTrail(!showAuditTrail)}
-            className="w-full flex items-center justify-between text-xs text-slate-600 hover:text-slate-900 py-2 px-3 rounded-lg bg-slate-50 border border-slate-200 transition-colors cursor-pointer"
+            className="w-full flex items-center justify-between text-xs text-fg-secondary hover:text-fg-primary py-2 px-3 rounded-lg bg-surface-subtle border border-border-subtle transition-colors cursor-pointer"
           >
             <span className="flex items-center gap-1.5 font-bold">
-              <SlidersIcon className="w-3.5 h-3.5 text-slate-500" />
+              <SlidersIcon className="w-3.5 h-3.5 text-fg-muted" />
               Engine Calculation Log ({ctx?.auditTrail.length || 0} steps)
             </span>
             <ChevronRightIcon
@@ -820,14 +820,14 @@ export function PersistentFareSimulator({
           </button>
 
           {showAuditTrail && ctx?.auditTrail && (
-            <div className="mt-2 p-3 rounded-xl bg-slate-900 border border-slate-800 font-mono text-[10px] space-y-2 max-h-56 overflow-y-auto custom-scrollbar text-slate-300">
+            <div className="mt-2 p-3 rounded-xl bg-surface-header border border-border-header font-mono text-[10px] space-y-2 max-h-56 overflow-y-auto custom-scrollbar text-slate-300">
               {ctx.auditTrail.map((step, idx: number) => (
-                <div key={idx} className="border-b border-slate-800 pb-1.5 last:border-0 last:pb-0">
+                <div key={idx} className="border-b border-border-header pb-1.5 last:border-0 last:pb-0">
                   <div className="text-emerald-400 font-semibold break-words">
                     Step {step.stepNumber}: {step.stepName}
                   </div>
-                  <div className="text-slate-400 whitespace-pre-wrap break-words">{step.description}</div>
-                  <div className="text-slate-500 text-[9px] mt-0.5 flex justify-between">
+                  <div className="text-fg-subtle whitespace-pre-wrap break-words">{step.description}</div>
+                  <div className="text-fg-muted text-[9px] mt-0.5 flex justify-between">
                     <span>
                       Delta: {step.appliedDelta >= 0 ? `+$${step.appliedDelta.toFixed(2)}` : `-$${Math.abs(step.appliedDelta).toFixed(2)}`}
                     </span>

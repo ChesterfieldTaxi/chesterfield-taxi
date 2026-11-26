@@ -101,15 +101,15 @@ export function DispatchEmailConfigPanel({
   return (
     <div className="space-y-6">
       {/* CARD 1: RESEND WEBHOOK & MAILBOX DIAGNOSTICS */}
-      <Card className="rounded-2xl border-slate-200">
-        <CardHeader className="border-b border-slate-100 pb-4">
+      <Card className="rounded-2xl border-border-subtle">
+        <CardHeader className="border-b border-border-faint pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div>
-              <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <CardTitle className="text-base font-extrabold text-fg-primary flex items-center gap-2">
                 <MailIcon className="w-5 h-5 text-blue-600 shrink-0" />
                 <span>Dispatch Mailbox ({emailDiag?.mailboxAddress || DISPATCH_MAILBOX_ADDRESS})</span>
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+              <CardDescription className="text-xs text-fg-muted">
                 Single-mailbox inbound/outbound RFC-5322 email threading, Svix HMAC-SHA256 verification, and Email-to-Booking extraction.
               </CardDescription>
             </div>
@@ -125,15 +125,15 @@ export function DispatchEmailConfigPanel({
         </CardHeader>
 
         <CardContent className="p-4 sm:p-6 space-y-4">
-          <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/40 space-y-2">
+          <div className="p-4 rounded-xl border border-status-info-border bg-status-info-bg/40 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-extrabold text-slate-900">Resend Inbound &amp; Delivery Webhook URL (POST):</span>
-              <span className="text-[11px] font-mono text-blue-700">
+              <span className="text-xs font-extrabold text-fg-primary">Resend Inbound &amp; Delivery Webhook URL (POST):</span>
+              <span className="text-[11px] font-mono text-status-info-fg">
                 Replay Window: {emailDiag?.toleranceSeconds ?? 300}s
               </span>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <code className="flex-1 text-xs font-mono bg-white p-2.5 rounded-lg border border-blue-200 text-slate-800 select-all break-all">
+              <code className="flex-1 text-xs font-mono bg-surface-card p-2.5 rounded-lg border border-status-info-border text-fg-strong select-all break-all">
                 {webhookUrl}
               </code>
               <Button
@@ -145,28 +145,28 @@ export function DispatchEmailConfigPanel({
                   setCopiedUrl(true);
                   setTimeout(() => setCopiedUrl(false), 2000);
                 }}
-                className="bg-white border-blue-300 text-blue-800 font-bold text-xs px-3 py-2"
+                className="bg-surface-card border-status-info-border text-status-info-fg font-bold text-xs px-3 py-2"
               >
-                {copiedUrl ? <CheckIcon className="w-3.5 h-3.5 mr-1 text-emerald-700" /> : <CopyIcon className="w-3.5 h-3.5 mr-1" />}
+                {copiedUrl ? <CheckIcon className="w-3.5 h-3.5 mr-1 text-status-success-fg" /> : <CopyIcon className="w-3.5 h-3.5 mr-1" />}
                 {copiedUrl ? 'Copied' : 'Copy URL'}
               </Button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1">
-              <span className="text-xs font-extrabold text-slate-900 block">Active Alias</span>
-              <p className="text-[11px] font-mono text-slate-700 break-all">{emailDiag?.mailboxAddress || DISPATCH_MAILBOX_ADDRESS}</p>
+            <div className="p-3.5 rounded-xl border border-border-subtle bg-surface-subtle/70 space-y-1">
+              <span className="text-xs font-extrabold text-fg-primary block">Active Alias</span>
+              <p className="text-[11px] font-mono text-fg-secondary break-all">{emailDiag?.mailboxAddress || DISPATCH_MAILBOX_ADDRESS}</p>
             </div>
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1">
-              <span className="text-xs font-extrabold text-slate-900 block">Resend Outbound API</span>
-              <p className="text-[11px] text-slate-600">
+            <div className="p-3.5 rounded-xl border border-border-subtle bg-surface-subtle/70 space-y-1">
+              <span className="text-xs font-extrabold text-fg-primary block">Resend Outbound API</span>
+              <p className="text-[11px] text-fg-secondary">
                 {emailDiag?.resendApiConfigured ? 'RESEND_API_KEY Active' : 'Simulation Fallback Mode'}
               </p>
             </div>
-            <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-1">
-              <span className="text-xs font-extrabold text-emerald-950 block">Synced Messages</span>
-              <p className="text-[11px] text-emerald-900">
+            <div className="p-3.5 rounded-xl border border-status-success-border bg-status-success-bg/50 space-y-1">
+              <span className="text-xs font-extrabold text-status-success-fg block">Synced Messages</span>
+              <p className="text-[11px] text-status-success-fg">
                 {emailDiag?.storedEmailCount ?? 0} Stored &middot; {emailDiag?.unreadEmailCount ?? 0} Unread
               </p>
             </div>
@@ -175,14 +175,14 @@ export function DispatchEmailConfigPanel({
       </Card>
 
       {/* CARD 2: DISPATCH EMAIL POLICY & GOVERNANCE */}
-      <Card className="rounded-2xl border-slate-200">
-        <CardHeader className="border-b border-slate-100 pb-4">
+      <Card className="rounded-2xl border-border-subtle">
+        <CardHeader className="border-b border-border-faint pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div>
-              <CardTitle className="text-base font-extrabold text-slate-900">
+              <CardTitle className="text-base font-extrabold text-fg-primary">
                 Dispatch Email Intake &amp; Outbound Signature Policy
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+              <CardDescription className="text-xs text-fg-muted">
                 Govern automatic booking draft extraction, EmailDock outbound signatures, and blocked sender/domain filters.
               </CardDescription>
             </div>
@@ -199,10 +199,10 @@ export function DispatchEmailConfigPanel({
 
         <CardContent className="p-4 sm:p-6 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex items-start justify-between gap-3 cursor-pointer">
+            <label className="p-4 rounded-xl border border-border-subtle bg-surface-subtle/50 flex items-start justify-between gap-3 cursor-pointer">
               <div>
-                <span className="text-sm font-bold text-slate-900 block">Parse Inbound Emails to Booking Draft</span>
-                <span className="text-xs text-slate-500">
+                <span className="text-sm font-bold text-fg-primary block">Parse Inbound Emails to Booking Draft</span>
+                <span className="text-xs text-fg-muted">
                   Automatically extract pickup/dropoff/time/flight details so operators can 1-click populate Dispatch Booking.
                 </span>
               </div>
@@ -214,10 +214,10 @@ export function DispatchEmailConfigPanel({
               />
             </label>
 
-            <label className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex items-start justify-between gap-3 cursor-pointer">
+            <label className="p-4 rounded-xl border border-border-subtle bg-surface-subtle/50 flex items-start justify-between gap-3 cursor-pointer">
               <div>
-                <span className="text-sm font-bold text-slate-900 block">Auto-Acknowledge Inbound Booking Emails</span>
-                <span className="text-xs text-slate-500">
+                <span className="text-sm font-bold text-fg-primary block">Auto-Acknowledge Inbound Booking Emails</span>
+                <span className="text-xs text-fg-muted">
                   Send an automated receipt acknowledgement when a parsed reservation email arrives at dispatch@.
                 </span>
               </div>
@@ -231,7 +231,7 @@ export function DispatchEmailConfigPanel({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
+            <label className="block text-xs font-bold text-fg-secondary mb-1">
               Default Outbound Email Signature (Appended in Dispatch EmailDock Composer)
             </label>
             <textarea
@@ -239,12 +239,12 @@ export function DispatchEmailConfigPanel({
               value={policy.outboundSignature}
               onChange={(e) => setPolicy({ ...policy, outboundSignature: e.target.value })}
               placeholder={DEFAULT_DISPATCH_EMAIL_POLICY.outboundSignature}
-              className="w-full text-xs p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white"
+              className="w-full text-xs p-3 rounded-xl border border-border-subtle bg-surface-subtle focus:bg-surface-card"
             />
           </div>
 
           <div className="space-y-2.5">
-            <label className="block text-xs font-bold text-slate-700">
+            <label className="block text-xs font-bold text-fg-secondary">
               Blocked Inbound Senders &amp; Domains ({policy.blockedSenderList.length})
             </label>
             <div className="flex gap-2 max-w-lg">
@@ -259,7 +259,7 @@ export function DispatchEmailConfigPanel({
                   }
                 }}
                 placeholder="e.g. spam@example.com or @marketing-domain.com"
-                className="flex-1 text-xs font-mono px-3 py-2 rounded-xl border border-slate-200 bg-white"
+                className="flex-1 text-xs font-mono px-3 py-2 rounded-xl border border-border-subtle bg-surface-card"
               />
               <Button type="button" variant="outline" size="sm" onClick={handleAddBlocked} className="text-xs font-bold">
                 <PlusIcon className="w-3.5 h-3.5 mr-1" /> Block
@@ -267,13 +267,13 @@ export function DispatchEmailConfigPanel({
             </div>
 
             {policy.blockedSenderList.length === 0 ? (
-              <p className="text-[11px] text-slate-500">No blocked email addresses or domains configured.</p>
+              <p className="text-[11px] text-fg-muted">No blocked email addresses or domains configured.</p>
             ) : (
               <div className="flex flex-wrap gap-2 pt-1">
                 {policy.blockedSenderList.map((entry) => (
                   <span
                     key={entry}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-xs font-mono font-semibold text-rose-800"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-status-danger-bg border border-status-danger-border text-xs font-mono font-semibold text-status-danger-fg"
                   >
                     <span>{entry}</span>
                     <button
@@ -284,7 +284,7 @@ export function DispatchEmailConfigPanel({
                           blockedSenderList: policy.blockedSenderList.filter((item) => item !== entry),
                         })
                       }
-                      className="text-rose-500 hover:text-rose-800 cursor-pointer"
+                      className="text-rose-500 hover:text-status-danger-fg cursor-pointer"
                       title="Remove blocked sender"
                     >
                       <TrashIcon className="w-3 h-3" />

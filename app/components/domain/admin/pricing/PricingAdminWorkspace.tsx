@@ -474,9 +474,9 @@ export function PricingAdminWorkspace({
   return (
     <div className="space-y-4">
       {/* Slim Utility Bar */}
-      <div className="bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <p className="text-xs text-slate-600">
-          <span className="font-bold text-slate-900 mr-1.5">
+      <div className="bg-surface-card border border-border-subtle/90 rounded-2xl px-4 py-2.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <p className="text-xs text-fg-secondary">
+          <span className="font-bold text-fg-primary mr-1.5">
             {activeTab === 'rates' && '1. Tariffs:'}
             {activeTab === 'extras' && '2. Extras & Wait:'}
             {activeTab === 'surcharges' && '3. Surcharges:'}
@@ -500,7 +500,7 @@ export function PricingAdminWorkspace({
             <Badge
               variant="warning"
               size="sm"
-              className="text-[10px] bg-amber-100 text-amber-800 border-amber-300"
+              className="text-[10px] bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border"
             >
               Unsaved Draft Active
             </Badge>
@@ -511,12 +511,12 @@ export function PricingAdminWorkspace({
               variant="outline"
               size="sm"
               onClick={handleOpenAuditDrawerAll}
-              className="text-xs border-slate-300 bg-white text-slate-800 hover:bg-slate-50 shadow-2xs shrink-0 cursor-pointer flex-1 sm:flex-none justify-center"
+              className="text-xs border-border-strong bg-surface-card text-fg-strong hover:bg-surface-subtle shadow-2xs shrink-0 cursor-pointer flex-1 sm:flex-none justify-center"
             >
               <HistoryIcon className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
               <span>Audit History</span>
               {auditEvents.length > 0 && (
-                <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-mono text-[10px] font-bold">
+                <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-surface-muted text-fg-secondary border border-border-subtle font-mono text-[10px] font-bold">
                   {auditEvents.length}
                 </span>
               )}
@@ -527,7 +527,7 @@ export function PricingAdminWorkspace({
             variant="outline"
             size="sm"
             onClick={() => setIsSimulatorOpen(true)}
-            className="text-xs border-slate-300 bg-white text-slate-800 hover:bg-slate-50 shadow-2xs shrink-0 cursor-pointer flex-1 sm:flex-none justify-center"
+            className="text-xs border-border-strong bg-surface-card text-fg-strong hover:bg-surface-subtle shadow-2xs shrink-0 cursor-pointer flex-1 sm:flex-none justify-center"
           >
             <SlidersIcon className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
             <span>Live Fare Preview</span>

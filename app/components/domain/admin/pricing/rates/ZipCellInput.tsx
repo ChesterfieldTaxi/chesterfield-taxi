@@ -20,7 +20,7 @@ export function ZipCellInput({
   value,
   onChange,
   disabled,
-  className = 'h-7 text-xs bg-white border-slate-300',
+  className = 'h-7 text-xs bg-surface-card border-border-strong',
   ariaLabel,
 }: ZipCellInputProps) {
   const label = ariaLabel || column.label;

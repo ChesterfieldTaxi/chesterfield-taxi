@@ -48,16 +48,16 @@ export function ZipMatrixColumnManager({
   };
 
   return (
-    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3 shadow-2xs">
+    <div className="p-4 rounded-xl bg-surface-subtle border border-border-subtle space-y-3 shadow-2xs">
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Manage Columns</h4>
+        <h4 className="text-xs font-bold text-fg-strong uppercase tracking-wider">Manage Columns</h4>
         {onClose && (
-          <button type="button" onClick={onClose} className="p-1 text-slate-500 hover:text-slate-800" title="Close">
+          <button type="button" onClick={onClose} className="p-1 text-fg-muted hover:text-fg-strong" title="Close">
             <XIcon className="w-3.5 h-3.5" />
           </button>
         )}
       </div>
-      <p className="text-[11px] text-slate-500">
+      <p className="text-[11px] text-fg-muted">
         Exactly one column is the <strong>Zip</strong> (5 digits) and one is the <strong>Price</strong>. Other
         columns are informational only.
       </p>
@@ -66,7 +66,7 @@ export function ZipMatrixColumnManager({
         {sorted.map((col, idx) => (
           <div
             key={col.key}
-            className="grid grid-cols-1 md:grid-cols-[1fr_120px_170px_auto] gap-2 items-start bg-white border border-slate-200 rounded-lg p-2"
+            className="grid grid-cols-1 md:grid-cols-[1fr_120px_170px_auto] gap-2 items-start bg-surface-card border border-border-subtle rounded-lg p-2"
           >
             <div className="space-y-1">
               <Input
@@ -76,7 +76,7 @@ export function ZipMatrixColumnManager({
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   onChange(renameColumn(columns, col.key, e.target.value), rows)
                 }
-                className="h-7 text-xs bg-white border-slate-300"
+                className="h-7 text-xs bg-surface-card border-border-strong"
               />
               {col.type === 'select' && (
                 <Input
@@ -96,7 +96,7 @@ export function ZipMatrixColumnManager({
                       rows
                     )
                   }
-                  className="h-7 text-xs bg-white border-slate-300"
+                  className="h-7 text-xs bg-surface-card border-border-strong"
                 />
               )}
             </div>
@@ -120,7 +120,7 @@ export function ZipMatrixColumnManager({
                 type="button"
                 disabled={idx === 0}
                 onClick={() => onChange(reorderColumns(columns, col.key, -1), rows)}
-                className="p-1 rounded border border-slate-200 text-slate-600 disabled:opacity-30"
+                className="p-1 rounded border border-border-subtle text-fg-secondary disabled:opacity-30"
                 title="Move up"
               >
                 <ChevronDownIcon className="w-3.5 h-3.5 rotate-180" />
@@ -129,7 +129,7 @@ export function ZipMatrixColumnManager({
                 type="button"
                 disabled={idx === sorted.length - 1}
                 onClick={() => onChange(reorderColumns(columns, col.key, 1), rows)}
-                className="p-1 rounded border border-slate-200 text-slate-600 disabled:opacity-30"
+                className="p-1 rounded border border-border-subtle text-fg-secondary disabled:opacity-30"
                 title="Move down"
               >
                 <ChevronDownIcon className="w-3.5 h-3.5" />
@@ -140,7 +140,7 @@ export function ZipMatrixColumnManager({
                 onClick={() =>
                   columnHasData(rows, col.key) ? setPendingDelete(col.key) : commitDelete(col.key)
                 }
-                className="p-1 rounded border border-slate-200 text-slate-400 hover:text-rose-600 disabled:opacity-30"
+                className="p-1 rounded border border-border-subtle text-fg-subtle hover:text-rose-600 disabled:opacity-30"
                 title={col.role ? 'Zip and Price columns cannot be deleted' : 'Delete column'}
               >
                 <TrashIcon className="w-3.5 h-3.5" />
@@ -167,7 +167,7 @@ export function ZipMatrixColumnManager({
             placeholder="New column label"
             value={newLabel}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewLabel(e.target.value)}
-            className="h-8 text-xs bg-white border-slate-300"
+            className="h-8 text-xs bg-surface-card border-border-strong"
           />
         </div>
         <div className="w-full sm:w-32">

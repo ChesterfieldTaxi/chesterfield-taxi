@@ -27,14 +27,14 @@ export function BookingIntakeRulesPanel({
 }: BookingIntakeRulesPanelProps) {
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle">
         <div className="flex items-center gap-2.5">
-          <span className="p-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-700">
+          <span className="p-2 bg-status-info-bg border border-status-info-border rounded-xl text-status-info-fg">
             <SlidersIcon className="w-5 h-5" />
           </span>
           <div>
-            <h2 className="text-xl font-black text-slate-900">Booking Intake Rules</h2>
-            <p className="text-xs text-slate-500 font-medium">
+            <h2 className="text-xl font-black text-fg-primary">Booking Intake Rules</h2>
+            <p className="text-xs text-fg-muted font-medium">
               Set conditions for Auto-Confirm, Dispatcher Review, and Blocked Bookings.
             </p>
           </div>
@@ -91,22 +91,22 @@ export function BookingIntakeRulesPanel({
         />
 
         {/* Airport Curbside Pickup Instructions */}
-        <div className="p-5 bg-white border border-blue-200 rounded-2xl shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <div className="p-5 bg-surface-card border border-status-info-border rounded-2xl shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-faint pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-status-info-bg text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
                 <PlaneIcon className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-sm font-bold text-fg-primary">
                   STL Lambert Airport Curbside Pickup Instructions
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-fg-muted">
                   Curbside doors, terminal baggage claim instructions, or driver meetup points shown to passengers in confirmation emails and receipts when pickup is STL Lambert Airport.
                 </p>
               </div>
             </div>
-            <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 uppercase tracking-wider self-start sm:self-auto">
+            <span className="text-[10px] font-bold text-status-info-fg bg-status-info-bg px-2.5 py-1 rounded-md border border-blue-100 uppercase tracking-wider self-start sm:self-auto">
               Airport Rules
             </span>
           </div>
@@ -116,9 +116,9 @@ export function BookingIntakeRulesPanel({
             value={lambertInstructions}
             onChange={(e) => onChangeLambertInstructions(e.target.value)}
             placeholder="e.g. Terminal 1: Exit Door 12 (Baggage Claim level) • Terminal 2: Exit Door 2. Your driver tracks flight arrivals in real time."
-            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
+            className="w-full px-3.5 py-2.5 border border-border-subtle rounded-xl text-xs font-medium text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface-subtle/50"
           />
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-500">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-fg-muted">
             <span>Synced automatically with Website → Booking &amp; /track → Airport Rules.</span>
             <Button
               size="sm"

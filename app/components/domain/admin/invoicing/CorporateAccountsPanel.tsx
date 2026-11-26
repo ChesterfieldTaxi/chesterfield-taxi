@@ -119,7 +119,7 @@ export function CorporateAccountsPanel({
   return (
     <div className="space-y-4">
       {/* ─── Global Credit Limit Enforcement & Search Bar ─── */}
-      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="bg-surface-card p-3.5 sm:p-4 rounded-2xl border border-border-subtle/90 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-1 min-w-0">
           <div className="relative w-full sm:w-72">
             <input
@@ -130,7 +130,7 @@ export function CorporateAccountsPanel({
                 setAccountSearchTerm(e.target.value);
                 setAccountPage(1);
               }}
-              className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:border-blue-500"
+              className="w-full pl-3 pr-8 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs text-fg-strong placeholder-fg-subtle focus:bg-surface-card focus:outline-hidden focus:border-blue-500"
             />
             {accountSearchTerm && (
               <button
@@ -140,7 +140,7 @@ export function CorporateAccountsPanel({
                   setAccountPage(1);
                 }}
                 aria-label="Clear search"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-secondary cursor-pointer"
               >
                 <XIcon className="w-3.5 h-3.5" />
               </button>
@@ -151,7 +151,7 @@ export function CorporateAccountsPanel({
             <button
               type="button"
               onClick={clearAccountFocus}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-status-info-bg border border-status-info-border text-status-info-fg text-xs font-bold cursor-pointer shrink-0"
             >
               <span>Filtered: {focusedAccountId}</span>
               <XIcon className="w-3.5 h-3.5" />
@@ -161,18 +161,18 @@ export function CorporateAccountsPanel({
 
         {/* Credit Limit Enforcement Toggle + Cross-Link */}
         <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5">
-          <div className="flex items-center gap-2 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs">
+          <div className="flex items-center gap-2 bg-surface-subtle px-2.5 py-1.5 rounded-xl border border-border-subtle text-xs">
             <ShieldCheckIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-            <span className="font-bold text-slate-700">Credit Limit Policy:</span>
-            <div className="inline-flex bg-white p-0.5 rounded-lg border border-slate-200">
+            <span className="font-bold text-fg-secondary">Credit Limit Policy:</span>
+            <div className="inline-flex bg-surface-card p-0.5 rounded-lg border border-border-subtle">
               <button
                 type="button"
                 disabled={isSaving}
                 onClick={() => onUpdateCreditLimitEnforcement('soft_warning')}
                 className={`px-2 py-1 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
                   creditLimitEnforcement === 'soft_warning'
-                    ? 'bg-amber-100 text-amber-900'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-status-warning-bg-strong text-status-warning-fg'
+                    : 'text-fg-muted hover:text-fg-strong'
                 }`}
               >
                 Soft Warning
@@ -184,7 +184,7 @@ export function CorporateAccountsPanel({
                 className={`px-2 py-1 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
                   creditLimitEnforcement === 'hard_block'
                     ? 'bg-rose-600 text-white'
-                    : 'text-slate-500 hover:text-slate-800'
+                    : 'text-fg-muted hover:text-fg-strong'
                 }`}
               >
                 Hard Block
@@ -194,7 +194,7 @@ export function CorporateAccountsPanel({
 
           <Link
             to="/app/admin?tab=customers&sub=corporate"
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 hover:text-blue-700 transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-border-subtle bg-surface-card hover:bg-surface-subtle text-xs font-bold text-fg-secondary hover:text-status-info-fg transition-colors"
           >
             <span>Directory &amp; Portal Logins &rarr;</span>
             <ExternalLinkIcon className="w-3.5 h-3.5" />
@@ -221,14 +221,14 @@ export function CorporateAccountsPanel({
               className={`border shadow-xs transition-all flex flex-col justify-between ${
                 focusedAccountId && (acc.id === focusedAccountId || acc.accountNumber === focusedAccountId)
                   ? 'border-blue-500 ring-2 ring-blue-500/15'
-                  : 'border-slate-200/90 hover:border-slate-300'
+                  : 'border-border-subtle/90 hover:border-border-strong'
               }`}
             >
               <div>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <CardTitle className="text-sm font-black text-slate-900 line-clamp-1">
+                      <CardTitle className="text-sm font-black text-fg-primary line-clamp-1">
                         {acc.companyName}
                       </CardTitle>
                       <CardDescription className="text-xs font-mono font-bold text-blue-600">
@@ -247,31 +247,31 @@ export function CorporateAccountsPanel({
 
                 <CardContent className="space-y-3 text-xs">
                   {/* Credit Utilization Progress Bar */}
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+                  <div className="p-3 bg-surface-subtle rounded-xl border border-border-subtle/80 space-y-2">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold text-slate-700">Credit Exposure</span>
-                      <span className="font-mono font-black text-slate-900">
+                      <span className="font-bold text-fg-secondary">Credit Exposure</span>
+                      <span className="font-mono font-black text-fg-primary">
                         ${metrics.totalExposure.toFixed(2)} / ${acc.creditLimit.toLocaleString()}
                       </span>
                     </div>
 
-                    <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                    <div className="w-full h-2 rounded-full bg-surface-emphasis overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all ${barColor}`}
                         style={{ width: `${barWidth}%` }}
                       />
                     </div>
 
-                    <div className="flex items-center justify-between text-[10px] text-slate-500">
+                    <div className="flex items-center justify-between text-[10px] text-fg-muted">
                       <span>Unbilled: ${metrics.unbilledSpend.toFixed(2)}</span>
                       <span>Open Inv: ${metrics.openInvoiceBalance.toFixed(2)}</span>
-                      <span className="font-bold text-slate-700">
+                      <span className="font-bold text-fg-secondary">
                         {metrics.creditUtilizationPercent}%
                       </span>
                     </div>
 
                     {metrics.isOverLimit && (
-                      <div className="flex items-center gap-1 text-[10px] font-bold text-rose-700 pt-0.5">
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-status-danger-fg pt-0.5">
                         <AlertTriangleIcon className="w-3 h-3 shrink-0" />
                         <span>
                           Over credit limit ({creditLimitEnforcement === 'hard_block' ? 'Blocked' : 'Warned'})
@@ -282,10 +282,10 @@ export function CorporateAccountsPanel({
 
                   {/* Financial Terms View vs Inline Editor */}
                   {isEditing ? (
-                    <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-200 space-y-2.5">
+                    <div className="p-3 bg-status-info-bg/50 rounded-xl border border-status-info-border space-y-2.5">
                       <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Terms</label>
+                          <label className="text-[10px] font-bold text-fg-secondary block mb-0.5">Terms</label>
                           <Select
                             size="xs"
                             value={termsDraft.billingCycle}
@@ -298,24 +298,24 @@ export function CorporateAccountsPanel({
                           </Select>
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Limit ($)</label>
+                          <label className="text-[10px] font-bold text-fg-secondary block mb-0.5">Limit ($)</label>
                           <input
                             type="number"
                             min="0"
                             value={termsDraft.creditLimit}
                             onChange={(e) => setTermsDraft((d) => ({ ...d, creditLimit: Number(e.target.value) || 0 }))}
-                            className="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                            className="w-full px-2 py-1 bg-surface-card border border-border-strong rounded-lg text-xs font-mono"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Disc (%)</label>
+                          <label className="text-[10px] font-bold text-fg-secondary block mb-0.5">Disc (%)</label>
                           <input
                             type="number"
                             min="0"
                             max="100"
                             value={termsDraft.discountPercent}
                             onChange={(e) => setTermsDraft((d) => ({ ...d, discountPercent: Number(e.target.value) || 0 }))}
-                            className="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                            className="w-full px-2 py-1 bg-surface-card border border-border-strong rounded-lg text-xs font-mono"
                           />
                         </div>
                       </div>
@@ -340,17 +340,17 @@ export function CorporateAccountsPanel({
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200/80 text-[11px]">
+                    <div className="flex items-center justify-between p-2.5 bg-surface-card rounded-xl border border-border-subtle/80 text-[11px]">
                       <div>
-                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Cycle</span>
-                        <span className="font-bold text-slate-800 uppercase">{acc.billingCycle}</span>
+                        <span className="text-fg-subtle block text-[9px] uppercase font-bold">Cycle</span>
+                        <span className="font-bold text-fg-strong uppercase">{acc.billingCycle}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Credit Limit</span>
-                        <span className="font-bold text-slate-800">${acc.creditLimit.toLocaleString()}</span>
+                        <span className="text-fg-subtle block text-[9px] uppercase font-bold">Credit Limit</span>
+                        <span className="font-bold text-fg-strong">${acc.creditLimit.toLocaleString()}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Discount</span>
+                        <span className="text-fg-subtle block text-[9px] uppercase font-bold">Discount</span>
                         <span className="font-bold text-emerald-600">{acc.discountPercent}% Off</span>
                       </div>
                       <button
@@ -363,7 +363,7 @@ export function CorporateAccountsPanel({
                             discountPercent: acc.discountPercent,
                           });
                         }}
-                        className="text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                        className="text-[11px] font-bold text-blue-600 hover:text-status-info-fg cursor-pointer"
                       >
                         Edit
                       </button>
@@ -378,7 +378,7 @@ export function CorporateAccountsPanel({
                   variant="outline"
                   onClick={() => onRunBatchInvoicing(acc)}
                   disabled={isSaving}
-                  className="text-[11px] font-bold text-blue-600 border-blue-200 hover:bg-blue-50 w-full cursor-pointer"
+                  className="text-[11px] font-bold text-blue-600 border-status-info-border hover:bg-status-info-bg w-full cursor-pointer"
                 >
                   Run Direct Batch Statement
                 </Button>
@@ -388,8 +388,8 @@ export function CorporateAccountsPanel({
         })}
 
         {filteredCorporateAccounts.length === 0 && (
-          <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-slate-200">
-            <p className="text-slate-400 font-medium text-xs">
+          <div className="col-span-full py-12 text-center bg-surface-card rounded-2xl border border-border-subtle">
+            <p className="text-fg-subtle font-medium text-xs">
               No corporate billing accounts matched your filter.
             </p>
           </div>
@@ -397,8 +397,8 @@ export function CorporateAccountsPanel({
       </div>
 
       {totalAccountPages > 1 && (
-        <div className="flex items-center justify-between bg-white px-4 py-3 rounded-2xl border border-slate-200/90 text-xs">
-          <span className="text-slate-500">Page {accountPage} of {totalAccountPages}</span>
+        <div className="flex items-center justify-between bg-surface-card px-4 py-3 rounded-2xl border border-border-subtle/90 text-xs">
+          <span className="text-fg-muted">Page {accountPage} of {totalAccountPages}</span>
           <div className="flex items-center gap-1.5">
             <Button size="sm" variant="outline" onClick={() => setAccountPage((p) => Math.max(p - 1, 1))} disabled={accountPage === 1}>
               Previous

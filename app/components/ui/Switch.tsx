@@ -62,7 +62,7 @@ export function Switch({
           {label && (
             <label
               htmlFor={switchId}
-              className={`text-sm font-semibold text-slate-900 cursor-pointer ${
+              className={`text-sm font-semibold text-fg-primary cursor-pointer ${
                 disabled ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
@@ -70,7 +70,7 @@ export function Switch({
             </label>
           )}
           {helperText && (
-            <p id={helperId} className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+            <p id={helperId} className="text-xs text-fg-muted mt-0.5 leading-relaxed">
               {helperText}
             </p>
           )}
@@ -88,11 +88,11 @@ export function Switch({
         onClick={toggle}
         onKeyDown={handleKeyDown}
         className={`relative inline-flex ${trackDims} shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 ${palette.ring} focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-          checked ? palette.active : 'bg-slate-200'
+          checked ? palette.active : 'bg-surface-emphasis'
         }`}
       >
         <span
-          className={`pointer-events-none inline-block ${thumbDims} rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out transform ${thumbTranslate}`}
+          className={`pointer-events-none inline-block ${thumbDims} rounded-full bg-surface-card shadow-sm ring-0 transition duration-200 ease-in-out transform ${thumbTranslate}`}
         />
       </button>
     </div>

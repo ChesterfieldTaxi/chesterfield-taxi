@@ -68,10 +68,10 @@ export function LocalizationAndUnitsPanel({
   return (
     <form onSubmit={handleSave} className="space-y-6">
       {/* Contextual Top Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-3 sm:px-4 sm:py-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-surface-card p-3 sm:px-4 sm:py-2.5 rounded-2xl border border-border-subtle/80 shadow-xs">
         <div className="flex items-center gap-2 min-w-0">
           <GlobeIcon className="w-4 h-4 text-blue-600 shrink-0" />
-          <span className="text-xs font-bold text-slate-700 truncate">
+          <span className="text-xs font-bold text-fg-secondary truncate">
             Time Format, Distance/Speed Units &amp; Regional Localization
           </span>
         </div>
@@ -99,36 +99,36 @@ export function LocalizationAndUnitsPanel({
       )}
 
       {/* Live Formatted Sample Preview Bar */}
-      <div className="bg-slate-900 text-white rounded-2xl border border-slate-800 p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-3 border-b border-slate-800 text-[11px]">
+      <div className="bg-surface-header text-white rounded-2xl border border-border-header p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-3 border-b border-border-header text-[11px]">
           <span className="font-extrabold uppercase tracking-wider text-blue-400">
             Live Formatting Preview ({localization.timezone})
           </span>
-          <span className="text-slate-400 font-medium truncate">
+          <span className="text-fg-subtle font-medium truncate">
             {localization.defaultServiceRegion}
           </span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
-          <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Sample Date</span>
+          <div className="p-2.5 rounded-xl bg-surface-header-elevated/80 border border-border-header/80">
+            <span className="text-[10px] uppercase font-bold text-fg-subtle block">Sample Date</span>
             <span className="font-mono font-extrabold text-white">{sample.dateSample}</span>
           </div>
-          <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Clock Time</span>
+          <div className="p-2.5 rounded-xl bg-surface-header-elevated/80 border border-border-header/80">
+            <span className="text-[10px] uppercase font-bold text-fg-subtle block">Clock Time</span>
             <span className="font-mono font-extrabold text-emerald-400">{sample.timeSample}</span>
           </div>
-          <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Trip Distance</span>
+          <div className="p-2.5 rounded-xl bg-surface-header-elevated/80 border border-border-header/80">
+            <span className="text-[10px] uppercase font-bold text-fg-subtle block">Trip Distance</span>
             <span className="font-mono font-extrabold text-white">{sample.distanceSample}</span>
           </div>
-          <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Speed &amp; Temp</span>
+          <div className="p-2.5 rounded-xl bg-surface-header-elevated/80 border border-border-header/80">
+            <span className="text-[10px] uppercase font-bold text-fg-subtle block">Speed &amp; Temp</span>
             <span className="font-mono font-extrabold text-white">
               {sample.speedSample} · {sample.temperatureSample}
             </span>
           </div>
-          <div className="col-span-2 sm:col-span-1 p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Sample Fare</span>
+          <div className="col-span-2 sm:col-span-1 p-2.5 rounded-xl bg-surface-header-elevated/80 border border-border-header/80">
+            <span className="text-[10px] uppercase font-bold text-fg-subtle block">Sample Fare</span>
             <span className="font-mono font-extrabold text-amber-300">{sample.fareSample}</span>
           </div>
         </div>
@@ -137,19 +137,19 @@ export function LocalizationAndUnitsPanel({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left: Clock, Timezone & Date Formatting */}
         <div className="lg:col-span-6">
-          <Card variant="elevated" className="border-slate-200 shadow-xs">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50">
-              <CardTitle className="text-base text-slate-900 flex items-center gap-2">
+          <Card variant="elevated" className="border-border-subtle shadow-xs">
+            <CardHeader className="border-b border-border-faint bg-surface-subtle/50">
+              <CardTitle className="text-base text-fg-primary flex items-center gap-2">
                 <ClockIcon className="w-4 h-4 text-blue-600" />
                 Timezone, Clock &amp; Calendar Format
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+              <CardDescription className="text-xs text-fg-muted">
                 Controls scheduled pickup timestamps across Dispatch, Driver HUD, and receipts.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-5 sm:p-6 space-y-4 text-xs">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-fg-secondary mb-1">
                   Operational Timezone
                 </label>
                 <Select
@@ -167,7 +167,7 @@ export function LocalizationAndUnitsPanel({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold text-fg-secondary mb-1.5">
                   Clock Time Format
                 </label>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -187,12 +187,12 @@ export function LocalizationAndUnitsPanel({
                         }
                         className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                           active
-                            ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500 text-blue-950'
-                            : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                            ? 'bg-status-info-bg border-blue-500 ring-1 ring-blue-500 text-status-info-fg'
+                            : 'bg-surface-card border-border-subtle hover:bg-surface-subtle text-fg-secondary'
                         }`}
                       >
                         <div className="font-extrabold text-xs">{opt.label}</div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">{opt.hint}</div>
+                        <div className="text-[10px] text-fg-muted mt-0.5">{opt.hint}</div>
                       </button>
                     );
                   })}
@@ -200,7 +200,7 @@ export function LocalizationAndUnitsPanel({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-fg-secondary mb-1">
                   Date Display Format
                 </label>
                 <Select
@@ -221,20 +221,20 @@ export function LocalizationAndUnitsPanel({
 
         {/* Right: Measurement Units, Currency & Default Region */}
         <div className="lg:col-span-6">
-          <Card variant="elevated" className="border-slate-200 shadow-xs">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50">
-              <CardTitle className="text-base text-slate-900 flex items-center gap-2">
+          <Card variant="elevated" className="border-border-subtle shadow-xs">
+            <CardHeader className="border-b border-border-faint bg-surface-subtle/50">
+              <CardTitle className="text-base text-fg-primary flex items-center gap-2">
                 <GlobeIcon className="w-4 h-4 text-emerald-600" />
                 Units, Currency &amp; Default Service Region
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+              <CardDescription className="text-xs text-fg-muted">
                 Distance, telemetry speed, weather unit, currency code, and regional coverage label.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-5 sm:p-6 space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Distance Unit</label>
+                  <label className="block text-xs font-bold text-fg-secondary mb-1">Distance Unit</label>
                   <Select
                     size="md"
                     value={localization.distanceUnit}
@@ -251,7 +251,7 @@ export function LocalizationAndUnitsPanel({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Speed Unit</label>
+                  <label className="block text-xs font-bold text-fg-secondary mb-1">Speed Unit</label>
                   <Select
                     size="md"
                     value={localization.speedUnit}
@@ -268,7 +268,7 @@ export function LocalizationAndUnitsPanel({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Temperature</label>
+                  <label className="block text-xs font-bold text-fg-secondary mb-1">Temperature</label>
                   <Select
                     size="md"
                     value={localization.temperatureUnit}
@@ -286,7 +286,7 @@ export function LocalizationAndUnitsPanel({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-fg-secondary mb-1">
                   Currency &amp; Symbol
                 </label>
                 <Select
@@ -319,7 +319,7 @@ export function LocalizationAndUnitsPanel({
                 placeholder="Chesterfield & St. Louis Metro, MO"
               />
             </CardContent>
-            <CardFooter className="bg-slate-50/50 px-5 py-3.5 border-t border-slate-100 flex justify-end">
+            <CardFooter className="bg-surface-subtle/50 px-5 py-3.5 border-t border-border-faint flex justify-end">
               <Button
                 type="submit"
                 variant="primary"

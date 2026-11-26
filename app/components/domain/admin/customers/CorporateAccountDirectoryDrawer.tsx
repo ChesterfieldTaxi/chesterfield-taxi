@@ -127,7 +127,7 @@ export function CorporateAccountDirectoryDrawer({
                 size="md"
                 onClick={() => onRequestArchive(editingCorp)}
                 leftIcon={<ArchiveBoxIcon className="w-4 h-4" />}
-                className="text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100 font-bold"
+                className="text-status-warning-fg border-status-warning-border bg-status-warning-bg hover:bg-status-warning-bg-strong font-bold"
               >
                 Archive Account
               </Button>
@@ -154,24 +154,24 @@ export function CorporateAccountDirectoryDrawer({
     >
       <form id="corporate-directory-form" onSubmit={handleSubmit} className="space-y-4 text-xs">
         {formError && (
-          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 font-bold">
+          <div className="p-3 bg-status-danger-bg border border-status-danger-border rounded-xl text-status-danger-fg font-bold">
             {formError}
           </div>
         )}
 
         {/* 1. Company Identity & Contact */}
-        <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-3.5">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+        <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-3.5">
+          <div className="flex items-center justify-between pb-2 border-b border-border-faint">
             <div className="flex items-center gap-2">
               <BuildingIcon className="w-4 h-4 text-blue-600" />
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
                 Directory Identity &amp; Contact
               </h3>
             </div>
             {!isNewCorp && (
               <Link
                 to={`/app/admin?tab=invoicing&sub=accounts&accountId=${encodeURIComponent(editingCorp.id)}`}
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800"
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-status-info-fg"
               >
                 <CreditCardIcon className="w-3.5 h-3.5" />
                 <span>Billing &amp; Credit &rarr;</span>
@@ -181,7 +181,7 @@ export function CorporateAccountDirectoryDrawer({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">
+              <label className="font-semibold text-fg-secondary block mb-1">
                 Company Name <span className="text-rose-500">*</span>
               </label>
               <input
@@ -190,11 +190,11 @@ export function CorporateAccountDirectoryDrawer({
                 value={editingCorp.companyName}
                 onChange={(e) => setEditingCorp({ ...editingCorp, companyName: e.target.value })}
                 placeholder="e.g. Bayer Crop Science"
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs"
               />
             </div>
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">
+              <label className="font-semibold text-fg-secondary block mb-1">
                 Account Number <span className="text-rose-500">*</span>
               </label>
               <input
@@ -203,82 +203,82 @@ export function CorporateAccountDirectoryDrawer({
                 value={editingCorp.accountNumber}
                 onChange={(e) => setEditingCorp({ ...editingCorp, accountNumber: e.target.value })}
                 placeholder="CORP-101"
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold"
+                className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs font-mono font-semibold"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Primary Contact Name</label>
+              <label className="font-semibold text-fg-secondary block mb-1">Primary Contact Name</label>
               <input
                 type="text"
                 required
                 value={editingCorp.billingContactName || ''}
                 onChange={(e) => setEditingCorp({ ...editingCorp, billingContactName: e.target.value })}
                 placeholder="Laura Vance"
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs"
               />
             </div>
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Contact Email *</label>
+              <label className="font-semibold text-fg-secondary block mb-1">Contact Email *</label>
               <input
                 type="email"
                 required
                 value={editingCorp.billingContactEmail}
                 onChange={(e) => setEditingCorp({ ...editingCorp, billingContactEmail: e.target.value })}
                 placeholder="traveldesk@company.com"
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs"
               />
             </div>
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Contact Phone</label>
+              <label className="font-semibold text-fg-secondary block mb-1">Contact Phone</label>
               <input
                 type="tel"
                 value={editingCorp.billingContactPhone || ''}
                 onChange={(e) => setEditingCorp({ ...editingCorp, billingContactPhone: e.target.value })}
                 placeholder="(314) 555-0140"
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">
-              <label className="font-semibold text-slate-700 block mb-1">Physical / Billing Address</label>
+              <label className="font-semibold text-fg-secondary block mb-1">Physical / Billing Address</label>
               <input
                 type="text"
                 value={editingCorp.billingAddress || ''}
                 onChange={(e) => setEditingCorp({ ...editingCorp, billingAddress: e.target.value })}
                 placeholder="800 N Lindbergh Blvd, Creve Coeur, MO 63167"
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs"
               />
             </div>
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Tax ID / EIN</label>
+              <label className="font-semibold text-fg-secondary block mb-1">Tax ID / EIN</label>
               <input
                 type="text"
                 value={editingCorp.taxId || ''}
                 onChange={(e) => setEditingCorp({ ...editingCorp, taxId: e.target.value })}
                 placeholder="XX-XXXXXXX"
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs font-mono"
               />
             </div>
           </div>
         </section>
 
         {/* 2. PO Security & Account Status */}
-        <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+        <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-3">
+          <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
             <ShieldCheckIcon className="w-4 h-4 text-emerald-600" />
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
               PO Security &amp; Status
             </h3>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">
+              <label className="font-semibold text-fg-secondary block mb-1">
                 Active PO Number {portalPolicy.poFormatRegex ? `(Pattern: ${portalPolicy.poFormatRegex})` : ''}
               </label>
               <input
@@ -286,11 +286,11 @@ export function CorporateAccountDirectoryDrawer({
                 value={editingCorp.currentPoNumber || ''}
                 onChange={(e) => setEditingCorp({ ...editingCorp, currentPoNumber: e.target.value })}
                 placeholder="PO-XXXXXX"
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold"
+                className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs font-mono font-semibold"
               />
             </div>
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">
+              <label className="font-semibold text-fg-secondary block mb-1">
                 Verbal Booking PIN (4–8 Alphanumeric, Optional)
               </label>
               <input
@@ -304,7 +304,7 @@ export function CorporateAccountDirectoryDrawer({
                   })
                 }
                 placeholder="e.g. BAYR26"
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-semibold uppercase tracking-wider"
+                className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs font-mono font-semibold uppercase tracking-wider"
               />
             </div>
           </div>
@@ -315,18 +315,18 @@ export function CorporateAccountDirectoryDrawer({
                 type="checkbox"
                 checked={Boolean(editingCorp.poRequired)}
                 onChange={(e) => setEditingCorp({ ...editingCorp, poRequired: e.target.checked })}
-                className="w-4 h-4 text-blue-600 rounded border-slate-300"
+                className="w-4 h-4 text-blue-600 rounded border-border-strong"
               />
-              <span className="font-semibold text-slate-800">Enforce PO Number on Bookings</span>
+              <span className="font-semibold text-fg-strong">Enforce PO Number on Bookings</span>
             </label>
             <label className="inline-flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={Boolean(editingCorp.isActive)}
                 onChange={(e) => setEditingCorp({ ...editingCorp, isActive: e.target.checked })}
-                className="w-4 h-4 text-emerald-600 rounded border-slate-300"
+                className="w-4 h-4 text-emerald-600 rounded border-border-strong"
               />
-              <span className="font-semibold text-slate-800">Account Active</span>
+              <span className="font-semibold text-fg-strong">Account Active</span>
             </label>
           </div>
         </section>
@@ -336,11 +336,11 @@ export function CorporateAccountDirectoryDrawer({
 
         {/* 4. Corporate Portal Managers Summary */}
         {!isNewCorp && (
-          <section className="bg-indigo-50/50 rounded-2xl border border-indigo-200/80 p-4 space-y-2.5">
+          <section className="bg-status-staged-bg/50 rounded-2xl border border-status-staged-border/80 p-4 space-y-2.5">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <UserCheckIcon className="w-4 h-4 text-indigo-600" />
-                <span className="font-extrabold uppercase tracking-wider text-indigo-950">
+                <span className="font-extrabold uppercase tracking-wider text-status-staged-fg">
                   Portal Managers (/app/corporate)
                 </span>
               </div>
@@ -349,7 +349,7 @@ export function CorporateAccountDirectoryDrawer({
                 size="sm"
                 variant="outline"
                 onClick={() => onOpenProvisionModal(editingCorp)}
-                className="text-[11px] font-bold bg-white border-indigo-300 text-indigo-800 hover:bg-indigo-100 cursor-pointer"
+                className="text-[11px] font-bold bg-surface-card border-status-staged-border text-status-staged-fg hover:bg-status-staged-bg-strong cursor-pointer"
               >
                 + Provision Manager
               </Button>
@@ -359,11 +359,11 @@ export function CorporateAccountDirectoryDrawer({
                 {editingCorp.portalManagers!.map((pm, idx) => (
                   <div
                     key={`${pm.email}-${idx}`}
-                    className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-white border border-indigo-100"
+                    className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-surface-card border border-indigo-100"
                   >
                     <div className="min-w-0">
-                      <span className="font-bold text-slate-900">{pm.name}</span>{' '}
-                      <span className="text-slate-500 font-mono">({pm.email})</span>
+                      <span className="font-bold text-fg-primary">{pm.name}</span>{' '}
+                      <span className="text-fg-muted font-mono">({pm.email})</span>
                     </div>
                     <Badge variant="success" size="sm" className="text-[10px]">
                       {pm.status.toUpperCase()}
@@ -372,7 +372,7 @@ export function CorporateAccountDirectoryDrawer({
                 ))}
               </div>
             ) : (
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-fg-muted">
                 No Travel Desk Portal Managers provisioned yet.
               </p>
             )}

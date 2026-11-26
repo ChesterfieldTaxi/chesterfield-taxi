@@ -36,15 +36,15 @@ export function GuestSelfServicePolicyCard({
   };
 
   return (
-    <Card variant="elevated" className="border-indigo-200 bg-white shadow-xs">
-      <CardHeader className="border-b border-indigo-100 bg-indigo-50/40 p-4 sm:p-5">
+    <Card variant="elevated" className="border-status-staged-border bg-surface-card shadow-xs">
+      <CardHeader className="border-b border-indigo-100 bg-status-staged-bg/40 p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
           <div className="min-w-0">
-            <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <CardTitle className="text-base font-extrabold text-fg-primary flex items-center gap-2">
               <EditIcon className="w-5 h-5 text-indigo-600 shrink-0" />
               <span>Guest /track &ldquo;Manage My Ride&rdquo; Self-Service Policy</span>
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500 mt-0.5">
+            <CardDescription className="text-xs text-fg-muted mt-0.5">
               Govern 4-digit phone verified self-service edits, pre-dispatch lead windows, assigned change requests, and lookup rate limits on <code>/track</code>.
             </CardDescription>
           </div>
@@ -72,13 +72,13 @@ export function GuestSelfServicePolicyCard({
 
       <CardContent className="p-4 sm:p-6 space-y-4">
         {/* Master Kill-Switch */}
-        <div className="flex items-start justify-between gap-3 p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/30">
+        <div className="flex items-start justify-between gap-3 p-3.5 rounded-xl border border-status-staged-border bg-status-staged-bg/30">
           <div className="space-y-0.5 min-w-0">
-            <h4 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+            <h4 className="text-xs font-extrabold text-fg-primary flex items-center gap-1.5">
               <ShieldCheckIcon className="w-4 h-4 text-indigo-600 shrink-0" />
               <span>Enable Self-Service &ldquo;Manage My Ride&rdquo; on <code>/track</code></span>
             </h4>
-            <p className="text-[11px] text-slate-600">
+            <p className="text-[11px] text-fg-secondary">
               When turned off, tokenized tracking links show live GPS progress and ETA only, directing riders to call 24/7 Dispatch for changes.
             </p>
           </div>
@@ -96,9 +96,9 @@ export function GuestSelfServicePolicyCard({
             cfg.enableGuestSelfService ? 'opacity-100' : 'opacity-55 pointer-events-none'
           }`}
         >
-          <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1">
+          <div className="p-3.5 rounded-xl border border-border-subtle bg-surface-subtle/60 space-y-1">
             <div className="flex items-center justify-between gap-2">
-              <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5 cursor-pointer">
+              <label className="text-xs font-bold text-fg-primary flex items-center gap-1.5 cursor-pointer">
                 <PlaneIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                 <span>Instant Notes, Gate Code &amp; Flight # Edits</span>
               </label>
@@ -109,14 +109,14 @@ export function GuestSelfServicePolicyCard({
                 className="w-4 h-4 rounded text-blue-600 shrink-0 cursor-pointer"
               />
             </div>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-fg-muted">
               Allows verified passengers to update curb notes, gate codes, and airline/flight numbers (stamping Driver Ack when assigned).
             </p>
           </div>
 
-          <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1">
+          <div className="p-3.5 rounded-xl border border-border-subtle bg-surface-subtle/60 space-y-1">
             <div className="flex items-center justify-between gap-2">
-              <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5 cursor-pointer">
+              <label className="text-xs font-bold text-fg-primary flex items-center gap-1.5 cursor-pointer">
                 <CalendarIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                 <span>Pre-Dispatch Route &amp; Time Auto-Edits</span>
               </label>
@@ -129,14 +129,14 @@ export function GuestSelfServicePolicyCard({
                 className="w-4 h-4 rounded text-blue-600 shrink-0 cursor-pointer"
               />
             </div>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-fg-muted">
               Automatically applies pickup time and address changes on unassigned rides outside the minimum lead window.
             </p>
           </div>
 
-          <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1">
+          <div className="p-3.5 rounded-xl border border-border-subtle bg-surface-subtle/60 space-y-1">
             <div className="flex items-center justify-between gap-2">
-              <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5 cursor-pointer">
+              <label className="text-xs font-bold text-fg-primary flex items-center gap-1.5 cursor-pointer">
                 <EditIcon className="w-3.5 h-3.5 text-violet-600 shrink-0" />
                 <span>Assigned Driver Change Requests</span>
               </label>
@@ -149,14 +149,14 @@ export function GuestSelfServicePolicyCard({
                 className="w-4 h-4 rounded text-blue-600 shrink-0 cursor-pointer"
               />
             </div>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-fg-muted">
               Queues passenger time/route edits for 1-tap Dispatch Approve/Decline once a driver is assigned or pickup is imminent.
             </p>
           </div>
 
-          <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1">
+          <div className="p-3.5 rounded-xl border border-border-subtle bg-surface-subtle/60 space-y-1">
             <div className="flex items-center justify-between gap-2">
-              <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5 cursor-pointer">
+              <label className="text-xs font-bold text-fg-primary flex items-center gap-1.5 cursor-pointer">
                 <BanIcon className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                 <span>Online Self-Service Cancellation</span>
               </label>
@@ -167,7 +167,7 @@ export function GuestSelfServicePolicyCard({
                 className="w-4 h-4 rounded text-blue-600 shrink-0 cursor-pointer"
               />
             </div>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-fg-muted">
               Permits verified online cancellation with automatic policy-tier fee preview before ride start.
             </p>
           </div>
@@ -175,8 +175,8 @@ export function GuestSelfServicePolicyCard({
 
         {/* Numeric Thresholds */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-          <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1">
-            <label className="text-xs font-bold text-slate-800 block">
+          <div className="p-3.5 rounded-xl border border-border-subtle bg-surface-card space-y-1">
+            <label className="text-xs font-bold text-fg-strong block">
               Pre-Dispatch Direct Edit Min Lead (Minutes)
             </label>
             <input
@@ -188,16 +188,16 @@ export function GuestSelfServicePolicyCard({
               onChange={(e) =>
                 updateField('guestDirectEditMinLeadMinutes', Number(e.target.value))
               }
-              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-mono font-bold bg-slate-50 focus:bg-white"
+              className="w-full px-2.5 py-1.5 border border-border-subtle rounded-lg text-xs font-mono font-bold bg-surface-subtle focus:bg-surface-card"
             />
-            <span className="text-[10px] text-slate-500 block">
+            <span className="text-[10px] text-fg-muted block">
               0–720m (Default 30m). Unassigned rides closer than this switch from auto-apply to Dispatch Approval.
             </span>
           </div>
 
-          <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1">
-            <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <LockIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          <div className="p-3.5 rounded-xl border border-border-subtle bg-surface-card space-y-1">
+            <label className="text-xs font-bold text-fg-strong flex items-center gap-1.5">
+              <LockIcon className="w-3.5 h-3.5 text-fg-muted shrink-0" />
               <span>Max Lookup &amp; Verify Attempts per 5 Min</span>
             </label>
             <input
@@ -207,9 +207,9 @@ export function GuestSelfServicePolicyCard({
               step={1}
               value={cfg.maxLookupAttemptsPer5Min}
               onChange={(e) => updateField('maxLookupAttemptsPer5Min', Number(e.target.value))}
-              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-mono font-bold bg-slate-50 focus:bg-white"
+              className="w-full px-2.5 py-1.5 border border-border-subtle rounded-lg text-xs font-mono font-bold bg-surface-subtle focus:bg-surface-card"
             />
-            <span className="text-[10px] text-slate-500 block">
+            <span className="text-[10px] text-fg-muted block">
               3–30 attempts per IP + Trip ID (Default 5) enforced by <code>/api/track</code> brute-force shield.
             </span>
           </div>

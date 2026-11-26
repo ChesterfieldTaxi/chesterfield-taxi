@@ -506,12 +506,12 @@ export function PricingRulesPanel({
   };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-[640px] border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
+    <div className="flex flex-col lg:flex-row min-h-[640px] border border-border-subtle rounded-xl overflow-hidden bg-surface-card shadow-xs">
       {/* Left Sidebar: Priority-Ordered Firewall Rules List */}
-      <div className="w-full lg:w-76 border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col bg-slate-50/80 shrink-0">
-        <div className="p-3.5 border-b border-slate-200 space-y-2.5 bg-white">
+      <div className="w-full lg:w-76 border-b lg:border-b-0 lg:border-r border-border-subtle flex flex-col bg-surface-subtle/80 shrink-0">
+        <div className="p-3.5 border-b border-border-subtle space-y-2.5 bg-surface-card">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <h3 className="text-xs font-bold text-fg-strong uppercase tracking-wider flex items-center gap-1.5">
               <ShieldCheckIcon className="w-3.5 h-3.5 text-purple-600" />
               Pricing Rules ({rules.length})
             </h3>
@@ -527,16 +527,16 @@ export function PricingRulesPanel({
           </div>
 
           <div className="relative">
-            <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
+            <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-2 text-fg-subtle" />
             <Input
               type="text"
               placeholder="Search rules..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-7.5 text-xs pl-7.5 bg-white border-slate-200 text-slate-800 w-full"
+              className="h-7.5 text-xs pl-7.5 bg-surface-card border-border-subtle text-fg-strong w-full"
             />
           </div>
-          <p className="text-[10px] text-slate-400">
+          <p className="text-[10px] text-fg-subtle">
             Checked top-to-bottom. Highest priority wins on conflicts.
           </p>
         </div>
@@ -556,53 +556,53 @@ export function PricingRulesPanel({
                 onClick={() => handleSelectRule(rule.id)}
                 className={`w-full text-left p-3 rounded-xl border transition-all cursor-pointer ${
                   isSelected
-                    ? 'bg-purple-50/90 border-purple-400 shadow-2xs'
-                    : 'bg-white border-slate-200 hover:border-slate-300'
+                    ? 'bg-status-staged-bg/90 border-purple-400 shadow-2xs'
+                    : 'bg-surface-card border-border-subtle hover:border-border-strong'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <span
                     className={`text-xs font-bold leading-tight ${
-                      isSelected ? 'text-purple-950' : 'text-slate-900'
+                      isSelected ? 'text-purple-950' : 'text-fg-primary'
                     }`}
                   >
                     {rule.name}
                   </span>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-surface-muted text-fg-secondary border border-border-subtle shrink-0">
                     P{rule.priority}
                   </span>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1 mt-1.5">
                   {targetRate && (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-status-info-bg text-status-info-fg border border-status-info-border">
                       Rate: {targetRate.name}
                     </span>
                   )}
                   {sCount > 0 && (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-status-success-bg text-status-success-fg border border-status-success-border">
                       {sCount} Surcharge{sCount > 1 ? 's' : ''}
                     </span>
                   )}
                   {eCount > 0 && (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-status-warning-bg text-status-warning-fg border border-status-warning-border">
                       {eCount} Extra{eCount > 1 ? 's' : ''}
                     </span>
                   )}
                   {rule.stopProcessingOnMatch && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-status-danger-bg text-status-danger-fg border border-status-danger-border">
                       STOP
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100">
-                  <span className="text-[10px] text-slate-400">
+                <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-border-faint">
+                  <span className="text-[10px] text-fg-subtle">
                     {rule.isActive ? 'Active' : 'Disabled'}
                   </span>
                   <span
                     className={`inline-block w-2 h-2 rounded-full ${
-                      rule.isActive ? 'bg-emerald-500' : 'bg-slate-300'
+                      rule.isActive ? 'bg-emerald-500' : 'bg-surface-strong'
                     }`}
                   />
                 </div>
@@ -613,31 +613,31 @@ export function PricingRulesPanel({
       </div>
 
       {/* Main Editor Pane */}
-      <div className="flex-1 flex flex-col bg-white overflow-y-auto custom-scrollbar min-w-0">
+      <div className="flex-1 flex flex-col bg-surface-card overflow-y-auto custom-scrollbar min-w-0">
         {workingCopy ? (
           <div className="p-5 space-y-5">
             {/* Header & Save Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border-subtle">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg font-bold text-slate-950">{workingCopy.name}</h2>
-                  <Badge variant="outline" className="text-[10px] font-mono bg-purple-50 text-purple-800 border-purple-200">
+                  <h2 className="text-lg font-bold text-fg-primary">{workingCopy.name}</h2>
+                  <Badge variant="outline" className="text-[10px] font-mono bg-status-staged-bg text-status-staged-fg border-status-staged-border">
                     Priority {workingCopy.priority}
                   </Badge>
                   {isDirty && (
-                    <Badge variant="warning" size="sm" className="text-[10px] bg-amber-100 text-amber-800 border-amber-300">
+                    <Badge variant="warning" size="sm" className="text-[10px] bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border">
                       Unsaved Draft
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-fg-muted mt-1">
                   Choose which <strong>Rate</strong>, <strong>Surcharges</strong> (apply/waive/override), and <strong>Extras</strong> apply when trip conditions match.
                 </p>
               </div>
 
               <div className="flex items-center gap-2 shrink-0 flex-wrap">
                 {saveSuccessMsg && (
-                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1">
+                  <span className="text-xs font-semibold text-status-success-fg bg-status-success-bg px-2.5 py-1 rounded-lg border border-status-success-border flex items-center gap-1">
                     <CheckIcon className="w-3.5 h-3.5" />
                     {saveSuccessMsg}
                   </span>
@@ -649,7 +649,7 @@ export function PricingRulesPanel({
                     variant="outline"
                     size="sm"
                     onClick={() => setConfirmDeleteId(workingCopy.id)}
-                    className="h-8 text-xs border-rose-200 text-rose-700 hover:bg-rose-50 bg-white cursor-pointer"
+                    className="h-8 text-xs border-status-danger-border text-status-danger-fg hover:bg-status-danger-bg bg-surface-card cursor-pointer"
                   >
                     <TrashIcon className="w-3.5 h-3.5 mr-1" />
                     Delete
@@ -657,8 +657,8 @@ export function PricingRulesPanel({
                 )}
 
                 {confirmDeleteId === workingCopy.id && (
-                  <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1">
-                    <span className="text-[11px] font-semibold text-rose-800">Delete rule?</span>
+                  <div className="flex items-center gap-1.5 bg-status-danger-bg border border-status-danger-border rounded-lg px-2 py-1">
+                    <span className="text-[11px] font-semibold text-status-danger-fg">Delete rule?</span>
                     <Button
                       type="button"
                       size="sm"
@@ -672,7 +672,7 @@ export function PricingRulesPanel({
                       variant="outline"
                       size="sm"
                       onClick={() => setConfirmDeleteId(null)}
-                      className="h-6 px-2 text-[11px] bg-white"
+                      className="h-6 px-2 text-[11px] bg-surface-card"
                     >
                       Cancel
                     </Button>
@@ -688,7 +688,7 @@ export function PricingRulesPanel({
                     baselineNormalized &&
                     setWorkingCopy(JSON.parse(JSON.stringify(baselineNormalized)))
                   }
-                  className="h-8 text-xs border-slate-300 bg-white text-slate-700 cursor-pointer"
+                  className="h-8 text-xs border-border-strong bg-surface-card text-fg-secondary cursor-pointer"
                 >
                   Discard
                 </Button>
@@ -707,19 +707,19 @@ export function PricingRulesPanel({
             </div>
 
             {/* Rule Identity & Priority */}
-            <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 space-y-3">
+            <div className="p-4 rounded-xl bg-surface-subtle/80 border border-border-subtle space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="md:col-span-2">
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Rule Name</label>
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">Rule Name</label>
                   <Input
                     type="text"
                     value={workingCopy.name}
                     onChange={(e) => setWorkingCopy({ ...workingCopy, name: e.target.value })}
-                    className="h-8 text-xs bg-white font-semibold"
+                    className="h-8 text-xs bg-surface-card font-semibold"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                     Priority (1–100)
                   </label>
                   <Input
@@ -730,51 +730,51 @@ export function PricingRulesPanel({
                     onChange={(e) =>
                       setWorkingCopy({ ...workingCopy, priority: parseInt(e.target.value, 10) || 50 })
                     }
-                    className="h-8 text-xs bg-white font-mono font-bold"
+                    className="h-8 text-xs bg-surface-card font-mono font-bold"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Description</label>
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">Description</label>
                   <Input
                     type="text"
                     value={workingCopy.description || ''}
                     onChange={(e) => setWorkingCopy({ ...workingCopy, description: e.target.value })}
-                    className="h-8 text-xs bg-white"
+                    className="h-8 text-xs bg-surface-card"
                   />
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-5 pt-2.5 border-t border-slate-200/80 text-xs">
-                <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+              <div className="flex flex-wrap items-center gap-5 pt-2.5 border-t border-border-subtle/80 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer text-fg-secondary font-medium">
                   <input
                     type="checkbox"
                     checked={workingCopy.isActive}
                     onChange={(e) => setWorkingCopy({ ...workingCopy, isActive: e.target.checked })}
-                    className="rounded border-slate-300 text-emerald-600"
+                    className="rounded border-border-strong text-emerald-600"
                   />
                   <span>Rule Active</span>
                 </label>
 
-                <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                <label className="flex items-center gap-2 cursor-pointer text-fg-secondary font-medium">
                   <input
                     type="checkbox"
                     checked={Boolean(workingCopy.stopProcessingOnMatch)}
                     onChange={(e) =>
                       setWorkingCopy({ ...workingCopy, stopProcessingOnMatch: e.target.checked })
                     }
-                    className="rounded border-slate-300 text-rose-600"
+                    className="rounded border-border-strong text-rose-600"
                   />
                   <span>Stop checking lower-priority rules when matched</span>
                 </label>
 
-                <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                <label className="flex items-center gap-2 cursor-pointer text-fg-secondary font-medium">
                   <input
                     type="checkbox"
                     checked={Boolean(workingCopy.allowDriverSelection)}
                     onChange={(e) =>
                       setWorkingCopy({ ...workingCopy, allowDriverSelection: e.target.checked })
                     }
-                    className="rounded border-slate-300 text-blue-600"
+                    className="rounded border-border-strong text-blue-600"
                   />
                   <span>Allow manual selection in Dispatch / Driver</span>
                 </label>
@@ -782,27 +782,27 @@ export function PricingRulesPanel({
             </div>
 
             {/* 1. IF — CONDITIONS */}
-            <div className="p-3.5 sm:p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2.5">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 inline-flex items-center justify-center text-[11px] shrink-0">
+            <div className="p-3.5 sm:p-4.5 rounded-xl bg-surface-card border border-border-subtle shadow-2xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-border-faint pb-2.5">
+                <h3 className="text-xs font-bold text-fg-primary uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-status-staged-bg-strong text-purple-700 inline-flex items-center justify-center text-[11px] shrink-0">
                     IF
                   </span>
                   <span>Conditions (All configured conditions must match)</span>
                 </h3>
-                <span className="text-[11px] text-slate-500">Leave a condition empty to match any</span>
+                <span className="text-[11px] text-fg-muted">Leave a condition empty to match any</span>
               </div>
 
               {/* A. Location & Airport Conditions */}
-              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200/80 space-y-3">
+              <div className="p-3.5 rounded-lg bg-surface-subtle border border-border-subtle/80 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-fg-strong flex items-center gap-1.5">
                     <MapPinIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                     <span>Location / Service Zones</span>
                   </span>
 
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-wrap">
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-blue-900 cursor-pointer bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg">
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-status-info-fg cursor-pointer bg-status-info-bg border border-status-info-border px-2.5 py-1 rounded-lg">
                       <input
                         type="checkbox"
                         checked={Boolean(workingCopy.triggers.isAirportOnly)}
@@ -815,7 +815,7 @@ export function PricingRulesPanel({
                             },
                           })
                         }
-                        className="rounded border-blue-300 text-blue-600 shrink-0"
+                        className="rounded border-status-info-border text-blue-600 shrink-0"
                       />
                       <span>Airport Transfer Only (STL / SUS)</span>
                     </label>
@@ -848,7 +848,7 @@ export function PricingRulesPanel({
                           className={`px-2.5 py-1 rounded-md text-[11px] font-medium border cursor-pointer ${
                             active
                               ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+                              : 'bg-surface-card border-border-strong text-fg-secondary hover:border-border-emphasis'
                           }`}
                         >
                           {z.name}
@@ -860,8 +860,8 @@ export function PricingRulesPanel({
 
                 {currentZoneMode === 'corridor' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                    <div className="p-2.5 rounded-lg bg-white border border-slate-200 space-y-1.5">
-                      <span className="text-[11px] font-semibold text-emerald-800 block">
+                    <div className="p-2.5 rounded-lg bg-surface-card border border-border-subtle space-y-1.5">
+                      <span className="text-[11px] font-semibold text-status-success-fg block">
                         Pickup (Origin) Zone(s):
                       </span>
                       <div className="flex flex-wrap gap-1">
@@ -875,7 +875,7 @@ export function PricingRulesPanel({
                               className={`px-2 py-0.5 rounded text-[11px] font-medium border cursor-pointer ${
                                 active
                                   ? 'bg-emerald-600 text-white border-emerald-600'
-                                  : 'bg-slate-50 border-slate-200 text-slate-600'
+                                  : 'bg-surface-subtle border-border-subtle text-fg-secondary'
                               }`}
                             >
                               {z.name}
@@ -884,8 +884,8 @@ export function PricingRulesPanel({
                         })}
                       </div>
                     </div>
-                    <div className="p-2.5 rounded-lg bg-white border border-slate-200 space-y-1.5">
-                      <span className="text-[11px] font-semibold text-rose-800 block">
+                    <div className="p-2.5 rounded-lg bg-surface-card border border-border-subtle space-y-1.5">
+                      <span className="text-[11px] font-semibold text-status-danger-fg block">
                         Dropoff (Destination) Zone(s):
                       </span>
                       <div className="flex flex-wrap gap-1">
@@ -899,7 +899,7 @@ export function PricingRulesPanel({
                               className={`px-2 py-0.5 rounded text-[11px] font-medium border cursor-pointer ${
                                 active
                                   ? 'bg-rose-600 text-white border-rose-600'
-                                  : 'bg-slate-50 border-slate-200 text-slate-600'
+                                  : 'bg-surface-subtle border-border-subtle text-fg-secondary'
                               }`}
                             >
                               {z.name}
@@ -914,7 +914,7 @@ export function PricingRulesPanel({
 
               {/* B. Vehicles */}
               <div className="space-y-1.5">
-                <span className="text-xs font-semibold text-slate-700 block">
+                <span className="text-xs font-semibold text-fg-secondary block">
                   Fleet Vehicle Types (Leave on &ldquo;All Vehicles&rdquo; to apply regardless of vehicle)
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -934,7 +934,7 @@ export function PricingRulesPanel({
                     className={`px-2.5 py-1 rounded-md text-xs font-medium border cursor-pointer ${
                       getWorkingVehicleTypes(workingCopy).length === 0
                         ? 'bg-emerald-600 text-white border-emerald-600'
-                        : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+                        : 'bg-surface-card border-border-strong text-fg-secondary hover:border-border-emphasis'
                     }`}
                   >
                     All Vehicles
@@ -951,7 +951,7 @@ export function PricingRulesPanel({
                         className={`px-2.5 py-1 rounded-md text-xs font-medium border cursor-pointer ${
                           active
                             ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+                            : 'bg-surface-card border-border-strong text-fg-secondary hover:border-border-emphasis'
                         }`}
                       >
                         {vt.label}
@@ -962,10 +962,10 @@ export function PricingRulesPanel({
               </div>
 
               {/* C. Schedule (Days of Week + Overnight-Safe Time Window) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border-faint">
                 <div className="space-y-1.5">
-                  <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                    <ClockIcon className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="text-xs font-semibold text-fg-secondary flex items-center gap-1.5">
+                    <ClockIcon className="w-3.5 h-3.5 text-fg-muted" />
                     Days of Week (Optional — empty = every day)
                   </span>
                   <div className="flex flex-wrap gap-1">
@@ -979,7 +979,7 @@ export function PricingRulesPanel({
                           className={`px-2.5 py-1 rounded-md text-[11px] font-bold border cursor-pointer ${
                             active
                               ? 'bg-purple-600 text-white border-purple-600'
-                              : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+                              : 'bg-surface-card border-border-strong text-fg-secondary hover:border-border-emphasis'
                           }`}
                         >
                           {d.label}
@@ -990,12 +990,12 @@ export function PricingRulesPanel({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-fg-secondary cursor-pointer">
                     <input
                       type="checkbox"
                       checked={Boolean(activeTimeWindow)}
                       onChange={(e) => handleToggleTimeWindow(e.target.checked)}
-                      className="rounded border-slate-300 text-purple-600"
+                      className="rounded border-border-strong text-purple-600"
                     />
                     <span>Restrict to Time Window (24h, supports overnight e.g. 22:00 → 05:00)</span>
                   </label>
@@ -1013,9 +1013,9 @@ export function PricingRulesPanel({
                             },
                           })
                         }
-                        className="h-8 text-xs bg-white font-mono"
+                        className="h-8 text-xs bg-surface-card font-mono"
                       />
-                      <span className="text-xs text-slate-400 font-semibold text-center shrink-0">to</span>
+                      <span className="text-xs text-fg-subtle font-semibold text-center shrink-0">to</span>
                       <Input
                         type="time"
                         value={activeTimeWindow.end}
@@ -1028,7 +1028,7 @@ export function PricingRulesPanel({
                             },
                           })
                         }
-                        className="h-8 text-xs bg-white font-mono"
+                        className="h-8 text-xs bg-surface-card font-mono"
                       />
                     </div>
                   )}
@@ -1036,9 +1036,9 @@ export function PricingRulesPanel({
               </div>
 
               {/* D. Distance, Corporate Account & Hourly */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2 border-t border-border-faint">
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                     Min Distance (mi)
                   </label>
                   <Input
@@ -1057,11 +1057,11 @@ export function PricingRulesPanel({
                         },
                       })
                     }
-                    className="h-8 text-xs bg-white font-mono"
+                    className="h-8 text-xs bg-surface-card font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                     Max Distance (mi)
                   </label>
                   <Input
@@ -1080,11 +1080,11 @@ export function PricingRulesPanel({
                         },
                       })
                     }
-                    className="h-8 text-xs bg-white font-mono"
+                    className="h-8 text-xs bg-surface-card font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                     Corporate Account
                   </label>
                   <Select
@@ -1109,7 +1109,7 @@ export function PricingRulesPanel({
                   </Select>
                 </div>
                 <div className="flex items-end pb-1">
-                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-fg-secondary cursor-pointer">
                     <input
                       type="checkbox"
                       checked={workingCopy.triggers.isHourlyBooking === true}
@@ -1122,7 +1122,7 @@ export function PricingRulesPanel({
                           },
                         })
                       }
-                      className="rounded border-slate-300 text-blue-600"
+                      className="rounded border-border-strong text-blue-600"
                     />
                     <span>Hourly Charters Only</span>
                   </label>
@@ -1131,21 +1131,21 @@ export function PricingRulesPanel({
             </div>
 
             {/* 2. THEN — PRICING ACTIONS */}
-            <div className="p-3.5 sm:p-4.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2.5">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <span className="px-1.5 h-5 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center justify-center text-[10px] shrink-0">
+            <div className="p-3.5 sm:p-4.5 rounded-xl bg-surface-card border border-border-subtle shadow-2xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-border-faint pb-2.5">
+                <h3 className="text-xs font-bold text-fg-primary uppercase tracking-wider flex items-center gap-2">
+                  <span className="px-1.5 h-5 rounded-full bg-status-success-bg-strong text-status-success-fg inline-flex items-center justify-center text-[10px] shrink-0">
                     THEN
                   </span>
                   <span>Set Rate, Surcharges, Extras &amp; Adjustments</span>
                 </h3>
-                <span className="text-[11px] text-slate-500">Combine any actions in one rule</span>
+                <span className="text-[11px] text-fg-muted">Combine any actions in one rule</span>
               </div>
 
               {/* A. Select Service Rate + Optional Base Adjustment */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                     Use Service Rate
                   </label>
                   <Select
@@ -1171,7 +1171,7 @@ export function PricingRulesPanel({
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                     Base Fare Adjustment (Optional)
                   </label>
                   <Select
@@ -1189,7 +1189,7 @@ export function PricingRulesPanel({
 
                 {fareAdj && (
                   <div>
-                    <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                    <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                       {fareAdj.type === 'flat_override'
                         ? 'Fixed Base Fare ($)'
                         : fareAdj.type === 'discount_percent'
@@ -1215,21 +1215,21 @@ export function PricingRulesPanel({
                           },
                         })
                       }
-                      className="h-9 text-xs bg-white font-mono font-bold"
+                      className="h-9 text-xs bg-surface-card font-mono font-bold"
                     />
                   </div>
                 )}
               </div>
 
               {/* B. Surcharge Actions (APPLY / WAIVE / OVERRIDE) */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2.5">
+              <div className="p-3.5 rounded-xl bg-surface-subtle border border-border-subtle/80 space-y-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-fg-primary flex items-center gap-1.5">
                       <ZapIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                       <span>Surcharge Rules &amp; Exceptions</span>
                     </span>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-fg-muted">
                       Turn on <strong>Rule-Only</strong> surcharges (APPLY), waive <strong>All-Trips</strong> surcharges (WAIVE), or override their amount.
                     </p>
                   </div>
@@ -1238,7 +1238,7 @@ export function PricingRulesPanel({
                     variant="outline"
                     size="sm"
                     onClick={handleAddSurchargeAction}
-                    className="w-full sm:w-auto justify-center h-8 sm:h-7.5 text-xs bg-white border-slate-300 text-slate-800 cursor-pointer shrink-0"
+                    className="w-full sm:w-auto justify-center h-8 sm:h-7.5 text-xs bg-surface-card border-border-strong text-fg-strong cursor-pointer shrink-0"
                   >
                     <PlusIcon className="w-3 h-3 mr-1 text-emerald-600" />
                     Add Surcharge Rule
@@ -1246,7 +1246,7 @@ export function PricingRulesPanel({
                 </div>
 
                 {surchargeActions.length === 0 ? (
-                  <p className="text-[11px] text-slate-400 italic py-2">
+                  <p className="text-[11px] text-fg-subtle italic py-2">
                     No surcharge exceptions — all surcharges follow their default Universal / Rule-Only policy.
                   </p>
                 ) : (
@@ -1254,7 +1254,7 @@ export function PricingRulesPanel({
                     {surchargeActions.map((act, idx) => (
                       <div
                         key={idx}
-                        className="p-2.5 rounded-lg bg-white border border-slate-200 flex flex-wrap items-center gap-2"
+                        className="p-2.5 rounded-lg bg-surface-card border border-border-subtle flex flex-wrap items-center gap-2"
                       >
                         <div className="w-full sm:w-auto flex-1 sm:min-w-[180px]">
                           <Select
@@ -1289,10 +1289,10 @@ export function PricingRulesPanel({
                           }}
                           triggerClassName={`font-bold ${
                             act.action === 'waive'
-                              ? 'bg-rose-50 border-rose-300 text-rose-800'
+                              ? 'bg-status-danger-bg border-status-danger-border text-status-danger-fg'
                               : act.action === 'override'
-                              ? 'bg-amber-50 border-amber-300 text-amber-800'
-                              : 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                              ? 'bg-status-warning-bg border-status-warning-border text-status-warning-fg'
+                              : 'bg-status-success-bg border-status-success-border text-status-success-fg'
                           }`}
                         >
                           <option value="apply">APPLY (Include)</option>
@@ -1328,7 +1328,7 @@ export function PricingRulesPanel({
                                     overrideAmount: parseFloat(e.target.value) || 0,
                                   })
                                 }
-                                className="h-8 text-xs font-mono font-bold bg-white px-2"
+                                className="h-8 text-xs font-mono font-bold bg-surface-card px-2"
                               />
                             </div>
                           </>
@@ -1337,7 +1337,7 @@ export function PricingRulesPanel({
                         <button
                           type="button"
                           onClick={() => handleRemoveSurchargeAction(idx)}
-                          className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer ml-auto sm:ml-0"
+                          className="p-1.5 rounded text-fg-subtle hover:text-rose-600 hover:bg-status-danger-bg cursor-pointer ml-auto sm:ml-0"
                           title="Remove surcharge action"
                         >
                           <TrashIcon className="w-3.5 h-3.5" />
@@ -1349,14 +1349,14 @@ export function PricingRulesPanel({
               </div>
 
               {/* C. Extra Overrides & Waivers */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2.5">
+              <div className="p-3.5 rounded-xl bg-surface-subtle border border-border-subtle/80 space-y-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-fg-primary flex items-center gap-1.5">
                       <SparklesIcon className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                       <span>Extra Overrides &amp; Waivers</span>
                     </span>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-fg-muted">
                       Optionally waive or customize Car Seat, Extra Passenger, Stop, or Curb Wait pricing when this rule matches.
                     </p>
                   </div>
@@ -1365,7 +1365,7 @@ export function PricingRulesPanel({
                     variant="outline"
                     size="sm"
                     onClick={handleAddExtraAction}
-                    className="w-full sm:w-auto justify-center h-8 sm:h-7.5 text-xs bg-white border-slate-300 text-slate-800 cursor-pointer shrink-0"
+                    className="w-full sm:w-auto justify-center h-8 sm:h-7.5 text-xs bg-surface-card border-border-strong text-fg-strong cursor-pointer shrink-0"
                   >
                     <PlusIcon className="w-3 h-3 mr-1 text-amber-600" />
                     Add Extra Override
@@ -1373,7 +1373,7 @@ export function PricingRulesPanel({
                 </div>
 
                 {extraActions.length === 0 ? (
-                  <p className="text-[11px] text-slate-400 italic py-1.5">
+                  <p className="text-[11px] text-fg-subtle italic py-1.5">
                     No extra overrides — standard Extras catalog pricing applies.
                   </p>
                 ) : (
@@ -1381,7 +1381,7 @@ export function PricingRulesPanel({
                     {extraActions.map((act, idx) => (
                       <div
                         key={idx}
-                        className="p-2.5 rounded-lg bg-white border border-slate-200 flex flex-wrap items-center gap-2"
+                        className="p-2.5 rounded-lg bg-surface-card border border-border-subtle flex flex-wrap items-center gap-2"
                       >
                         <div className="w-full sm:w-auto flex-1 sm:min-w-[180px]">
                           <Select
@@ -1414,8 +1414,8 @@ export function PricingRulesPanel({
                           }}
                           triggerClassName={`font-bold ${
                             act.action === 'waive'
-                              ? 'bg-rose-50 border-rose-300 text-rose-800'
-                              : 'bg-amber-50 border-amber-300 text-amber-800'
+                              ? 'bg-status-danger-bg border-status-danger-border text-status-danger-fg'
+                              : 'bg-status-warning-bg border-status-warning-border text-status-warning-fg'
                           }`}
                         >
                           <option value="waive">WAIVE ($0)</option>
@@ -1434,7 +1434,7 @@ export function PricingRulesPanel({
                                   overrideAmount: parseFloat(e.target.value) || 0,
                                 })
                               }
-                              className="h-8 text-xs font-mono font-bold bg-white px-2"
+                              className="h-8 text-xs font-mono font-bold bg-surface-card px-2"
                             />
                           </div>
                         )}
@@ -1442,7 +1442,7 @@ export function PricingRulesPanel({
                         <button
                           type="button"
                           onClick={() => handleRemoveExtraAction(idx)}
-                          className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer ml-auto sm:ml-0"
+                          className="p-1.5 rounded text-fg-subtle hover:text-rose-600 hover:bg-status-danger-bg cursor-pointer ml-auto sm:ml-0"
                           title="Remove extra override"
                         >
                           <TrashIcon className="w-3.5 h-3.5" />
@@ -1455,7 +1455,7 @@ export function PricingRulesPanel({
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-400 text-sm p-12">
+          <div className="flex-1 flex items-center justify-center text-fg-subtle text-sm p-12">
             Select a Rule from the left panel or click &ldquo;+ New Rule&rdquo;
           </div>
         )}

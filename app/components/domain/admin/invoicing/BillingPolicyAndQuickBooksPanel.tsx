@@ -46,14 +46,14 @@ export function BillingPolicyAndQuickBooksPanel({
   return (
     <div className="space-y-5">
       {/* ─── Card 1: 1-Tap Pay Link, Card & Remittance Policies ─── */}
-      <Card className="border border-slate-200/90 shadow-xs">
-        <CardHeader className="pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+      <Card className="border border-border-subtle/90 shadow-xs">
+        <CardHeader className="pb-3 border-b border-border-faint flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div>
-            <CardTitle className="text-sm font-black text-slate-900 flex items-center gap-2">
+            <CardTitle className="text-sm font-black text-fg-primary flex items-center gap-2">
               <CreditCardIcon className="w-4 h-4 text-blue-600" />
               <span>1-Tap Pay Link, Card &amp; Remittance Policies</span>
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
+            <CardDescription className="text-xs text-fg-muted">
               Controls default <code>/pay/:payToken</code> expiration, gratuity prompts, card surcharges, and invoice remittance bank info.
             </CardDescription>
           </div>
@@ -72,8 +72,8 @@ export function BillingPolicyAndQuickBooksPanel({
 
         <CardContent className="pt-4 space-y-4 text-xs">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
-              <label className="font-bold text-slate-900 block">1-Tap Pay Link Expiry (Hours)</label>
+            <div className="p-3 bg-surface-subtle rounded-xl border border-border-subtle/80 space-y-2">
+              <label className="font-bold text-fg-primary block">1-Tap Pay Link Expiry (Hours)</label>
               <div className="flex flex-wrap items-center gap-1.5">
                 {EXPIRY_PRESETS.map((p) => (
                   <button
@@ -83,7 +83,7 @@ export function BillingPolicyAndQuickBooksPanel({
                     className={`px-2 py-1 rounded-lg border text-[11px] font-bold cursor-pointer ${
                       billingDraft.payLinkExpiryHours === p.hours
                         ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        : 'bg-surface-card text-fg-secondary border-border-subtle hover:bg-surface-muted'
                     }`}
                   >
                     {p.label}
@@ -95,14 +95,14 @@ export function BillingPolicyAndQuickBooksPanel({
                   max="720"
                   value={billingDraft.payLinkExpiryHours}
                   onChange={(e) => setBillingDraft((d) => ({ ...d, payLinkExpiryHours: Number(e.target.value) || 72 }))}
-                  className="w-20 px-2 py-1 bg-white border border-slate-300 rounded-lg font-mono text-xs"
+                  className="w-20 px-2 py-1 bg-surface-card border border-border-strong rounded-lg font-mono text-xs"
                 />
               </div>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+            <div className="p-3 bg-surface-subtle rounded-xl border border-border-subtle/80 space-y-2">
               <label className="flex items-center justify-between gap-2 cursor-pointer">
-                <span className="font-bold text-slate-900">Allow Tip on Trip Pay Links</span>
+                <span className="font-bold text-fg-primary">Allow Tip on Trip Pay Links</span>
                 <input
                   type="checkbox"
                   checked={billingDraft.payLinkAllowTipOnTrips}
@@ -110,8 +110,8 @@ export function BillingPolicyAndQuickBooksPanel({
                   className="w-4 h-4 rounded text-blue-600"
                 />
               </label>
-              <label className="flex items-center justify-between gap-2 cursor-pointer pt-1.5 border-t border-slate-200/60">
-                <span className="font-bold text-slate-900">Allow Tip on Corporate Invoices</span>
+              <label className="flex items-center justify-between gap-2 cursor-pointer pt-1.5 border-t border-border-subtle/60">
+                <span className="font-bold text-fg-primary">Allow Tip on Corporate Invoices</span>
                 <input
                   type="checkbox"
                   checked={billingDraft.payLinkAllowTipOnInvoices}
@@ -121,9 +121,9 @@ export function BillingPolicyAndQuickBooksPanel({
               </label>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+            <div className="p-3 bg-surface-subtle rounded-xl border border-border-subtle/80 space-y-2">
               <label className="flex items-center justify-between gap-2 cursor-pointer">
-                <span className="font-bold text-slate-900">Auto-Email Tax Receipts</span>
+                <span className="font-bold text-fg-primary">Auto-Email Tax Receipts</span>
                 <input
                   type="checkbox"
                   checked={billingDraft.autoEmailReceipts}
@@ -131,8 +131,8 @@ export function BillingPolicyAndQuickBooksPanel({
                   className="w-4 h-4 rounded text-blue-600"
                 />
               </label>
-              <label className="flex items-center justify-between gap-2 cursor-pointer pt-1.5 border-t border-slate-200/60">
-                <span className="font-bold text-slate-900">Auto-SMS Pay Link Receipts</span>
+              <label className="flex items-center justify-between gap-2 cursor-pointer pt-1.5 border-t border-border-subtle/60">
+                <span className="font-bold text-fg-primary">Auto-SMS Pay Link Receipts</span>
                 <input
                   type="checkbox"
                   checked={billingDraft.autoSendPayLinkReceiptSms}
@@ -144,10 +144,10 @@ export function BillingPolicyAndQuickBooksPanel({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <label className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between gap-2 cursor-pointer">
+            <label className="p-3 bg-surface-subtle rounded-xl border border-border-subtle/80 flex items-center justify-between gap-2 cursor-pointer">
               <div>
-                <span className="font-bold text-slate-900 block">In-Vehicle Contactless Terminals</span>
-                <span className="text-[11px] text-slate-500">Enable Apple Pay, Google Pay, and chip readers</span>
+                <span className="font-bold text-fg-primary block">In-Vehicle Contactless Terminals</span>
+                <span className="text-[11px] text-fg-muted">Enable Apple Pay, Google Pay, and chip readers</span>
               </div>
               <input
                 type="checkbox"
@@ -157,7 +157,7 @@ export function BillingPolicyAndQuickBooksPanel({
               />
             </label>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3">
+            <div className="p-3 bg-surface-subtle rounded-xl border border-border-subtle/80 flex items-center justify-between gap-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -166,8 +166,8 @@ export function BillingPolicyAndQuickBooksPanel({
                   className="w-4 h-4 rounded text-blue-600"
                 />
                 <div>
-                  <span className="font-bold text-slate-900 block">Pass Card Processing Surcharge</span>
-                  <span className="text-[11px] text-slate-500">Itemized % added to card transactions</span>
+                  <span className="font-bold text-fg-primary block">Pass Card Processing Surcharge</span>
+                  <span className="text-[11px] text-fg-muted">Itemized % added to card transactions</span>
                 </div>
               </label>
               <div className="flex items-center gap-1 shrink-0">
@@ -178,81 +178,81 @@ export function BillingPolicyAndQuickBooksPanel({
                   max="15"
                   value={billingDraft.surchargePercent}
                   onChange={(e) => setBillingDraft((d) => ({ ...d, surchargePercent: Number(e.target.value) || 0 }))}
-                  className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-lg font-mono"
+                  className="w-16 px-2 py-1 bg-surface-card border border-border-strong rounded-lg font-mono"
                 />
-                <span className="font-bold text-slate-700">%</span>
+                <span className="font-bold text-fg-secondary">%</span>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 pt-2 border-t border-slate-100">
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 pt-2 border-t border-border-faint">
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Remittance Bank</label>
+              <label className="font-semibold text-fg-secondary block mb-1">Remittance Bank</label>
               <input
                 type="text"
                 value={billingDraft.remittanceBankName || ''}
                 onChange={(e) => setBillingDraft((d) => ({ ...d, remittanceBankName: e.target.value }))}
                 placeholder="Commerce Bank"
-                className="w-full h-9 px-2.5 bg-white border border-slate-300 rounded-xl text-xs"
+                className="w-full h-9 px-2.5 bg-surface-card border border-border-strong rounded-xl text-xs"
               />
             </div>
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Account Name</label>
+              <label className="font-semibold text-fg-secondary block mb-1">Account Name</label>
               <input
                 type="text"
                 value={billingDraft.remittanceAccountName || ''}
                 onChange={(e) => setBillingDraft((d) => ({ ...d, remittanceAccountName: e.target.value }))}
                 placeholder="Chesterfield Taxi LLC"
-                className="w-full h-9 px-2.5 bg-white border border-slate-300 rounded-xl text-xs"
+                className="w-full h-9 px-2.5 bg-surface-card border border-border-strong rounded-xl text-xs"
               />
             </div>
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">ABA Routing #</label>
+              <label className="font-semibold text-fg-secondary block mb-1">ABA Routing #</label>
               <input
                 type="text"
                 value={billingDraft.remittanceRoutingNumber || ''}
                 onChange={(e) => setBillingDraft((d) => ({ ...d, remittanceRoutingNumber: e.target.value }))}
                 placeholder="081000210"
-                className="w-full h-9 px-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                className="w-full h-9 px-2.5 bg-surface-card border border-border-strong rounded-xl text-xs font-mono"
               />
             </div>
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Acct Last 4</label>
+              <label className="font-semibold text-fg-secondary block mb-1">Acct Last 4</label>
               <input
                 type="text"
                 maxLength={4}
                 value={billingDraft.remittanceAccountLast4 || ''}
                 onChange={(e) => setBillingDraft((d) => ({ ...d, remittanceAccountLast4: e.target.value }))}
                 placeholder="4829"
-                className="w-full h-9 px-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                className="w-full h-9 px-2.5 bg-surface-card border border-border-strong rounded-xl text-xs font-mono"
               />
             </div>
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">USDOT #</label>
+              <label className="font-semibold text-fg-secondary block mb-1">USDOT #</label>
               <input
                 type="text"
                 value={billingDraft.usdotNumber || ''}
                 onChange={(e) => setBillingDraft((d) => ({ ...d, usdotNumber: e.target.value }))}
                 placeholder="USDOT-..."
-                className="w-full h-9 px-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                className="w-full h-9 px-2.5 bg-surface-card border border-border-strong rounded-xl text-xs font-mono"
               />
             </div>
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Federal Tax ID</label>
+              <label className="font-semibold text-fg-secondary block mb-1">Federal Tax ID</label>
               <input
                 type="text"
                 value={billingDraft.taxId || ''}
                 onChange={(e) => setBillingDraft((d) => ({ ...d, taxId: e.target.value }))}
                 placeholder="XX-XXXXXXX"
-                className="w-full h-9 px-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                className="w-full h-9 px-2.5 bg-surface-card border border-border-strong rounded-xl text-xs font-mono"
               />
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-100 flex justify-end">
+          <div className="pt-2 border-t border-border-faint flex justify-end">
             <Link
               to="/app/admin?tab=integrations&sub=gateways"
-              className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-status-staged-fg"
             >
               <span>Manage payment &amp; telephony API credentials in Comms &amp; Integrations &rarr;</span>
               <ExternalLinkIcon className="w-3 h-3" />
@@ -262,13 +262,13 @@ export function BillingPolicyAndQuickBooksPanel({
       </Card>
 
       {/* ─── Card 2: General Ledger & QuickBooks Sync ─── */}
-      <Card className="border border-slate-200/90 shadow-xs overflow-hidden">
-        <CardHeader className="pb-3 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <Card className="border border-border-subtle/90 shadow-xs overflow-hidden">
+        <CardHeader className="pb-3 border-b border-border-faint flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-sm font-black text-slate-900">
+            <CardTitle className="text-sm font-black text-fg-primary">
               General Ledger &amp; QuickBooks Sync
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
+            <CardDescription className="text-xs text-fg-muted">
               Balanced double-entry journal for fares, AR settlements, commissions, and driver/staff/vendor payouts.
             </CardDescription>
           </div>
@@ -315,7 +315,7 @@ export function BillingPolicyAndQuickBooksPanel({
 
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full text-left text-xs min-w-[740px]">
-            <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase">
+            <thead className="bg-surface-subtle border-b border-border-subtle text-[10px] font-bold text-fg-muted uppercase">
               <tr>
                 <th className="px-4 py-2.5">Date</th>
                 <th className="px-3 py-2.5">Type</th>
@@ -326,22 +326,22 @@ export function BillingPolicyAndQuickBooksPanel({
                 <th className="px-4 py-2.5 text-right">Credit ($)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border-faint">
               {filteredLedgerEntries.map((entry) => {
                 const isCredit = entry.type === 'fare_revenue' || entry.type === 'platform_commission';
                 return (
-                  <tr key={entry.id} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-2.5 font-mono text-slate-600 whitespace-nowrap">{entry.date}</td>
+                  <tr key={entry.id} className="hover:bg-surface-subtle/70">
+                    <td className="px-4 py-2.5 font-mono text-fg-secondary whitespace-nowrap">{entry.date}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap">
-                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 text-[10px] font-bold uppercase">
+                      <span className="px-2 py-0.5 rounded-full bg-surface-muted text-fg-strong text-[10px] font-bold uppercase">
                         {entry.type.replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 font-mono font-semibold text-slate-800">{entry.accountCode}</td>
+                    <td className="px-3 py-2.5 font-mono font-semibold text-fg-strong">{entry.accountCode}</td>
                     <td className="px-3 py-2.5 font-mono text-[11px] text-blue-600">
                       {entry.tripId || entry.invoiceId || entry.driverId || '—'}
                     </td>
-                    <td className="px-3 py-2.5 text-slate-700">{entry.description}</td>
+                    <td className="px-3 py-2.5 text-fg-secondary">{entry.description}</td>
                     <td className="px-3 py-2.5 font-mono text-right text-rose-600 font-bold">
                       {!isCredit ? `$${entry.amount.toFixed(2)}` : '—'}
                     </td>
@@ -353,7 +353,7 @@ export function BillingPolicyAndQuickBooksPanel({
               })}
               {filteredLedgerEntries.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                  <td colSpan={7} className="py-8 text-center text-fg-subtle">
                     No ledger journal entries recorded for the selected filters.
                   </td>
                 </tr>

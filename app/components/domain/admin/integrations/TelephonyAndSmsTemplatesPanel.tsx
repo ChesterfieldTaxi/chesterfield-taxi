@@ -214,15 +214,15 @@ export function TelephonyAndSmsTemplatesPanel({
 
   return (
     <div className="space-y-6">
-      <Card className="rounded-2xl border-slate-200">
-        <CardHeader className="border-b border-slate-100 pb-4">
+      <Card className="rounded-2xl border-border-subtle">
+        <CardHeader className="border-b border-border-faint pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <CardTitle className="text-base font-extrabold text-fg-primary flex items-center gap-2">
                 <PhoneIcon className="w-5 h-5 text-rose-600 shrink-0" />
                 <span>Twilio Telephony &amp; In-Browser WebRTC Softphone</span>
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+              <CardDescription className="text-xs text-fg-muted">
                 Configure Nextiva Simultaneous Ring bridge, Verified Outbound Caller ID, WebRTC SIDs, and SMS relay.
               </CardDescription>
             </div>
@@ -235,27 +235,27 @@ export function TelephonyAndSmsTemplatesPanel({
         <CardContent className="p-4 sm:p-6 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700">Twilio Account SID</label>
-              <input type="text" value={twilioSid} onChange={(e) => setTwilioSid(e.target.value)} placeholder="AC..." className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white" />
+              <label className="text-xs font-bold text-fg-secondary">Twilio Account SID</label>
+              <input type="text" value={twilioSid} onChange={(e) => setTwilioSid(e.target.value)} placeholder="AC..." className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-border-subtle bg-surface-card" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                <LockIcon className="w-3 h-3 text-slate-400" /> Auth Token (Server-Verified Only)
+              <label className="text-xs font-bold text-fg-secondary flex items-center gap-1">
+                <LockIcon className="w-3 h-3 text-fg-subtle" /> Auth Token (Server-Verified Only)
               </label>
-              <input type="password" value={twilioToken} onChange={(e) => setTwilioToken(e.target.value)} placeholder="TWILIO_AUTH_TOKEN" className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white" />
+              <input type="password" value={twilioToken} onChange={(e) => setTwilioToken(e.target.value)} placeholder="TWILIO_AUTH_TOKEN" className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-border-subtle bg-surface-card" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700">Verified Outbound Caller ID</label>
-              <input type="text" value={twilioPhone} onChange={(e) => setTwilioPhone(e.target.value)} placeholder="+13147380100" className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white" />
-              <p className="text-[10.5px] text-slate-500">Shown to customers on outbound softphone calls — verify in Twilio Verified Caller IDs</p>
+              <label className="text-xs font-bold text-fg-secondary">Verified Outbound Caller ID</label>
+              <input type="text" value={twilioPhone} onChange={(e) => setTwilioPhone(e.target.value)} placeholder="+13147380100" className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-border-subtle bg-surface-card" />
+              <p className="text-[10.5px] text-fg-muted">Shown to customers on outbound softphone calls — verify in Twilio Verified Caller IDs</p>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700">Twilio Inbound Bridge Number</label>
-              <input type="text" value={bridgePhone} onChange={(e) => setBridgePhone(e.target.value)} placeholder="+13142281454" className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white" />
-              <p className="text-[10.5px] text-slate-500">Nextiva Simultaneous Ring target number</p>
+              <label className="text-xs font-bold text-fg-secondary">Twilio Inbound Bridge Number</label>
+              <input type="text" value={bridgePhone} onChange={(e) => setBridgePhone(e.target.value)} placeholder="+13142281454" className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-border-subtle bg-surface-card" />
+              <p className="text-[10.5px] text-fg-muted">Nextiva Simultaneous Ring target number</p>
             </div>
             <div className="space-y-1 md:col-span-2">
-              <label className="text-xs font-bold text-slate-700 block">Inbound Call Mode</label>
+              <label className="text-xs font-bold text-fg-secondary block">Inbound Call Mode</label>
               <Select
                 size="sm"
                 aria-label="Inbound Call Mode"
@@ -265,22 +265,22 @@ export function TelephonyAndSmsTemplatesPanel({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700">WebRTC API Key SID</label>
-              <input type="text" value={twilioApiKey} onChange={(e) => setTwilioApiKey(e.target.value)} placeholder="SK..." className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white" />
+              <label className="text-xs font-bold text-fg-secondary">WebRTC API Key SID</label>
+              <input type="text" value={twilioApiKey} onChange={(e) => setTwilioApiKey(e.target.value)} placeholder="SK..." className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-border-subtle bg-surface-card" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                <LockIcon className="w-3 h-3 text-slate-400" /> WebRTC API Secret
+              <label className="text-xs font-bold text-fg-secondary flex items-center gap-1">
+                <LockIcon className="w-3 h-3 text-fg-subtle" /> WebRTC API Secret
               </label>
-              <input type="password" value={twilioApiSecret} onChange={(e) => setTwilioApiSecret(e.target.value)} placeholder="Server env TWILIO_API_SECRET" className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white" />
+              <input type="password" value={twilioApiSecret} onChange={(e) => setTwilioApiSecret(e.target.value)} placeholder="Server env TWILIO_API_SECRET" className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-border-subtle bg-surface-card" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700">TwiML App SID</label>
-              <input type="text" value={twilioTwimlAppSid} onChange={(e) => setTwilioTwimlAppSid(e.target.value)} placeholder="AP..." className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white" />
+              <label className="text-xs font-bold text-fg-secondary">TwiML App SID</label>
+              <input type="text" value={twilioTwimlAppSid} onChange={(e) => setTwilioTwimlAppSid(e.target.value)} placeholder="AP..." className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-border-subtle bg-surface-card" />
             </div>
           </div>
 
-          <div className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/70">
+          <div className="px-3.5 py-2 rounded-xl border border-border-subtle bg-surface-subtle/70">
             <Switch
               size="sm"
               tone="blue"
@@ -293,12 +293,12 @@ export function TelephonyAndSmsTemplatesPanel({
 
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="outline" onClick={handleVerifyTwilio} disabled={twilioStatus === 'checking' || !twilioSid.trim()} className="text-xs font-bold text-rose-700 border-rose-200 hover:bg-rose-50">
+              <Button type="button" variant="outline" onClick={handleVerifyTwilio} disabled={twilioStatus === 'checking' || !twilioSid.trim()} className="text-xs font-bold text-status-danger-fg border-status-danger-border hover:bg-status-danger-bg">
                 {twilioStatus === 'checking' && <SpinnerIcon className="w-3.5 h-3.5 animate-spin mr-1.5" />}
                 Verify Credentials
               </Button>
               {twilioStatusMsg && (
-                <span className={`text-xs font-medium ${twilioStatus === 'connected' ? 'text-emerald-700' : 'text-rose-600'}`}>{twilioStatusMsg}</span>
+                <span className={`text-xs font-medium ${twilioStatus === 'connected' ? 'text-status-success-fg' : 'text-rose-600'}`}>{twilioStatusMsg}</span>
               )}
             </div>
             <Button type="button" onClick={handleSaveTelephony} disabled={isSavingTel || isLoading} className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-5 py-2 rounded-xl cursor-pointer">
@@ -307,34 +307,34 @@ export function TelephonyAndSmsTemplatesPanel({
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
-            <div className="p-3.5 rounded-xl border border-rose-200 bg-rose-50/30 space-y-2">
-              <span className="text-xs font-extrabold text-slate-900 block">Test Outbound Call</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border-faint">
+            <div className="p-3.5 rounded-xl border border-status-danger-border bg-status-danger-bg/30 space-y-2">
+              <span className="text-xs font-extrabold text-fg-primary block">Test Outbound Call</span>
               <div className="flex gap-2">
-                <input type="tel" value={testCallPhone} onChange={(e) => setTestCallPhone(e.target.value)} placeholder="+1 (314) 555-0123" className="flex-1 px-3 py-1.5 text-xs font-mono rounded-lg border border-slate-300 bg-white" />
+                <input type="tel" value={testCallPhone} onChange={(e) => setTestCallPhone(e.target.value)} placeholder="+1 (314) 555-0123" className="flex-1 px-3 py-1.5 text-xs font-mono rounded-lg border border-border-strong bg-surface-card" />
                 <Button type="button" onClick={() => handleTestAction('call')} disabled={testCallStatus === 'calling'} className="bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer">
                   Ring Cell
                 </Button>
               </div>
-              {testCallMsg && <p className={`text-[11px] font-medium ${testCallStatus === 'success' ? 'text-emerald-700' : 'text-rose-600'}`}>{testCallMsg}</p>}
+              {testCallMsg && <p className={`text-[11px] font-medium ${testCallStatus === 'success' ? 'text-status-success-fg' : 'text-rose-600'}`}>{testCallMsg}</p>}
             </div>
 
             {voiceOnlyMode ? (
-              <div className="p-3.5 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 flex flex-col justify-center gap-1 opacity-75">
-                <span className="text-xs font-extrabold text-slate-600">Test Outbound SMS (Paused — Voice-Only Mode)</span>
-                <p className="text-[11px] text-slate-500">A2P SMS is deferred to Nextiva. Disable Voice-Only Mode above to test Twilio SMS dispatch.</p>
+              <div className="p-3.5 rounded-xl border border-dashed border-border-subtle bg-surface-subtle/60 flex flex-col justify-center gap-1 opacity-75">
+                <span className="text-xs font-extrabold text-fg-secondary">Test Outbound SMS (Paused — Voice-Only Mode)</span>
+                <p className="text-[11px] text-fg-muted">A2P SMS is deferred to Nextiva. Disable Voice-Only Mode above to test Twilio SMS dispatch.</p>
               </div>
             ) : (
-              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2">
-                <span className="text-xs font-extrabold text-slate-900 block">Test Outbound SMS</span>
+              <div className="p-3.5 rounded-xl border border-border-subtle bg-surface-subtle/60 space-y-2">
+                <span className="text-xs font-extrabold text-fg-primary block">Test Outbound SMS</span>
                 <div className="flex gap-2">
-                  <input type="tel" value={testSmsPhone} onChange={(e) => setTestSmsPhone(e.target.value)} placeholder="+1 (314) 555-0123" className="w-36 px-2.5 py-1.5 text-xs font-mono rounded-lg border border-slate-300 bg-white" />
-                  <input type="text" value={testSmsBody} onChange={(e) => setTestSmsBody(e.target.value)} className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white" />
+                  <input type="tel" value={testSmsPhone} onChange={(e) => setTestSmsPhone(e.target.value)} placeholder="+1 (314) 555-0123" className="w-36 px-2.5 py-1.5 text-xs font-mono rounded-lg border border-border-strong bg-surface-card" />
+                  <input type="text" value={testSmsBody} onChange={(e) => setTestSmsBody(e.target.value)} className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-border-strong bg-surface-card" />
                   <Button type="button" onClick={() => handleTestAction('sms')} disabled={testSmsStatus === 'sending'} className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer">
                     Send
                   </Button>
                 </div>
-                {testSmsMsg && <p className={`text-[11px] font-medium ${testSmsStatus === 'success' ? 'text-emerald-700' : 'text-rose-600'}`}>{testSmsMsg}</p>}
+                {testSmsMsg && <p className={`text-[11px] font-medium ${testSmsStatus === 'success' ? 'text-status-success-fg' : 'text-rose-600'}`}>{testSmsMsg}</p>}
               </div>
             )}
           </div>

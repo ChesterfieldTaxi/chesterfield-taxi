@@ -132,25 +132,25 @@ export function DriverAppPoliciesPanel({
   return (
     <div className="space-y-6">
       {/* 1. Multi-Stop Free-Wait Timer & Excess Wait Billing */}
-      <Card className="border border-slate-200 bg-white shadow-xs">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+      <Card className="border border-border-subtle bg-surface-card shadow-xs">
+        <CardHeader className="border-b border-border-faint bg-surface-subtle/50 p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
+              <CardTitle className="text-base font-black text-fg-primary flex items-center gap-2">
                 <ClockIcon className="w-5 h-5 text-amber-600" />
                 <span>Multi-Stop Free-Wait Countdown &amp; Overtime Billing</span>
               </CardTitle>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-fg-muted mt-0.5">
                 Live countdown and suggested wait-fee rates on <code>/app/driver</code> intermediate stops (synced bidirectionally with Pricing Extras).
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 to="/app/admin?tab=rates&sub=extras"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border-subtle bg-surface-card hover:bg-surface-subtle text-xs font-bold text-fg-secondary"
               >
                 <span>Extras &amp; Wait</span>
-                <ExternalLinkIcon className="w-3.5 h-3.5 text-slate-400" />
+                <ExternalLinkIcon className="w-3.5 h-3.5 text-fg-subtle" />
               </Link>
               <Button
                 variant="primary"
@@ -170,8 +170,8 @@ export function DriverAppPoliciesPanel({
         </CardHeader>
 
         <CardContent className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-            <label className="font-bold text-slate-900 block mb-1">
+          <div className="p-4 bg-surface-subtle rounded-xl border border-border-subtle">
+            <label className="font-bold text-fg-primary block mb-1">
               Intermediate Stop Free-Wait Allowance (Minutes, 0–30)
             </label>
             <Input
@@ -187,15 +187,15 @@ export function DriverAppPoliciesPanel({
                   ),
                 })
               }
-              className="bg-white h-9 text-xs font-mono"
+              className="bg-surface-card h-9 text-xs font-mono"
             />
-            <span className="text-[10px] text-slate-500 mt-1 block">
+            <span className="text-[10px] text-fg-muted mt-1 block">
               Included free curb-wait countdown when a driver taps &ldquo;Arrived at Stop #k&rdquo; (default 5m).
             </span>
           </div>
 
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-            <label className="font-bold text-slate-900 block mb-1">
+          <div className="p-4 bg-surface-subtle rounded-xl border border-border-subtle">
+            <label className="font-bold text-fg-primary block mb-1">
               Excess Stop Wait Rate ($ / Minute, $0–$10)
             </label>
             <Input
@@ -212,9 +212,9 @@ export function DriverAppPoliciesPanel({
                   ),
                 })
               }
-              className="bg-white h-9 text-xs font-mono"
+              className="bg-surface-card h-9 text-xs font-mono"
             />
-            <span className="text-[10px] text-slate-500 mt-1 block">
+            <span className="text-[10px] text-fg-muted mt-1 block">
               Suggested per-minute wait fee past the free window, synced with <code>UniversalExtrasConfig</code> (default $0.50/min).
             </span>
           </div>
@@ -222,9 +222,9 @@ export function DriverAppPoliciesPanel({
       </Card>
 
       {/* 2. Assigned-Edit Driver Update Ack & Shift Hardware Policies */}
-      <Card className="border border-slate-200 bg-white shadow-xs">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
-          <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
+      <Card className="border border-border-subtle bg-surface-card shadow-xs">
+        <CardHeader className="border-b border-border-faint bg-surface-subtle/50 p-5">
+          <CardTitle className="text-base font-black text-fg-primary flex items-center gap-2">
             <ShieldCheckIcon className="w-5 h-5 text-blue-600" />
             <span>Assigned-Trip Edit Acknowledgement, Wake Lock &amp; Navigation</span>
           </CardTitle>
@@ -232,12 +232,12 @@ export function DriverAppPoliciesPanel({
 
         <CardContent className="p-6 space-y-5 text-xs">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="flex items-start justify-between gap-3 p-4 bg-amber-50/50 border border-amber-200 rounded-xl cursor-pointer">
+            <label className="flex items-start justify-between gap-3 p-4 bg-status-warning-bg/50 border border-status-warning-border rounded-xl cursor-pointer">
               <div>
-                <span className="font-extrabold text-slate-900 block">
+                <span className="font-extrabold text-fg-primary block">
                   Require 1-Tap Driver Update Acknowledgement
                 </span>
-                <span className="text-[11px] text-slate-600 mt-0.5 block">
+                <span className="text-[11px] text-fg-secondary mt-0.5 block">
                   When Dispatch edits time, stops, route, or notes on an assigned trip, prompts the driver to tap &ldquo;Acknowledge Update&rdquo;.
                 </span>
               </div>
@@ -249,8 +249,8 @@ export function DriverAppPoliciesPanel({
               />
             </label>
 
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-              <label className="font-bold text-slate-900 block mb-1">
+            <div className="p-4 bg-surface-subtle border border-border-subtle rounded-xl">
+              <label className="font-bold text-fg-primary block mb-1">
                 Unacknowledged Update Overdue Alert (Minutes, 1–60)
               </label>
               <Input
@@ -264,23 +264,23 @@ export function DriverAppPoliciesPanel({
                     unacknowledgedAlertMinutes: parseInt(e.target.value, 10) || 5,
                   })
                 }
-                className="bg-white h-9 text-xs font-mono"
+                className="bg-surface-card h-9 text-xs font-mono"
               />
-              <span className="text-[10px] text-slate-500 mt-1 block">
+              <span className="text-[10px] text-fg-muted mt-1 block">
                 Highlights an Overdue Ack alert in <code>Trips &rarr; Exceptions</code> when unacknowledged past this window.
               </span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="flex items-start justify-between gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer">
+            <label className="flex items-start justify-between gap-3 p-4 bg-surface-subtle border border-border-subtle rounded-xl cursor-pointer">
               <div className="flex items-start gap-2.5">
                 <CarIcon className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
                 <div>
-                  <span className="font-bold text-slate-900 block">
+                  <span className="font-bold text-fg-primary block">
                     Enforce Screen Wake Lock While On-Duty
                   </span>
-                  <span className="text-[11px] text-slate-500 mt-0.5 block">
+                  <span className="text-[11px] text-fg-muted mt-0.5 block">
                     Keeps the driver&apos;s phone display awake automatically while <code>on_duty</code> so offers and GPS telemetry stay live.
                   </span>
                 </div>
@@ -293,14 +293,14 @@ export function DriverAppPoliciesPanel({
               />
             </label>
 
-            <label className="flex items-start justify-between gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer">
+            <label className="flex items-start justify-between gap-3 p-4 bg-surface-subtle border border-border-subtle rounded-xl cursor-pointer">
               <div className="flex items-start gap-2.5">
                 <BellIcon className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                 <div>
-                  <span className="font-bold text-slate-900 block">
+                  <span className="font-bold text-fg-primary block">
                     Enable Audible Incoming Offer Chime
                   </span>
-                  <span className="text-[11px] text-slate-500 mt-0.5 block">
+                  <span className="text-[11px] text-fg-muted mt-0.5 block">
                     Plays the repeating high-clarity acoustic chime cadence when a live ride offer arrives on <code>/app/driver</code>.
                   </span>
                 </div>
@@ -315,8 +315,8 @@ export function DriverAppPoliciesPanel({
           </div>
 
           {/* Default Navigation App */}
-          <div className="space-y-2 pt-2 border-t border-slate-100">
-            <label className="font-bold text-slate-900 flex items-center gap-1.5">
+          <div className="space-y-2 pt-2 border-t border-border-faint">
+            <label className="font-bold text-fg-primary flex items-center gap-1.5">
               <CompassIcon className="w-4 h-4 text-indigo-600" />
               <span>Default Fleet Navigation App (Fallback Before Driver Local Choice)</span>
             </label>
@@ -330,15 +330,15 @@ export function DriverAppPoliciesPanel({
                     onClick={() => update({ defaultNavigationProvider: nav.value })}
                     className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                       selected
-                        ? 'border-blue-600 bg-blue-50/70 ring-1 ring-blue-500/20'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
+                        ? 'border-blue-600 bg-status-info-bg/70 ring-1 ring-blue-500/20'
+                        : 'border-border-subtle bg-surface-card hover:border-border-strong'
                     }`}
                   >
-                    <div className="font-extrabold text-slate-900 flex items-center justify-between">
+                    <div className="font-extrabold text-fg-primary flex items-center justify-between">
                       <span>{nav.label}</span>
                       {selected && <CheckIcon className="w-3.5 h-3.5 text-blue-600" />}
                     </div>
-                    <div className="text-[10px] text-slate-500 mt-1">{nav.hint}</div>
+                    <div className="text-[10px] text-fg-muted mt-1">{nav.hint}</div>
                   </button>
                 );
               })}

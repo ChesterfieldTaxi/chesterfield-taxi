@@ -164,7 +164,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       {/* Mobile Backdrop Overlay */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-slate-950/60 z-50 lg:hidden transition-opacity"
+          className="fixed inset-0 bg-surface-overlay/60 z-50 lg:hidden transition-opacity"
           onClick={onCloseMobile}
           aria-hidden="true"
         />
@@ -172,13 +172,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:h-screen lg:self-start flex flex-col bg-slate-900 border-r border-slate-800 text-slate-300 transition-all duration-300 ease-in-out shadow-xl lg:shadow-none ${
+        className={`fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:h-screen lg:self-start flex flex-col bg-surface-header border-r border-border-header text-slate-300 transition-all duration-300 ease-in-out shadow-xl lg:shadow-none ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } ${isCollapsed ? 'w-20' : 'w-64'}`}
       >
         {/* Top Brand Banner */}
         <div
-          className={`relative h-16 flex items-center border-b border-slate-800/80 shrink-0 ${
+          className={`relative h-16 flex items-center border-b border-border-header/80 shrink-0 ${
             isCollapsed ? 'justify-center px-2' : 'justify-between px-4'
           }`}
         >
@@ -207,7 +207,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               <button
                 type="button"
                 onClick={onToggleCollapse}
-                className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-6 bg-slate-800 hover:bg-blue-600 border border-slate-700 hover:border-blue-500 rounded-full items-center justify-center text-slate-300 hover:text-white transition-colors shadow-md cursor-pointer"
+                className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-6 bg-surface-header-elevated hover:bg-blue-600 border border-border-header hover:border-blue-500 rounded-full items-center justify-center text-slate-300 hover:text-white transition-colors shadow-md cursor-pointer"
                 title="Expand sidebar"
                 aria-label="Expand sidebar"
               >
@@ -241,7 +241,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                       {settings.company?.name || COMPANY_CONFIG.name}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <div className="flex items-center gap-1.5 text-[11px] text-fg-subtle">
                     <span className="font-semibold uppercase tracking-wider text-[10px] text-blue-400">
                       Admin
                     </span>
@@ -251,7 +251,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                         isLiveFirebase ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]' : 'bg-amber-400'
                       }`}
                     />
-                    <span className="text-[10px] font-medium text-slate-400">
+                    <span className="text-[10px] font-medium text-fg-subtle">
                       {isLiveFirebase ? 'Cloud' : 'Local'}
                     </span>
                   </div>
@@ -263,7 +263,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 <button
                   type="button"
                   onClick={onCloseMobile}
-                  className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  className="lg:hidden p-1.5 rounded-lg text-fg-subtle hover:text-white hover:bg-surface-header-elevated transition-colors"
                   title="Close navigation"
                 >
                   <XIcon className="w-5 h-5" />
@@ -272,7 +272,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 <button
                   type="button"
                   onClick={onToggleCollapse}
-                  className="hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  className="hidden lg:flex p-1.5 rounded-lg text-fg-subtle hover:text-white hover:bg-surface-header-elevated transition-colors"
                   title="Collapse sidebar"
                 >
                   <ChevronLeftIcon className="w-4 h-4" />
@@ -287,7 +287,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           {ADMIN_NAV_GROUPS.map((group) => (
             <div key={group.title} className="space-y-0.5">
               {!isCollapsed && (
-                <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-fg-muted">
                   {group.title}
                 </div>
               )}
@@ -308,12 +308,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all group cursor-pointer ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-bold'
-                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
+                        : 'text-fg-subtle hover:text-fg-on-header hover:bg-surface-header-elevated/80'
                     } ${isCollapsed ? 'justify-center px-2' : ''}`}
                   >
                     <Icon
                       className={`w-4 h-4 shrink-0 ${
-                        isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
+                        isActive ? 'text-white' : 'text-fg-subtle group-hover:text-fg-on-header'
                       }`}
                     />
 
@@ -328,7 +328,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </nav>
 
         {/* Bottom User & Utility Bar */}
-        <div className={`p-2.5 border-t border-slate-800/80 bg-slate-950/40 shrink-0 flex items-center ${isCollapsed ? 'justify-center' : 'w-full'}`}>
+        <div className={`p-2.5 border-t border-border-header/80 bg-surface-overlay/40 shrink-0 flex items-center ${isCollapsed ? 'justify-center' : 'w-full'}`}>
           <UserDropdown
             email={user?.email}
             onSignOut={onSignOut}

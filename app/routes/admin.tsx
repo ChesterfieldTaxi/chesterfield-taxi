@@ -7,6 +7,8 @@ import { isFirebaseConfigured } from '../core/services/firebase';
 import type { AppSettings } from '../core/types/config';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { AdminSidebar } from '../components/domain/admin/navigation/AdminSidebar';
+import { AppearanceToggle } from '../components/ui/AppearanceToggle';
+import { useTheme } from '../hooks/useTheme';
 
 const AdminDashboardTab = React.lazy(() =>
   import('../components/domain/admin/AdminDashboardTab').then((m) => ({
@@ -214,6 +216,10 @@ export default function AdminLayout() {
   // Authentication state (initialize `isAuthChecking = true` so SSR & initial client hydration match)
   const [user, setUser] = useState<AdminUser | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const { preference: themePreference, setPreference: setThemePreference } = useTheme({
+    uid: user?.uid,
+    profilePreference: user?.themePreference,
+  });
 
   // Dynamic configuration state
   const [settings, setSettings] = useState<AppSettings>(() =>
@@ -326,7 +332,7 @@ export default function AdminLayout() {
   // Render auth loading screen while validating credentials
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-4">
+      <div className="min-h-screen bg-surface-header flex flex-col items-center justify-center text-white p-4">
         <div
           style={{
             backgroundColor: 'var(--brand-primary, #2563eb)',
@@ -336,7 +342,7 @@ export default function AdminLayout() {
         >
           <CarIcon className="w-7 h-7" />
         </div>
-        <div className="flex items-center gap-2 text-sm text-slate-400">
+        <div className="flex items-center gap-2 text-sm text-fg-subtle">
           <SpinnerIcon className="w-4 h-4 animate-spin text-blue-500" />
           <span>Verifying administrator credentials...</span>
         </div>
@@ -350,7 +356,7 @@ export default function AdminLayout() {
 
   return (
     <div
-      className="min-h-screen bg-slate-50 text-slate-900 flex flex-row antialiased"
+      className="min-h-screen bg-surface-subtle text-fg-primary flex flex-row antialiased"
       style={
         {
           "--color-primary": settings.branding?.primaryColor || COMPANY_CONFIG.primaryColor || "#2563eb",
@@ -389,21 +395,21 @@ export default function AdminLayout() {
       {/* ─── Main Admin Workspace Canvas ─── */}
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Clean Executive Top Header + Underline Sub-Navigation */}
-        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/90">
+        <header className="sticky top-0 z-30 bg-surface-card/95 backdrop-blur-md border-b border-border-subtle/90">
           <div className="px-3 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-2 sm:gap-4">
             {/* Left: Mobile Toggle + Page Title */}
             <div className="flex items-center gap-3 min-w-0">
               <button
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(true)}
-                className="lg:hidden p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
+                className="lg:hidden p-1.5 rounded-lg text-fg-secondary hover:text-fg-primary hover:bg-surface-muted transition-colors shrink-0 cursor-pointer"
                 title="Open Navigation Menu"
                 aria-label="Open Navigation Menu"
               >
                 <MenuIcon className="w-5 h-5" />
               </button>
 
-              <h1 className="text-base sm:text-lg font-extrabold text-slate-950 tracking-tight truncate">
+              <h1 className="text-base sm:text-lg font-extrabold text-fg-primary tracking-tight truncate">
                 {currentTabObj.label}
               </h1>
 
@@ -411,7 +417,7 @@ export default function AdminLayout() {
                 <button
                   type="button"
                   onClick={() => setIsSystemMenuOpen(true)}
-                  className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-300 text-amber-800 text-[11px] font-bold hover:bg-amber-100 transition-colors cursor-pointer shrink-0"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-status-warning-bg border border-status-warning-border text-status-warning-fg text-[11px] font-bold hover:bg-status-warning-bg-strong transition-colors cursor-pointer shrink-0"
                   title="Maintenance Mode is active — click to manage"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
@@ -436,12 +442,18 @@ export default function AdminLayout() {
                 href="/"
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-slate-600 hover:text-slate-900 font-semibold px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 transition-colors flex items-center gap-1.5"
+                className="text-xs text-fg-secondary hover:text-fg-primary font-semibold px-2.5 py-1.5 rounded-xl bg-surface-muted hover:bg-surface-emphasis/80 transition-colors flex items-center gap-1.5"
                 title="Open live customer website"
               >
-                <ExternalLinkIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <ExternalLinkIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
                 <span className="hidden md:inline">Live Site</span>
               </a>
+
+              <AppearanceToggle
+                variant="cycle"
+                preference={themePreference}
+                onChange={setThemePreference}
+              />
 
               {/* Compact System Controls Popover (Maintenance, Get App, Cloud Sync) */}
               <div className="relative" ref={systemMenuRef}>
@@ -450,8 +462,8 @@ export default function AdminLayout() {
                   onClick={() => setIsSystemMenuOpen((prev) => !prev)}
                   className={`p-2 rounded-xl border text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
                     isSystemMenuOpen
-                      ? 'bg-slate-900 text-white border-slate-900'
-                      : 'bg-white text-slate-600 hover:text-slate-900 border-slate-200 hover:bg-slate-50'
+                      ? 'bg-surface-header text-white border-slate-900'
+                      : 'bg-surface-card text-fg-secondary hover:text-fg-primary border-border-subtle hover:bg-surface-subtle'
                   }`}
                   title="Site Availability & System Status"
                   aria-label="Site Availability & System Status"
@@ -463,7 +475,7 @@ export default function AdminLayout() {
                         ? 'bg-amber-500'
                         : isLiveFirebase
                         ? 'bg-emerald-500'
-                        : 'bg-slate-400'
+                        : 'bg-fg-subtle'
                     }`}
                   />
                 </button>
@@ -471,12 +483,12 @@ export default function AdminLayout() {
                 {isSystemMenuOpen && (
                   <>
                     {/* Desktop Popover */}
-                    <div className="hidden sm:block absolute right-0 mt-2 w-72 bg-white rounded-2xl border border-slate-200 shadow-xl p-3 space-y-2.5 z-50">
-                      <div className="flex items-center justify-between px-1 pb-2 border-b border-slate-100">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <div className="hidden sm:block absolute right-0 mt-2 w-72 bg-surface-card rounded-2xl border border-border-subtle shadow-xl p-3 space-y-2.5 z-50">
+                      <div className="flex items-center justify-between px-1 pb-2 border-b border-border-faint">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">
                           Site Controls
                         </span>
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-fg-secondary">
                           <span
                             className={`w-2 h-2 rounded-full ${
                               isLiveFirebase ? 'bg-emerald-500' : 'bg-amber-400'
@@ -496,11 +508,11 @@ export default function AdminLayout() {
                             updatedAt: new Date().toISOString(),
                           });
                         }}
-                        className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-left transition-colors cursor-pointer"
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl bg-surface-subtle hover:bg-surface-muted border border-border-subtle/80 text-left transition-colors cursor-pointer"
                       >
                         <div className="min-w-0 pr-2">
-                          <div className="text-xs font-bold text-slate-900">Maintenance Mode</div>
-                          <div className="text-[11px] text-slate-500">
+                          <div className="text-xs font-bold text-fg-primary">Maintenance Mode</div>
+                          <div className="text-[11px] text-fg-muted">
                             {settings.constructionMode !== false
                               ? 'Showing Under Construction page'
                               : 'Public site live for booking'}
@@ -510,7 +522,7 @@ export default function AdminLayout() {
                           className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md shrink-0 ${
                             settings.constructionMode !== false
                               ? 'bg-amber-500 text-slate-950'
-                              : 'bg-emerald-100 text-emerald-800'
+                              : 'bg-status-success-bg-strong text-status-success-fg'
                           }`}
                         >
                           {settings.constructionMode !== false ? 'ON' : 'OFF'}
@@ -527,11 +539,11 @@ export default function AdminLayout() {
                             updatedAt: new Date().toISOString(),
                           });
                         }}
-                        className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-left transition-colors cursor-pointer"
+                        className="w-full flex items-center justify-between p-2.5 rounded-xl bg-surface-subtle hover:bg-surface-muted border border-border-subtle/80 text-left transition-colors cursor-pointer"
                       >
                         <div className="min-w-0 pr-2">
-                          <div className="text-xs font-bold text-slate-900">&ldquo;Get App&rdquo; Buttons</div>
-                          <div className="text-[11px] text-slate-500">
+                          <div className="text-xs font-bold text-fg-primary">&ldquo;Get App&rdquo; Buttons</div>
+                          <div className="text-[11px] text-fg-muted">
                             {settings.enableGetAppButtons === true
                               ? 'Visible in public header'
                               : 'Hidden sitewide'}
@@ -541,7 +553,7 @@ export default function AdminLayout() {
                           className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md shrink-0 ${
                             settings.enableGetAppButtons === true
                               ? 'bg-blue-600 text-white'
-                              : 'bg-slate-200 text-slate-700'
+                              : 'bg-surface-emphasis text-fg-secondary'
                           }`}
                         >
                           {settings.enableGetAppButtons === true ? 'ON' : 'OFF'}
@@ -551,23 +563,23 @@ export default function AdminLayout() {
 
                     {/* Mobile Drag-Down-to-Close Site Controls Sheet */}
                     <div
-                      className="sm:hidden fixed inset-0 z-[110] bg-slate-950/45 flex items-end"
+                      className="sm:hidden fixed inset-0 z-[110] bg-surface-overlay/45 flex items-end"
                       onClick={dismissSystemMenu}
                     >
                       <div
                         style={systemSheetDrag.sheetStyle}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-full bg-white rounded-t-3xl border-t border-slate-200 shadow-2xl overflow-hidden pb-[max(1rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom duration-200"
+                        className="w-full bg-surface-card rounded-t-3xl border-t border-border-subtle shadow-2xl overflow-hidden pb-[max(1rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom duration-200"
                       >
                         <div
                           {...systemSheetDrag.dragHandlers}
-                          className="px-4 pt-2.5 pb-3 border-b border-slate-100 touch-none"
+                          className="px-4 pt-2.5 pb-3 border-b border-border-faint touch-none"
                         >
-                          <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5" aria-hidden="true" />
+                          <div className="w-10 h-1 rounded-full bg-surface-strong mx-auto mb-2.5" aria-hidden="true" />
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-extrabold text-slate-950">Site Controls</span>
-                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                              <span className="text-sm font-extrabold text-fg-primary">Site Controls</span>
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-fg-secondary bg-surface-muted px-2 py-0.5 rounded-full">
                                 <span
                                   className={`w-1.5 h-1.5 rounded-full ${
                                     isLiveFirebase ? 'bg-emerald-500' : 'bg-amber-400'
@@ -579,7 +591,7 @@ export default function AdminLayout() {
                             <button
                               type="button"
                               onClick={dismissSystemMenu}
-                              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                              className="p-1.5 rounded-xl text-fg-subtle hover:text-fg-secondary hover:bg-surface-muted cursor-pointer"
                               aria-label="Close site controls"
                             >
                               <XIcon className="w-4 h-4" />
@@ -588,6 +600,20 @@ export default function AdminLayout() {
                         </div>
 
                         <div className="p-4 space-y-2.5">
+                          <div className="p-3 rounded-2xl bg-surface-subtle border border-border-subtle/80 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-extrabold text-fg-primary">Appearance</span>
+                              <span className="text-[11px] font-semibold text-fg-muted capitalize">
+                                {themePreference}
+                              </span>
+                            </div>
+                            <AppearanceToggle
+                              variant="selector"
+                              preference={themePreference}
+                              onChange={setThemePreference}
+                            />
+                          </div>
+
                           <button
                             type="button"
                             onClick={async () => {
@@ -597,11 +623,11 @@ export default function AdminLayout() {
                                 updatedAt: new Date().toISOString(),
                               });
                             }}
-                            className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-50 active:bg-slate-100 border border-slate-200/80 text-left cursor-pointer"
+                            className="w-full flex items-center justify-between p-3 rounded-2xl bg-surface-subtle active:bg-surface-muted border border-border-subtle/80 text-left cursor-pointer"
                           >
                             <div className="min-w-0 pr-2">
-                              <div className="text-xs font-extrabold text-slate-900">Maintenance Mode</div>
-                              <div className="text-[11px] text-slate-500 mt-0.5">
+                              <div className="text-xs font-extrabold text-fg-primary">Maintenance Mode</div>
+                              <div className="text-[11px] text-fg-muted mt-0.5">
                                 {settings.constructionMode !== false
                                   ? 'Showing Under Construction page'
                                   : 'Public site live for booking'}
@@ -611,7 +637,7 @@ export default function AdminLayout() {
                               className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-lg shrink-0 ${
                                 settings.constructionMode !== false
                                   ? 'bg-amber-500 text-slate-950'
-                                  : 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-status-success-bg-strong text-status-success-fg'
                               }`}
                             >
                               {settings.constructionMode !== false ? 'ON' : 'OFF'}
@@ -627,11 +653,11 @@ export default function AdminLayout() {
                                 updatedAt: new Date().toISOString(),
                               });
                             }}
-                            className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-50 active:bg-slate-100 border border-slate-200/80 text-left cursor-pointer"
+                            className="w-full flex items-center justify-between p-3 rounded-2xl bg-surface-subtle active:bg-surface-muted border border-border-subtle/80 text-left cursor-pointer"
                           >
                             <div className="min-w-0 pr-2">
-                              <div className="text-xs font-extrabold text-slate-900">&ldquo;Get App&rdquo; Buttons</div>
-                              <div className="text-[11px] text-slate-500 mt-0.5">
+                              <div className="text-xs font-extrabold text-fg-primary">&ldquo;Get App&rdquo; Buttons</div>
+                              <div className="text-[11px] text-fg-muted mt-0.5">
                                 {settings.enableGetAppButtons === true
                                   ? 'Visible in public header'
                                   : 'Hidden sitewide'}
@@ -641,7 +667,7 @@ export default function AdminLayout() {
                               className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-lg shrink-0 ${
                                 settings.enableGetAppButtons === true
                                   ? 'bg-blue-600 text-white'
-                                  : 'bg-slate-200 text-slate-700'
+                                  : 'bg-surface-emphasis text-fg-secondary'
                               }`}
                             >
                               {settings.enableGetAppButtons === true ? 'ON' : 'OFF'}
@@ -658,7 +684,7 @@ export default function AdminLayout() {
 
           {/* Clean Underline Sub-Navigation Bar */}
           {activeSubList.length > 0 && (
-            <div className="px-3 sm:px-6 lg:px-8 border-t border-slate-100 overflow-x-auto no-scrollbar flex items-center gap-4 sm:gap-5 shrink-0">
+            <div className="px-3 sm:px-6 lg:px-8 border-t border-border-faint overflow-x-auto no-scrollbar flex items-center gap-4 sm:gap-5 shrink-0">
               {activeSubList.map((sub) => {
                 const isActive = effectiveSub === sub.key;
                 return (
@@ -669,7 +695,7 @@ export default function AdminLayout() {
                     className={`py-2.5 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
                       isActive
                         ? 'border-blue-600 text-blue-600 font-bold'
-                        : 'border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300'
+                        : 'border-transparent text-fg-muted hover:text-fg-primary hover:border-border-strong'
                     }`}
                   >
                     {sub.label}
@@ -686,7 +712,7 @@ export default function AdminLayout() {
           <div className="pt-1">
             <Suspense
               fallback={
-                <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-500">
+                <div className="flex flex-col items-center justify-center py-20 gap-3 text-fg-muted">
                   <SpinnerIcon className="w-6 h-6 animate-spin text-blue-600" />
                   <span className="text-xs font-semibold tracking-wide">Loading module...</span>
                 </div>
@@ -785,6 +811,7 @@ export default function AdminLayout() {
                 onSave={handleSaveSettings}
                 isLoading={isSavingConfig || isConfigLoading}
                 initialSubTab={effectiveSub as any}
+                uid={user?.uid}
               />
             )}
             </Suspense>
@@ -797,7 +824,7 @@ export default function AdminLayout() {
         {/* ─── Mobile Bottom Quick-Navigation Bar (< lg) ─── */}
         <nav
           aria-label="Admin Mobile Navigation"
-          className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-1.5 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] flex items-center justify-around"
+          className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface-card/95 backdrop-blur-md border-t border-border-subtle/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-1.5 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] flex items-center justify-around"
         >
           {(
             [
@@ -816,10 +843,10 @@ export default function AdminLayout() {
                 className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
                   isActive
                     ? 'text-blue-600 font-extrabold'
-                    : 'text-slate-500 hover:text-slate-800 font-medium'
+                    : 'text-fg-muted hover:text-fg-strong font-medium'
                 }`}
               >
-                <div className={`px-3 py-1 rounded-full transition-colors ${isActive ? 'bg-blue-50 text-blue-600' : ''}`}>
+                <div className={`px-3 py-1 rounded-full transition-colors ${isActive ? 'bg-status-info-bg text-blue-600' : ''}`}>
                   <Icon className="w-5 h-5" />
                 </div>
                 <span className="text-[10px] tracking-tight leading-none">{label}</span>
@@ -833,13 +860,13 @@ export default function AdminLayout() {
             className={`flex-1 py-1 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer ${
               !['dashboard', 'trips', 'rates', 'customers'].includes(normalizedTab)
                 ? 'text-blue-600 font-extrabold'
-                : 'text-slate-500 hover:text-slate-800 font-medium'
+                : 'text-fg-muted hover:text-fg-strong font-medium'
             }`}
           >
             <div
               className={`px-3 py-1 rounded-full transition-colors ${
                 !['dashboard', 'trips', 'rates', 'customers'].includes(normalizedTab)
-                  ? 'bg-blue-50 text-blue-600'
+                  ? 'bg-status-info-bg text-blue-600'
                   : ''
               }`}
             >

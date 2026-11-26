@@ -217,7 +217,7 @@ export function AdminOnboardingQueue() {
                  key={s}
                  onClick={() => setStatusFilter(s as any)}
                  className={`px-3 py-1.5 text-xs rounded-full capitalize font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-                   statusFilter === s ? 'bg-slate-900 text-white shadow-xs' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                   statusFilter === s ? 'bg-surface-header text-white shadow-xs' : 'bg-surface-card border border-border-subtle text-fg-secondary hover:bg-surface-muted'
                  }`}
                >
                  {s}
@@ -232,26 +232,26 @@ export function AdminOnboardingQueue() {
         <Card variant="elevated" className="rounded-2xl overflow-hidden">
           <CardContent className="p-0 min-w-full">
             {/* Mobile Applicant Cards (< md) */}
-            <div className="md:hidden divide-y divide-slate-100">
+            <div className="md:hidden divide-y divide-border-faint">
               {isLoading ? (
-                <div className="p-8 text-center text-slate-500 text-xs">Loading...</div>
+                <div className="p-8 text-center text-fg-muted text-xs">Loading...</div>
               ) : filtered.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 text-xs">No applicants found.</div>
+                <div className="p-8 text-center text-fg-muted text-xs">No applicants found.</div>
               ) : filtered.map((a) => (
                 <div key={a.id} className="p-3.5 space-y-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-extrabold text-slate-900 text-sm truncate">
+                      <div className="font-extrabold text-fg-primary text-sm truncate">
                         {a.firstName} {a.lastName}
                       </div>
-                      <div className="text-xs text-slate-500 truncate">{a.email}</div>
+                      <div className="text-xs text-fg-muted truncate">{a.email}</div>
                     </div>
                     <Badge variant={a.status === 'approved' ? 'success' : a.status === 'rejected' ? 'error' : a.status === 'reviewing' ? 'info' : 'warning'}>
                       {a.status}
                     </Badge>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="capitalize font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                  <div className="flex items-center justify-between text-xs text-fg-muted">
+                    <span className="capitalize font-semibold text-fg-secondary bg-surface-muted px-2 py-0.5 rounded-md">
                       {a.role}
                     </span>
                     <span>Applied {new Date(a.createdAt).toLocaleDateString()}</span>
@@ -271,7 +271,7 @@ export function AdminOnboardingQueue() {
             {/* Desktop Table (md+) */}
             <div className="hidden md:block overflow-x-auto custom-scrollbar min-w-full">
             <table className="w-full text-left text-xs min-w-[650px]">
-              <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+              <thead className="bg-surface-subtle text-fg-secondary font-bold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-4 py-3">Applicant</th>
                   <th className="px-4 py-3">Role</th>
@@ -280,16 +280,16 @@ export function AdminOnboardingQueue() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border-faint">
                 {isLoading ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-slate-500">Loading...</td></tr>
+                  <tr><td colSpan={5} className="p-8 text-center text-fg-muted">Loading...</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-slate-500">No applicants found.</td></tr>
+                  <tr><td colSpan={5} className="p-8 text-center text-fg-muted">No applicants found.</td></tr>
                 ) : filtered.map(a => (
-                  <tr key={a.id} className="hover:bg-slate-50">
+                  <tr key={a.id} className="hover:bg-surface-subtle">
                     <td className="px-4 py-3">
-                      <div className="font-bold text-slate-900">{a.firstName} {a.lastName}</div>
-                      <div className="text-slate-500">{a.email}</div>
+                      <div className="font-bold text-fg-primary">{a.firstName} {a.lastName}</div>
+                      <div className="text-fg-muted">{a.email}</div>
                     </td>
                     <td className="px-4 py-3 capitalize">{a.role}</td>
                     <td className="px-4 py-3">
@@ -297,7 +297,7 @@ export function AdminOnboardingQueue() {
                         {a.status}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{new Date(a.createdAt).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-fg-muted">{new Date(a.createdAt).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-right">
                       <Button size="sm" variant="outline" onClick={() => { setSelectedApplicant(a); setSuccess(null); setError(null); }}>
                         Review Dossier
@@ -314,40 +314,40 @@ export function AdminOnboardingQueue() {
 
       {selectedApplicant && (
         <div className="w-full lg:w-1/3 flex flex-col gap-4">
-           <Card className="border-blue-200 shadow-md">
+           <Card className="border-status-info-border shadow-md">
              <CardContent className="p-4 sm:p-6 space-y-5">
                 <div className="flex justify-between items-start gap-2">
                   <div className="min-w-0">
-                    <h3 className="text-lg font-black text-slate-900 truncate">{selectedApplicant.firstName} {selectedApplicant.lastName}</h3>
-                    <p className="text-xs sm:text-sm text-slate-500 break-words">{selectedApplicant.email} · {selectedApplicant.phone}</p>
+                    <h3 className="text-lg font-black text-fg-primary truncate">{selectedApplicant.firstName} {selectedApplicant.lastName}</h3>
+                    <p className="text-xs sm:text-sm text-fg-muted break-words">{selectedApplicant.email} · {selectedApplicant.phone}</p>
                     <Badge className="mt-2 capitalize" variant="info">Target: {selectedApplicant.role}</Badge>
                   </div>
                   <button
                     type="button"
                     onClick={() => setSelectedApplicant(null)}
                     aria-label="Close applicant dossier"
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 shrink-0 cursor-pointer"
+                    className="p-1.5 rounded-lg text-fg-subtle hover:text-fg-secondary hover:bg-surface-muted shrink-0 cursor-pointer"
                   >
                     <XIcon className="w-4 h-4" />
                   </button>
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-slate-700 uppercase">Documents</h4>
+                  <h4 className="text-xs font-bold text-fg-secondary uppercase">Documents</h4>
                   <div className="grid grid-cols-1 gap-2">
                     {(selectedApplicant.documents || []).length === 0 ? (
-                      <div className="text-xs text-slate-400">No documents uploaded.</div>
+                      <div className="text-xs text-fg-subtle">No documents uploaded.</div>
                     ) : (
                       (selectedApplicant.documents || []).map((doc, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <span className="text-xs font-semibold text-slate-700 truncate mr-2" title={doc.name}>{doc.name}</span>
-                          <a href={doc.url} target="_blank" rel="noreferrer" className="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold hover:bg-blue-200">
+                        <div key={idx} className="flex justify-between items-center bg-surface-subtle p-2 rounded-lg border border-border-faint">
+                          <span className="text-xs font-semibold text-fg-secondary truncate mr-2" title={doc.name}>{doc.name}</span>
+                          <a href={doc.url} target="_blank" rel="noreferrer" className="text-[10px] bg-status-info-bg-strong text-status-info-fg px-2 py-1 rounded font-bold hover:bg-blue-200">
                             View
                           </a>
                         </div>
                       ))
                     )}
-                    <label className="mt-2 block w-full text-center border-2 border-dashed border-slate-300 rounded-lg p-3 cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors">
+                    <label className="mt-2 block w-full text-center border-2 border-dashed border-border-strong rounded-lg p-3 cursor-pointer hover:border-blue-500 hover:bg-status-info-bg transition-colors">
                       <span className="text-xs font-bold text-blue-600">Upload Document</span>
                       <input 
                         type="file" 
@@ -390,16 +390,16 @@ export function AdminOnboardingQueue() {
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-slate-700 uppercase">Compliance Checklist</h4>
+                  <h4 className="text-xs font-bold text-fg-secondary uppercase">Compliance Checklist</h4>
                   <div className="grid grid-cols-1 gap-2">
                     {Object.entries(selectedApplicant.checks || {}).map(([k, v]) => (
-                      <div key={k} className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        <span className="text-xs capitalize font-semibold text-slate-700">{k} Check</span>
+                      <div key={k} className="flex justify-between items-center bg-surface-subtle p-2 rounded-lg border border-border-faint">
+                        <span className="text-xs capitalize font-semibold text-fg-secondary">{k} Check</span>
                         <button 
                           onClick={() => toggleCheck(k as any)}
-                          className={`w-10 h-5 rounded-full relative transition-colors ${v ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                          className={`w-10 h-5 rounded-full relative transition-colors ${v ? 'bg-emerald-500' : 'bg-surface-strong'}`}
                         >
-                          <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${v ? 'translate-x-5' : ''}`} />
+                          <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-surface-card rounded-full transition-transform ${v ? 'translate-x-5' : ''}`} />
                         </button>
                       </div>
                     ))}
@@ -407,7 +407,7 @@ export function AdminOnboardingQueue() {
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-slate-700 uppercase">Action</h4>
+                  <h4 className="text-xs font-bold text-fg-secondary uppercase">Action</h4>
                   {selectedApplicant.status !== 'approved' ? (
                     <Button 
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold"
@@ -427,15 +427,15 @@ export function AdminOnboardingQueue() {
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-slate-700 uppercase">Audit Log</h4>
+                  <h4 className="text-xs font-bold text-fg-secondary uppercase">Audit Log</h4>
                   <div className="max-h-40 overflow-y-auto text-[10px] space-y-1">
                     {(selectedApplicant.auditLog || []).map((log, i) => (
-                      <div key={i} className="flex justify-between bg-slate-50 p-1.5 rounded">
-                        <span className="text-slate-700">{log.action}</span>
-                        <span className="text-slate-400">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                      <div key={i} className="flex justify-between bg-surface-subtle p-1.5 rounded">
+                        <span className="text-fg-secondary">{log.action}</span>
+                        <span className="text-fg-subtle">{new Date(log.timestamp).toLocaleTimeString()}</span>
                       </div>
                     ))}
-                    {(selectedApplicant.auditLog || []).length === 0 && <div className="text-slate-400">No logs yet.</div>}
+                    {(selectedApplicant.auditLog || []).length === 0 && <div className="text-fg-subtle">No logs yet.</div>}
                   </div>
                 </div>
              </CardContent>

@@ -11,10 +11,10 @@ export function Card({
   ...props
 }: CardProps) {
   const variantStyles = {
-    default: 'bg-white border border-slate-200/90 shadow-xs text-slate-900',
-    muted: 'bg-slate-50/80 border border-slate-200/70 text-slate-800',
-    elevated: 'bg-white border border-slate-200 shadow-md text-slate-900',
-    bordered: 'bg-transparent border-2 border-slate-200 text-slate-900',
+    default: 'bg-surface-card border border-border-subtle/90 shadow-xs text-fg-primary',
+    muted: 'bg-surface-subtle/80 border border-border-subtle/70 text-fg-strong',
+    elevated: 'bg-surface-card border border-border-subtle shadow-md text-fg-primary',
+    bordered: 'bg-transparent border-2 border-border-subtle text-fg-primary',
   };
 
   return (
@@ -47,7 +47,7 @@ export function CardTitle({
 }: React.HTMLAttributes<HTMLHeadingElement> & { as?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' }) {
   return (
     <Component
-      className={`text-lg sm:text-xl font-bold tracking-tight text-slate-900 ${className}`}
+      className={`text-lg sm:text-xl font-bold tracking-tight text-fg-primary ${className}`}
       {...props}
     >
       {children}
@@ -61,7 +61,7 @@ export function CardDescription({
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={`text-sm text-slate-500 mt-1 leading-relaxed ${className}`} {...props}>
+    <p className={`text-sm text-fg-muted mt-1 leading-relaxed ${className}`} {...props}>
       {children}
     </p>
   );
@@ -86,7 +86,7 @@ export function CardFooter({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={`p-5 sm:p-6 pt-3 sm:pt-4 border-t border-slate-100 flex items-center justify-between gap-3 ${className}`}
+      className={`p-5 sm:p-6 pt-3 sm:pt-4 border-t border-border-faint flex items-center justify-between gap-3 ${className}`}
       {...props}
     >
       {children}

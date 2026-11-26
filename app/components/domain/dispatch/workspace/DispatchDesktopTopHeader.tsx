@@ -8,8 +8,8 @@ import {
 import type { Trip } from '../../../../core/types/trip';
 import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
-import { APPEARANCE_OPTIONS, type AppearanceOption } from '../../../../config/theme-tokens';
 import { useTheme } from '../../../../hooks/useTheme';
+import { AppearanceToggle } from '../../../ui/AppearanceToggle';
 import { DispatchHeaderCallHud } from '../DispatchHeaderCallHud';
 import { FleetAlertCard, type DispatchMessageItem } from '../FleetAlertCard';
 import {
@@ -28,8 +28,6 @@ import {
   VolumeXIcon,
   ClockIcon,
   SunIcon,
-  MoonIcon,
-  MonitorIcon,
   SettingsIcon,
   MapPinIcon,
   BoltIcon,
@@ -671,39 +669,11 @@ export function DispatchDesktopTopHeader({
                         {themePreference}
                       </span>
                     </div>
-                    <div
-                      role="radiogroup"
-                      aria-label="Appearance"
-                      className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-surface-muted border border-border-subtle"
-                    >
-                      {APPEARANCE_OPTIONS.map((opt: AppearanceOption) => {
-                        const isSelected = themePreference === opt.value;
-                        const IconComp =
-                          opt.icon === 'moon'
-                            ? MoonIcon
-                            : opt.icon === 'monitor'
-                            ? MonitorIcon
-                            : SunIcon;
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            role="radio"
-                            aria-checked={isSelected}
-                            onClick={() => setThemePreference(opt.value)}
-                            title={opt.description}
-                            className={`px-2 py-1.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-surface-card text-blue-600 dark:text-blue-400 shadow-2xs ring-1 ring-border-subtle'
-                                : 'text-fg-muted hover:text-fg-primary'
-                            }`}
-                          >
-                            <IconComp className="w-3.5 h-3.5 shrink-0" />
-                            <span>{opt.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <AppearanceToggle
+                      variant="selector"
+                      preference={themePreference}
+                      onChange={setThemePreference}
+                    />
                   </div>
                   <div className="p-2.5 rounded-xl bg-surface-subtle border border-border-subtle flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5 min-w-0">

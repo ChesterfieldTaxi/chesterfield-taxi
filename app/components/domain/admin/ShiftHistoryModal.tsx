@@ -54,30 +54,30 @@ export function ShiftHistoryModal({ vehicleId, onClose }: ShiftHistoryModalProps
 
   return (
     <div
-      className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-in fade-in duration-200"
+      className="fixed inset-0 bg-surface-overlay/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
         style={sheetDrag.sheetStyle}
-        className="w-full max-w-4xl bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0"
+        className="w-full max-w-4xl bg-surface-card rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-border-subtle overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0"
       >
         <div
           {...sheetDrag.dragHandlers}
-          className="px-4 sm:px-5 pt-2.5 sm:pt-5 pb-3.5 sm:pb-5 border-b border-slate-100 bg-slate-50 shrink-0 touch-none"
+          className="px-4 sm:px-5 pt-2.5 sm:pt-5 pb-3.5 sm:pb-5 border-b border-border-faint bg-surface-subtle shrink-0 touch-none"
         >
-          <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+          <div className="w-10 h-1 rounded-full bg-surface-strong mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shadow-inner shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-status-info-bg-strong text-status-info-fg flex items-center justify-center shadow-inner shrink-0">
                 <HistoryIcon className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate">
+                <h3 className="text-base sm:text-lg font-extrabold text-fg-primary truncate">
                   Vehicle Shift History
                 </h3>
-                <p className="text-xs text-slate-500 font-medium truncate">
+                <p className="text-xs text-fg-muted font-medium truncate">
                   Temporal mapping of driver vehicle assignments
                 </p>
               </div>
@@ -86,26 +86,26 @@ export function ShiftHistoryModal({ vehicleId, onClose }: ShiftHistoryModalProps
               type="button"
               onClick={onClose}
               aria-label="Close shift history"
-              className="w-8 h-8 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center shrink-0 cursor-pointer"
+              className="w-8 h-8 rounded-xl bg-surface-emphasis hover:bg-surface-strong text-fg-secondary flex items-center justify-center shrink-0 cursor-pointer"
             >
               <XIcon className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        <div className="p-4 border-b border-slate-100 bg-white flex flex-col sm:flex-row gap-3 sm:gap-4 items-end">
+        <div className="p-4 border-b border-border-faint bg-surface-card flex flex-col sm:flex-row gap-3 sm:gap-4 items-end">
           <div className="flex-1 w-full">
-            <label className="block text-xs font-bold text-slate-700 mb-1">
+            <label className="block text-xs font-bold text-fg-secondary mb-1">
               Vehicle ID or Unit Number
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <CarIcon className="w-4 h-4 text-slate-400" />
+                <CarIcon className="w-4 h-4 text-fg-subtle" />
               </div>
               <input
                 type="text"
                 placeholder="e.g. Unit #101"
-                className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-300 bg-white text-sm focus:ring-2 focus:ring-blue-500"
+                className="w-full h-9 pl-9 pr-3 rounded-lg border border-border-strong bg-surface-card text-sm focus:ring-2 focus:ring-blue-500"
                 value={searchVehicleId}
                 onChange={(e) => setSearchVehicleId(e.target.value)}
               />
@@ -113,10 +113,10 @@ export function ShiftHistoryModal({ vehicleId, onClose }: ShiftHistoryModalProps
           </div>
 
           <div className="w-full sm:w-48">
-            <label className="block text-xs font-bold text-slate-700 mb-1">Date</label>
+            <label className="block text-xs font-bold text-fg-secondary mb-1">Date</label>
             <input
               type="date"
-              className="w-full h-9 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:ring-2 focus:ring-blue-500"
+              className="w-full h-9 px-3 rounded-lg border border-border-strong bg-surface-card text-sm focus:ring-2 focus:ring-blue-500"
               value={searchDate}
               onChange={(e) => setSearchDate(e.target.value)}
             />
@@ -132,27 +132,27 @@ export function ShiftHistoryModal({ vehicleId, onClose }: ShiftHistoryModalProps
           </Button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-0 bg-slate-50">
+        <div className="flex-1 overflow-y-auto p-0 bg-surface-subtle">
           {isLoading ? (
-            <div className="p-16 flex flex-col items-center justify-center text-slate-500">
+            <div className="p-16 flex flex-col items-center justify-center text-fg-muted">
               <SpinnerIcon className="w-8 h-8 animate-spin text-blue-600 mb-4" />
               <p className="font-medium text-sm">Querying shift timeline...</p>
             </div>
           ) : error ? (
-            <div className="p-8 text-center text-rose-600 bg-rose-50 m-4 rounded-xl border border-rose-200">
+            <div className="p-8 text-center text-rose-600 bg-status-danger-bg m-4 rounded-xl border border-status-danger-border">
               <p className="font-bold">{error}</p>
             </div>
           ) : shifts.length === 0 ? (
-            <div className="p-16 text-center text-slate-500">
+            <div className="p-16 text-center text-fg-muted">
               <HistoryIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="font-bold text-slate-800 text-lg">No Shift Records Found</p>
+              <p className="font-bold text-fg-strong text-lg">No Shift Records Found</p>
               <p className="text-sm mt-1">Try adjusting your search criteria.</p>
             </div>
           ) : (
             <div className="overflow-x-auto custom-scrollbar min-w-full">
               <table className="w-full text-left text-sm whitespace-nowrap min-w-[650px]">
-                <thead className="bg-white sticky top-0 border-b border-slate-200 shadow-sm z-10">
-                  <tr className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                <thead className="bg-surface-card sticky top-0 border-b border-border-subtle shadow-sm z-10">
+                  <tr className="text-fg-muted font-bold uppercase tracking-wider text-[10px]">
                     <th className="px-6 py-3">Shift ID</th>
                     <th className="px-6 py-3">Vehicle</th>
                     <th className="px-6 py-3">Driver</th>
@@ -160,23 +160,23 @@ export function ShiftHistoryModal({ vehicleId, onClose }: ShiftHistoryModalProps
                     <th className="px-6 py-3">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
+                <tbody className="divide-y divide-border-faint bg-surface-card">
                   {shifts.map((shift) => (
-                    <tr key={shift.id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={shift.id} className="hover:bg-surface-subtle transition-colors">
                       <td className="px-6 py-4">
-                        <span className="font-mono text-xs text-slate-500" title={shift.id}>
+                        <span className="font-mono text-xs text-fg-muted" title={shift.id}>
                           {shift.id.substring(0, 8)}...
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="font-bold text-slate-900">{shift.vehicleNumber}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">
+                        <div className="font-bold text-fg-primary">{shift.vehicleNumber}</div>
+                        <div className="text-[10px] text-fg-muted font-mono">
                           ID: {shift.vehicleId.substring(0, 8)}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                        <div className="font-semibold text-fg-strong flex items-center gap-1.5">
+                          <div className="w-5 h-5 rounded-full bg-status-info-bg-strong text-status-info-fg flex items-center justify-center shrink-0">
                             <CarIcon className="w-3 h-3" />
                           </div>
                           <span>{shift.driverId}</span>
@@ -184,11 +184,11 @@ export function ShiftHistoryModal({ vehicleId, onClose }: ShiftHistoryModalProps
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1 text-xs">
-                          <div className="flex items-center gap-1.5 text-emerald-700">
+                          <div className="flex items-center gap-1.5 text-status-success-fg">
                             <span className="font-bold w-12">Start:</span>
                             <span>{new Date(shift.startedAt).toLocaleString()}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 text-slate-600">
+                          <div className="flex items-center gap-1.5 text-fg-secondary">
                             <span className="font-bold w-12">End:</span>
                             <span>
                               {shift.endedAt ? new Date(shift.endedAt).toLocaleString() : "Ongoing"}
@@ -198,12 +198,12 @@ export function ShiftHistoryModal({ vehicleId, onClose }: ShiftHistoryModalProps
                       </td>
                       <td className="px-6 py-4">
                         {shift.status === "active" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 uppercase tracking-wider">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-status-success-bg-strong text-status-success-fg uppercase tracking-wider">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                             Active
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-600 uppercase tracking-wider">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-surface-muted text-fg-secondary uppercase tracking-wider">
                             Completed
                           </span>
                         )}

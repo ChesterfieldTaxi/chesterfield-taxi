@@ -147,15 +147,15 @@ export function WebsitePagesTab({ settings, onSave, isLoading }: WebsitePagesTab
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-surface-card p-4 sm:p-6 rounded-2xl border border-border-subtle shadow-xs">
         <div className="min-w-0">
           <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
             Content Management System (CMS)
           </span>
-          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 mt-0.5">
+          <h2 className="text-lg sm:text-xl font-extrabold text-fg-primary mt-0.5">
             Website Pages &amp; Metadata Manager
           </h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-fg-muted mt-1">
             Configure SEO metadata, publication state, and section structures for all website routes.
           </p>
         </div>
@@ -172,7 +172,7 @@ export function WebsitePagesTab({ settings, onSave, isLoading }: WebsitePagesTab
       </div>
 
       {saveSuccess && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in">
+        <div className="p-4 bg-status-success-bg border border-status-success-border text-status-success-fg rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in">
           <CheckIcon className="w-4 h-4 text-emerald-600" />
           <span>Page metadata and route settings saved successfully!</span>
         </div>
@@ -181,12 +181,12 @@ export function WebsitePagesTab({ settings, onSave, isLoading }: WebsitePagesTab
       {/* Main Grid: Pages Sidebar + Details Editor */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left: Page Directory List */}
-        <div className="lg:col-span-5 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-          <div className="px-2 py-1 flex items-center justify-between border-b border-slate-100 pb-3">
-            <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+        <div className="lg:col-span-5 bg-surface-card p-4 rounded-2xl border border-border-subtle shadow-xs space-y-3">
+          <div className="px-2 py-1 flex items-center justify-between border-b border-border-faint pb-3">
+            <span className="text-xs font-extrabold text-fg-primary uppercase tracking-wider">
               Published Site Routes ({pages.length})
             </span>
-            <span className="text-[10px] font-mono text-slate-400">All Live</span>
+            <span className="text-[10px] font-mono text-fg-subtle">All Live</span>
           </div>
 
           <div className="space-y-2">
@@ -198,29 +198,29 @@ export function WebsitePagesTab({ settings, onSave, isLoading }: WebsitePagesTab
                   onClick={() => setSelectedPageId(page.id)}
                   className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
                     isSelected
-                      ? 'border-blue-600 bg-blue-50/50 ring-1 ring-blue-600 shadow-xs'
-                      : 'border-slate-100 bg-slate-50/40 hover:bg-slate-50 hover:border-slate-200'
+                      ? 'border-blue-600 bg-status-info-bg/50 ring-1 ring-blue-600 shadow-xs'
+                      : 'border-border-faint bg-surface-subtle/40 hover:bg-surface-subtle hover:border-border-subtle'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-mono text-xs font-extrabold text-blue-700">
+                    <span className="font-mono text-xs font-extrabold text-status-info-fg">
                       {page.slug}
                     </span>
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                         page.status === 'published'
-                          ? 'bg-emerald-100 text-emerald-800'
+                          ? 'bg-status-success-bg-strong text-status-success-fg'
                           : page.status === 'draft'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-rose-100 text-rose-800'
+                          ? 'bg-status-warning-bg-strong text-status-warning-fg'
+                          : 'bg-status-danger-bg-strong text-status-danger-fg'
                       }`}
                     >
                       {page.status}
                     </span>
                   </div>
 
-                  <h4 className="text-xs font-bold text-slate-900 truncate">{page.title}</h4>
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
+                  <h4 className="text-xs font-bold text-fg-primary truncate">{page.title}</h4>
+                  <div className="mt-2 flex items-center justify-between text-[11px] text-fg-subtle">
                     <span>{page.sectionsCount} active sections</span>
                     <span>Updated {page.updatedAt}</span>
                   </div>
@@ -231,13 +231,13 @@ export function WebsitePagesTab({ settings, onSave, isLoading }: WebsitePagesTab
         </div>
 
         {/* Right: Page Settings & Section Controls */}
-        <div className="lg:col-span-7 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+        <div className="lg:col-span-7 bg-surface-card p-4 sm:p-6 rounded-2xl border border-border-subtle shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-faint pb-4">
             <div className="min-w-0">
               <span className="text-xs font-mono font-bold text-blue-600 block truncate">
                 Editing: {selectedPage.slug}
               </span>
-              <h3 className="text-base font-extrabold text-slate-900 mt-0.5 break-words">
+              <h3 className="text-base font-extrabold text-fg-primary mt-0.5 break-words">
                 {selectedPage.title}
               </h3>
             </div>
@@ -246,7 +246,7 @@ export function WebsitePagesTab({ settings, onSave, isLoading }: WebsitePagesTab
               href={selectedPage.slug}
               target="_blank"
               rel="noreferrer"
-              className="w-full sm:w-auto justify-center shrink-0 text-xs font-bold text-slate-600 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-slate-200 inline-flex items-center gap-1.5 transition-colors"
+              className="w-full sm:w-auto justify-center shrink-0 text-xs font-bold text-fg-secondary hover:text-blue-600 bg-surface-muted hover:bg-status-info-bg px-3 py-1.5 rounded-lg border border-border-subtle inline-flex items-center gap-1.5 transition-colors"
             >
               <EyeIcon className="w-3.5 h-3.5" />
               <span>Preview Route</span>
@@ -255,7 +255,7 @@ export function WebsitePagesTab({ settings, onSave, isLoading }: WebsitePagesTab
 
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-fg-secondary block mb-1">
                 Page Title Tag (SERP H1)
               </label>
               <Input
@@ -263,29 +263,29 @@ export function WebsitePagesTab({ settings, onSave, isLoading }: WebsitePagesTab
                 onChange={(e) => handleUpdateSelected({ title: e.target.value })}
                 className="text-xs"
               />
-              <span className="text-[10px] text-slate-400 mt-1 block">
+              <span className="text-[10px] text-fg-subtle mt-1 block">
                 Recommended 50–60 characters for optimal Google SERP ranking.
               </span>
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-fg-secondary block mb-1">
                 Meta Description (Search Snippet)
               </label>
               <textarea
                 value={selectedPage.metaDescription}
                 onChange={(e) => handleUpdateSelected({ metaDescription: e.target.value })}
                 rows={3}
-                className="w-full text-xs p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                className="w-full text-xs p-3 rounded-xl border border-border-subtle bg-surface-subtle focus:bg-surface-card focus:ring-2 focus:ring-blue-600 focus:outline-none"
               />
-              <span className="text-[10px] text-slate-400 mt-1 block">
+              <span className="text-[10px] text-fg-subtle mt-1 block">
                 Length: {selectedPage.metaDescription.length} / 160 characters.
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                <label className="text-xs font-bold text-slate-800 block">Publication State</label>
+              <div className="p-3.5 bg-surface-subtle border border-border-subtle rounded-xl space-y-2">
+                <label className="text-xs font-bold text-fg-strong block">Publication State</label>
                 <Select
                   size="sm"
                   value={selectedPage.status}
@@ -301,10 +301,10 @@ export function WebsitePagesTab({ settings, onSave, isLoading }: WebsitePagesTab
                 </Select>
               </div>
 
-              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 flex flex-col justify-between">
+              <div className="p-3.5 bg-surface-subtle border border-border-subtle rounded-xl space-y-2 flex flex-col justify-between">
                 <div>
-                  <span className="text-xs font-bold text-slate-800 block">Featured Header Banner</span>
-                  <span className="text-[11px] text-slate-500">
+                  <span className="text-xs font-bold text-fg-strong block">Featured Header Banner</span>
+                  <span className="text-[11px] text-fg-muted">
                     Display high-contrast hero backdrop with quick booking CTA
                   </span>
                 </div>
@@ -315,18 +315,18 @@ export function WebsitePagesTab({ settings, onSave, isLoading }: WebsitePagesTab
                     onChange={(e) => handleUpdateSelected({ featuredBanner: e.target.checked })}
                     className="w-4 h-4 rounded text-blue-600 cursor-pointer shrink-0"
                   />
-                  <span className="text-xs font-semibold text-slate-700">Enable Header Banner</span>
+                  <span className="text-xs font-semibold text-fg-secondary">Enable Header Banner</span>
                 </label>
               </div>
             </div>
 
             {/* Quick Layout Summary */}
-            <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-xl">
-              <h5 className="text-xs font-extrabold text-blue-900 flex items-center gap-2 mb-1.5">
+            <div className="p-4 bg-status-info-bg/50 border border-status-info-border rounded-xl">
+              <h5 className="text-xs font-extrabold text-status-info-fg flex items-center gap-2 mb-1.5">
                 <ShieldCheckIcon className="w-4 h-4 text-blue-600" />
                 <span>Dynamic Section Pipeline Active</span>
               </h5>
-              <p className="text-[11px] text-blue-700 leading-relaxed">
+              <p className="text-[11px] text-status-info-fg leading-relaxed">
                 This page utilizes modular component blocks. You can reorder sections, adjust headings, or inject custom HTML blocks using the layout canvas.
               </p>
             </div>

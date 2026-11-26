@@ -185,8 +185,8 @@ export function AdminAdvancedTab({
     <div className="space-y-6">
       {/* Contextual Action Bar for Audit / System Export */}
       {(activeSub === 'audit' || activeSub === 'system') && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-3 sm:p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="text-xs font-bold text-slate-700 px-1 sm:px-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-surface-card p-3 sm:p-2.5 rounded-2xl border border-border-subtle/80 shadow-xs">
+          <div className="text-xs font-bold text-fg-secondary px-1 sm:px-2">
             {activeSub === 'audit' ? (
               <span>Config Audit Trail ({auditLogs.length} logged events)</span>
             ) : (
@@ -240,22 +240,22 @@ export function AdminAdvancedTab({
       ═══════════════════════════════════════════════════════════════════════ */}
       {activeSub === 'security' && (
         <form onSubmit={handleSaveSecurity} className="space-y-6">
-          <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
-              <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+          <Card variant="elevated" className="border-border-subtle bg-surface-card shadow-xs">
+            <CardHeader className="border-b border-border-faint bg-surface-subtle/50 p-5">
+              <CardTitle className="text-base font-extrabold text-fg-primary flex items-center gap-2">
                 <LockIcon className="w-5 h-5 text-amber-600" />
                 Security, Authentication &amp; IP Access Controls
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+              <CardDescription className="text-xs text-fg-muted">
                 Enforce dispatcher 2FA, idle session timeouts, and IP allowlist restrictions for the administration console.
               </CardDescription>
             </CardHeader>
 
             <CardContent className="p-6 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="p-4 bg-surface-subtle border border-border-subtle rounded-xl space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900 text-xs">Enforce Two-Factor Authentication (2FA)</span>
+                    <span className="font-bold text-fg-primary text-xs">Enforce Two-Factor Authentication (2FA)</span>
                     <input
                       type="checkbox"
                       checked={securityConfig.require2FA}
@@ -265,14 +265,14 @@ export function AdminAdvancedTab({
                       className="w-4 h-4 rounded text-blue-600"
                     />
                   </div>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-[11px] text-fg-muted">
                     Requires SMS or Authenticator TOTP token upon dispatcher and administrator login.
                   </p>
                 </div>
 
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="p-4 bg-surface-subtle border border-border-subtle rounded-xl space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900 text-xs">IP Address Allowlisting</span>
+                    <span className="font-bold text-fg-primary text-xs">IP Address Allowlisting</span>
                     <input
                       type="checkbox"
                       checked={securityConfig.enableIpAllowlist || false}
@@ -285,15 +285,15 @@ export function AdminAdvancedTab({
                       className="w-4 h-4 rounded text-blue-600"
                     />
                   </div>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-[11px] text-fg-muted">
                     Restricts admin console access strictly to approved dispatch office static IPs.
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                <div className="p-3 bg-surface-subtle border border-border-subtle rounded-xl">
+                  <label className="text-xs font-bold text-fg-strong block mb-1">
                     Idle Session Timeout (Minutes)
                   </label>
                   <input
@@ -307,12 +307,12 @@ export function AdminAdvancedTab({
                         sessionTimeoutMinutes: Number(e.target.value),
                       }))
                     }
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                    className="w-full px-2.5 py-1.5 border border-border-subtle rounded-lg text-xs font-bold"
                   />
                 </div>
 
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                <div className="p-3 bg-surface-subtle border border-border-subtle rounded-xl">
+                  <label className="text-xs font-bold text-fg-strong block mb-1">
                     Max Failed Login Attempts
                   </label>
                   <input
@@ -326,12 +326,12 @@ export function AdminAdvancedTab({
                         maxFailedLoginAttempts: Number(e.target.value),
                       }))
                     }
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                    className="w-full px-2.5 py-1.5 border border-border-subtle rounded-lg text-xs font-bold"
                   />
                 </div>
 
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                <div className="p-3 bg-surface-subtle border border-border-subtle rounded-xl">
+                  <label className="text-xs font-bold text-fg-strong block mb-1">
                     Password Expiration (Days)
                   </label>
                   <input
@@ -345,13 +345,13 @@ export function AdminAdvancedTab({
                         passwordExpiryDays: Number(e.target.value),
                       }))
                     }
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-bold"
+                    className="w-full px-2.5 py-1.5 border border-border-subtle rounded-lg text-xs font-bold"
                   />
                 </div>
               </div>
             </CardContent>
 
-            <CardFooter className="border-t border-slate-100 bg-slate-50/50 p-4 flex justify-end">
+            <CardFooter className="border-t border-border-faint bg-surface-subtle/50 p-4 flex justify-end">
               <Button
                 type="submit"
                 variant="primary"
@@ -371,38 +371,38 @@ export function AdminAdvancedTab({
       ═══════════════════════════════════════════════════════════════════════ */}
       {activeSub === 'audit' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-surface-card p-3 rounded-2xl border border-border-subtle shadow-xs">
             <input
               type="text"
               placeholder="Search audit trail by operator, action, section, or IP..."
               value={auditSearch}
               onChange={(e) => setAuditSearch(e.target.value)}
-              className="w-full sm:max-w-md px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full sm:max-w-md px-3.5 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs font-medium focus:bg-surface-card focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <span className="text-xs text-slate-500 font-semibold whitespace-nowrap self-end sm:self-auto">
+            <span className="text-xs text-fg-muted font-semibold whitespace-nowrap self-end sm:self-auto">
               {filteredAuditLogs.length} Logged Actions
             </span>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="bg-surface-card rounded-2xl border border-border-subtle/80 shadow-xs overflow-hidden">
             {/* Mobile Audit Cards (< md) */}
-            <div className="md:hidden divide-y divide-slate-100">
+            <div className="md:hidden divide-y divide-border-faint">
               {filteredAuditLogs.map((log) => (
                 <div key={log.id} className="p-3.5 space-y-1.5">
                   <div className="flex flex-wrap items-center justify-between gap-1.5">
                     <Badge variant="info" size="sm" className="font-mono text-[10px] uppercase">
                       {log.tab}:{log.section}
                     </Badge>
-                    <span className="font-mono text-[10px] text-slate-400">
+                    <span className="font-mono text-[10px] text-fg-subtle">
                       {new Date(log.timestamp).toLocaleString()}
                     </span>
                   </div>
-                  <div className="text-xs font-semibold text-slate-800 leading-snug">
+                  <div className="text-xs font-semibold text-fg-strong leading-snug">
                     {log.action}
                   </div>
-                  <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-500">
-                    <span className="font-semibold text-slate-700 truncate">{log.operatorEmail}</span>
-                    <span className="font-mono text-[10px] text-slate-400">{log.ipAddress}</span>
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-fg-muted">
+                    <span className="font-semibold text-fg-secondary truncate">{log.operatorEmail}</span>
+                    <span className="font-mono text-[10px] text-fg-subtle">{log.ipAddress}</span>
                   </div>
                 </div>
               ))}
@@ -411,7 +411,7 @@ export function AdminAdvancedTab({
             {/* Desktop Audit Table (md+) */}
             <div className="hidden md:block overflow-x-auto custom-scrollbar min-w-full">
               <table className="w-full text-left text-xs min-w-[650px]">
-                <thead className="bg-slate-50/80 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <thead className="bg-surface-subtle/80 border-b border-border-subtle text-[10px] font-bold text-fg-subtle uppercase tracking-wider">
                   <tr>
                     <th className="px-4 py-3">Timestamp</th>
                     <th className="px-4 py-3">Operator</th>
@@ -420,13 +420,13 @@ export function AdminAdvancedTab({
                     <th className="px-4 py-3">IP Address</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border-faint">
                   {filteredAuditLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="px-4 py-3 font-mono text-slate-500 whitespace-nowrap">
+                    <tr key={log.id} className="hover:bg-surface-subtle/70 transition-colors">
+                      <td className="px-4 py-3 font-mono text-fg-muted whitespace-nowrap">
                         {new Date(log.timestamp).toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">
+                      <td className="px-4 py-3 font-semibold text-fg-primary whitespace-nowrap">
                         {log.operatorEmail}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -434,10 +434,10 @@ export function AdminAdvancedTab({
                           {log.tab}:{log.section}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-slate-700 font-medium">
+                      <td className="px-4 py-3 text-fg-secondary font-medium">
                         {log.action}
                       </td>
-                      <td className="px-4 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                      <td className="px-4 py-3 font-mono text-[11px] text-fg-subtle whitespace-nowrap">
                         {log.ipAddress}
                       </td>
                     </tr>
@@ -461,88 +461,88 @@ export function AdminAdvancedTab({
         <div className="space-y-6">
           {/* Infrastructure Health Monitors (from screenshot media_1789324367315.png) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
+            <Card variant="elevated" className="border-border-subtle bg-surface-card p-4 shadow-xs">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">DATABASE</span>
+                <span className="text-xs font-bold text-fg-muted uppercase tracking-wider">DATABASE</span>
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               </div>
-              <div className="font-extrabold text-sm text-slate-900">Cloud Database</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
+              <div className="font-extrabold text-sm text-fg-primary">Cloud Database</div>
+              <div className="text-[11px] text-fg-muted mt-0.5">
                 {firebaseStatus ? 'Connected & Synced' : 'Offline / Local Fallback'}
               </div>
-              <div className="mt-2 text-[10px] font-mono text-slate-400">
+              <div className="mt-2 text-[10px] font-mono text-fg-subtle">
                 Access Controls Active
               </div>
             </Card>
 
-            <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
+            <Card variant="elevated" className="border-border-subtle bg-surface-card p-4 shadow-xs">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">MAPPING API</span>
+                <span className="text-xs font-bold text-fg-muted uppercase tracking-wider">MAPPING API</span>
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               </div>
-              <div className="font-extrabold text-sm text-slate-900">Google Places / Roads</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
+              <div className="font-extrabold text-sm text-fg-primary">Google Places / Roads</div>
+              <div className="text-[11px] text-fg-muted mt-0.5">
                 Distance &amp; Address Lookup
               </div>
-              <div className="mt-2 text-[10px] font-mono text-slate-400">
+              <div className="mt-2 text-[10px] font-mono text-fg-subtle">
                 Latency: ~42ms (Optimal)
               </div>
             </Card>
 
-            <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
+            <Card variant="elevated" className="border-border-subtle bg-surface-card p-4 shadow-xs">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">PHONE &amp; SMS</span>
+                <span className="text-xs font-bold text-fg-muted uppercase tracking-wider">PHONE &amp; SMS</span>
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
               </div>
-              <div className="font-extrabold text-sm text-slate-900">Dispatch Softphone</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
+              <div className="font-extrabold text-sm text-fg-primary">Dispatch Softphone</div>
+              <div className="text-[11px] text-fg-muted mt-0.5">
                 Browser Audio Ready
               </div>
-              <div className="mt-2 text-[10px] font-mono text-slate-400">
+              <div className="mt-2 text-[10px] font-mono text-fg-subtle">
                 Line: (314) 738-0100
               </div>
             </Card>
 
-            <Card variant="elevated" className="border-slate-200 bg-white p-4 shadow-xs">
+            <Card variant="elevated" className="border-border-subtle bg-surface-card p-4 shadow-xs">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">PRICING</span>
+                <span className="text-xs font-bold text-fg-muted uppercase tracking-wider">PRICING</span>
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               </div>
-              <div className="font-extrabold text-sm text-slate-900">Live Fare Calculator</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
+              <div className="font-extrabold text-sm text-fg-primary">Live Fare Calculator</div>
+              <div className="text-[11px] text-fg-muted mt-0.5">
                 Rates, Extras &amp; Surcharges
               </div>
-              <div className="mt-2 text-[10px] font-mono text-slate-400">
+              <div className="mt-2 text-[10px] font-mono text-fg-subtle">
                 Active
               </div>
             </Card>
           </div>
 
           {/* Relocated Cross-Link: Live Map Route Polylines (`enableRealtimeRouting`) */}
-          <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
+          <Card variant="elevated" className="border-border-subtle bg-surface-card shadow-xs">
             <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h4 className="text-sm font-bold text-slate-900">
+                  <h4 className="text-sm font-bold text-fg-primary">
                     Routing Engine &amp; Live Google Maps Polylines
                   </h4>
                   {realtimeRouting ? (
                     <Badge
                       variant="success"
-                      className="bg-emerald-50 text-emerald-700 border-emerald-200 font-bold text-[10px]"
+                      className="bg-status-success-bg text-status-success-fg border-status-success-border font-bold text-[10px]"
                     >
                       Live Directions Active
                     </Badge>
                   ) : (
                     <Badge
                       variant="warning"
-                      className="bg-amber-50 text-amber-700 border-amber-200 font-bold text-[10px]"
+                      className="bg-status-warning-bg text-status-warning-fg border-status-warning-border font-bold text-[10px]"
                     >
                       Mock Curvature Active
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-fg-muted">
                   Live Map Route Polylines (<code>enableRealtimeRouting</code>), Conflict Guard windows, and Dispatch workspace defaults now live under <strong>Dispatch &amp; Automation &rarr; Console &amp; Conflict Guard</strong>.
                 </p>
               </div>
@@ -556,20 +556,20 @@ export function AdminAdvancedTab({
           </Card>
 
           {/* Maintenance Lock & Cache Operations */}
-          <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
-              <CardTitle className="text-base font-bold text-slate-900">
+          <Card variant="elevated" className="border-border-subtle bg-surface-card shadow-xs">
+            <CardHeader className="border-b border-border-faint bg-surface-subtle/50 p-5">
+              <CardTitle className="text-base font-bold text-fg-primary">
                 Maintenance Mode &amp; Local Storage Cache
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+              <CardDescription className="text-xs text-fg-muted">
                 Temporarily lock public booking access or purge browser-side configuration caching.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 space-y-4">
-              <div className="flex items-center justify-between gap-3 p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="flex items-center justify-between gap-3 p-3.5 sm:p-4 bg-surface-subtle border border-border-subtle rounded-xl">
                 <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-slate-900">Maintenance Mode</h4>
-                  <p className="text-[11px] text-slate-500">
+                  <h4 className="text-xs font-bold text-fg-primary">Maintenance Mode</h4>
+                  <p className="text-[11px] text-fg-muted">
                     Blocks client booking access while leaving admin dispatch fully operable.
                   </p>
                 </div>
@@ -592,10 +592,10 @@ export function AdminAdvancedTab({
                 />
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 bg-surface-subtle border border-border-subtle rounded-xl">
                 <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-slate-900">Purge Local Configuration Cache</h4>
-                  <p className="text-[11px] text-slate-500">
+                  <h4 className="text-xs font-bold text-fg-primary">Purge Local Configuration Cache</h4>
+                  <p className="text-[11px] text-fg-muted">
                     Clears client-side <code>localStorage</code> copy and forces immediate hydration from Firestore.
                   </p>
                 </div>
@@ -604,17 +604,17 @@ export function AdminAdvancedTab({
                   variant="outline"
                   size="sm"
                   onClick={handlePurgeCache}
-                  className="w-full sm:w-auto justify-center shrink-0 text-xs font-bold text-rose-700 border-rose-300 hover:bg-rose-50"
+                  className="w-full sm:w-auto justify-center shrink-0 text-xs font-bold text-status-danger-fg border-status-danger-border hover:bg-status-danger-bg"
                 >
                   Purge Local Cache
                 </Button>
               </div>
 
               {/* Fleet Tactical Alerts Retention & Auto-Dismiss Duration */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 bg-surface-subtle border border-border-subtle rounded-xl">
                 <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-slate-900">Fleet Tactical Alerts Auto-Dismiss Retention</h4>
-                  <p className="text-[11px] text-slate-500">
+                  <h4 className="text-xs font-bold text-fg-primary">Fleet Tactical Alerts Auto-Dismiss Retention</h4>
+                  <p className="text-[11px] text-fg-muted">
                     Automatically dismisses non-pinned tactical alerts from the Dispatch Console after a specified duration (1 hour default).
                   </p>
                 </div>
@@ -648,10 +648,10 @@ export function AdminAdvancedTab({
               </div>
 
               {/* Developer Stress Testing */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 bg-status-warning-bg border border-status-warning-border rounded-xl">
                 <div className="min-w-0">
-                  <h4 className="text-xs font-extrabold text-amber-900">Developer Tools: Seed Stress Data</h4>
-                  <p className="text-[11px] text-amber-700">
+                  <h4 className="text-xs font-extrabold text-status-warning-fg">Developer Tools: Seed Stress Data</h4>
+                  <p className="text-[11px] text-status-warning-fg">
                     Generates 100+ concurrent mock trips to test <code>/dispatch</code> virtualized rendering and smooth scrolling.
                   </p>
                 </div>
@@ -728,7 +728,7 @@ export function AdminAdvancedTab({
                         alert("Error seeding data. Check console for details.");
                       }
                     }}
-                    className="text-xs font-bold bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200"
+                    className="text-xs font-bold bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border hover:bg-status-warning-bg-strong"
                   >
                     Seed 120 Trips
                   </Button>
@@ -784,7 +784,7 @@ export function AdminAdvancedTab({
                         alert('Error purging mock trips. Check console for details.');
                       }
                     }}
-                    className="text-xs font-bold bg-rose-100 text-rose-800 border-rose-300 hover:bg-rose-200"
+                    className="text-xs font-bold bg-status-danger-bg-strong text-status-danger-fg border-status-danger-border hover:bg-rose-200"
                   >
                     Purge Mock Trips
                   </Button>

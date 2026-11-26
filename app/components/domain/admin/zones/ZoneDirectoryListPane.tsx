@@ -42,7 +42,7 @@ function getCategoryIcon(cat?: LocationCategory | string) {
     case 'hospital':
       return <HeartPulseIcon className="w-3.5 h-3.5 inline-block text-rose-600" />;
     default:
-      return <MapPinIcon className="w-3.5 h-3.5 inline-block text-slate-500" />;
+      return <MapPinIcon className="w-3.5 h-3.5 inline-block text-fg-muted" />;
   }
 }
 
@@ -78,8 +78,8 @@ export function ZoneSubTabActionBar({
   onStartCreateBlacklist,
 }: ZoneSubTabActionBarProps) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
-      <div className="text-xs font-bold text-slate-700 px-1 flex items-center gap-2 min-w-0">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-card p-3 rounded-2xl border border-border-subtle/80 shadow-xs">
+      <div className="text-xs font-bold text-fg-secondary px-1 flex items-center gap-2 min-w-0">
         {activeSubTab === 'zones' && (
           <>
             <MapPinIcon className="w-4 h-4 text-blue-600 shrink-0" />
@@ -115,7 +115,7 @@ export function ZoneSubTabActionBar({
               variant="outline"
               size="sm"
               onClick={onResetZones}
-              className="flex-1 sm:flex-none justify-center text-xs font-semibold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
+              className="flex-1 sm:flex-none justify-center text-xs font-semibold text-fg-strong hover:text-slate-950 border-border-strong hover:border-border-emphasis bg-surface-card hover:bg-surface-muted shadow-2xs"
             >
               Reset
             </Button>
@@ -125,7 +125,7 @@ export function ZoneSubTabActionBar({
               size="sm"
               onClick={onStartCreateZone}
               leftIcon={<PlusIcon className="w-4 h-4" />}
-              className="flex-1 sm:flex-none justify-center text-xs font-bold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
+              className="flex-1 sm:flex-none justify-center text-xs font-bold text-fg-strong hover:text-slate-950 border-border-strong hover:border-border-emphasis bg-surface-card hover:bg-surface-muted shadow-2xs"
             >
               Radius Zone
             </Button>
@@ -149,7 +149,7 @@ export function ZoneSubTabActionBar({
               variant="outline"
               size="sm"
               onClick={onResetGroups}
-              className="flex-1 sm:flex-none justify-center text-xs font-semibold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
+              className="flex-1 sm:flex-none justify-center text-xs font-semibold text-fg-strong hover:text-slate-950 border-border-strong hover:border-border-emphasis bg-surface-card hover:bg-surface-muted shadow-2xs"
             >
               Reset Presets
             </Button>
@@ -173,7 +173,7 @@ export function ZoneSubTabActionBar({
               variant="outline"
               size="sm"
               onClick={onResetCollections}
-              className="flex-1 sm:flex-none justify-center text-xs font-semibold text-slate-800 hover:text-slate-950 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-100 shadow-2xs"
+              className="flex-1 sm:flex-none justify-center text-xs font-semibold text-fg-strong hover:text-slate-950 border-border-strong hover:border-border-emphasis bg-surface-card hover:bg-surface-muted shadow-2xs"
             >
               Reset Presets
             </Button>
@@ -290,9 +290,9 @@ export function ZoneDirectoryListPane({
 }: ZoneDirectoryListPaneProps) {
   return (
     <>
-      <Card variant="elevated" className="border-slate-200 bg-white shadow-xs p-4">
+      <Card variant="elevated" className="border-border-subtle bg-surface-card shadow-xs p-4">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+          <span className="text-xs font-bold uppercase tracking-wider text-fg-secondary">
             {activeSubTab === 'zones' && 'Service Zones Directory'}
             {activeSubTab === 'groups' && 'Zone Groups Directory'}
             {activeSubTab === 'collections' && 'Location Collections Directory'}
@@ -300,14 +300,14 @@ export function ZoneDirectoryListPane({
         </div>
 
         {/* Archive State Filter Pills */}
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl mb-3">
+        <div className="flex items-center gap-1.5 bg-surface-muted p-1 rounded-xl mb-3">
           <button
             type="button"
             onClick={() => onChangeZoneArchiveFilter('active')}
             className={`flex-1 py-1 text-center rounded-lg text-xs font-bold transition-all ${
               zoneArchiveFilter === 'active'
-                ? 'bg-white text-blue-600 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-surface-card text-blue-600 shadow-xs'
+                : 'text-fg-secondary hover:text-fg-primary'
             }`}
           >
             Active
@@ -317,8 +317,8 @@ export function ZoneDirectoryListPane({
             onClick={() => onChangeZoneArchiveFilter('archived')}
             className={`flex-1 py-1 text-center rounded-lg text-xs font-bold transition-all ${
               zoneArchiveFilter === 'archived'
-                ? 'bg-amber-100 text-amber-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-status-warning-bg-strong text-status-warning-fg shadow-xs'
+                : 'text-fg-secondary hover:text-fg-primary'
             }`}
           >
             Archived
@@ -328,8 +328,8 @@ export function ZoneDirectoryListPane({
             onClick={() => onChangeZoneArchiveFilter('all')}
             className={`flex-1 py-1 text-center rounded-lg text-xs font-bold transition-all ${
               zoneArchiveFilter === 'all'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-surface-card text-fg-primary shadow-xs'
+                : 'text-fg-secondary hover:text-fg-primary'
             }`}
           >
             All
@@ -344,7 +344,7 @@ export function ZoneDirectoryListPane({
         />
 
         {isLoading ? (
-          <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2">
+          <div className="p-8 text-center text-fg-subtle flex items-center justify-center gap-2">
             <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
             <span className="text-xs">Loading geographic entities...</span>
           </div>
@@ -354,7 +354,7 @@ export function ZoneDirectoryListPane({
             {activeSubTab === 'zones' && (
               <div className="space-y-2 lg:max-h-[520px] lg:overflow-y-auto lg:pr-1">
                 {filteredZones.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400 text-xs">
+                  <div className="p-8 text-center text-fg-subtle text-xs">
                     No matching zones found. Click "Create Zone" to add one.
                   </div>
                 ) : (
@@ -366,8 +366,8 @@ export function ZoneDirectoryListPane({
                         onClick={() => onSelectZone(z.id)}
                         className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col gap-2 ${
                           isSelected
-                            ? 'border-blue-500 bg-blue-50/40 shadow-xs'
-                            : 'border-slate-200/90 hover:border-slate-300 bg-white'
+                            ? 'border-blue-500 bg-status-info-bg/40 shadow-xs'
+                            : 'border-border-subtle/90 hover:border-border-strong bg-surface-card'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -376,7 +376,7 @@ export function ZoneDirectoryListPane({
                               className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs"
                               style={{ backgroundColor: z.color || '#3b82f6' }}
                             />
-                            <h4 className="text-xs font-bold text-slate-900 leading-snug">
+                            <h4 className="text-xs font-bold text-fg-primary leading-snug">
                               {z.name}
                             </h4>
                           </div>
@@ -398,7 +398,7 @@ export function ZoneDirectoryListPane({
                               className={`w-5 h-5 rounded-full flex items-center justify-center ${
                                 z.isActive
                                   ? 'bg-emerald-500 text-white'
-                                  : 'bg-slate-200 text-slate-500'
+                                  : 'bg-surface-emphasis text-fg-muted'
                               }`}
                               title={z.isActive ? 'Active Zone' : 'Disabled'}
                             >
@@ -408,31 +408,31 @@ export function ZoneDirectoryListPane({
                         </div>
 
                         {z.description && (
-                          <p className="text-[11px] text-slate-500 line-clamp-2">
+                          <p className="text-[11px] text-fg-muted line-clamp-2">
                             {z.description}
                           </p>
                         )}
 
-                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100">
+                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-border-faint">
                           <div className="flex items-center gap-2">
                             {z.flatFee ? (
-                              <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                              <span className="font-bold text-status-success-fg bg-status-success-bg px-1.5 py-0.5 rounded">
                                 +${z.flatFee.toFixed(2)} Fee
                               </span>
                             ) : null}
                             {z.surchargeMultiplier && z.surchargeMultiplier > 1 ? (
-                              <span className="font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                              <span className="font-bold text-status-warning-fg bg-status-warning-bg px-1.5 py-0.5 rounded">
                                 {z.surchargeMultiplier}x Multiplier
                               </span>
                             ) : null}
                             {!z.flatFee && (!z.surchargeMultiplier || z.surchargeMultiplier === 1) && (
-                              <span className="text-slate-400">Standard Rate</span>
+                              <span className="text-fg-subtle">Standard Rate</span>
                             )}
                           </div>
 
                           <div className="flex flex-wrap items-center gap-1.5">
                             {z.isArchived && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border">
                                 ARCHIVED
                               </span>
                             )}
@@ -444,8 +444,8 @@ export function ZoneDirectoryListPane({
                               }}
                               className={`px-2 py-0.5 text-[10px] font-bold rounded border transition-colors ${
                                 z.isArchived
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-700'
+                                  ? 'bg-status-success-bg text-status-success-fg border-status-success-border hover:bg-status-success-bg-strong'
+                                  : 'bg-surface-subtle text-fg-secondary border-border-subtle hover:bg-status-warning-bg hover:text-status-warning-fg'
                               }`}
                               title={z.isArchived ? 'Restore Zone' : 'Archive Zone'}
                             >
@@ -457,7 +457,7 @@ export function ZoneDirectoryListPane({
                                 e.stopPropagation();
                                 onStartEditZone(z);
                               }}
-                              className="px-2 py-0.5 rounded hover:bg-slate-100 text-blue-600 font-semibold"
+                              className="px-2 py-0.5 rounded hover:bg-surface-muted text-blue-600 font-semibold"
                             >
                               Edit
                             </button>
@@ -467,7 +467,7 @@ export function ZoneDirectoryListPane({
                                 e.stopPropagation();
                                 onDeleteZone(z.id);
                               }}
-                              className="p-1 rounded hover:bg-red-50 text-red-500"
+                              className="p-1 rounded hover:bg-status-danger-bg text-red-500"
                               title="Delete Zone"
                             >
                               <TrashIcon className="w-3.5 h-3.5" />
@@ -485,7 +485,7 @@ export function ZoneDirectoryListPane({
             {activeSubTab === 'groups' && (
               <div className="space-y-2 lg:max-h-[520px] lg:overflow-y-auto lg:pr-1">
                 {filteredGroups.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400 text-xs">
+                  <div className="p-8 text-center text-fg-subtle text-xs">
                     No matching zone groups. Click "Create Zone Group" to cluster zones.
                   </div>
                 ) : (
@@ -498,8 +498,8 @@ export function ZoneDirectoryListPane({
                         onClick={() => onSelectGroup(g.id)}
                         className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col gap-2 ${
                           isSelected
-                            ? 'border-indigo-500 bg-indigo-50/40 shadow-xs'
-                            : 'border-slate-200/90 hover:border-slate-300 bg-white'
+                            ? 'border-indigo-500 bg-status-staged-bg/40 shadow-xs'
+                            : 'border-border-subtle/90 hover:border-border-strong bg-surface-card'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -508,7 +508,7 @@ export function ZoneDirectoryListPane({
                               className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs"
                               style={{ backgroundColor: g.color || '#6366f1' }}
                             />
-                            <h4 className="text-xs font-bold text-slate-900 leading-snug">
+                            <h4 className="text-xs font-bold text-fg-primary leading-snug">
                               {g.name}
                             </h4>
                           </div>
@@ -517,7 +517,7 @@ export function ZoneDirectoryListPane({
                             <Badge
                               variant="primary"
                               size="sm"
-                              className="text-[9px] uppercase font-bold bg-indigo-100 text-indigo-700"
+                              className="text-[9px] uppercase font-bold bg-status-staged-bg-strong text-status-staged-fg"
                             >
                               {g.zoneIds.length} {g.zoneIds.length === 1 ? 'Zone' : 'Zones'}
                             </Badge>
@@ -530,7 +530,7 @@ export function ZoneDirectoryListPane({
                               className={`w-5 h-5 rounded-full flex items-center justify-center ${
                                 g.isActive
                                   ? 'bg-emerald-500 text-white'
-                                  : 'bg-slate-200 text-slate-500'
+                                  : 'bg-surface-emphasis text-fg-muted'
                               }`}
                               title={g.isActive ? 'Active Group' : 'Disabled'}
                             >
@@ -540,7 +540,7 @@ export function ZoneDirectoryListPane({
                         </div>
 
                         {g.description && (
-                          <p className="text-[11px] text-slate-500 line-clamp-2">
+                          <p className="text-[11px] text-fg-muted line-clamp-2">
                             {g.description}
                           </p>
                         )}
@@ -550,7 +550,7 @@ export function ZoneDirectoryListPane({
                           {memberZones.map((mz) => (
                             <span
                               key={mz.id}
-                              className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1"
+                              className="px-1.5 py-0.5 rounded text-[10px] bg-surface-muted text-fg-secondary border border-border-subtle flex items-center gap-1"
                             >
                               <span
                                 className="w-1.5 h-1.5 rounded-full"
@@ -561,26 +561,26 @@ export function ZoneDirectoryListPane({
                           ))}
                         </div>
 
-                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100">
+                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-border-faint">
                           <div className="flex items-center gap-2">
                             {g.flatFee ? (
-                              <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                              <span className="font-bold text-status-success-fg bg-status-success-bg px-1.5 py-0.5 rounded">
                                 +${g.flatFee.toFixed(2)} Group Fee
                               </span>
                             ) : null}
                             {g.surchargeMultiplier && g.surchargeMultiplier > 1 ? (
-                              <span className="font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                              <span className="font-bold text-status-warning-fg bg-status-warning-bg px-1.5 py-0.5 rounded">
                                 {g.surchargeMultiplier}x Multiplier
                               </span>
                             ) : null}
                             {!g.flatFee && (!g.surchargeMultiplier || g.surchargeMultiplier === 1) && (
-                              <span className="text-slate-400">Cluster Preset</span>
+                              <span className="text-fg-subtle">Cluster Preset</span>
                             )}
                           </div>
 
                           <div className="flex flex-wrap items-center gap-1.5">
                             {g.isArchived && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border">
                                 ARCHIVED
                               </span>
                             )}
@@ -592,8 +592,8 @@ export function ZoneDirectoryListPane({
                               }}
                               className={`px-2 py-0.5 text-[10px] font-bold rounded border transition-colors ${
                                 g.isArchived
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-700'
+                                  ? 'bg-status-success-bg text-status-success-fg border-status-success-border hover:bg-status-success-bg-strong'
+                                  : 'bg-surface-subtle text-fg-secondary border-border-subtle hover:bg-status-warning-bg hover:text-status-warning-fg'
                               }`}
                               title={g.isArchived ? 'Restore Zone Group' : 'Archive Zone Group'}
                             >
@@ -605,7 +605,7 @@ export function ZoneDirectoryListPane({
                                 e.stopPropagation();
                                 onStartEditGroup(g);
                               }}
-                              className="px-2 py-0.5 rounded hover:bg-slate-100 text-indigo-600 font-semibold"
+                              className="px-2 py-0.5 rounded hover:bg-surface-muted text-indigo-600 font-semibold"
                             >
                               Edit
                             </button>
@@ -615,7 +615,7 @@ export function ZoneDirectoryListPane({
                                 e.stopPropagation();
                                 onDeleteGroup(g.id);
                               }}
-                              className="p-1 rounded hover:bg-red-50 text-red-500"
+                              className="p-1 rounded hover:bg-status-danger-bg text-red-500"
                               title="Delete Group"
                             >
                               <TrashIcon className="w-3.5 h-3.5" />
@@ -633,7 +633,7 @@ export function ZoneDirectoryListPane({
             {activeSubTab === 'collections' && (
               <div className="space-y-2 lg:max-h-[520px] lg:overflow-y-auto lg:pr-1">
                 {filteredCollections.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400 text-xs">
+                  <div className="p-8 text-center text-fg-subtle text-xs">
                     No matching collections found. Click "Create Collection" to add POIs.
                   </div>
                 ) : (
@@ -645,8 +645,8 @@ export function ZoneDirectoryListPane({
                         onClick={() => onSelectCollection(c.id)}
                         className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col gap-2 ${
                           isSelected
-                            ? 'border-emerald-500 bg-emerald-50/40 shadow-xs'
-                            : 'border-slate-200/90 hover:border-slate-300 bg-white'
+                            ? 'border-emerald-500 bg-status-success-bg/40 shadow-xs'
+                            : 'border-border-subtle/90 hover:border-border-strong bg-surface-card'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -654,7 +654,7 @@ export function ZoneDirectoryListPane({
                             <span className="text-sm">
                               {getCategoryIcon(c.category)}
                             </span>
-                            <h4 className="text-xs font-bold text-slate-900 leading-snug">
+                            <h4 className="text-xs font-bold text-fg-primary leading-snug">
                               {c.name}
                             </h4>
                           </div>
@@ -676,7 +676,7 @@ export function ZoneDirectoryListPane({
                               className={`w-5 h-5 rounded-full flex items-center justify-center ${
                                 c.isActive
                                   ? 'bg-emerald-500 text-white'
-                                  : 'bg-slate-200 text-slate-500'
+                                  : 'bg-surface-emphasis text-fg-muted'
                               }`}
                               title={c.isActive ? 'Active Collection' : 'Disabled'}
                             >
@@ -686,13 +686,13 @@ export function ZoneDirectoryListPane({
                         </div>
 
                         {c.description && (
-                          <p className="text-[11px] text-slate-500 line-clamp-2">
+                          <p className="text-[11px] text-fg-muted line-clamp-2">
                             {c.description}
                           </p>
                         )}
 
                         {/* POI List Preview */}
-                        <div className="space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-200/60 text-[10px]">
+                        <div className="space-y-1 bg-surface-subtle p-2 rounded-lg border border-border-subtle/60 text-[10px]">
                           {c.locations?.map((loc) => (
                             <div
                               key={loc.id}
@@ -700,28 +700,28 @@ export function ZoneDirectoryListPane({
                                 e.stopPropagation();
                                 onSelectPoi(loc.id, c.id);
                               }}
-                              className={`flex items-center justify-between p-1 rounded hover:bg-white transition-colors ${
-                                selectedPoiId === loc.id ? 'bg-white font-bold text-emerald-800' : 'text-slate-700'
+                              className={`flex items-center justify-between p-1 rounded hover:bg-surface-card transition-colors ${
+                                selectedPoiId === loc.id ? 'bg-surface-card font-bold text-status-success-fg' : 'text-fg-secondary'
                               }`}
                             >
                               <div className="flex items-center gap-1.5 truncate">
                                 <span>{getCategoryIcon(loc.category)}</span>
                                 <span className="truncate">{loc.name}</span>
                               </div>
-                              <span className="font-mono text-[9px] text-slate-400 shrink-0">
+                              <span className="font-mono text-[9px] text-fg-subtle shrink-0">
                                 {loc.coordinates.lat.toFixed(3)}, {loc.coordinates.lng.toFixed(3)}
                               </span>
                             </div>
                           ))}
                         </div>
 
-                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100">
+                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-border-faint">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-slate-600">
+                            <span className="font-semibold text-fg-secondary">
                               Buffer: {c.proximityRadiusMiles ?? 0.5} mi
                             </span>
                             {c.flatFee ? (
-                              <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                              <span className="font-bold text-status-success-fg bg-status-success-bg px-1.5 py-0.5 rounded">
                                 +${c.flatFee.toFixed(2)} Fee
                               </span>
                             ) : null}
@@ -729,7 +729,7 @@ export function ZoneDirectoryListPane({
 
                           <div className="flex flex-wrap items-center gap-1.5">
                             {c.isArchived && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border">
                                 ARCHIVED
                               </span>
                             )}
@@ -741,8 +741,8 @@ export function ZoneDirectoryListPane({
                               }}
                               className={`px-2 py-0.5 text-[10px] font-bold rounded border transition-colors ${
                                 c.isArchived
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-700'
+                                  ? 'bg-status-success-bg text-status-success-fg border-status-success-border hover:bg-status-success-bg-strong'
+                                  : 'bg-surface-subtle text-fg-secondary border-border-subtle hover:bg-status-warning-bg hover:text-status-warning-fg'
                               }`}
                               title={c.isArchived ? 'Restore Collection' : 'Archive Collection'}
                             >
@@ -754,7 +754,7 @@ export function ZoneDirectoryListPane({
                                 e.stopPropagation();
                                 onStartEditCollection(c);
                               }}
-                              className="px-2 py-0.5 rounded hover:bg-slate-100 text-emerald-600 font-semibold"
+                              className="px-2 py-0.5 rounded hover:bg-surface-muted text-emerald-600 font-semibold"
                             >
                               Edit
                             </button>
@@ -764,7 +764,7 @@ export function ZoneDirectoryListPane({
                                 e.stopPropagation();
                                 onDeleteCollection(c.id);
                               }}
-                              className="p-1 rounded hover:bg-red-50 text-red-500"
+                              className="p-1 rounded hover:bg-status-danger-bg text-red-500"
                               title="Delete Collection"
                             >
                               <TrashIcon className="w-3.5 h-3.5" />
@@ -773,20 +773,20 @@ export function ZoneDirectoryListPane({
                         </div>
 
                         {/* Autocomplete Consolidation Row */}
-                        <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100 bg-slate-50/50 -mx-3 -mb-3 px-3 py-1.5 rounded-b-xl">
+                        <div className="flex items-center justify-between text-[10px] pt-1 border-t border-border-faint bg-surface-subtle/50 -mx-3 -mb-3 px-3 py-1.5 rounded-b-xl">
                           <div className="flex items-center gap-1.5">
                             {c.consolidateInAutocomplete ? (
-                              <span className="font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                              <span className="font-bold px-1.5 py-0.5 rounded-full bg-status-success-bg-strong text-status-success-fg border border-status-success-border flex items-center gap-1">
                                 <ZapIcon className="w-2.5 h-2.5" />
                                 Consolidated
                               </span>
                             ) : (
-                              <span className="font-medium px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+                              <span className="font-medium px-1.5 py-0.5 rounded-full bg-surface-muted text-fg-muted border border-border-subtle">
                                 Standard Autocomplete
                               </span>
                             )}
                             {c.consolidateInAutocomplete && c.canonicalPlace?.name && (
-                              <span className="text-slate-500 truncate max-w-[150px]" title={c.canonicalPlace.name}>
+                              <span className="text-fg-muted truncate max-w-[150px]" title={c.canonicalPlace.name}>
                                 → {c.canonicalPlace.name}
                               </span>
                             )}
@@ -799,8 +799,8 @@ export function ZoneDirectoryListPane({
                             }}
                             className={`px-2 py-0.5 font-bold rounded border transition-colors ${
                               c.consolidateInAutocomplete
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
-                                : 'bg-white text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
+                                ? 'bg-status-success-bg text-status-success-fg border-status-success-border hover:bg-status-success-bg-strong'
+                                : 'bg-surface-card text-fg-secondary border-border-subtle hover:bg-status-success-bg hover:text-status-success-fg'
                             }`}
                             title="Toggle Client Autocomplete Consolidation"
                           >
@@ -821,7 +821,7 @@ export function ZoneDirectoryListPane({
       {activeSubTab === 'blacklists' && (
         <div className="space-y-2 lg:max-h-[520px] lg:overflow-y-auto lg:pr-1">
           {filteredBlacklists.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-xs">
+            <div className="p-8 text-center text-fg-subtle text-xs">
               No blacklisted locations found. Click "Create Exclusion Zone" to add one.
             </div>
           ) : (
@@ -833,8 +833,8 @@ export function ZoneDirectoryListPane({
                   onClick={() => onSelectBlacklist(c.id)}
                   className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col gap-2 ${
                     isSelected
-                      ? 'border-red-500 bg-red-50/40 shadow-xs'
-                      : 'border-slate-200/90 hover:border-slate-300 bg-white'
+                      ? 'border-red-500 bg-status-danger-bg/40 shadow-xs'
+                      : 'border-border-subtle/90 hover:border-border-strong bg-surface-card'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -842,7 +842,7 @@ export function ZoneDirectoryListPane({
                       <span className="w-3.5 h-3.5 rounded-full shrink-0 shadow-xs bg-red-600 flex items-center justify-center text-white">
                         <AlertTriangleIcon className="w-2.5 h-2.5" />
                       </span>
-                      <h4 className="text-xs font-bold text-slate-900 leading-snug">
+                      <h4 className="text-xs font-bold text-fg-primary leading-snug">
                         {c.name}
                       </h4>
                     </div>
@@ -864,7 +864,7 @@ export function ZoneDirectoryListPane({
                         className={`w-5 h-5 rounded-full flex items-center justify-center ${
                           c.isActive
                             ? 'bg-red-500 text-white'
-                            : 'bg-slate-200 text-slate-500'
+                            : 'bg-surface-emphasis text-fg-muted'
                         }`}
                         title={c.isActive ? 'Active' : 'Disabled'}
                       >
@@ -873,11 +873,11 @@ export function ZoneDirectoryListPane({
                     </div>
                   </div>
                   {c.reasonCode && (
-                    <p className="text-[11px] text-slate-500 line-clamp-1">
+                    <p className="text-[11px] text-fg-muted line-clamp-1">
                       {c.reasonCode}
                     </p>
                   )}
-                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-border-faint">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <button
                         type="button"
@@ -885,7 +885,7 @@ export function ZoneDirectoryListPane({
                           e.stopPropagation();
                           onStartEditBlacklist(c);
                         }}
-                        className="px-2 py-0.5 rounded hover:bg-slate-100 text-blue-600 font-semibold"
+                        className="px-2 py-0.5 rounded hover:bg-surface-muted text-blue-600 font-semibold"
                       >
                         Edit
                       </button>
@@ -895,7 +895,7 @@ export function ZoneDirectoryListPane({
                           e.stopPropagation();
                           onDeleteBlacklist(c.id);
                         }}
-                        className="p-1 rounded hover:bg-red-50 text-red-500"
+                        className="p-1 rounded hover:bg-status-danger-bg text-red-500"
                         title="Delete"
                       >
                         <TrashIcon className="w-3.5 h-3.5" />

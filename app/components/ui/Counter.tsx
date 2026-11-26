@@ -53,19 +53,19 @@ export function Counter({
       {label && (
         <span
           id={counterId}
-          className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+          className="block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
         >
           {label}
           {required && <span className="text-amber-600 ml-1" title="Required">*</span>}
         </span>
       )}
 
-      <div className="flex items-center justify-between p-2 rounded-xl border border-slate-200 bg-white">
+      <div className="flex items-center justify-between p-2 rounded-xl border border-border-subtle bg-surface-card">
         <div className="pl-2">
-          <span className="text-base font-bold text-slate-900 tabular-nums">
+          <span className="text-base font-bold text-fg-primary tabular-nums">
             {value}
           </span>
-          <span className="text-xs text-slate-400 ml-2">
+          <span className="text-xs text-fg-subtle ml-2">
             (min {min}, max {max})
           </span>
         </div>
@@ -76,7 +76,7 @@ export function Counter({
             onClick={decrement}
             disabled={!canDecrement}
             aria-label={`Decrease ${label || 'count'}`}
-            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            className="w-8 h-8 rounded-lg border border-border-subtle flex items-center justify-center text-fg-secondary hover:bg-surface-subtle active:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
           >
             <MinusIcon className="w-3.5 h-3.5" />
           </button>
@@ -86,7 +86,7 @@ export function Counter({
             onClick={increment}
             disabled={!canIncrement}
             aria-label={`Increase ${label || 'count'}`}
-            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            className="w-8 h-8 rounded-lg border border-border-subtle flex items-center justify-center text-fg-secondary hover:bg-surface-subtle active:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
           >
             <PlusIcon className="w-3.5 h-3.5" />
           </button>
@@ -100,7 +100,7 @@ export function Counter({
       )}
 
       {!error && helperText && (
-        <p id={helperId} className="text-xs text-slate-500 mt-0.5">
+        <p id={helperId} className="text-xs text-fg-muted mt-0.5">
           {helperText}
         </p>
       )}

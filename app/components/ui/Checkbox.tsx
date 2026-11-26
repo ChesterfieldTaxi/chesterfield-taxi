@@ -70,7 +70,7 @@ export function Checkbox({
           />
           <div
             className={`${boxDims} border flex items-center justify-center transition-all ${
-              checked ? palette.checked : 'bg-white border-slate-300 hover:border-slate-400'
+              checked ? palette.checked : 'bg-surface-card border-border-strong hover:border-border-emphasis'
             }`}
           >
             {checked && <CheckIcon className={iconDims} />}
@@ -78,7 +78,7 @@ export function Checkbox({
         </div>
 
         {label && (
-          <div className="flex-1 text-sm text-slate-700 leading-snug">
+          <div className="flex-1 text-sm text-fg-secondary leading-snug">
             <span>{label}</span>
             {required && <span className="text-blue-600 ml-1" title="Required">*</span>}
           </div>
@@ -91,7 +91,7 @@ export function Checkbox({
         </p>
       )}
       {!error && helperText && (
-        <p id={helperId} className="text-xs text-slate-500 pl-7 mt-0.5">
+        <p id={helperId} className="text-xs text-fg-muted pl-7 mt-0.5">
           {helperText}
         </p>
       )}

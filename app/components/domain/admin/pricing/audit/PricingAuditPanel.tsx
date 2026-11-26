@@ -52,21 +52,21 @@ const PILLAR_LABELS: Record<PricingAuditEvent['pillar'], string> = {
 
 function getActionBadgeMeta(action: PricingAuditAction): { label: string; className: string } {
   if (action === 'surcharge_enabled' || action === 'rule_enabled') {
-    return { label: 'ENABLED', className: 'bg-emerald-100 text-emerald-900 border-emerald-300' };
+    return { label: 'ENABLED', className: 'bg-status-success-bg-strong text-status-success-fg border-status-success-border' };
   }
   if (action === 'surcharge_disabled' || action === 'rule_disabled') {
-    return { label: 'DISABLED', className: 'bg-slate-200 text-slate-800 border-slate-300' };
+    return { label: 'DISABLED', className: 'bg-surface-emphasis text-fg-strong border-border-strong' };
   }
   if (action === 'surcharge_created' || action === 'tariff_created' || action === 'rule_created') {
-    return { label: 'CREATED', className: 'bg-indigo-100 text-indigo-900 border-indigo-300' };
+    return { label: 'CREATED', className: 'bg-status-staged-bg-strong text-status-staged-fg border-status-staged-border' };
   }
   if (action === 'surcharge_deleted' || action === 'tariff_deleted' || action === 'rule_deleted') {
-    return { label: 'DELETED', className: 'bg-rose-100 text-rose-900 border-rose-300' };
+    return { label: 'DELETED', className: 'bg-status-danger-bg-strong text-status-danger-fg border-status-danger-border' };
   }
   if (action === 'surcharge_legacy_migrated') {
-    return { label: 'MIGRATED', className: 'bg-blue-100 text-blue-900 border-blue-300' };
+    return { label: 'MIGRATED', className: 'bg-status-info-bg-strong text-status-info-fg border-status-info-border' };
   }
-  return { label: 'UPDATED', className: 'bg-blue-100 text-blue-900 border-blue-300' };
+  return { label: 'UPDATED', className: 'bg-status-info-bg-strong text-status-info-fg border-status-info-border' };
 }
 
 function formatDiffValue(val: PricingFieldDiff['before']): string {
@@ -180,15 +180,15 @@ export function PricingAuditPanel({
   return (
     <div className="space-y-4">
       {showHeader && (
-        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="p-4 bg-surface-card rounded-2xl border border-border-subtle shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-extrabold text-slate-900">Pricing &amp; Surcharge Audit Log</h3>
-              <Badge variant="outline" className="text-[10px] font-mono bg-slate-100 text-slate-700 border-slate-200">
+              <h3 className="text-base font-extrabold text-fg-primary">Pricing &amp; Surcharge Audit Log</h3>
+              <Badge variant="outline" className="text-[10px] font-mono bg-surface-muted text-fg-secondary border-border-subtle">
                 {filteredEvents.length} / {events.length} events
               </Badge>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-fg-muted mt-0.5">
               Immutable before/after history of surcharge On/Off toggles, active durations, tariffs, extras &amp; firewall rules.
             </p>
           </div>
@@ -198,7 +198,7 @@ export function PricingAuditPanel({
             size="sm"
             disabled={filteredEvents.length === 0}
             onClick={handleExportCsv}
-            className="h-8 text-xs bg-white border-slate-300 text-slate-800 hover:bg-slate-50 shrink-0"
+            className="h-8 text-xs bg-surface-card border-border-strong text-fg-strong hover:bg-surface-subtle shrink-0"
           >
             <DownloadIcon className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
             Export Audit CSV
@@ -207,7 +207,7 @@ export function PricingAuditPanel({
       )}
 
       {/* Filter Toolbar */}
-      <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3">
+      <div className="p-3.5 rounded-xl bg-surface-card border border-border-subtle shadow-2xs space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
             {FILTER_PILLS.map((pill) => {
@@ -226,8 +226,8 @@ export function PricingAuditPanel({
                     active
                       ? pill.id === 'surcharges_on_off'
                         ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                        : 'bg-slate-900 text-white border-slate-900 shadow-2xs'
-                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+                        : 'bg-surface-header text-white border-slate-900 shadow-2xs'
+                      : 'bg-surface-subtle text-fg-secondary border-border-subtle hover:bg-surface-muted hover:text-fg-primary'
                   }`}
                 >
                   {pill.label}
@@ -242,7 +242,7 @@ export function PricingAuditPanel({
               size="sm"
               disabled={filteredEvents.length === 0}
               onClick={handleExportCsv}
-              className="h-7.5 text-xs bg-white border-slate-300 text-slate-800"
+              className="h-7.5 text-xs bg-surface-card border-border-strong text-fg-strong"
             >
               <DownloadIcon className="w-3 h-3 mr-1 text-blue-600" />
               CSV
@@ -273,20 +273,20 @@ export function PricingAuditPanel({
             </Select>
           </div>
           <div className="sm:col-span-7 relative">
-            <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
+            <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-fg-subtle" />
             <Input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search item, operator, note, or field..."
-              className="h-8.5 text-xs pl-8 pr-7 bg-slate-50 focus:bg-white border-slate-200 text-slate-900 w-full"
+              className="h-8.5 text-xs pl-8 pr-7 bg-surface-subtle focus:bg-surface-card border-border-subtle text-fg-primary w-full"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
                 aria-label="Clear search"
-                className="absolute right-2 top-2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                className="absolute right-2 top-2 text-fg-subtle hover:text-fg-secondary cursor-pointer"
               >
                 <XIcon className="w-3.5 h-3.5" />
               </button>
@@ -297,10 +297,10 @@ export function PricingAuditPanel({
 
       {/* Timeline Feed */}
       {filteredEvents.length === 0 ? (
-        <div className="p-10 rounded-xl bg-white border border-dashed border-slate-200 text-center space-y-2">
+        <div className="p-10 rounded-xl bg-surface-card border border-dashed border-border-subtle text-center space-y-2">
           <HistoryIcon className="w-7 h-7 text-slate-300 mx-auto" />
-          <p className="text-sm font-bold text-slate-700">No matching audit events</p>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+          <p className="text-sm font-bold text-fg-secondary">No matching audit events</p>
+          <p className="text-xs text-fg-muted max-w-sm mx-auto">
             Toggle any surcharge On/Off or save changes in Tariffs, Rules, or Extras to record before/after provenance here.
           </p>
         </div>
@@ -312,53 +312,53 @@ export function PricingAuditPanel({
             const durationStr =
               ev.activeDurationMinutes !== undefined ? formatActiveDuration(ev.activeDurationMinutes) : '';
             return (
-              <div key={ev.id} className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2.5">
+              <div key={ev.id} className="p-4 rounded-xl bg-surface-card border border-border-subtle shadow-2xs space-y-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide border ${badge.className}`}>
                       {badge.label}
                     </span>
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200">
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-surface-muted text-fg-secondary border border-border-subtle">
                       {PILLAR_LABELS[ev.pillar] || ev.pillar}
                     </span>
                     {durationStr && (
-                      <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-300 inline-flex items-center gap-1">
-                        <ClockIcon className="w-3 h-3 text-amber-700" />
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-status-warning-bg text-status-warning-fg border border-status-warning-border inline-flex items-center gap-1">
+                        <ClockIcon className="w-3 h-3 text-status-warning-fg" />
                         Active {durationStr}
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] font-mono text-slate-500">{formatTimestampFull(ev.timestamp)}</span>
+                  <span className="text-[11px] font-mono text-fg-muted">{formatTimestampFull(ev.timestamp)}</span>
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-slate-900">{ev.targetName}</div>
-                  <p className="text-xs text-slate-600 mt-0.5">{ev.summary}</p>
+                  <div className="text-sm font-bold text-fg-primary">{ev.targetName}</div>
+                  <p className="text-xs text-fg-secondary mt-0.5">{ev.summary}</p>
                 </div>
                 {ev.diffs && ev.diffs.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pt-0.5">
                     {ev.diffs.map((diff, idx) => (
                       <span
                         key={`${ev.id}-${diff.field}-${idx}`}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200 text-[11px] font-mono text-slate-800"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-subtle border border-border-subtle text-[11px] font-mono text-fg-strong"
                       >
-                        <span className="font-sans font-semibold text-slate-500">{diff.label}:</span>
-                        <span className="text-slate-500">{formatDiffValue(diff.before)}</span>
-                        <span className="text-slate-400">→</span>
-                        <span className="font-bold text-slate-900">{formatDiffValue(diff.after)}</span>
+                        <span className="font-sans font-semibold text-fg-muted">{diff.label}:</span>
+                        <span className="text-fg-muted">{formatDiffValue(diff.before)}</span>
+                        <span className="text-fg-subtle">→</span>
+                        <span className="font-bold text-fg-primary">{formatDiffValue(diff.after)}</span>
                       </span>
                     ))}
                   </div>
                 )}
-                <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
-                  <div className="flex items-center gap-1.5 text-slate-500 min-w-0 flex-wrap">
-                    <UserIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="font-semibold text-slate-700">{ev.operatorName}</span>
-                    <span className="text-slate-400">({ev.operatorEmail})</span>
+                <div className="pt-2 border-t border-border-faint flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-fg-muted min-w-0 flex-wrap">
+                    <UserIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
+                    <span className="font-semibold text-fg-secondary">{ev.operatorName}</span>
+                    <span className="text-fg-subtle">({ev.operatorEmail})</span>
                   </div>
                   {!isEditing ? (
                     <div className="flex items-center gap-2 flex-wrap">
                       {ev.note && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-50/90 text-amber-950 border border-amber-200 font-medium italic">
+                        <span className="px-2 py-0.5 rounded-full bg-status-warning-bg/90 text-status-warning-fg border border-status-warning-border font-medium italic">
                           &ldquo;{ev.note}&rdquo;
                         </span>
                       )}
@@ -368,7 +368,7 @@ export function PricingAuditPanel({
                           setEditingEventId(ev.id);
                           setNoteInput(ev.note || '');
                         }}
-                        className="text-blue-600 hover:text-blue-800 font-semibold hover:underline cursor-pointer"
+                        className="text-blue-600 hover:text-status-info-fg font-semibold hover:underline cursor-pointer"
                       >
                         {ev.note ? 'Edit note' : '+ Add note'}
                       </button>
@@ -381,7 +381,7 @@ export function PricingAuditPanel({
                         onChange={(e) => setNoteInput(e.target.value)}
                         placeholder="Add operational reason / note..."
                         autoFocus
-                        className="h-7 flex-1 sm:w-56 rounded-md border border-blue-300 bg-white px-2 text-xs text-slate-900"
+                        className="h-7 flex-1 sm:w-56 rounded-md border border-status-info-border bg-surface-card px-2 text-xs text-fg-primary"
                       />
                       <button
                         type="button"
@@ -394,7 +394,7 @@ export function PricingAuditPanel({
                       <button
                         type="button"
                         onClick={() => setEditingEventId(null)}
-                        className="px-2 py-1 rounded-md bg-white border border-slate-300 text-slate-600 cursor-pointer"
+                        className="px-2 py-1 rounded-md bg-surface-card border border-border-strong text-fg-secondary cursor-pointer"
                       >
                         Cancel
                       </button>

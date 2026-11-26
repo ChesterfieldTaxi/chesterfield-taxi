@@ -32,10 +32,10 @@ export function SegmentedControl<T extends string = string>({
 }: SegmentedControlProps<T>) {
   const containerVariantCls =
     variant === 'dark'
-      ? 'bg-slate-900 border border-slate-700/90'
+      ? 'bg-surface-header border border-border-header/90'
       : variant === 'brand'
-      ? 'bg-blue-50/80 border border-blue-200/80'
-      : 'bg-slate-100 border border-slate-200/80';
+      ? 'bg-status-info-bg/80 border border-status-info-border/80'
+      : 'bg-surface-muted border border-border-subtle/80';
 
   const containerSizeCls =
     size === 'xs'
@@ -64,13 +64,13 @@ export function SegmentedControl<T extends string = string>({
             ? 'bg-blue-600 text-white shadow-xs'
             : variant === 'brand'
             ? 'bg-blue-600 text-white shadow-xs'
-            : 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-200/80';
+            : 'bg-surface-card text-fg-primary shadow-xs ring-1 ring-border-subtle/80';
         const inactiveCls =
           variant === 'dark'
-            ? 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+            ? 'text-slate-300 hover:text-white hover:bg-surface-header-elevated/80'
             : variant === 'brand'
-            ? 'text-blue-800 hover:text-blue-950 hover:bg-blue-100/60'
-            : 'text-slate-600 hover:text-slate-900 hover:bg-white/60';
+            ? 'text-status-info-fg hover:text-status-info-fg hover:bg-status-info-bg-strong/60'
+            : 'text-fg-secondary hover:text-fg-primary hover:bg-surface-card/60';
 
         return (
           <button

@@ -66,24 +66,24 @@ export function CorporateAssetsSection({
   };
 
   return (
-    <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-3.5">
-      <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+    <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-3.5">
+      <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
         <UsersIcon className="w-4 h-4 text-indigo-600" />
-        <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+        <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
           Authorized Riders, Cost Centers &amp; Saved Places
         </h3>
       </div>
 
       {/* Cost Centers */}
       <div>
-        <label className="font-semibold text-slate-700 block mb-1">Cost Centers</label>
+        <label className="font-semibold text-fg-secondary block mb-1">Cost Centers</label>
         <div className="flex gap-2 mb-2">
           <input
             type="text"
             value={newCostCenter}
             onChange={(e) => setNewCostCenter(e.target.value)}
             placeholder="e.g. EXEC-100"
-            className="flex-1 h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+            className="flex-1 h-8 px-2.5 bg-surface-card border border-border-strong rounded-lg text-xs font-mono"
           />
           <Button type="button" size="sm" variant="outline" onClick={addCostCenter}>
             + Add
@@ -93,7 +93,7 @@ export function CorporateAssetsSection({
           {(editingCorp.costCenters || []).map((cc) => (
             <span
               key={cc}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 font-mono font-bold text-[10px]"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-muted border border-border-subtle font-mono font-bold text-[10px]"
             >
               {cc}
               <button
@@ -104,7 +104,7 @@ export function CorporateAssetsSection({
                     costCenters: (editingCorp.costCenters || []).filter((x) => x !== cc),
                   })
                 }
-                className="text-slate-400 hover:text-rose-600 cursor-pointer"
+                className="text-fg-subtle hover:text-rose-600 cursor-pointer"
               >
                 <XIcon className="w-3 h-3" />
               </button>
@@ -114,22 +114,22 @@ export function CorporateAssetsSection({
       </div>
 
       {/* Authorized Riders */}
-      <div className="pt-2 border-t border-slate-100">
-        <label className="font-semibold text-slate-700 block mb-1">Authorized Riders</label>
+      <div className="pt-2 border-t border-border-faint">
+        <label className="font-semibold text-fg-secondary block mb-1">Authorized Riders</label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
           <input
             type="text"
             value={newRiderName}
             onChange={(e) => setNewRiderName(e.target.value)}
             placeholder="Rider Name"
-            className="h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs"
+            className="h-8 px-2.5 bg-surface-card border border-border-strong rounded-lg text-xs"
           />
           <input
             type="email"
             value={newRiderEmail}
             onChange={(e) => setNewRiderEmail(e.target.value)}
             placeholder="Rider Email"
-            className="h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs"
+            className="h-8 px-2.5 bg-surface-card border border-border-strong rounded-lg text-xs"
           />
           <div className="flex gap-1.5">
             <input
@@ -137,7 +137,7 @@ export function CorporateAssetsSection({
               value={newRiderDept}
               onChange={(e) => setNewRiderDept(e.target.value)}
               placeholder="Dept"
-              className="flex-1 h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs"
+              className="flex-1 h-8 px-2.5 bg-surface-card border border-border-strong rounded-lg text-xs"
             />
             <Button type="button" size="sm" variant="outline" onClick={addAuthorizedRider}>
               Add
@@ -148,9 +148,9 @@ export function CorporateAssetsSection({
           {(editingCorp.authorizedRiders || []).map((r) => (
             <div
               key={r.id}
-              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-100"
+              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-surface-subtle border border-border-faint"
             >
-              <span className="truncate font-medium text-slate-800">
+              <span className="truncate font-medium text-fg-strong">
                 {r.name} {r.department ? `(${r.department})` : ''} {r.email ? `· ${r.email}` : ''}
               </span>
               <button
@@ -161,7 +161,7 @@ export function CorporateAssetsSection({
                     authorizedRiders: (editingCorp.authorizedRiders || []).filter((x) => x.id !== r.id),
                   })
                 }
-                className="text-slate-400 hover:text-rose-600 cursor-pointer"
+                className="text-fg-subtle hover:text-rose-600 cursor-pointer"
               >
                 <TrashIcon className="w-3.5 h-3.5" />
               </button>
@@ -171,9 +171,9 @@ export function CorporateAssetsSection({
       </div>
 
       {/* Saved Company Locations */}
-      <div className="pt-2 border-t border-slate-100">
-        <label className="font-semibold text-slate-700 block mb-1 flex items-center gap-1">
-          <MapPinIcon className="w-3.5 h-3.5 text-slate-500" />
+      <div className="pt-2 border-t border-border-faint">
+        <label className="font-semibold text-fg-secondary block mb-1 flex items-center gap-1">
+          <MapPinIcon className="w-3.5 h-3.5 text-fg-muted" />
           <span>Saved Company Locations</span>
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
@@ -182,7 +182,7 @@ export function CorporateAssetsSection({
             value={newLocLabel}
             onChange={(e) => setNewLocLabel(e.target.value)}
             placeholder="Label (e.g. HQ West Gate)"
-            className="h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs"
+            className="h-8 px-2.5 bg-surface-card border border-border-strong rounded-lg text-xs"
           />
           <div className="sm:col-span-2 flex gap-1.5">
             <input
@@ -190,7 +190,7 @@ export function CorporateAssetsSection({
               value={newLocAddress}
               onChange={(e) => setNewLocAddress(e.target.value)}
               placeholder="Street Address"
-              className="flex-1 h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs"
+              className="flex-1 h-8 px-2.5 bg-surface-card border border-border-strong rounded-lg text-xs"
             />
             <Button type="button" size="sm" variant="outline" onClick={addSavedLocation}>
               Save
@@ -201,9 +201,9 @@ export function CorporateAssetsSection({
           {(editingCorp.savedCompanyLocations || []).map((loc) => (
             <div
               key={loc.id}
-              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-100"
+              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-surface-subtle border border-border-faint"
             >
-              <span className="truncate text-slate-800">
+              <span className="truncate text-fg-strong">
                 <strong>{loc.label}:</strong> {loc.address}
               </span>
               <button
@@ -216,7 +216,7 @@ export function CorporateAssetsSection({
                     ),
                   })
                 }
-                className="text-slate-400 hover:text-rose-600 cursor-pointer"
+                className="text-fg-subtle hover:text-rose-600 cursor-pointer"
               >
                 <TrashIcon className="w-3.5 h-3.5" />
               </button>

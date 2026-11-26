@@ -18,15 +18,15 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 }
 
 const variantStyles: Record<BadgeVariant, string> = {
-  default: 'bg-slate-100 text-slate-800 border-slate-200',
-  primary: 'bg-amber-100 text-amber-900 border-amber-300',
-  success: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  warning: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-  danger: 'bg-red-100 text-red-800 border-red-300',
-  outline: 'bg-transparent text-slate-700 border-slate-300',
-  info: 'bg-blue-100 text-blue-800 border-blue-300',
-  neutral: 'bg-slate-100 text-slate-700 border-slate-200',
-  error: 'bg-red-100 text-red-800 border-red-300',
+  default: 'bg-surface-muted text-fg-strong border-border-subtle',
+  primary: 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border',
+  success: 'bg-status-success-bg-strong text-status-success-fg border-status-success-border',
+  warning: 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border',
+  danger: 'bg-status-danger-bg-strong text-status-danger-fg border-status-danger-border',
+  outline: 'bg-transparent text-fg-secondary border-border-strong',
+  info: 'bg-status-info-bg-strong text-status-info-fg border-status-info-border',
+  neutral: 'bg-surface-muted text-fg-secondary border-border-subtle',
+  error: 'bg-status-danger-bg-strong text-status-danger-fg border-status-danger-border',
 };
 
 

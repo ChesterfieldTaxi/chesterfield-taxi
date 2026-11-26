@@ -61,15 +61,15 @@ export function CorporateGovernanceCard({
   };
 
   return (
-    <Card className="border border-indigo-200/80 bg-white shadow-xs">
-      <CardHeader className="pb-3 border-b border-slate-100">
+    <Card className="border border-status-staged-border/80 bg-surface-card shadow-xs">
+      <CardHeader className="pb-3 border-b border-border-faint">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <CardTitle className="text-sm font-black text-slate-900 flex items-center gap-2">
+            <CardTitle className="text-sm font-black text-fg-primary flex items-center gap-2">
               <ShieldCheckIcon className="w-4 h-4 text-indigo-600 shrink-0" />
               <span>Global Corporate Portal &amp; PO Governance</span>
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
+            <CardDescription className="text-xs text-fg-muted">
               Controls self-service permissions on <code>/app/corporate</code> and company-wide PO format validation.
             </CardDescription>
           </div>
@@ -91,16 +91,16 @@ export function CorporateGovernanceCard({
 
       <CardContent className="pt-3.5 space-y-3 text-xs">
         {regexError && (
-          <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-semibold">
+          <div className="p-2.5 rounded-xl bg-status-danger-bg border border-status-danger-border text-status-danger-fg font-semibold">
             {regexError}
           </div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <label className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start justify-between gap-2 cursor-pointer">
+          <label className="p-2.5 rounded-xl bg-surface-subtle border border-border-subtle/80 flex items-start justify-between gap-2 cursor-pointer">
             <div>
-              <span className="font-bold text-slate-900 block">Self-Manage Riders</span>
-              <span className="text-[11px] text-slate-500">
+              <span className="font-bold text-fg-primary block">Self-Manage Riders</span>
+              <span className="text-[11px] text-fg-muted">
                 Allow portal managers to add/remove authorized travelers
               </span>
             </div>
@@ -114,10 +114,10 @@ export function CorporateGovernanceCard({
             />
           </label>
 
-          <label className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start justify-between gap-2 cursor-pointer">
+          <label className="p-2.5 rounded-xl bg-surface-subtle border border-border-subtle/80 flex items-start justify-between gap-2 cursor-pointer">
             <div>
-              <span className="font-bold text-slate-900 block">Self-Manage Locations</span>
-              <span className="text-[11px] text-slate-500">
+              <span className="font-bold text-fg-primary block">Self-Manage Locations</span>
+              <span className="text-[11px] text-fg-muted">
                 Allow portal managers to edit saved company places
               </span>
             </div>
@@ -131,10 +131,10 @@ export function CorporateGovernanceCard({
             />
           </label>
 
-          <label className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start justify-between gap-2 cursor-pointer">
+          <label className="p-2.5 rounded-xl bg-surface-subtle border border-border-subtle/80 flex items-start justify-between gap-2 cursor-pointer">
             <div>
-              <span className="font-bold text-slate-900 block">Require PO by Default</span>
-              <span className="text-[11px] text-slate-500">
+              <span className="font-bold text-fg-primary block">Require PO by Default</span>
+              <span className="text-[11px] text-fg-muted">
                 Enforce PO numbers automatically on new corporate accounts
               </span>
             </div>
@@ -148,8 +148,8 @@ export function CorporateGovernanceCard({
             />
           </label>
 
-          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
-            <label className="font-bold text-slate-900 block">
+          <div className="p-2.5 rounded-xl bg-surface-subtle border border-border-subtle/80 space-y-1">
+            <label className="font-bold text-fg-primary block">
               PO Format Regex (Optional)
             </label>
             <input
@@ -157,7 +157,7 @@ export function CorporateGovernanceCard({
               value={regexInput}
               onChange={(e) => setRegexInput(e.target.value)}
               placeholder="e.g. ^PO-[A-Z0-9-]{4,14}$"
-              className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900"
+              className="w-full px-2.5 py-1.5 bg-surface-card border border-border-strong rounded-lg text-xs font-mono text-fg-primary"
             />
           </div>
         </div>

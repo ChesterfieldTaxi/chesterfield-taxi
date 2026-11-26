@@ -179,17 +179,17 @@ export function ModernDatePicker({
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen((o) => !o)}
-        className={`w-full flex items-center justify-between gap-2 bg-white border font-medium text-left transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 ${triggerClasses} ${
+        className={`w-full flex items-center justify-between gap-2 bg-surface-card border font-medium text-left transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 ${triggerClasses} ${
           error
-            ? 'border-red-400 focus:border-red-500 focus:ring-red-200 text-slate-900'
+            ? 'border-red-400 focus:border-red-500 focus:ring-status-danger-border text-fg-primary'
             : isOpen
-            ? 'border-blue-500 ring-2 ring-blue-500/20 text-slate-900'
-            : 'border-slate-300 hover:border-slate-400 focus:border-blue-500 focus:ring-blue-500/20 text-slate-900'
+            ? 'border-blue-500 ring-2 ring-blue-500/20 text-fg-primary'
+            : 'border-border-strong hover:border-border-emphasis focus:border-blue-500 focus:ring-blue-500/20 text-fg-primary'
         }`}
       >
         <span className="flex items-center gap-2 min-w-0">
           <CalendarIcon className="w-4 h-4 text-blue-600 shrink-0" />
-          <span className={`truncate ${value ? 'text-slate-900 font-semibold' : 'text-slate-400'}`}>
+          <span className={`truncate ${value ? 'text-fg-primary font-semibold' : 'text-fg-subtle'}`}>
             {value ? formatReadableDate(value) : placeholder}
           </span>
         </span>
@@ -206,7 +206,7 @@ export function ModernDatePicker({
               left: portalPos.left,
               width: portalPos.width,
             }}
-            className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-3 z-[99999] space-y-2.5"
+            className="bg-surface-card rounded-2xl border border-border-subtle shadow-2xl p-3 z-[99999] space-y-2.5"
           >
             {/* Quick Chips */}
             <div className="flex items-center gap-1.5">
@@ -220,7 +220,7 @@ export function ModernDatePicker({
                 className={`flex-1 py-1 px-2 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer disabled:opacity-40 ${
                   value === todayIso
                     ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-slate-50 hover:bg-blue-50 text-slate-700 border-slate-200'
+                    : 'bg-surface-subtle hover:bg-status-info-bg text-fg-secondary border-border-subtle'
                 }`}
               >
                 Today
@@ -235,7 +235,7 @@ export function ModernDatePicker({
                 className={`flex-1 py-1 px-2 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer disabled:opacity-40 ${
                   value === tomorrowIso
                     ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-slate-50 hover:bg-blue-50 text-slate-700 border-slate-200'
+                    : 'bg-surface-subtle hover:bg-status-info-bg text-fg-secondary border-border-subtle'
                 }`}
               >
                 Tomorrow
@@ -249,12 +249,12 @@ export function ModernDatePicker({
                 onClick={() =>
                   setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
                 }
-                className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
+                className="p-1 rounded-lg text-fg-muted hover:text-fg-primary hover:bg-surface-muted cursor-pointer"
                 aria-label="Previous month"
               >
                 <ChevronLeftIcon className="w-4 h-4" />
               </button>
-              <span className="text-xs font-extrabold text-slate-900">
+              <span className="text-xs font-extrabold text-fg-primary">
                 {MONTHS[viewMonth.getMonth()]} {viewMonth.getFullYear()}
               </span>
               <button
@@ -262,7 +262,7 @@ export function ModernDatePicker({
                 onClick={() =>
                   setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
                 }
-                className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
+                className="p-1 rounded-lg text-fg-muted hover:text-fg-primary hover:bg-surface-muted cursor-pointer"
                 aria-label="Next month"
               >
                 <ChevronRightIcon className="w-4 h-4" />
@@ -272,7 +272,7 @@ export function ModernDatePicker({
             {/* Weekday Headers */}
             <div className="grid grid-cols-7 gap-0.5 text-center">
               {WEEKDAYS.map((w) => (
-                <div key={w} className="text-[10px] font-bold text-slate-400 py-1">
+                <div key={w} className="text-[10px] font-bold text-fg-subtle py-1">
                   {w}
                 </div>
               ))}
@@ -296,8 +296,8 @@ export function ModernDatePicker({
                       isSelected
                         ? 'bg-blue-600 text-white font-bold shadow-xs'
                         : isToday
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200 font-bold hover:bg-blue-100'
-                        : 'text-slate-700 hover:bg-slate-100'
+                        ? 'bg-status-info-bg text-status-info-fg border border-status-info-border font-bold hover:bg-status-info-bg-strong'
+                        : 'text-fg-secondary hover:bg-surface-muted'
                     }`}
                   >
                     {cell.day}
@@ -404,22 +404,22 @@ export function ModernTimePicker({
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen((o) => !o)}
-        className={`w-full flex items-center justify-between gap-2 bg-white border font-medium text-left transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 ${triggerClasses} ${
+        className={`w-full flex items-center justify-between gap-2 bg-surface-card border font-medium text-left transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 ${triggerClasses} ${
           error
-            ? 'border-red-400 focus:border-red-500 focus:ring-red-200 text-slate-900'
+            ? 'border-red-400 focus:border-red-500 focus:ring-status-danger-border text-fg-primary'
             : isOpen
-            ? 'border-blue-500 ring-2 ring-blue-500/20 text-slate-900'
-            : 'border-slate-300 hover:border-slate-400 focus:border-blue-500 focus:ring-blue-500/20 text-slate-900'
+            ? 'border-blue-500 ring-2 ring-blue-500/20 text-fg-primary'
+            : 'border-border-strong hover:border-border-emphasis focus:border-blue-500 focus:ring-blue-500/20 text-fg-primary'
         }`}
       >
         <span className="flex items-center gap-2 min-w-0">
           <ClockIcon className="w-4 h-4 text-blue-600 shrink-0" />
-          <span className={`truncate ${value ? 'text-slate-900 font-semibold' : 'text-slate-400'}`}>
+          <span className={`truncate ${value ? 'text-fg-primary font-semibold' : 'text-fg-subtle'}`}>
             {value ? formatReadableTime(value) : placeholder}
           </span>
         </span>
         <ChevronDownIcon
-          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${
+          className={`w-4 h-4 text-fg-subtle shrink-0 transition-transform duration-200 ${
             isOpen ? 'rotate-180 text-blue-600' : ''
           }`}
         />
@@ -436,11 +436,11 @@ export function ModernTimePicker({
               left: portalPos.left,
               width: portalPos.width,
             }}
-            className="bg-white rounded-2xl border border-slate-200 shadow-2xl z-[99999]"
+            className="bg-surface-card rounded-2xl border border-border-subtle shadow-2xl z-[99999]"
           >
             {/* Live Time Readout Header */}
-            <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200/80 rounded-t-2xl flex items-center justify-between">
-              <span className="text-sm font-extrabold text-slate-950 font-mono tracking-tight">
+            <div className="px-3.5 py-2.5 bg-surface-subtle border-b border-border-subtle/80 rounded-t-2xl flex items-center justify-between">
+              <span className="text-sm font-extrabold text-fg-primary font-mono tracking-tight">
                 {parsed.hour12}:{parsed.minute}{' '}
                 <span className="text-blue-600">{parsed.period}</span>
               </span>
@@ -458,7 +458,7 @@ export function ModernTimePicker({
               <div className="flex items-end gap-2">
                 {/* Hour Dropdown */}
                 <div className="relative flex-1">
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-fg-subtle mb-1">
                     Hour
                   </label>
                   <button
@@ -468,20 +468,20 @@ export function ModernTimePicker({
                     }
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                       openDropdown === 'hour'
-                        ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/40 text-blue-900'
-                        : 'border-slate-300 bg-white hover:border-slate-400 text-slate-900'
+                        ? 'border-blue-500 ring-2 ring-blue-500/20 bg-status-info-bg/40 text-status-info-fg'
+                        : 'border-border-strong bg-surface-card hover:border-border-emphasis text-fg-primary'
                     }`}
                   >
                     <span className="font-mono text-sm">{parsed.hour12}</span>
                     <ChevronDownIcon
-                      className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                      className={`w-4 h-4 text-fg-subtle transition-transform duration-200 ${
                         openDropdown === 'hour' ? 'rotate-180 text-blue-600' : ''
                       }`}
                     />
                   </button>
 
                   {openDropdown === 'hour' && (
-                    <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl py-1 max-h-48 overflow-y-auto z-50 animate-in fade-in slide-in-from-top-1 duration-150 custom-scrollbar">
+                    <div className="absolute left-0 right-0 mt-1.5 bg-surface-card border border-border-subtle rounded-xl shadow-xl py-1 max-h-48 overflow-y-auto z-50 animate-in fade-in slide-in-from-top-1 duration-150 custom-scrollbar">
                       {HOURS_12.map((h) => {
                         const active = parsed.hour12 === h;
                         return (
@@ -495,7 +495,7 @@ export function ModernTimePicker({
                             className={`w-full px-3 py-1.5 text-left text-xs font-semibold font-mono transition-colors cursor-pointer flex items-center justify-between ${
                               active
                                 ? 'bg-blue-600 text-white font-bold'
-                                : 'text-slate-700 hover:bg-blue-50 hover:text-blue-700'
+                                : 'text-fg-secondary hover:bg-status-info-bg hover:text-status-info-fg'
                             }`}
                           >
                             <span>{h}</span>
@@ -507,11 +507,11 @@ export function ModernTimePicker({
                 </div>
 
                 {/* Centered Colon Separator */}
-                <span className="pb-2 text-base font-black text-slate-400 select-none">:</span>
+                <span className="pb-2 text-base font-black text-fg-subtle select-none">:</span>
 
                 {/* Minute Dropdown (5-minute increments) */}
                 <div className="relative flex-1">
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-fg-subtle mb-1">
                     Minute
                   </label>
                   <button
@@ -521,20 +521,20 @@ export function ModernTimePicker({
                     }
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                       openDropdown === 'minute'
-                        ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/40 text-blue-900'
-                        : 'border-slate-300 bg-white hover:border-slate-400 text-slate-900'
+                        ? 'border-blue-500 ring-2 ring-blue-500/20 bg-status-info-bg/40 text-status-info-fg'
+                        : 'border-border-strong bg-surface-card hover:border-border-emphasis text-fg-primary'
                     }`}
                   >
                     <span className="font-mono text-sm">{parsed.minute}</span>
                     <ChevronDownIcon
-                      className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                      className={`w-4 h-4 text-fg-subtle transition-transform duration-200 ${
                         openDropdown === 'minute' ? 'rotate-180 text-blue-600' : ''
                       }`}
                     />
                   </button>
 
                   {openDropdown === 'minute' && (
-                    <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl py-1 max-h-48 overflow-y-auto z-50 animate-in fade-in slide-in-from-top-1 duration-150 custom-scrollbar">
+                    <div className="absolute left-0 right-0 mt-1.5 bg-surface-card border border-border-subtle rounded-xl shadow-xl py-1 max-h-48 overflow-y-auto z-50 animate-in fade-in slide-in-from-top-1 duration-150 custom-scrollbar">
                       {MINUTES_5.map((m) => {
                         const active = parsed.minute === m;
                         return (
@@ -548,7 +548,7 @@ export function ModernTimePicker({
                             className={`w-full px-3 py-1.5 text-left text-xs font-semibold font-mono transition-colors cursor-pointer flex items-center justify-between ${
                               active
                                 ? 'bg-blue-600 text-white font-bold'
-                                : 'text-slate-700 hover:bg-blue-50 hover:text-blue-700'
+                                : 'text-fg-secondary hover:bg-status-info-bg hover:text-status-info-fg'
                             }`}
                           >
                             <span>{m}</span>
@@ -562,10 +562,10 @@ export function ModernTimePicker({
 
               {/* Dedicated AM / PM Separation */}
               <div>
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-fg-subtle mb-1">
                   Period
                 </span>
-                <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-surface-muted rounded-xl border border-border-subtle">
                   {(['AM', 'PM'] as const).map((p) => {
                     const active = parsed.period === p;
                     return (
@@ -576,7 +576,7 @@ export function ModernTimePicker({
                         className={`py-1.5 rounded-lg text-xs font-extrabold tracking-wide transition-all cursor-pointer ${
                           active
                             ? 'bg-blue-600 text-white shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900'
+                            : 'text-fg-secondary hover:text-fg-primary'
                         }`}
                       >
                         {p}

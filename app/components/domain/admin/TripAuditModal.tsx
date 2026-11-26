@@ -105,32 +105,32 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
       case 'AUTO_CONFIRMED':
       case 'DRIVER_ACCEPTED':
       case 'TRIP_COMPLETED':
-        return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+        return 'bg-status-success-bg-strong text-status-success-fg border-status-success-border';
       case 'TRIP_MODIFIED':
-        return 'bg-violet-100 text-violet-800 border-violet-300';
+        return 'bg-status-staged-bg-strong text-status-staged-fg border-status-staged-border';
       case 'CALL_LOGGED':
-        return 'bg-teal-100 text-teal-800 border-teal-300';
+        return 'bg-status-success-bg-strong text-status-success-fg border-status-success-border';
       case 'SMS_LOGGED':
-        return 'bg-cyan-100 text-cyan-800 border-cyan-300';
+        return 'bg-status-info-bg-strong text-status-info-fg border-status-info-border';
       case 'EMAIL_LOGGED':
-        return 'bg-indigo-100 text-indigo-800 border-indigo-300';
+        return 'bg-status-staged-bg-strong text-status-staged-fg border-status-staged-border';
       case 'DRIVER_DECLINED':
       case 'BLACK_LISTED':
       case 'TRIP_CANCELED':
-        return 'bg-rose-100 text-rose-800 border-rose-300';
+        return 'bg-status-danger-bg-strong text-status-danger-fg border-status-danger-border';
       case 'FLAGGED_FOR_HUMAN_REVIEW':
       case 'SCORE_UPDATED':
-        return 'bg-amber-100 text-amber-800 border-amber-300';
+        return 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border';
       case 'TRIP_REQUESTED':
       case 'DISPATCH_OFFERED':
       case 'DRIVER_ASSIGNED':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
+        return 'bg-status-info-bg-strong text-status-info-fg border-status-info-border';
       case 'DRIVER_STAGED':
-        return 'bg-indigo-100 text-indigo-800 border-indigo-300';
+        return 'bg-status-staged-bg-strong text-status-staged-fg border-status-staged-border';
       case 'DRIVER_UNSTAGED':
-        return 'bg-slate-200 text-slate-700 border-slate-300';
+        return 'bg-surface-emphasis text-fg-secondary border-border-strong';
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-300';
+        return 'bg-surface-muted text-fg-secondary border-border-strong';
     }
   };
 
@@ -138,13 +138,13 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
     switch (actor) {
       case 'admin':
       case 'dispatcher':
-        return 'bg-purple-100 text-purple-700';
+        return 'bg-status-staged-bg-strong text-purple-700';
       case 'driver':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-status-info-bg-strong text-status-info-fg';
       case 'passenger':
-        return 'bg-emerald-100 text-emerald-700';
+        return 'bg-status-success-bg-strong text-status-success-fg';
       default:
-        return 'bg-slate-100 text-slate-700';
+        return 'bg-surface-muted text-fg-secondary';
     }
   };
 
@@ -165,47 +165,47 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {!hideSummaryBar && (
-        <div className="p-4 bg-slate-50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs shrink-0">
+        <div className="p-4 bg-surface-subtle border-b border-border-subtle grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs shrink-0">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider block">
               Passenger &amp; Status
             </span>
-            <div className="font-bold text-slate-900 mt-0.5">
+            <div className="font-bold text-fg-primary mt-0.5">
               {[trip.passenger?.firstName, trip.passenger?.lastName].filter(Boolean).join(' ') || 'Guest'}
             </div>
-            <div className="text-slate-500 font-medium capitalize mt-0.5">
+            <div className="text-fg-muted font-medium capitalize mt-0.5">
               Status: <span className="font-bold text-blue-600">{trip.status}</span>
             </div>
           </div>
 
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider block">
               Frozen Assigned Vehicle
             </span>
             {trip.assignedVehicle ? (
               <div className="mt-0.5">
-                <div className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                <div className="font-extrabold text-fg-primary flex items-center gap-1.5">
                   <CarIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                   <span>{trip.assignedVehicle.vehicleNumber}</span>
                 </div>
-                <div className="text-slate-500 font-mono text-[11px]">
+                <div className="text-fg-muted font-mono text-[11px]">
                   {trip.assignedVehicle.model} ({trip.assignedVehicle.licensePlate})
                 </div>
               </div>
             ) : (
-              <div className="text-slate-400 italic mt-0.5">None assigned yet</div>
+              <div className="text-fg-subtle italic mt-0.5">None assigned yet</div>
             )}
           </div>
 
           <div className="flex flex-col justify-center sm:items-end">
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-status-success-bg text-status-success-fg border border-status-success-border">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
               Immutable Audit Ledger
             </span>
             <button
               type="button"
               onClick={handleCopyJson}
-              className="text-[11px] font-bold text-blue-600 hover:text-blue-800 mt-2 inline-flex items-center gap-1.5 cursor-pointer"
+              className="text-[11px] font-bold text-blue-600 hover:text-status-info-fg mt-2 inline-flex items-center gap-1.5 cursor-pointer"
             >
               {copied ? (
                 <>
@@ -225,26 +225,26 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
 
       {/* Multi-Car Convoy Audit Summary */}
       {isMultiCar && (
-        <div className="px-4 py-3 bg-violet-50/90 border-b border-violet-200 text-xs space-y-2 shrink-0">
+        <div className="px-4 py-3 bg-status-staged-bg/90 border-b border-status-staged-border text-xs space-y-2 shrink-0">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-violet-600 text-white">
                 Multi-Car · Car {multiCarIndex} of {multiCarTotal}
               </span>
               {multiCarGroupId && (
-                <span className="font-mono text-[11px] font-bold text-violet-900 bg-white px-2 py-0.5 rounded border border-violet-200">
+                <span className="font-mono text-[11px] font-bold text-status-staged-fg bg-surface-card px-2 py-0.5 rounded border border-status-staged-border">
                   {multiCarGroupId}
                 </span>
               )}
               {(multiCarTotalPax > 0 || multiCarTotalBags > 0) && (
-                <span className="text-[11px] font-semibold text-violet-800">
+                <span className="text-[11px] font-semibold text-status-staged-fg">
                   Party Total: {multiCarTotalPax || trip.passenger?.passengerCount || 1} {(multiCarTotalPax || trip.passenger?.passengerCount || 1) === 1 ? 'Passenger' : 'Passengers'}
                   {multiCarTotalBags > 0 ? ` · ${multiCarTotalBags} ${multiCarTotalBags === 1 ? 'Bag' : 'Bags'}` : ''}
                 </span>
               )}
             </div>
             {typeof multiCarOrderTotalFare === 'number' && (
-              <span className="text-[11px] font-mono font-extrabold text-violet-900">
+              <span className="text-[11px] font-mono font-extrabold text-status-staged-fg">
                 Convoy Total: ${multiCarOrderTotalFare.toFixed(2)}
               </span>
             )}
@@ -259,25 +259,25 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
                     key={assoc.tripId}
                     className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] ${
                       isSelf
-                        ? 'bg-violet-100/80 border-violet-300 font-semibold'
-                        : 'bg-white border-violet-200/80'
+                        ? 'bg-status-staged-bg-strong/80 border-status-staged-border font-semibold'
+                        : 'bg-surface-card border-status-staged-border/80'
                     }`}
                   >
                     <div className="min-w-0 truncate">
-                      <span className="font-black text-violet-700 mr-1.5">
+                      <span className="font-black text-status-staged-fg mr-1.5">
                         Car {assoc.carIndex}/{multiCarTotal}
                       </span>
-                      <span className="text-slate-800 font-semibold">
+                      <span className="text-fg-strong font-semibold">
                         {assoc.driverName || (assoc.driverId ? `Driver ${assoc.driverId.slice(-4)}` : 'Unassigned')}
                       </span>
                       {assoc.vehicleUnit && (
-                        <span className="text-slate-500 font-mono text-[10px] ml-1">({assoc.vehicleUnit})</span>
+                        <span className="text-fg-muted font-mono text-[10px] ml-1">({assoc.vehicleUnit})</span>
                       )}
                       {isSelf && (
-                        <span className="ml-1.5 text-[9px] font-black uppercase text-violet-700">(This Trip)</span>
+                        <span className="ml-1.5 text-[9px] font-black uppercase text-status-staged-fg">(This Trip)</span>
                       )}
                     </div>
-                    <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
+                    <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-surface-muted text-fg-secondary border border-border-subtle shrink-0">
                       {assoc.status || 'pending'}
                     </span>
                   </div>
@@ -289,16 +289,16 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
       )}
 
       {/* Timeline Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-3.5 sm:p-5 space-y-4 bg-white">
+      <div className="flex-1 min-h-0 overflow-y-auto p-3.5 sm:p-5 space-y-4 bg-surface-card">
         {hideSummaryBar && (
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
-            <span className="text-xs font-semibold text-slate-500">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border-faint">
+            <span className="text-xs font-semibold text-fg-muted">
               {sortedEntries.length} total event(s) recorded
             </span>
             <button
               type="button"
               onClick={handleCopyJson}
-              className="text-xs font-bold text-blue-600 hover:text-blue-800 inline-flex items-center gap-1.5 cursor-pointer"
+              className="text-xs font-bold text-blue-600 hover:text-status-info-fg inline-flex items-center gap-1.5 cursor-pointer"
             >
               {copied ? (
                 <>
@@ -316,18 +316,18 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
         )}
 
         {sortedEntries.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">
+          <div className="p-12 text-center text-fg-subtle">
             <HistoryIcon className="w-10 h-10 mx-auto mb-2 text-slate-300" />
             <p className="font-bold">No Audit Log Entries Recorded</p>
           </div>
         ) : (
-          <div className="relative border-l-2 border-slate-200 ml-2.5 sm:ml-4 pl-4 sm:pl-6 space-y-4 sm:space-y-5">
+          <div className="relative border-l-2 border-border-subtle ml-2.5 sm:ml-4 pl-4 sm:pl-6 space-y-4 sm:space-y-5">
             {sortedEntries.map((event, idx) => (
               <div key={idx} className="relative group">
                 {/* Timeline dot */}
-                <div className="absolute -left-[23px] sm:-left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-white border-2 border-blue-600 shadow-xs group-hover:scale-125 transition-transform" />
+                <div className="absolute -left-[23px] sm:-left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-surface-card border-2 border-blue-600 shadow-xs group-hover:scale-125 transition-transform" />
 
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
+                <div className="bg-surface-subtle border border-border-subtle rounded-xl p-3 sm:p-3.5 shadow-2xs hover:shadow-xs transition-shadow">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
@@ -347,47 +347,47 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
                         </span>
                       )}
                       {event.referenceNumber && (
-                        <span className="font-mono text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-800 border border-slate-300">
+                        <span className="font-mono text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-surface-emphasis/80 text-fg-strong border border-border-strong">
                           Ref: {event.referenceNumber}
                         </span>
                       )}
                       {event.bookingChannel && (
-                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">
+                        <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-status-staged-bg text-status-staged-fg border border-status-staged-border uppercase">
                           Intake: {event.bookingChannel}
                         </span>
                       )}
                       {event.bookedBy?.name && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-status-warning-bg text-status-warning-fg border border-status-warning-border">
                           By: {event.bookedBy.name}
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] font-mono text-slate-500">
+                    <span className="text-[11px] font-mono text-fg-muted">
                       {new Date(event.timestamp).toLocaleString()}
                     </span>
                   </div>
 
                   {event.context && (
-                    <p className="text-xs text-slate-700 font-medium leading-relaxed mt-1 break-words">
+                    <p className="text-xs text-fg-secondary font-medium leading-relaxed mt-1 break-words">
                       {event.context}
                     </p>
                   )}
 
                   {/* Field Modifications Diff Table */}
                   {event.fieldChanges && event.fieldChanges.length > 0 && (
-                    <div className="mt-2.5 bg-white border border-slate-200 rounded-lg p-2.5 space-y-1.5 text-xs">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <div className="mt-2.5 bg-surface-card border border-border-subtle rounded-lg p-2.5 space-y-1.5 text-xs">
+                      <div className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider">
                         Field Changes Recorded:
                       </div>
                       <div className="space-y-1.5">
                         {event.fieldChanges.map((change, cIdx) => (
                           <div key={cIdx} className="flex items-center gap-1.5 text-[11px] font-mono flex-wrap min-w-0">
-                            <span className="font-bold text-slate-700">{change.label}:</span>
-                            <span className="text-rose-600 line-through bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 break-all">
+                            <span className="font-bold text-fg-secondary">{change.label}:</span>
+                            <span className="text-rose-600 line-through bg-status-danger-bg px-1.5 py-0.5 rounded border border-status-danger-border break-all">
                               {String(change.oldValue ?? 'None')}
                             </span>
-                            <span className="text-slate-400 font-bold">→</span>
-                            <span className="text-emerald-700 font-black bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 break-all">
+                            <span className="text-fg-subtle font-bold">→</span>
+                            <span className="text-status-success-fg font-black bg-status-success-bg px-1.5 py-0.5 rounded border border-status-success-border break-all">
                               {String(change.newValue ?? 'None')}
                             </span>
                           </div>
@@ -397,7 +397,7 @@ export function TripAuditTimeline({ trip, hideSummaryBar = false }: TripAuditTim
                   )}
 
                   {event.matchedRuleId && (
-                    <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-mono font-bold border border-blue-200">
+                    <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-status-info-bg text-status-info-fg text-[10px] font-mono font-bold border border-status-info-border">
                       Rule Match: {event.matchedRuleId}
                     </div>
                   )}
@@ -430,7 +430,7 @@ export function TripAuditModal({ trip, onClose }: TripAuditModalProps) {
       isMaximizable={true}
       zIndex={135}
       footer={
-        <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-end items-center text-xs text-slate-500">
+        <div className="p-3 bg-surface-subtle border-t border-border-faint flex justify-end items-center text-xs text-fg-muted">
           <Button type="button" variant="outline" size="sm" onClick={onClose} className="cursor-pointer">
             Close Inspector
           </Button>

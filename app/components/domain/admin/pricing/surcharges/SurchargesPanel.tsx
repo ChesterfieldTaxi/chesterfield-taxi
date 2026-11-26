@@ -413,21 +413,21 @@ export function SurchargesPanel({
   return (
     <div className="space-y-5">
       {/* Header Save Bar */}
-      <div className="p-4 rounded-xl bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+      <div className="p-4 rounded-xl bg-surface-card border border-border-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-base font-bold text-slate-900">Surcharges</h2>
+            <h2 className="text-base font-bold text-fg-primary">Surcharges</h2>
             {isDirty && (
               <Badge
                 variant="warning"
                 size="sm"
-                className="text-[10px] bg-amber-100 text-amber-800 border-amber-300"
+                className="text-[10px] bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border"
               >
                 Unsaved Rate/Policy Edits
               </Badge>
             )}
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-fg-muted mt-0.5">
             Clicking <strong>Enabled / Disabled</strong> saves &amp; logs instantly in 1 click. Use{' '}
             <strong>Save Surcharges</strong> after editing amounts, modes, or default behavior.
           </p>
@@ -435,7 +435,7 @@ export function SurchargesPanel({
 
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {saveSuccess && (
-            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1">
+            <span className="text-xs font-semibold text-status-success-fg bg-status-success-bg px-2.5 py-1 rounded-lg border border-status-success-border flex items-center gap-1">
               <CheckIcon className="w-3.5 h-3.5" />
               Saved
             </span>
@@ -445,7 +445,7 @@ export function SurchargesPanel({
             variant="outline"
             size="sm"
             onClick={openAddModal}
-            className="h-8 text-xs border-slate-300 bg-white text-slate-800 hover:bg-slate-50 cursor-pointer"
+            className="h-8 text-xs border-border-strong bg-surface-card text-fg-strong hover:bg-surface-subtle cursor-pointer"
           >
             <PlusIcon className="w-3.5 h-3.5 mr-1 text-blue-600" />
             Add Surcharge
@@ -456,7 +456,7 @@ export function SurchargesPanel({
             size="sm"
             disabled={!isDirty}
             onClick={handleDiscardAll}
-            className="h-8 text-xs border-slate-300 bg-white text-slate-700 cursor-pointer"
+            className="h-8 text-xs border-border-strong bg-surface-card text-fg-secondary cursor-pointer"
           >
             Discard
           </Button>
@@ -475,12 +475,12 @@ export function SurchargesPanel({
 
       {/* Legacy Migration Banner (only if Firestore doc is still pre-v2) */}
       {needsLegacyUpgrade && onMigrateLegacyToFirewall && (
-        <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-start gap-2.5 text-xs text-blue-950">
+        <div className="p-3.5 rounded-xl bg-status-info-bg border border-status-info-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5 text-xs text-status-info-fg">
             <ShieldCheckIcon className="w-4.5 h-4.5 text-blue-600 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold block">Update Legacy Surcharges to Pricing Rules</span>
-              <span className="text-blue-800">
+              <span className="text-status-info-fg">
                 Your live database is using older surcharge conditions. Click update to save your surcharges and create matching Pricing Rules (Airport Transfer, SUV/Minivan Upgrade, Out-of-Area &gt; 15 mi) in one click.
               </span>
             </div>
@@ -530,8 +530,8 @@ export function SurchargesPanel({
               key={item.id}
               className={`p-4.5 rounded-xl border transition-all shadow-2xs space-y-3.5 ${
                 item.enabled
-                  ? 'bg-white border-slate-200'
-                  : 'bg-slate-50/70 border-slate-200/80 opacity-90'
+                  ? 'bg-surface-card border-border-subtle'
+                  : 'bg-surface-subtle/70 border-border-subtle/80 opacity-90'
               }`}
             >
               {/* Top Row: Identity, Optional Note Input, 1-Click Master Switch, Amount Badge, Edit/Delete */}
@@ -540,35 +540,35 @@ export function SurchargesPanel({
                   <div
                     className={`p-2 rounded-lg border shrink-0 mt-0.5 ${
                       !item.enabled
-                        ? 'bg-slate-100 text-slate-400 border-slate-200'
+                        ? 'bg-surface-muted text-fg-subtle border-border-subtle'
                         : item.defaultPolicy === 'universal'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-blue-50 text-blue-700 border-blue-200'
+                        ? 'bg-status-success-bg text-status-success-fg border-status-success-border'
+                        : 'bg-status-info-bg text-status-info-fg border-status-info-border'
                     }`}
                   >
                     <ZapIcon className="w-4.5 h-4.5" />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-bold text-slate-900">{item.name}</h3>
-                      <span className="text-[10px] font-mono text-slate-400">{item.id}</span>
+                      <h3 className="text-sm font-bold text-fg-primary">{item.name}</h3>
+                      <span className="text-[10px] font-mono text-fg-subtle">{item.id}</span>
                       {item.isBuiltIn && (
                         <Badge
                           variant="outline"
-                          className="text-[9px] py-0 px-1.5 bg-slate-50 text-slate-500 border-slate-200"
+                          className="text-[9px] py-0 px-1.5 bg-surface-subtle text-fg-muted border-border-subtle"
                         >
                           Core
                         </Badge>
                       )}
                       {wasJustToggled && (
-                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                        <span className="text-[10px] font-semibold text-status-success-fg bg-status-success-bg border border-status-success-border px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                           <CheckIcon className="w-3 h-3" />
                           Saved &amp; logged
                         </span>
                       )}
                     </div>
                     {item.description && (
-                      <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
+                      <p className="text-xs text-fg-muted mt-0.5">{item.description}</p>
                     )}
                   </div>
                 </div>
@@ -588,14 +588,14 @@ export function SurchargesPanel({
                     }}
                     placeholder="Optional reason / note (e.g. Winter storm I-64)..."
                     aria-label={`Optional audit note for ${item.name}`}
-                    className="h-8 w-full sm:w-64 rounded-lg border border-slate-200 bg-slate-50/80 focus:bg-white focus:border-blue-400 focus:outline-none px-2.5 text-xs text-slate-800 placeholder:text-slate-400 transition-colors"
+                    className="h-8 w-full sm:w-64 rounded-lg border border-border-subtle bg-surface-subtle/80 focus:bg-surface-card focus:border-blue-400 focus:outline-none px-2.5 text-xs text-fg-strong placeholder:text-fg-subtle transition-colors"
                   />
 
                   <span
                     className={`text-base font-mono font-extrabold px-2.5 py-0.5 rounded-lg border ${
                       item.enabled
-                        ? 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-slate-100 text-slate-400 border-slate-200 line-through'
+                        ? 'bg-surface-header text-white border-slate-900'
+                        : 'bg-surface-muted text-fg-subtle border-border-subtle line-through'
                     }`}
                   >
                     {formatAmountBadge(item)}
@@ -614,7 +614,7 @@ export function SurchargesPanel({
                     } ${
                       item.enabled
                         ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
-                        : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                        : 'bg-surface-card text-fg-secondary border-border-strong hover:bg-surface-muted'
                     }`}
                   >
                     {isCardToggling && <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />}
@@ -630,7 +630,7 @@ export function SurchargesPanel({
                   <button
                     type="button"
                     onClick={() => openEditModal(item)}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:border-blue-300 cursor-pointer"
+                    className="p-1.5 rounded-lg border border-border-subtle bg-surface-card text-fg-muted hover:text-blue-600 hover:border-status-info-border cursor-pointer"
                     title="Edit name & description"
                   >
                     <EditIcon className="w-3.5 h-3.5" />
@@ -640,7 +640,7 @@ export function SurchargesPanel({
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteId(item.id)}
-                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-rose-600 hover:border-rose-300 cursor-pointer"
+                      className="p-1.5 rounded-lg border border-border-subtle bg-surface-card text-fg-subtle hover:text-rose-600 hover:border-status-danger-border cursor-pointer"
                       title="Delete surcharge"
                     >
                       <TrashIcon className="w-3.5 h-3.5" />
@@ -648,8 +648,8 @@ export function SurchargesPanel({
                   )}
 
                   {confirmDeleteId === item.id && (
-                    <div className="flex items-center gap-1 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1">
-                      <span className="text-[11px] font-semibold text-rose-800">Delete?</span>
+                    <div className="flex items-center gap-1 bg-status-danger-bg border border-status-danger-border rounded-lg px-2 py-1">
+                      <span className="text-[11px] font-semibold text-status-danger-fg">Delete?</span>
                       <button
                         type="button"
                         onClick={() => handleDeleteItem(item.id)}
@@ -660,7 +660,7 @@ export function SurchargesPanel({
                       <button
                         type="button"
                         onClick={() => setConfirmDeleteId(null)}
-                        className="px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-700 text-[11px] cursor-pointer"
+                        className="px-2 py-0.5 rounded bg-surface-card border border-border-strong text-fg-secondary text-[11px] cursor-pointer"
                       >
                         No
                       </button>
@@ -670,20 +670,20 @@ export function SurchargesPanel({
               </div>
 
               {/* Middle Row: Firewall Default Policy + Calculation Mode + Amount */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 pt-3 border-t border-slate-100 items-end">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 pt-3 border-t border-border-faint items-end">
                 {/* Default Behavior */}
                 <div className="lg:col-span-6">
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                     Default Behavior (when Enabled)
                   </label>
-                  <div className="grid grid-cols-2 gap-1.5 p-1 rounded-lg bg-slate-100 border border-slate-200/80">
+                  <div className="grid grid-cols-2 gap-1.5 p-1 rounded-lg bg-surface-muted border border-border-subtle/80">
                     <button
                       type="button"
                       onClick={() => updateItem(item.id, { defaultPolicy: 'universal' })}
                       className={`py-1.5 px-2.5 rounded-md text-xs font-bold transition-all cursor-pointer text-center ${
                         item.defaultPolicy === 'universal'
                           ? 'bg-emerald-600 text-white shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
+                          : 'text-fg-secondary hover:text-fg-primary'
                       }`}
                     >
                       All Trips
@@ -694,7 +694,7 @@ export function SurchargesPanel({
                       className={`py-1.5 px-2.5 rounded-md text-xs font-bold transition-all cursor-pointer text-center ${
                         item.defaultPolicy === 'rule_only'
                           ? 'bg-blue-600 text-white shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
+                          : 'text-fg-secondary hover:text-fg-primary'
                       }`}
                     >
                       Rule-Only (Off by Default)
@@ -704,7 +704,7 @@ export function SurchargesPanel({
 
                 {/* Calculation Mode */}
                 <div className="lg:col-span-3">
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                     Calculation Mode
                   </label>
                   <Select
@@ -730,7 +730,7 @@ export function SurchargesPanel({
 
                 {/* Amount */}
                 <div className="lg:col-span-3">
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">
                     {item.mode === 'multiplier'
                       ? 'Multiplier (e.g. 1.25)'
                       : item.mode === 'percent'
@@ -747,15 +747,15 @@ export function SurchargesPanel({
                     onChange={(e) =>
                       updateItem(item.id, { amount: parseFloat(e.target.value) || 0 })
                     }
-                    className="h-9 text-xs font-mono font-bold bg-white border-slate-300 text-slate-900"
+                    className="h-9 text-xs font-mono font-bold bg-surface-card border-border-strong text-fg-primary"
                   />
                 </div>
               </div>
 
               {/* Bottom Row: Live Rules Exceptions Summary */}
-              <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+              <div className="pt-2.5 border-t border-border-faint flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
+                  <span className="text-[11px] font-semibold text-fg-muted flex items-center gap-1">
                     <SlidersIcon className="w-3 h-3" />
                     Rule Exceptions:
                   </span>
@@ -767,10 +767,10 @@ export function SurchargesPanel({
                         onClick={() => onNavigateToRule?.(ref.ruleId)}
                         className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-colors cursor-pointer ${
                           ref.action === 'waive'
-                            ? 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+                            ? 'bg-status-danger-bg text-status-danger-fg border-status-danger-border hover:bg-status-danger-bg-strong'
                             : ref.action === 'override'
-                            ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
-                            : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                            ? 'bg-status-warning-bg text-status-warning-fg border-status-warning-border hover:bg-status-warning-bg-strong'
+                            : 'bg-status-success-bg text-status-success-fg border-status-success-border hover:bg-status-success-bg-strong'
                         } ${!ref.isActive ? 'opacity-50 line-through' : ''}`}
                       >
                         {ref.action.toUpperCase()}
@@ -778,7 +778,7 @@ export function SurchargesPanel({
                       </button>
                     ))
                   ) : (
-                    <span className="text-[11px] text-slate-400 italic">
+                    <span className="text-[11px] text-fg-subtle italic">
                       {item.defaultPolicy === 'universal'
                         ? 'No waiver exceptions (applies to every ride when enabled)'
                         : item.legacyAutoCondition
@@ -792,7 +792,7 @@ export function SurchargesPanel({
                   <button
                     type="button"
                     onClick={() => onNavigateToRule?.()}
-                    className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg hover:bg-amber-100 flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] font-semibold text-status-warning-fg bg-status-warning-bg border border-status-warning-border px-2.5 py-1 rounded-lg hover:bg-status-warning-bg-strong flex items-center gap-1 cursor-pointer"
                   >
                     <AlertTriangleIcon className="w-3.5 h-3.5 text-amber-600" />
                     Add an APPLY Rule in Rules &amp; Routing →
@@ -802,7 +802,7 @@ export function SurchargesPanel({
 
               {/* Live Audit Provenance Footer */}
               {(primaryAuditEv || onOpenAuditHistory) && (
-                <div className="pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
+                <div className="pt-2.5 border-t border-border-faint flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
                   {primaryAuditEv ? (
                     <div className="flex items-center gap-2 flex-wrap min-w-0">
                       <span
@@ -810,42 +810,42 @@ export function SurchargesPanel({
                           item.enabled && primaryAuditEv.action === 'surcharge_enabled'
                             ? 'bg-emerald-500'
                             : !item.enabled && primaryAuditEv.action === 'surcharge_disabled'
-                            ? 'bg-slate-400'
+                            ? 'bg-fg-subtle'
                             : 'bg-blue-500'
                         }`}
                         aria-hidden="true"
                       />
 
-                      <span className="text-slate-600">
+                      <span className="text-fg-secondary">
                         {item.enabled && primaryAuditEv.action === 'surcharge_enabled' ? (
                           <>
-                            <strong className="text-emerald-800">Enabled</strong>{' '}
+                            <strong className="text-status-success-fg">Enabled</strong>{' '}
                             {formatAuditTimestampShort(primaryAuditEv.timestamp)} by{' '}
-                            <strong className="text-slate-800">{primaryAuditEv.operatorName}</strong>{' '}
-                            <span className="text-slate-400">({primaryAuditEv.operatorEmail})</span>
+                            <strong className="text-fg-strong">{primaryAuditEv.operatorName}</strong>{' '}
+                            <span className="text-fg-subtle">({primaryAuditEv.operatorEmail})</span>
                           </>
                         ) : !item.enabled && primaryAuditEv.action === 'surcharge_disabled' ? (
                           <>
-                            <strong className="text-slate-700">Disabled</strong>{' '}
+                            <strong className="text-fg-secondary">Disabled</strong>{' '}
                             {formatAuditTimestampShort(primaryAuditEv.timestamp)} by{' '}
-                            <strong className="text-slate-800">{primaryAuditEv.operatorName}</strong>
+                            <strong className="text-fg-strong">{primaryAuditEv.operatorName}</strong>
                             {primaryAuditEv.activeDurationMinutes !== undefined && (
-                              <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 font-semibold">
+                              <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded bg-status-warning-bg text-status-warning-fg border border-status-warning-border font-semibold">
                                 Was active {formatActiveDuration(primaryAuditEv.activeDurationMinutes)}
                               </span>
                             )}
                           </>
                         ) : (
                           <>
-                            <strong className="text-blue-800">Last updated</strong>{' '}
+                            <strong className="text-status-info-fg">Last updated</strong>{' '}
                             {formatAuditTimestampShort(primaryAuditEv.timestamp)} by{' '}
-                            <strong className="text-slate-800">{primaryAuditEv.operatorName}</strong>
+                            <strong className="text-fg-strong">{primaryAuditEv.operatorName}</strong>
                           </>
                         )}
                       </span>
 
                       {!isEditingThisEventNote && primaryAuditEv.note && (
-                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-200 font-medium italic">
+                        <span className="px-2 py-0.5 rounded-full bg-surface-muted text-fg-strong border border-border-subtle font-medium italic">
                           &ldquo;{primaryAuditEv.note}&rdquo;
                         </span>
                       )}
@@ -854,7 +854,7 @@ export function SurchargesPanel({
                         <button
                           type="button"
                           onClick={() => startEditingEventNote(primaryAuditEv)}
-                          className="text-blue-600 hover:text-blue-800 font-semibold underline-offset-2 hover:underline cursor-pointer"
+                          className="text-blue-600 hover:text-status-info-fg font-semibold underline-offset-2 hover:underline cursor-pointer"
                         >
                           {primaryAuditEv.note ? 'Edit note' : '+ Add note'}
                         </button>
@@ -876,7 +876,7 @@ export function SurchargesPanel({
                             }}
                             placeholder="Reason / operational note..."
                             autoFocus
-                            className="h-7 w-52 rounded-md border border-blue-300 bg-white px-2 text-xs text-slate-900 focus:outline-none"
+                            className="h-7 w-52 rounded-md border border-status-info-border bg-surface-card px-2 text-xs text-fg-primary focus:outline-none"
                           />
                           <button
                             type="button"
@@ -889,7 +889,7 @@ export function SurchargesPanel({
                           <button
                             type="button"
                             onClick={() => setEditingNoteEventId(null)}
-                            className="px-2 py-1 rounded-md bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 cursor-pointer"
+                            className="px-2 py-1 rounded-md bg-surface-card border border-border-strong text-fg-secondary hover:bg-surface-subtle cursor-pointer"
                           >
                             Cancel
                           </button>
@@ -897,7 +897,7 @@ export function SurchargesPanel({
                       )}
                     </div>
                   ) : (
-                    <span className="text-slate-400 flex items-center gap-1">
+                    <span className="text-fg-subtle flex items-center gap-1">
                       <HistoryIcon className="w-3 h-3" />
                       No On/Off history recorded yet
                     </span>
@@ -907,7 +907,7 @@ export function SurchargesPanel({
                     <button
                       type="button"
                       onClick={() => onOpenAuditHistory(item.id)}
-                      className="text-slate-600 hover:text-blue-700 font-semibold inline-flex items-center gap-1 shrink-0 cursor-pointer self-start sm:self-auto"
+                      className="text-fg-secondary hover:text-status-info-fg font-semibold inline-flex items-center gap-1 shrink-0 cursor-pointer self-start sm:self-auto"
                     >
                       <span>History →</span>
                     </button>
@@ -922,7 +922,7 @@ export function SurchargesPanel({
       {/* Add / Edit Surcharge Modal (Drag-down bottom sheet on mobile) */}
       {isModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-50 bg-surface-overlay/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) setIsModalOpen(false);
           }}
@@ -930,22 +930,22 @@ export function SurchargesPanel({
           <form
             onSubmit={handleModalSubmit}
             style={surchargeSheetDrag.sheetStyle}
-            className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0"
+            className="w-full max-w-md bg-surface-card rounded-t-3xl sm:rounded-2xl border-t sm:border border-border-subtle shadow-2xl overflow-hidden max-h-[90dvh] flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0"
           >
             <div
               {...surchargeSheetDrag.dragHandlers}
-              className="px-5 pt-2.5 sm:pt-4 pb-3.5 sm:pb-4 border-b border-slate-200 shrink-0 touch-none"
+              className="px-5 pt-2.5 sm:pt-4 pb-3.5 sm:pb-4 border-b border-border-subtle shrink-0 touch-none"
             >
-              <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+              <div className="w-10 h-1 rounded-full bg-surface-strong mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-sm font-bold text-fg-primary">
                   {editingId ? 'Edit Surcharge' : 'New Surcharge'}
                 </h3>
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
                   aria-label="Close surcharge dialog"
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                  className="p-1.5 rounded-lg text-fg-subtle hover:text-fg-secondary hover:bg-surface-muted cursor-pointer"
                 >
                   <XIcon className="w-4 h-4" />
                 </button>
@@ -954,7 +954,7 @@ export function SurchargesPanel({
 
             <div className="p-5 space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                <label className="text-xs font-semibold text-fg-secondary block mb-1">
                   Surcharge Name (shown on customer breakdown)
                 </label>
                 <Input
@@ -963,12 +963,12 @@ export function SurchargesPanel({
                   placeholder="e.g., Late-Night Service Fee, Holiday Surcharge"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="h-9 text-xs bg-white"
+                  className="h-9 text-xs bg-surface-card"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                <label className="text-xs font-semibold text-fg-secondary block mb-1">
                   Description (optional)
                 </label>
                 <Input
@@ -976,13 +976,13 @@ export function SurchargesPanel({
                   placeholder="Short internal or receipt note"
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
-                  className="h-9 text-xs bg-white"
+                  className="h-9 text-xs bg-surface-card"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Mode</label>
+                  <label className="text-xs font-semibold text-fg-secondary block mb-1">Mode</label>
                   <Select
                     size="sm"
                     value={formMode}
@@ -995,20 +995,20 @@ export function SurchargesPanel({
                   </Select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Amount</label>
+                  <label className="text-xs font-semibold text-fg-secondary block mb-1">Amount</label>
                   <Input
                     type="number"
                     step={formMode === 'multiplier' || formMode === 'per_mile' ? '0.05' : '0.50'}
                     min={formMode === 'multiplier' ? '1.0' : '0'}
                     value={formAmount}
                     onChange={(e) => setFormAmount(parseFloat(e.target.value) || 0)}
-                    className="h-9 text-xs font-mono font-bold bg-white"
+                    className="h-9 text-xs font-mono font-bold bg-surface-card"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                <label className="text-xs font-semibold text-fg-secondary block mb-1">
                   Default Behavior
                 </label>
                 <Select
@@ -1021,24 +1021,24 @@ export function SurchargesPanel({
                 </Select>
               </div>
 
-              <label className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer">
+              <label className="flex items-center gap-2 text-xs font-semibold text-fg-strong cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formEnabled}
                   onChange={(e) => setFormEnabled(e.target.checked)}
-                  className="rounded border-slate-300 text-emerald-600"
+                  className="rounded border-border-strong text-emerald-600"
                 />
                 <span>Enabled immediately</span>
               </label>
             </div>
 
-            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+            <div className="px-5 py-3.5 bg-surface-subtle border-t border-border-subtle flex items-center justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setIsModalOpen(false)}
-                className="h-8 text-xs bg-white"
+                className="h-8 text-xs bg-surface-card"
               >
                 Cancel
               </Button>

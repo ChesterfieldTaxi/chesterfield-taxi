@@ -84,7 +84,7 @@ export function AdminTripsExceptionsPanel({
   }, [trips, categoryFilter, exceptionByTripId]);
 
   const filterChips: Array<{ id: AdminTripExceptionFilter; label: string; count: number; tone: string }> = [
-    { id: 'all', label: 'All Exceptions', count: counts.total, tone: 'bg-slate-900 text-white border-slate-900' },
+    { id: 'all', label: 'All Exceptions', count: counts.total, tone: 'bg-surface-header text-white border-slate-900' },
     {
       id: 'sla_unassigned',
       label: 'SLA / Unassigned Alerts',
@@ -107,14 +107,14 @@ export function AdminTripsExceptionsPanel({
       id: 'cancelled_declined_noshow',
       label: 'Cancelled / Declined / No-Show',
       count: counts.cancelled,
-      tone: 'bg-slate-700 text-white border-slate-700',
+      tone: 'bg-surface-header-muted text-white border-border-header',
     },
   ];
 
   return (
     <div className="space-y-4">
       {/* Filterable Exception Category Chips */}
-      <div className="p-3.5 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-wrap items-center gap-2">
+      <div className="p-3.5 bg-surface-card rounded-2xl border border-border-subtle/90 shadow-xs flex flex-wrap items-center gap-2">
         {filterChips.map((chip) => {
           const active = categoryFilter === chip.id;
           return (
@@ -125,13 +125,13 @@ export function AdminTripsExceptionsPanel({
               className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                 active
                   ? chip.tone
-                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  : 'bg-surface-subtle text-fg-secondary border-border-subtle hover:bg-surface-muted'
               }`}
             >
               <span>{chip.label}</span>
               <span
                 className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                  active ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
+                  active ? 'bg-white/20 text-white' : 'bg-surface-emphasis text-fg-strong'
                 }`}
               >
                 {chip.count}
@@ -143,12 +143,12 @@ export function AdminTripsExceptionsPanel({
 
       {/* Exceptions List */}
       {visibleTrips.length === 0 ? (
-        <Card variant="elevated" className="border-slate-200 bg-white p-10 text-center space-y-2">
-          <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+        <Card variant="elevated" className="border-border-subtle bg-surface-card p-10 text-center space-y-2">
+          <div className="w-11 h-11 rounded-2xl bg-status-success-bg text-emerald-600 flex items-center justify-center mx-auto">
             <CheckIcon className="w-6 h-6" />
           </div>
-          <p className="text-sm font-extrabold text-slate-800">Zero Active Exceptions in This Category</p>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm font-extrabold text-fg-strong">Zero Active Exceptions in This Category</p>
+          <p className="text-xs text-fg-muted">
             All SLA windows, rider /track edit requests, and driver update acknowledgements are clear.
           </p>
         </Card>
@@ -170,17 +170,17 @@ export function AdminTripsExceptionsPanel({
               <div
                 key={trip.id}
                 onClick={() => onSelectTrip(trip)}
-                className="bg-white rounded-2xl border border-slate-200/90 hover:border-slate-300 shadow-xs p-4 space-y-3 cursor-pointer transition-all"
+                className="bg-surface-card rounded-2xl border border-border-subtle/90 hover:border-border-strong shadow-xs p-4 space-y-3 cursor-pointer transition-all"
               >
                 {/* Top Header */}
                 <div className="flex flex-wrap items-start justify-between gap-2.5">
                   <div className="space-y-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono font-extrabold text-xs text-slate-900">
+                      <span className="font-mono font-extrabold text-xs text-fg-primary">
                         #{trip.id.slice(-6).toUpperCase()}
                       </span>
-                      <span className="font-bold text-xs text-slate-900">{passengerFullName}</span>
-                      <span className="text-[11px] font-mono text-slate-500">
+                      <span className="font-bold text-xs text-fg-primary">{passengerFullName}</span>
+                      <span className="text-[11px] font-mono text-fg-muted">
                         {trip.passenger?.phone}
                       </span>
                       <Badge
@@ -192,8 +192,8 @@ export function AdminTripsExceptionsPanel({
                       </Badge>
                     </div>
 
-                    <div className="text-xs text-slate-600 flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1 font-semibold text-slate-800">
+                    <div className="text-xs text-fg-secondary flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1 font-semibold text-fg-strong">
                         <ClockIcon className="w-3.5 h-3.5 text-blue-600" />
                         {trip.bookingType === 'scheduled' && trip.scheduledPickupTime
                           ? new Date(trip.scheduledPickupTime).toLocaleString([], {
@@ -277,7 +277,7 @@ export function AdminTripsExceptionsPanel({
                 {/* Actionable Exception Context Banners */}
                 <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                   {ex?.hasSlaOrCascadeAlert && (
-                    <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center gap-2 font-semibold">
+                    <div className="p-2.5 rounded-xl bg-status-danger-bg border border-status-danger-border text-status-danger-fg text-xs flex items-center gap-2 font-semibold">
                       <AlertTriangleIcon className="w-4 h-4 text-rose-600 shrink-0" />
                       <span>
                         {ex.isCascadeExhausted
@@ -288,12 +288,12 @@ export function AdminTripsExceptionsPanel({
                   )}
 
                   {ex?.hasPendingRiderChangeRequest && (
-                    <div className="p-3 rounded-xl bg-violet-50 border border-violet-300 text-violet-950 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="p-3 rounded-xl bg-status-staged-bg border border-status-staged-border text-status-staged-fg text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <div className="min-w-0">
                         <span className="font-extrabold block">
                           📝Rider Edit Req (/track Change Request Pending)
                         </span>
-                        <span className="text-[11px] text-violet-800 block mt-0.5">
+                        <span className="text-[11px] text-status-staged-fg block mt-0.5">
                           {ex.riderChangeSummary}
                         </span>
                       </div>
@@ -315,7 +315,7 @@ export function AdminTripsExceptionsPanel({
                           variant="outline"
                           disabled={isBusy}
                           onClick={() => onResolveGuestChangeRequest(trip, 'decline')}
-                          className="text-[11px] border-rose-300 text-rose-700 hover:bg-rose-50"
+                          className="text-[11px] border-status-danger-border text-status-danger-fg hover:bg-status-danger-bg"
                         >
                           <XIcon className="w-3.5 h-3.5 mr-1" />
                           Decline
@@ -328,8 +328,8 @@ export function AdminTripsExceptionsPanel({
                     <div
                       className={`p-2.5 rounded-xl border text-xs ${
                         ex.isDriverAckOverdue
-                          ? 'bg-rose-50 border-rose-300 text-rose-950'
-                          : 'bg-amber-50 border-amber-300 text-amber-950'
+                          ? 'bg-status-danger-bg border-status-danger-border text-status-danger-fg'
+                          : 'bg-status-warning-bg border-status-warning-border text-status-warning-fg'
                       }`}
                     >
                       <span className="font-extrabold">

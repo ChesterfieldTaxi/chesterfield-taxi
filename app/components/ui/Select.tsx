@@ -272,16 +272,16 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       'h-10 px-3.5 text-sm rounded-xl gap-2';
 
     const variantCls = error
-      ? 'bg-white border-red-400 text-slate-900 focus:border-red-500 focus:ring-red-500/20'
+      ? 'bg-surface-card border-red-400 text-fg-primary focus:border-red-500 focus:ring-red-500/20'
       : variant === 'dark'
       ? isOpen
-        ? 'bg-slate-800 border-blue-400 text-white ring-2 ring-blue-400/30'
-        : 'bg-slate-800/95 border-slate-700 text-slate-100 hover:bg-slate-800 hover:border-slate-600 focus:border-blue-400 focus:ring-blue-500/30'
+        ? 'bg-surface-header-elevated border-blue-400 text-white ring-2 ring-blue-400/30'
+        : 'bg-surface-header-elevated/95 border-border-header text-fg-on-header hover:bg-surface-header-elevated hover:border-slate-600 focus:border-blue-400 focus:ring-blue-500/30'
       : isOpen
-      ? 'bg-blue-50 border-blue-400 text-blue-700 ring-2 ring-blue-500/20'
+      ? 'bg-status-info-bg border-blue-400 text-status-info-fg ring-2 ring-blue-500/20'
       : variant === 'subtle'
-      ? 'bg-transparent border-transparent text-slate-800 hover:bg-slate-100/80 focus:ring-blue-500/20'
-      : 'bg-white border-slate-200 text-slate-900 hover:border-slate-300 shadow-2xs focus:border-blue-500 focus:ring-blue-500/20';
+      ? 'bg-transparent border-transparent text-fg-strong hover:bg-surface-muted/80 focus:ring-blue-500/20'
+      : 'bg-surface-card border-border-subtle text-fg-primary hover:border-border-strong shadow-2xs focus:border-blue-500 focus:ring-blue-500/20';
 
     const hasFieldChrome = Boolean(label || error || helperText);
     const displayLabel = selectedOption ? selectedOption.selectedLabel || selectedOption.label : placeholder || 'Select...';
@@ -292,7 +292,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       <div className={`${fullWidth ? 'w-full' : 'inline-flex'} ${hasFieldChrome ? 'flex flex-col gap-1.5' : 'relative items-center'}`}>
         {name && <input type="hidden" name={name} value={currentValue} disabled={disabled} />}
         {label && (
-          <label htmlFor={selectId} className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+          <label htmlFor={selectId} className="block text-xs font-semibold uppercase tracking-wider text-fg-secondary">
             {label}
             {required && <span className="text-blue-600 ml-1" title="Required">*</span>}
           </label>
@@ -311,7 +311,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
             {(selectedOption?.dotClass || selectedOption?.dotColor) && (
               <span className={`w-2 h-2 rounded-full shrink-0 ${selectedOption.dotClass || ''}`} style={selectedOption.dotColor ? { backgroundColor: selectedOption.dotColor } : undefined} />
             )}
-            <span className={`truncate ${isPlaceholderShown ? 'text-slate-400 font-normal' : ''}`}>{displayLabel}</span>
+            <span className={`truncate ${isPlaceholderShown ? 'text-fg-subtle font-normal' : ''}`}>{displayLabel}</span>
           </span>
           <ChevronDownIcon
             className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${
@@ -332,15 +332,15 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                 width: `${coords.width}px`, zIndex: 99999,
                 transformOrigin: coords.openUpward ? 'bottom left' : 'top left',
               }}
-              className="bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-slate-100 select-none z-[99999]"
+              className="bg-surface-card rounded-xl shadow-xl border border-border-subtle/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-left divide-y divide-border-faint select-none z-[99999]"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
             >
               {showSearch && (
-                <div className="px-2.5 py-1.5 bg-slate-50/70">
+                <div className="px-2.5 py-1.5 bg-surface-subtle/70">
                   <div className="relative flex items-center h-7">
-                    <SearchIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+                    <SearchIcon className="w-3.5 h-3.5 text-fg-subtle absolute left-2.5 pointer-events-none" />
                     <input
                       ref={searchInputRef}
                       type="text"
@@ -348,10 +348,10 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={handleKeyNavigation}
                       placeholder={searchPlaceholder}
-                      className="w-full h-7 pl-7 pr-6 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className="w-full h-7 pl-7 pr-6 bg-surface-card border border-border-subtle rounded-lg text-xs text-fg-strong placeholder:text-fg-subtle outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     />
                     {searchQuery && (
-                      <button type="button" onClick={() => setSearchQuery('')} className="absolute right-2 text-slate-400 hover:text-slate-600 cursor-pointer" aria-label="Clear search">
+                      <button type="button" onClick={() => setSearchQuery('')} className="absolute right-2 text-fg-subtle hover:text-fg-secondary cursor-pointer" aria-label="Clear search">
                         <XIcon className="w-3 h-3" />
                       </button>
                     )}
@@ -361,7 +361,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
 
               <div className="max-h-64 overflow-y-auto py-1">
                 {filteredOptions.length === 0 ? (
-                  <div className="py-4 px-3 text-center text-slate-400 text-[11px] font-medium">No matching options found.</div>
+                  <div className="py-4 px-3 text-center text-fg-subtle text-[11px] font-medium">No matching options found.</div>
                 ) : (
                   filteredOptions.map((opt, idx) => {
                     const strVal = String(opt.value);
@@ -371,7 +371,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     return (
                       <React.Fragment key={`${opt.group || 'root'}-${strVal}-${idx}`}>
                         {opt.group && opt.group !== prevGroup && (
-                          <div className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 bg-slate-50/50">{opt.group}</div>
+                          <div className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-fg-subtle bg-surface-subtle/50">{opt.group}</div>
                         )}
                         <button
                           type="button"
@@ -381,10 +381,10 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                           onMouseEnter={() => { if (!opt.disabled) setHighlightedIdx(idx); }}
                           onClick={() => { if (!opt.disabled) commitSelection(strVal); }}
                           className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs text-left transition-colors ${
-                            opt.disabled ? 'opacity-45 cursor-not-allowed text-slate-400' :
-                            isSelected ? 'font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100/70 cursor-pointer' :
-                            isHighlighted ? 'font-semibold text-blue-700 bg-blue-50/80 cursor-pointer' :
-                            'font-semibold text-slate-700 hover:bg-blue-50/80 hover:text-blue-700 cursor-pointer'
+                            opt.disabled ? 'opacity-45 cursor-not-allowed text-fg-subtle' :
+                            isSelected ? 'font-bold text-status-info-fg bg-status-info-bg/80 hover:bg-status-info-bg-strong/70 cursor-pointer' :
+                            isHighlighted ? 'font-semibold text-status-info-fg bg-status-info-bg/80 cursor-pointer' :
+                            'font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg cursor-pointer'
                           }`}
                         >
                           <div className="flex items-center gap-2 min-w-0">
@@ -394,11 +394,11 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                             )}
                             <div className="min-w-0">
                               <div className="truncate text-xs leading-snug">{opt.label}</div>
-                              {opt.subtitle && <div className="truncate text-[10.5px] text-slate-500 font-normal">{opt.subtitle}</div>}
+                              {opt.subtitle && <div className="truncate text-[10.5px] text-fg-muted font-normal">{opt.subtitle}</div>}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {opt.badge && <span className="px-1.5 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-700">{opt.badge}</span>}
+                            {opt.badge && <span className="px-1.5 py-0.5 rounded-md bg-surface-muted border border-border-subtle text-[10px] font-bold text-fg-secondary">{opt.badge}</span>}
                             {isSelected && <CheckIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
                           </div>
                         </button>
@@ -412,7 +412,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
           )}
 
         {error && <p id={errorId} className="text-xs text-red-600 font-medium flex items-center gap-1 mt-0.5"><span>{error}</span></p>}
-        {!error && helperText && <p id={helperId} className="text-xs text-slate-500 mt-0.5">{helperText}</p>}
+        {!error && helperText && <p id={helperId} className="text-xs text-fg-muted mt-0.5">{helperText}</p>}
       </div>
     );
   }

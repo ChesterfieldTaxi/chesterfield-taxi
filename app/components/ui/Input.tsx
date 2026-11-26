@@ -39,7 +39,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+            className="block text-xs font-semibold uppercase tracking-wider text-fg-secondary"
           >
             {label}
             {required && <span className="text-rose-600 ml-1" title="Required">*</span>}
@@ -48,9 +48,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
         <div className="relative flex items-center w-full">
           {(prefixIcon || prefixText) && (
-            <div className="absolute left-3.5 flex items-center pointer-events-none text-slate-400 gap-1">
+            <div className="absolute left-3.5 flex items-center pointer-events-none text-fg-subtle gap-1">
               {prefixIcon}
-              {prefixText && <span className="text-sm font-medium text-slate-500">{prefixText}</span>}
+              {prefixText && <span className="text-sm font-medium text-fg-muted">{prefixText}</span>}
             </div>
           )}
 
@@ -61,19 +61,19 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             disabled={disabled}
             aria-invalid={Boolean(error)}
             aria-describedby={error ? errorId : helperText ? helperId : undefined}
-            className={`w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:outline-none focus:ring-2 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed ${
+            className={`w-full rounded-xl border bg-surface-card px-3.5 py-2.5 text-sm text-fg-primary placeholder:text-fg-subtle transition-all focus:outline-none focus:ring-2 disabled:bg-surface-subtle disabled:text-fg-subtle disabled:cursor-not-allowed ${
               prefixIcon || prefixText ? 'pl-10' : ''
             } ${suffixIcon || suffixText ? 'pr-10' : ''} ${
               error
-                ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
-                : 'border-slate-300 hover:border-slate-400 focus:border-blue-500 focus:ring-blue-500/20'
+                ? 'border-red-400 focus:border-red-500 focus:ring-status-danger-border'
+                : 'border-border-strong hover:border-border-emphasis focus:border-blue-500 focus:ring-blue-500/20'
             } ${className}`}
             {...props}
           />
 
           {(suffixIcon || suffixText) && (
-            <div className="absolute right-3.5 flex items-center pointer-events-none text-slate-400 gap-1">
-              {suffixText && <span className="text-sm font-medium text-slate-500">{suffixText}</span>}
+            <div className="absolute right-3.5 flex items-center pointer-events-none text-fg-subtle gap-1">
+              {suffixText && <span className="text-sm font-medium text-fg-muted">{suffixText}</span>}
               {suffixIcon}
             </div>
           )}
@@ -86,7 +86,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         )}
 
         {!error && helperText && (
-          <p id={helperId} className="text-xs text-slate-500 mt-0.5">
+          <p id={helperId} className="text-xs text-fg-muted mt-0.5">
             {helperText}
           </p>
         )}

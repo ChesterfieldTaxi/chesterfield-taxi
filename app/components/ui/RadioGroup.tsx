@@ -43,7 +43,7 @@ export function RadioGroup({
   return (
     <fieldset className={`w-full flex flex-col gap-2 ${className}`} aria-describedby={error ? errorId : helperText ? helperId : undefined}>
       {label && (
-        <legend className="text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+        <legend className="text-xs font-semibold uppercase tracking-wider text-fg-secondary mb-1">
           {label}
           {required && <span className="text-amber-600 ml-1" title="Required">*</span>}
         </legend>
@@ -71,10 +71,10 @@ export function RadioGroup({
                 htmlFor={optId}
                 className={`relative flex items-start gap-3.5 p-4 rounded-xl border cursor-pointer transition-all ${
                   isOptDisabled
-                    ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200'
+                    ? 'opacity-50 cursor-not-allowed bg-surface-subtle border-border-subtle'
                     : isSelected
-                    ? 'border-amber-500 bg-amber-50/40 ring-1 ring-amber-500 shadow-xs'
-                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                    ? 'border-amber-500 bg-status-warning-bg/40 ring-1 ring-amber-500 shadow-xs'
+                    : 'border-border-subtle hover:border-border-strong bg-surface-card'
                 }`}
               >
                 <input
@@ -93,25 +93,25 @@ export function RadioGroup({
                   className={`mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all ${
                     isSelected
                       ? 'border-amber-500 bg-amber-500'
-                      : 'border-slate-300 bg-white'
+                      : 'border-border-strong bg-surface-card'
                   }`}
                 >
-                  {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-surface-card" />}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-slate-900">
+                    <span className="text-sm font-semibold text-fg-primary">
                       {opt.label}
                     </span>
                     {opt.badge && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-status-warning-bg-strong text-status-warning-fg">
                         {opt.badge}
                       </span>
                     )}
                   </div>
                   {opt.description && (
-                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    <p className="text-xs text-fg-muted mt-1 leading-relaxed">
                       {opt.description}
                     </p>
                   )}
@@ -125,8 +125,8 @@ export function RadioGroup({
             <label
               key={String(opt.value)}
               htmlFor={optId}
-              className={`inline-flex items-center gap-2.5 cursor-pointer select-none text-sm text-slate-700 ${
-                isOptDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:text-slate-900'
+              className={`inline-flex items-center gap-2.5 cursor-pointer select-none text-sm text-fg-secondary ${
+                isOptDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:text-fg-primary'
               }`}
             >
               <input
@@ -137,7 +137,7 @@ export function RadioGroup({
                 checked={isSelected}
                 disabled={isOptDisabled}
                 onChange={() => onChange?.(String(opt.value))}
-                className="w-4 h-4 text-amber-600 border-slate-300 focus:ring-amber-500"
+                className="w-4 h-4 text-amber-600 border-border-strong focus:ring-amber-500"
               />
               <span>{opt.label}</span>
             </label>
@@ -152,7 +152,7 @@ export function RadioGroup({
       )}
 
       {!error && helperText && (
-        <p id={helperId} className="text-xs text-slate-500 mt-0.5">
+        <p id={helperId} className="text-xs text-fg-muted mt-0.5">
           {helperText}
         </p>
       )}

@@ -54,14 +54,14 @@ export function PricingAuditDrawer({
       headerBadge={
         <Badge
           variant="outline"
-          className="text-[10px] font-mono bg-slate-100 text-slate-700 border-slate-200"
+          className="text-[10px] font-mono bg-surface-muted text-fg-secondary border-border-subtle"
         >
           {events.length} events
         </Badge>
       }
       footer={
         <div className="w-full flex items-center justify-between gap-2">
-          <span className="text-[11px] text-slate-500 truncate">
+          <span className="text-[11px] text-fg-muted truncate">
             Stored securely in staff-only <code>/config/pricingAuditLog</code>
           </span>
           <div className="flex items-center gap-2 shrink-0">
@@ -71,7 +71,7 @@ export function PricingAuditDrawer({
               size="sm"
               disabled={events.length === 0}
               onClick={handleExportAllCsv}
-              className="h-8 text-xs bg-white border-slate-300 text-slate-800 hover:bg-slate-50 cursor-pointer"
+              className="h-8 text-xs bg-surface-card border-border-strong text-fg-strong hover:bg-surface-subtle cursor-pointer"
             >
               <DownloadIcon className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
               Export CSV
@@ -80,7 +80,7 @@ export function PricingAuditDrawer({
               type="button"
               size="sm"
               onClick={onClose}
-              className="h-8 text-xs bg-slate-900 hover:bg-slate-800 text-white cursor-pointer"
+              className="h-8 text-xs bg-surface-header hover:bg-surface-header-elevated text-white cursor-pointer"
             >
               Done
             </Button>

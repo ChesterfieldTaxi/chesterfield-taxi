@@ -19,16 +19,16 @@ export function LayoutToggle({
   const isDark = variant === 'dark';
 
   const baseContainerStyles = isDark
-    ? 'bg-slate-800/80 border border-slate-700/80 text-slate-400'
-    : 'bg-slate-100 border border-slate-200 text-slate-600';
+    ? 'bg-surface-header-elevated/80 border border-border-header/80 text-fg-subtle'
+    : 'bg-surface-muted border border-border-subtle text-fg-secondary';
 
   const activeStyles = isDark
     ? 'bg-blue-600 text-white shadow-xs font-bold'
-    : 'bg-white text-blue-700 shadow-xs font-bold';
+    : 'bg-surface-card text-status-info-fg shadow-xs font-bold';
 
   const inactiveStyles = isDark
-    ? 'hover:text-slate-200 hover:bg-slate-700/50'
-    : 'hover:text-slate-900 hover:bg-slate-200/60';
+    ? 'hover:text-fg-on-header hover:bg-surface-header-muted/50'
+    : 'hover:text-fg-primary hover:bg-surface-emphasis/60';
 
   const paddingClasses = size === 'sm' ? 'p-0.5 text-xs' : 'p-1 text-sm';
   const buttonPaddingClasses = size === 'sm' ? 'px-2 py-1 gap-1.5' : 'px-3 py-1.5 gap-2';

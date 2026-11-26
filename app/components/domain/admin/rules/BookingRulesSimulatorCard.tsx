@@ -83,7 +83,7 @@ export function BookingRulesSimulatorCard({ config, zones }: BookingRulesSimulat
   ]);
 
   return (
-    <Card className="border-2 border-indigo-200 shadow-md overflow-hidden bg-slate-50/60">
+    <Card className="border-2 border-status-staged-border shadow-md overflow-hidden bg-surface-subtle/60">
       <div className="p-4 sm:p-5 bg-indigo-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="p-2 bg-indigo-800 rounded-xl text-indigo-200 shrink-0">
@@ -100,11 +100,11 @@ export function BookingRulesSimulatorCard({ config, zones }: BookingRulesSimulat
       </div>
 
       <CardContent className="p-4 sm:p-6 space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl border border-slate-200 bg-white shadow-2xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl border border-border-subtle bg-surface-card shadow-2xs">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700">Client Score</span>
-              <span className="text-xs font-black px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
+              <span className="text-xs font-bold text-fg-secondary">Client Score</span>
+              <span className="text-xs font-black px-2 py-0.5 rounded bg-status-info-bg text-status-info-fg border border-status-info-border inline-flex items-center gap-1">
                 {simIsUnratedGuest ? 'Unrated' : (<><StarIcon className="w-3 h-3 text-blue-600" /><span>{simCustomerScore}</span></>)}
               </span>
             </div>
@@ -113,14 +113,14 @@ export function BookingRulesSimulatorCard({ config, zones }: BookingRulesSimulat
               onChange={(e) => setSimCustomerScore(parseInt(e.target.value, 10) || 0)}
               className="w-full accent-blue-600 cursor-pointer disabled:opacity-40"
             />
-            <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600 pt-1">
+            <label className="flex items-center gap-2 cursor-pointer text-[11px] text-fg-secondary pt-1">
               <input type="checkbox" checked={simIsUnratedGuest} onChange={(e) => setSimIsUnratedGuest(e.target.checked)} className="rounded text-blue-600" />
               <span>Simulate 1st-Time Guest Rider</span>
             </label>
           </div>
 
           <div className="space-y-2">
-            <span className="text-xs font-bold text-slate-700 block">Pickup Location</span>
+            <span className="text-xs font-bold text-fg-secondary block">Pickup Location</span>
             <Select size="sm" value={simPickupZoneId} onChange={(e) => setSimPickupZoneId(e.target.value)}>
               <option value="any">Standard Service Area</option>
               <option value="airport">STL Airport Terminal</option>
@@ -130,7 +130,7 @@ export function BookingRulesSimulatorCard({ config, zones }: BookingRulesSimulat
           </div>
 
           <div className="space-y-2">
-            <span className="text-xs font-bold text-slate-700 block">Dropoff Location</span>
+            <span className="text-xs font-bold text-fg-secondary block">Dropoff Location</span>
             <Select size="sm" value={simDropoffZoneId} onChange={(e) => setSimDropoffZoneId(e.target.value)}>
               <option value="any">Standard Service Area</option>
               <option value="airport">STL Airport Terminal</option>
@@ -141,25 +141,25 @@ export function BookingRulesSimulatorCard({ config, zones }: BookingRulesSimulat
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700">Pickup Hour</span>
-              <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-100 text-slate-800">{simPickupHour.toString().padStart(2, '0')}:00</span>
+              <span className="text-xs font-bold text-fg-secondary">Pickup Hour</span>
+              <span className="text-xs font-black px-2 py-0.5 rounded bg-surface-muted text-fg-strong">{simPickupHour.toString().padStart(2, '0')}:00</span>
             </div>
             <input type="range" min="0" max="23" value={simPickupHour} onChange={(e) => setSimPickupHour(parseInt(e.target.value, 10) || 0)} className="w-full accent-blue-600 cursor-pointer" />
-            <span className="text-[10px] text-slate-400 inline-flex items-center gap-1">
+            <span className="text-[10px] text-fg-subtle inline-flex items-center gap-1">
               {simPickupHour >= 23 || simPickupHour < 4 ? (<><MoonIcon className="w-3 h-3 text-indigo-500" /><span>Late Night Window</span></>) : (<><SunIcon className="w-3 h-3 text-amber-500" /><span>Standard Operating Hours</span></>)}
             </span>
           </div>
 
           <div className="space-y-2">
-            <span className="text-xs font-bold text-slate-700 block">Estimated Fare ($)</span>
+            <span className="text-xs font-bold text-fg-secondary block">Estimated Fare ($)</span>
             <div className="relative">
-              <span className="absolute left-2.5 top-2 text-slate-400 text-xs font-bold">$</span>
-              <Input type="number" min="0" value={simFare} onChange={(e) => setSimFare(parseFloat(e.target.value) || 0)} className="text-xs h-9 pl-6 bg-slate-50" />
+              <span className="absolute left-2.5 top-2 text-fg-subtle text-xs font-bold">$</span>
+              <Input type="number" min="0" value={simFare} onChange={(e) => setSimFare(parseFloat(e.target.value) || 0)} className="text-xs h-9 pl-6 bg-surface-subtle" />
             </div>
           </div>
 
           <div className="space-y-2">
-            <span className="text-xs font-bold text-slate-700 block">Payment Method</span>
+            <span className="text-xs font-bold text-fg-secondary block">Payment Method</span>
             <Select size="sm" value={simPaymentMethod} onChange={(e) => setSimPaymentMethod(e.target.value as RulePaymentMethod)}>
               <option value="prepaid">Prepaid In-App</option>
               <option value="corporate">Corporate Account</option>
@@ -170,7 +170,7 @@ export function BookingRulesSimulatorCard({ config, zones }: BookingRulesSimulat
           </div>
 
           <div className="space-y-2">
-            <span className="text-xs font-bold text-slate-700 block">Vehicle Class Tier</span>
+            <span className="text-xs font-bold text-fg-secondary block">Vehicle Class Tier</span>
             <Select size="sm" value={simVehicleTier} onChange={(e) => setSimVehicleTier(e.target.value)}>
               <option value="standard">Standard Sedan</option>
               <option value="premium">Executive Premium</option>
@@ -180,7 +180,7 @@ export function BookingRulesSimulatorCard({ config, zones }: BookingRulesSimulat
           </div>
 
           <div className="space-y-1.5 pt-1">
-            <span className="text-xs font-bold text-slate-700 block">Trip Complexity Flags:</span>
+            <span className="text-xs font-bold text-fg-secondary block">Trip Complexity Flags:</span>
             <div className="grid grid-cols-2 gap-1 text-[11px]">
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input type="checkbox" checked={simReturnBooked} onChange={(e) => setSimReturnBooked(e.target.checked)} className="rounded text-blue-600" />
@@ -202,10 +202,10 @@ export function BookingRulesSimulatorCard({ config, zones }: BookingRulesSimulat
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl border-2 border-indigo-200 bg-gradient-to-r from-indigo-50/70 to-slate-50 space-y-4">
+        <div className="p-5 rounded-2xl border-2 border-status-staged-border bg-gradient-to-r from-status-staged-bg/70 to-surface-subtle space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 block">Simulated Evaluation Verdict</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-status-staged-fg block">Simulated Evaluation Verdict</span>
               <div className="flex items-center gap-2 mt-1">
                 {simResult.mode === 'AUTO_CONFIRM' && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-black bg-emerald-600 text-white shadow-xs">
@@ -226,39 +226,39 @@ export function BookingRulesSimulatorCard({ config, zones }: BookingRulesSimulat
             </div>
             <div className="flex flex-wrap gap-1.5">
               {(simResult.matchedRuleTags || []).map((tag) => (
-                <Badge key={tag} variant="neutral" size="sm" className="font-mono text-[10px] bg-white border-slate-300">#{tag}</Badge>
+                <Badge key={tag} variant="neutral" size="sm" className="font-mono text-[10px] bg-surface-card border-border-strong">#{tag}</Badge>
               ))}
             </div>
           </div>
 
-          <div className="p-3 bg-white rounded-xl border border-indigo-100 text-xs text-slate-700 font-medium">
-            <span className="font-bold text-slate-900 block mb-0.5">Decision Rationale:</span>
+          <div className="p-3 bg-surface-card rounded-xl border border-indigo-100 text-xs text-fg-secondary font-medium">
+            <span className="font-bold text-fg-primary block mb-0.5">Decision Rationale:</span>
             {simResult.reason || 'All parameters satisfy automatic confirmation criteria.'}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-indigo-100/80 text-xs">
-            <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
-              <span className="font-bold text-slate-600">Tier 3 (Security Block):</span>
+            <div className="p-2.5 rounded-xl bg-surface-card border border-border-subtle flex items-center justify-between">
+              <span className="font-bold text-fg-secondary">Tier 3 (Security Block):</span>
               {simResult.mode === 'BLACKLIST_BLOCK' ? (
                 <span className="font-black text-rose-600 inline-flex items-center gap-1"><BanIcon className="w-3.5 h-3.5" /> TRIGGERED</span>
               ) : (
                 <span className="font-bold text-emerald-600 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" /> CLEAR</span>
               )}
             </div>
-            <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
-              <span className="font-bold text-slate-600">Tier 2 (Review Queue):</span>
+            <div className="p-2.5 rounded-xl bg-surface-card border border-border-subtle flex items-center justify-between">
+              <span className="font-bold text-fg-secondary">Tier 2 (Review Queue):</span>
               {simResult.mode === 'REQUIRE_REVIEW' ? (
                 <span className="font-black text-amber-600 inline-flex items-center gap-1"><AlertTriangleIcon className="w-3.5 h-3.5" /> HELD FOR REVIEW</span>
               ) : (
                 <span className="font-bold text-emerald-600 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" /> BYPASSED</span>
               )}
             </div>
-            <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between">
-              <span className="font-bold text-slate-600">Tier 1 (Auto-Confirm):</span>
+            <div className="p-2.5 rounded-xl bg-surface-card border border-border-subtle flex items-center justify-between">
+              <span className="font-bold text-fg-secondary">Tier 1 (Auto-Confirm):</span>
               {simResult.mode === 'AUTO_CONFIRM' ? (
                 <span className="font-black text-emerald-600 inline-flex items-center gap-1"><CheckIcon className="w-3.5 h-3.5" /> CONFIRMED</span>
               ) : (
-                <span className="font-bold text-slate-400">— NOT ELIGIBLE</span>
+                <span className="font-bold text-fg-subtle">— NOT ELIGIBLE</span>
               )}
             </div>
           </div>

@@ -320,27 +320,27 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
   const getTypeBadge = (type: GovernanceEntityType) => {
     switch (type) {
       case 'trip':
-        return <Badge variant="neutral" size="sm" className="bg-slate-100 text-slate-800">Trip</Badge>;
+        return <Badge variant="neutral" size="sm" className="bg-surface-muted text-fg-strong">Trip</Badge>;
       case 'passenger':
-        return <Badge variant="info" size="sm" className="bg-blue-100 text-blue-800">Client</Badge>;
+        return <Badge variant="info" size="sm" className="bg-status-info-bg-strong text-status-info-fg">Client</Badge>;
       case 'corporate_account':
-        return <Badge variant="primary" size="sm" className="bg-blue-100 text-blue-800 font-bold">Corporate</Badge>;
+        return <Badge variant="primary" size="sm" className="bg-status-info-bg-strong text-status-info-fg font-bold">Corporate</Badge>;
       case 'driver':
-        return <Badge variant="success" size="sm" className="bg-emerald-100 text-emerald-800">Driver</Badge>;
+        return <Badge variant="success" size="sm" className="bg-status-success-bg-strong text-status-success-fg">Driver</Badge>;
       case 'staff':
-        return <Badge variant="primary" size="sm" className="bg-indigo-100 text-indigo-800">Staff</Badge>;
+        return <Badge variant="primary" size="sm" className="bg-status-staged-bg-strong text-status-staged-fg">Staff</Badge>;
       case 'vehicle':
-        return <Badge variant="warning" size="sm" className="bg-amber-100 text-amber-800">Car</Badge>;
+        return <Badge variant="warning" size="sm" className="bg-status-warning-bg-strong text-status-warning-fg">Car</Badge>;
       case 'vehicle_type':
-        return <Badge variant="warning" size="sm" className="bg-amber-100 text-amber-900 font-bold">Vehicle Type</Badge>;
+        return <Badge variant="warning" size="sm" className="bg-status-warning-bg-strong text-status-warning-fg font-bold">Vehicle Type</Badge>;
       case 'zone':
-        return <Badge variant="danger" size="sm" className="bg-rose-100 text-rose-800">Zone</Badge>;
+        return <Badge variant="danger" size="sm" className="bg-status-danger-bg-strong text-status-danger-fg">Zone</Badge>;
       case 'zone_group':
-        return <Badge variant="primary" size="sm" className="bg-indigo-100 text-indigo-800">Zone Group</Badge>;
+        return <Badge variant="primary" size="sm" className="bg-status-staged-bg-strong text-status-staged-fg">Zone Group</Badge>;
       case 'collection':
-        return <Badge variant="success" size="sm" className="bg-teal-100 text-teal-800">Places</Badge>;
+        return <Badge variant="success" size="sm" className="bg-status-success-bg-strong text-status-success-fg">Places</Badge>;
       case 'tariff':
-        return <Badge variant="primary" size="sm" className="bg-purple-100 text-purple-800">Rate</Badge>;
+        return <Badge variant="primary" size="sm" className="bg-status-staged-bg-strong text-status-staged-fg">Rate</Badge>;
       default:
         return <Badge variant="neutral" size="sm">{type}</Badge>;
     }
@@ -349,7 +349,7 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
   const getTypeIcon = (type: GovernanceEntityType) => {
     switch (type) {
       case 'trip':
-        return <HistoryIcon className="w-4 h-4 text-slate-500" />;
+        return <HistoryIcon className="w-4 h-4 text-fg-muted" />;
       case 'passenger':
         return <UserIcon className="w-4 h-4 text-blue-600" />;
       case 'driver':
@@ -368,7 +368,7 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
       case 'corporate_account':
         return <BuildingIcon className="w-4 h-4 text-blue-600" />;
       default:
-        return <ArchiveBoxIcon className="w-4 h-4 text-slate-500" />;
+        return <ArchiveBoxIcon className="w-4 h-4 text-fg-muted" />;
     }
   };
 
@@ -384,9 +384,9 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
       )}
 
       {/* ─── Single Clean Toolbar + Mobile Cards / Desktop Table ─── */}
-      <Card variant="elevated" className="border-slate-200/90 shadow-xs overflow-hidden">
+      <Card variant="elevated" className="border-border-subtle/90 shadow-xs overflow-hidden">
         <CardContent className="p-3 sm:p-4 space-y-4">
-          <div className="flex flex-wrap items-center gap-1.5 pb-1 border-b border-slate-100">
+          <div className="flex flex-wrap items-center gap-1.5 pb-1 border-b border-border-faint">
             {[
               { id: 'all', label: 'All', count: archivedRecords.length },
               { id: 'corporate', label: 'Corporate', count: corporateCount },
@@ -403,8 +403,8 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
                 onClick={() => setActiveFilter(tab.id)}
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
                   activeFilter === tab.id
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                    ? 'bg-surface-header text-white'
+                    : 'bg-surface-muted text-fg-secondary hover:bg-surface-emphasis hover:text-fg-primary'
                 }`}
               >
                 {tab.label} ({tab.count})
@@ -418,18 +418,18 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
                 placeholder="Search archive by ID, name, reason..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="text-xs h-9 bg-slate-50"
+                className="text-xs h-9 bg-surface-subtle"
               />
             </div>
             <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto shrink-0">
-              <span className="text-xs font-semibold text-slate-500">
+              <span className="text-xs font-semibold text-fg-muted">
                 {filteredRecords.length} archived record{filteredRecords.length === 1 ? '' : 's'}
               </span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={loadAllArchives}
-                className="text-xs font-semibold text-slate-700 bg-white shadow-2xs"
+                className="text-xs font-semibold text-fg-secondary bg-surface-card shadow-2xs"
               >
                 Refresh
               </Button>
@@ -439,9 +439,9 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
           {/* Mobile Archive Cards (< md) */}
           <div className="md:hidden space-y-2.5">
             {filteredRecords.length === 0 ? (
-              <div className="py-12 text-center text-slate-400 rounded-xl border border-slate-200 bg-slate-50/40">
+              <div className="py-12 text-center text-fg-subtle rounded-xl border border-border-subtle bg-surface-subtle/40">
                 <ArchiveBoxIcon className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                <div className="font-bold text-slate-600 text-sm">No Archived Items Found</div>
+                <div className="font-bold text-fg-secondary text-sm">No Archived Items Found</div>
                 <div className="text-xs mt-1 px-4">
                   {searchQuery
                     ? 'No items matched your search filter.'
@@ -452,30 +452,30 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
               filteredRecords.map((item) => (
                 <div
                   key={`${item.entityType}-${item.entityId}`}
-                  className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2.5 shadow-2xs"
+                  className="p-3.5 rounded-xl border border-border-subtle bg-surface-card space-y-2.5 shadow-2xs"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       {getTypeIcon(item.entityType)}
                       {getTypeBadge(item.entityType)}
                     </div>
-                    <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 shrink-0">
+                    <span className="inline-block text-[9px] font-bold px-2 py-0.5 rounded bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border shrink-0">
                       ARCHIVED
                     </span>
                   </div>
 
                   <div className="min-w-0">
-                    <div className="font-extrabold text-slate-900 text-sm truncate">
+                    <div className="font-extrabold text-fg-primary text-sm truncate">
                       {item.displayName || item.entityId}
                     </div>
-                    <div className="text-[10px] font-mono text-slate-400 truncate">
+                    <div className="text-[10px] font-mono text-fg-subtle truncate">
                       ID: {item.entityId}
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-[11px] text-slate-600 space-y-1">
+                  <div className="p-2.5 rounded-lg bg-surface-subtle border border-border-faint text-[11px] text-fg-secondary space-y-1">
                     <div>{item.archiveReason || 'Archived by administrator'}</div>
-                    <div className="text-[10px] text-slate-400">
+                    <div className="text-[10px] text-fg-subtle">
                       {item.archivedAt ? new Date(item.archivedAt).toLocaleString() : 'Unknown date'}
                     </div>
                   </div>
@@ -485,7 +485,7 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
                     size="sm"
                     onClick={() => handleRestore(item)}
                     disabled={isRestoring === item.entityId}
-                    className="w-full justify-center font-bold text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 shadow-2xs h-8 text-xs gap-1.5"
+                    className="w-full justify-center font-bold text-status-success-fg border-status-success-border bg-status-success-bg hover:bg-status-success-bg-strong shadow-2xs h-8 text-xs gap-1.5"
                   >
                     {isRestoring === item.entityId ? (
                       <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
@@ -500,9 +500,9 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
           </div>
 
           {/* Desktop Archive Table (md+) */}
-          <div className="hidden md:block overflow-x-auto custom-scrollbar rounded-xl border border-slate-200 min-w-full">
+          <div className="hidden md:block overflow-x-auto custom-scrollbar rounded-xl border border-border-subtle min-w-full">
             <table className="w-full text-left text-xs min-w-[700px]">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
+              <thead className="bg-surface-subtle border-b border-border-subtle text-fg-secondary font-bold uppercase text-[10px] tracking-wider">
                 <tr>
                   <th className="py-3 px-4">Entity Type</th>
                   <th className="py-3 px-4">Name &amp; Identifier</th>
@@ -512,12 +512,12 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
                   <th className="py-3 px-4 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
+              <tbody className="divide-y divide-border-faint bg-surface-card">
                 {filteredRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <td colSpan={6} className="py-12 text-center text-fg-subtle">
                       <ArchiveBoxIcon className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                      <div className="font-bold text-slate-600">No Archived Items Found</div>
+                      <div className="font-bold text-fg-secondary">No Archived Items Found</div>
                       <div className="text-xs mt-1">
                         {searchQuery
                           ? 'No items matched your search filter.'
@@ -527,7 +527,7 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
                   </tr>
                 ) : (
                   filteredRecords.map((item) => (
-                    <tr key={`${item.entityType}-${item.entityId}`} className="hover:bg-slate-50/80 transition-colors">
+                    <tr key={`${item.entityType}-${item.entityId}`} className="hover:bg-surface-subtle/80 transition-colors">
                       <td className="py-3 px-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           {getTypeIcon(item.entityType)}
@@ -535,23 +535,23 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900">
+                        <div className="font-bold text-fg-primary">
                           {item.displayName || item.entityId}
                         </div>
-                        <div className="text-[10px] font-mono text-slate-400">
+                        <div className="text-[10px] font-mono text-fg-subtle">
                           ID: {item.entityId}
                         </div>
                       </td>
-                      <td className="py-3 px-4 whitespace-nowrap text-slate-600 text-[11px]">
+                      <td className="py-3 px-4 whitespace-nowrap text-fg-secondary text-[11px]">
                         {item.archivedAt
                           ? new Date(item.archivedAt).toLocaleString()
                           : 'Unknown date'}
                       </td>
-                      <td className="py-3 px-4 text-slate-600 text-[11px] max-w-xs truncate">
+                      <td className="py-3 px-4 text-fg-secondary text-[11px] max-w-xs truncate">
                         {item.archiveReason || 'Archived by administrator'}
                       </td>
                       <td className="py-3 px-4 whitespace-nowrap">
-                        <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                        <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border">
                           ARCHIVED
                         </span>
                       </td>
@@ -561,7 +561,7 @@ export function AdminArchiveTab({ initialSubTab = 'all' }: AdminArchiveTabProps)
                           size="sm"
                           onClick={() => handleRestore(item)}
                           disabled={isRestoring === item.entityId}
-                          className="font-bold text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 shadow-2xs h-7 px-2.5 text-xs"
+                          className="font-bold text-status-success-fg border-status-success-border bg-status-success-bg hover:bg-status-success-bg-strong shadow-2xs h-7 px-2.5 text-xs"
                         >
                           {isRestoring === item.entityId ? (
                             <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />

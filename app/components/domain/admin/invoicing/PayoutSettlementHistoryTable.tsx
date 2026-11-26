@@ -24,15 +24,15 @@ export function PayoutSettlementHistoryTable({
   onUpdateSettlementStatus,
 }: PayoutSettlementHistoryTableProps) {
   return (
-    <Card className="border border-slate-200/90 shadow-xs overflow-hidden">
-      <CardHeader className="pb-2.5 border-b border-slate-100">
-        <CardTitle className="text-sm font-black text-slate-900">
+    <Card className="border border-border-subtle/90 shadow-xs overflow-hidden">
+      <CardHeader className="pb-2.5 border-b border-border-faint">
+        <CardTitle className="text-sm font-black text-fg-primary">
           Payout Settlement History ({payoutSettlements.length})
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0 overflow-x-auto">
         <table className="w-full text-left text-xs min-w-[720px]">
-          <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-500">
+          <thead className="bg-surface-subtle border-b border-border-subtle text-[10px] font-bold uppercase text-fg-muted">
             <tr>
               <th className="px-4 py-2.5">Period</th>
               <th className="px-3 py-2.5">Payee</th>
@@ -43,24 +43,24 @@ export function PayoutSettlementHistoryTable({
               <th className="px-4 py-2.5 text-right">Workflow</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border-faint">
             {payoutSettlements.map((s) => (
-              <tr key={s.id} className="hover:bg-slate-50/70">
-                <td className="px-4 py-2.5 font-mono text-[11px] text-slate-600">
+              <tr key={s.id} className="hover:bg-surface-subtle/70">
+                <td className="px-4 py-2.5 font-mono text-[11px] text-fg-secondary">
                   {s.periodStart} &rarr; {s.periodEnd}
                 </td>
                 <td className="px-3 py-2.5">
-                  <span className="font-bold text-slate-900">{s.payeeName}</span>{' '}
-                  <span className="text-[10px] text-slate-500">({s.payeeRoleLabel})</span>
+                  <span className="font-bold text-fg-primary">{s.payeeName}</span>{' '}
+                  <span className="text-[10px] text-fg-muted">({s.payeeRoleLabel})</span>
                 </td>
-                <td className="px-3 py-2.5 font-mono text-[11px] text-slate-700">
+                <td className="px-3 py-2.5 font-mono text-[11px] text-fg-secondary">
                   {resolvePayoutLedgerMapping(s.payeeType).accountCode}
                 </td>
-                <td className="px-3 py-2.5 font-mono text-[11px] text-slate-600">
+                <td className="px-3 py-2.5 font-mono text-[11px] text-fg-secondary">
                   {s.paymentMethod.toUpperCase()}
                   {s.referenceNumber ? ` · ${s.referenceNumber}` : ''}
                 </td>
-                <td className="px-3 py-2.5 text-right font-mono font-black text-slate-900">
+                <td className="px-3 py-2.5 text-right font-mono font-black text-fg-primary">
                   ${s.netPayoutAmount.toFixed(2)}
                 </td>
                 <td className="px-3 py-2.5">
@@ -108,7 +108,7 @@ export function PayoutSettlementHistoryTable({
             ))}
             {payoutSettlements.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-slate-400">
+                <td colSpan={7} className="py-8 text-center text-fg-subtle">
                   No payout settlements recorded yet.
                 </td>
               </tr>

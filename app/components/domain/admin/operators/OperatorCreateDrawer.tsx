@@ -74,10 +74,10 @@ export function OperatorCreateDrawer({
     >
       <form id="create-operator-form" onSubmit={onSubmit} className="space-y-5">
         {/* Roles */}
-        <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+        <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-3">
+          <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
             <ShieldIcon className="w-4 h-4 text-purple-600" />
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
               Assign Roles
             </h3>
           </div>
@@ -93,16 +93,16 @@ export function OperatorCreateDrawer({
                   className={`flex items-start gap-2 p-3 rounded-xl border text-left transition-all cursor-pointer ${
                     selected
                       ? meta.cardActiveClass
-                      : 'border-slate-200 bg-white hover:border-slate-300'
+                      : 'border-border-subtle bg-surface-card hover:border-border-strong'
                   }`}
                 >
                   <RoleIcon role={r} className={`w-4 h-4 mt-0.5 shrink-0 ${meta.iconClass}`} />
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold text-slate-900 flex items-center justify-between">
+                    <div className="text-xs font-bold text-fg-primary flex items-center justify-between">
                       <span>{meta.label}</span>
-                      {selected && <CheckIcon className="w-3.5 h-3.5 text-slate-800" />}
+                      {selected && <CheckIcon className="w-3.5 h-3.5 text-fg-strong" />}
                     </div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">{meta.description}</div>
+                    <div className="text-[10px] text-fg-muted mt-0.5">{meta.description}</div>
                   </div>
                 </button>
               );
@@ -111,10 +111,10 @@ export function OperatorCreateDrawer({
         </section>
 
         {/* Identity & Credentials */}
-        <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+        <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
             <UserIcon className="w-4 h-4 text-blue-600" />
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
               Identity &amp; Login Credentials
             </h3>
           </div>
@@ -191,10 +191,10 @@ export function OperatorCreateDrawer({
 
         {/* Driver Details */}
         {createForm.roles.includes('driver') && (
-          <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+          <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
               <CarIcon className="w-4 h-4 text-emerald-600" />
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
                 Driver &amp; Vehicle Setup
               </h3>
             </div>
@@ -232,12 +232,12 @@ export function OperatorCreateDrawer({
               onChange={(e) => onChangeForm({ ...createForm, assignedUnit: e.target.value })}
             />
 
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2">
+            <div className="bg-surface-subtle border border-border-subtle rounded-xl p-3 flex items-center justify-between gap-2">
               <div>
-                <div className="text-xs font-bold text-slate-700">Auto-Generated Username</div>
-                <div className="text-[11px] text-slate-500">Format: [first][last_initial][cab]</div>
+                <div className="text-xs font-bold text-fg-secondary">Auto-Generated Username</div>
+                <div className="text-[11px] text-fg-muted">Format: [first][last_initial][cab]</div>
               </div>
-              <span className="font-mono text-xs font-extrabold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+              <span className="font-mono text-xs font-extrabold text-status-info-fg bg-surface-card px-2.5 py-1 rounded-lg border border-border-subtle">
                 @
                 {createForm.username ||
                   generateDriverUsername(createForm.firstName, createForm.lastName, createForm.cabNumber) ||
@@ -249,10 +249,10 @@ export function OperatorCreateDrawer({
 
         {/* Staff Desk Extension */}
         {(createForm.roles.includes('dispatcher') || createForm.roles.includes('admin')) && (
-          <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-3">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+          <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
               <RadioIcon className="w-4 h-4 text-blue-600" />
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">
                 Staff Details
               </h3>
             </div>

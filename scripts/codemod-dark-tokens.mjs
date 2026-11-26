@@ -120,6 +120,7 @@ function mapBaseToken(base, opacitySuffix) {
 
   // 2. Borders, Dividers & Rings (`border-*`, `divide-*`, `ring-*`)
   for (const prop of ['border', 'divide', 'ring']) {
+    if (base === `${prop}-slate-50` || base === `${prop}-gray-50`) return `${prop}-border-faint`;
     if (base === `${prop}-slate-100` || base === `${prop}-gray-100`) return `${prop}-border-faint`;
     if (base === `${prop}-slate-200` || base === `${prop}-gray-200`) return `${prop}-border-subtle`;
     if (base === `${prop}-slate-300` || base === `${prop}-gray-300`) return `${prop}-border-strong`;
@@ -201,6 +202,8 @@ function mapBaseToken(base, opacitySuffix) {
   if (base === 'text-slate-500' || base === 'text-gray-500') return 'text-fg-muted';
   if (base === 'text-slate-400' || base === 'text-gray-400') return 'text-fg-subtle';
   if (base === 'text-slate-200' || base === 'text-slate-100') return 'text-fg-on-header';
+  if (base === 'placeholder-slate-400' || base === 'placeholder-gray-400') return 'placeholder-fg-subtle';
+  if (base === 'placeholder-slate-500' || base === 'placeholder-gray-500') return 'placeholder-fg-muted';
 
   // Soft Status Foregrounds (`text-*-700` / `800` / `900` / `950`)
   if (
@@ -271,7 +274,7 @@ function mapBaseToken(base, opacitySuffix) {
 }
 
 const TOKEN_REGEX =
-  /(?<=["'`\s])((?:[a-z0-9-]+:)*)((?:bg|from|via|to|text|border(?:-[trblxy])?|divide|ring)-(?:white|(?:slate|gray|emerald|green|teal|amber|yellow|rose|red|blue|sky|cyan|indigo|purple|violet|fuchsia)-(?:50|100|200|300|400|500|600|700|800|900|950)))(\/\d{1,3})?(?=["'`\s])/g;
+  /(?<=["'`\s])((?:[a-z0-9-]+:)*)((?:bg|from|via|to|text|placeholder|border(?:-[trblxy])?|divide|ring)-(?:white|(?:slate|gray|emerald|green|teal|amber|yellow|rose|red|blue|sky|cyan|indigo|purple|violet|fuchsia)-(?:50|100|200|300|400|500|600|700|800|900|950)))(\/\d{1,3})?(?=["'`\s])/g;
 
 function transformSource(source) {
   let count = 0;

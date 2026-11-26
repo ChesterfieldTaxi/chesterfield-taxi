@@ -108,7 +108,7 @@ export function AdminTripDetailsSlideOver({
               onClick={() => onToggleArchive(trip, isArchived)}
               className="text-xs font-semibold inline-flex items-center gap-1"
             >
-              <ArchiveBoxIcon className="w-3.5 h-3.5 text-slate-500" />
+              <ArchiveBoxIcon className="w-3.5 h-3.5 text-fg-muted" />
               <span>{isArchived ? 'Restore' : 'Archive'}</span>
             </Button>
 
@@ -152,11 +152,11 @@ export function AdminTripDetailsSlideOver({
         <div className="space-y-4 text-xs">
           {/* Phase 56 Pending Rider /track Change Request Banner */}
           {exception?.hasPendingRiderChangeRequest && (
-            <div className="p-3.5 rounded-xl bg-violet-50 border border-violet-300 space-y-2.5">
-              <div className="font-extrabold text-violet-950">
+            <div className="p-3.5 rounded-xl bg-status-staged-bg border border-status-staged-border space-y-2.5">
+              <div className="font-extrabold text-status-staged-fg">
                 📝 Rider Edit Req (Pending /track Change Request)
               </div>
-              <p className="text-[11px] text-violet-800">{exception.riderChangeSummary}</p>
+              <p className="text-[11px] text-status-staged-fg">{exception.riderChangeSummary}</p>
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
@@ -173,7 +173,7 @@ export function AdminTripDetailsSlideOver({
                   variant="outline"
                   disabled={isBusy}
                   onClick={() => onResolveGuestChangeRequest(trip, 'decline')}
-                  className="text-[11px] border-rose-300 text-rose-700"
+                  className="text-[11px] border-status-danger-border text-status-danger-fg"
                 >
                   <XIcon className="w-3.5 h-3.5 mr-1" />
                   Decline
@@ -184,9 +184,9 @@ export function AdminTripDetailsSlideOver({
 
           {/* Phase 55 Unacknowledged Driver Update Banner */}
           {exception?.hasUnacknowledgedDriverAck && (
-            <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-950">
+            <div className="p-3 rounded-xl bg-status-warning-bg border border-status-warning-border text-status-warning-fg">
               <span className="font-extrabold block">⏳ Awaiting Driver Ack</span>
-              <span className="text-[11px] text-amber-900">
+              <span className="text-[11px] text-status-warning-fg">
                 {exception.driverAckSummary.join(' • ') ||
                   'Assigned driver has not acknowledged the latest dispatch modification yet.'}
               </span>
@@ -195,20 +195,20 @@ export function AdminTripDetailsSlideOver({
 
           {/* Driver Assignment & Stage Hold Card */}
           {!isTerminal && (
-            <div className="bg-white p-4 rounded-xl border border-slate-200/90 space-y-2.5">
+            <div className="bg-surface-card p-4 rounded-xl border border-border-subtle/90 space-y-2.5">
               <div className="flex items-center justify-between gap-2">
-                <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <h4 className="text-[11px] font-bold text-fg-muted uppercase tracking-wider">
                   Driver Assignment / Stage Hold
                 </h4>
                 {!trip.assignedDriverId && (
-                  <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[10px]">
+                  <div className="inline-flex rounded-lg border border-border-subtle bg-surface-subtle p-0.5 text-[10px]">
                     <button
                       type="button"
                       onClick={() => onAssignModeChange('send_to_driver')}
                       className={`px-2 py-0.5 rounded font-bold cursor-pointer ${
                         assignMode === 'send_to_driver'
                           ? 'bg-blue-600 text-white'
-                          : 'text-slate-600'
+                          : 'text-fg-secondary'
                       }`}
                     >
                       Send to Driver
@@ -219,7 +219,7 @@ export function AdminTripDetailsSlideOver({
                       className={`px-2 py-0.5 rounded font-bold cursor-pointer ${
                         assignMode === 'stage_hold'
                           ? 'bg-indigo-600 text-white'
-                          : 'text-slate-600'
+                          : 'text-fg-secondary'
                       }`}
                     >
                       📌 Hold (Stage)
@@ -252,25 +252,25 @@ export function AdminTripDetailsSlideOver({
           )}
 
           {/* Passenger & Contact */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200/90 space-y-2">
-            <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+          <div className="bg-surface-card p-4 rounded-xl border border-border-subtle/90 space-y-2">
+            <h4 className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider">
               Passenger &amp; Contact
             </h4>
-            <p className="text-sm font-bold text-slate-900">
+            <p className="text-sm font-bold text-fg-primary">
               {[trip.passenger?.firstName, trip.passenger?.lastName].filter(Boolean).join(' ') || 'Guest'}
             </p>
-            <p className="text-slate-600 flex items-center gap-1.5">
-              <PhoneIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <p className="text-fg-secondary flex items-center gap-1.5">
+              <PhoneIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
               <span>{trip.passenger?.phone || 'No phone'}</span>
             </p>
-            <p className="text-slate-600 flex items-center gap-1.5">
-              <MailIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <p className="text-fg-secondary flex items-center gap-1.5">
+              <MailIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />
               <span>{trip.passenger?.email || 'No email'}</span>
             </p>
             {(trip.passenger?.specialRequests || trip.driverNotes) && (
-              <div className="pt-2 border-t border-slate-100">
-                <p className="text-[11px] font-semibold text-slate-500">Special Notes</p>
-                <p className="text-slate-700 mt-0.5">
+              <div className="pt-2 border-t border-border-faint">
+                <p className="text-[11px] font-semibold text-fg-muted">Special Notes</p>
+                <p className="text-fg-secondary mt-0.5">
                   {trip.passenger?.specialRequests || trip.driverNotes}
                 </p>
               </div>
@@ -278,13 +278,13 @@ export function AdminTripDetailsSlideOver({
           </div>
 
           {/* Route Itinerary */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200/90 space-y-2.5">
-            <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+          <div className="bg-surface-card p-4 rounded-xl border border-border-subtle/90 space-y-2.5">
+            <h4 className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider">
               Route Itinerary
             </h4>
             <div>
               <span className="text-[10px] font-bold text-emerald-600 uppercase block">Pickup</span>
-              <p className="font-semibold text-slate-800 mt-0.5">{trip.pickupLocation?.address}</p>
+              <p className="font-semibold text-fg-strong mt-0.5">{trip.pickupLocation?.address}</p>
             </div>
             {trip.intermediateStops && trip.intermediateStops.length > 0 && (
               <div>
@@ -292,7 +292,7 @@ export function AdminTripDetailsSlideOver({
                   Intermediate Stops ({trip.intermediateStops.length})
                 </span>
                 {trip.intermediateStops.map((s, idx) => (
-                  <p key={idx} className="font-medium text-slate-700 mt-0.5">
+                  <p key={idx} className="font-medium text-fg-secondary mt-0.5">
                     Stop {idx + 1}: {s.address}
                   </p>
                 ))}
@@ -300,24 +300,24 @@ export function AdminTripDetailsSlideOver({
             )}
             <div>
               <span className="text-[10px] font-bold text-rose-600 uppercase block">Dropoff</span>
-              <p className="font-semibold text-slate-800 mt-0.5">{trip.dropoffLocation?.address}</p>
+              <p className="font-semibold text-fg-strong mt-0.5">{trip.dropoffLocation?.address}</p>
             </div>
           </div>
 
           {/* Financial Summary */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200/90 space-y-2">
-            <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+          <div className="bg-surface-card p-4 rounded-xl border border-border-subtle/90 space-y-2">
+            <h4 className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider">
               Financial Summary
             </h4>
             <div className="flex justify-between items-center">
-              <span className="text-slate-600">Total Upfront Fare</span>
-              <span className="font-extrabold text-slate-950 text-base font-mono">
+              <span className="text-fg-secondary">Total Upfront Fare</span>
+              <span className="font-extrabold text-fg-primary text-base font-mono">
                 ${Number(trip.pricing?.totalFare || trip.payment?.amount || 0).toFixed(2)}
               </span>
             </div>
-            <div className="flex justify-between items-center text-[11px] text-slate-500">
+            <div className="flex justify-between items-center text-[11px] text-fg-muted">
               <span>Payment Method</span>
-              <span className="font-semibold capitalize text-slate-700">
+              <span className="font-semibold capitalize text-fg-secondary">
                 {trip.payment?.method || 'Card'}
               </span>
             </div>

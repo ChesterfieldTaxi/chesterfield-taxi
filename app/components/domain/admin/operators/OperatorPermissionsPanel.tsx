@@ -177,24 +177,24 @@ export function OperatorPermissionsPanel({
 
   return (
     <div className="space-y-5">
-      <Card className="border border-slate-200 bg-white shadow-xs">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-5">
+      <Card className="border border-border-subtle bg-surface-card shadow-xs">
+        <CardHeader className="border-b border-border-faint bg-surface-subtle/50 p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-base font-black text-slate-900 flex items-center gap-2">
+              <CardTitle className="text-base font-black text-fg-primary flex items-center gap-2">
                 <ShieldCheckIcon className="w-5 h-5 text-purple-600" />
                 <span>Multi-Role Console Matrix &amp; Dispatch Lead-Window Access</span>
               </CardTitle>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-fg-muted mt-0.5">
                 Toggle staff/driver roles in 1 click and control which Dispatchers may adjust Pre-Pickup &amp; Staged Auto-Release Lead Windows in <code>/app/dispatch</code>.
               </p>
             </div>
             <Link
               to="/app/admin?tab=automation&sub=auto-dispatch"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 shrink-0"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border-subtle bg-surface-card hover:bg-surface-subtle text-xs font-bold text-fg-secondary shrink-0"
             >
               <span>Auto-Pilot Settings</span>
-              <ExternalLinkIcon className="w-3.5 h-3.5 text-slate-400" />
+              <ExternalLinkIcon className="w-3.5 h-3.5 text-fg-subtle" />
             </Link>
           </div>
         </CardHeader>
@@ -202,37 +202,37 @@ export function OperatorPermissionsPanel({
         <CardContent className="p-5 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="relative w-full sm:w-72">
-              <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <SearchIcon className="w-4 h-4 text-fg-subtle absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Filter by name, email, or car #..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs text-slate-900"
+                className="w-full h-9 pl-9 pr-3 rounded-xl border border-border-subtle bg-surface-subtle focus:bg-surface-card text-xs text-fg-primary"
               />
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-slate-600">
+            <div className="flex items-center gap-2 text-xs text-fg-secondary">
               <ClockIcon className="w-4 h-4 text-blue-600 shrink-0" />
               <span>
                 Authorized Non-Admin Dispatchers:{' '}
-                <strong className="text-slate-900">
+                <strong className="text-fg-primary">
                   {automationState.authorizedLeadWindowDispatcherIds.length}
                 </strong>
               </span>
             </div>
           </div>
 
-          <div className="overflow-x-auto custom-scrollbar border border-slate-200 rounded-2xl">
-            <table className="w-full text-left text-xs divide-y divide-slate-100 min-w-[780px]">
-              <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <div className="overflow-x-auto custom-scrollbar border border-border-subtle rounded-2xl">
+            <table className="w-full text-left text-xs divide-y divide-border-faint min-w-[780px]">
+              <thead className="bg-surface-subtle text-[10px] font-bold uppercase tracking-wider text-fg-muted">
                 <tr>
                   <th className="px-4 py-3">Member</th>
                   <th className="px-4 py-3">Assigned Roles (1-Click Toggle)</th>
                   <th className="px-4 py-3">Dispatch Lead-Window Override</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
+              <tbody className="divide-y divide-border-faint bg-surface-card">
                 {activeOperators.map((op) => {
                   const opRoles: UserRole[] =
                     op.roles && op.roles.length > 0 ? op.roles : [op.role || 'driver'];
@@ -243,17 +243,17 @@ export function OperatorPermissionsPanel({
                   const isLeadBusy = busyKey === `lead:${op.uid}`;
 
                   return (
-                    <tr key={op.uid} className="hover:bg-slate-50/70 transition-colors">
+                    <tr key={op.uid} className="hover:bg-surface-subtle/70 transition-colors">
                       <td className="px-4 py-3.5">
-                        <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <div className="font-bold text-fg-primary flex items-center gap-1.5">
                           <span>{op.displayName || 'Unnamed Member'}</span>
                           {op.cabNumber && (
-                            <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-extrabold text-[10px] border border-blue-200">
+                            <span className="px-1.5 py-0.5 rounded bg-status-info-bg text-status-info-fg font-extrabold text-[10px] border border-status-info-border">
                               #{op.cabNumber}
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-500">{op.email}</div>
+                        <div className="text-[11px] text-fg-muted">{op.email}</div>
                       </td>
 
                       <td className="px-4 py-3.5">
@@ -273,7 +273,7 @@ export function OperatorPermissionsPanel({
                                 className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-bold transition-all cursor-pointer disabled:opacity-60 ${
                                   active
                                     ? meta.pillClass
-                                    : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-700'
+                                    : 'bg-surface-card text-fg-subtle border-border-subtle hover:border-border-strong hover:text-fg-secondary'
                                 }`}
                                 title={locked ? 'Root admin role is locked' : `Toggle ${meta.label}`}
                               >
@@ -294,7 +294,7 @@ export function OperatorPermissionsPanel({
                         {isAdmin ? (
                           <Badge
                             variant="success"
-                            className="bg-purple-50 text-purple-800 border-purple-200 text-[10px] font-bold"
+                            className="bg-status-staged-bg text-status-staged-fg border-status-staged-border text-[10px] font-bold"
                           >
                             Always Authorized (Admin)
                           </Badge>
@@ -306,7 +306,7 @@ export function OperatorPermissionsPanel({
                             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-extrabold transition-all cursor-pointer disabled:opacity-60 ${
                               hasLeadAccess
                                 ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                                : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
+                                : 'bg-surface-subtle text-fg-secondary border-border-strong hover:bg-surface-muted'
                             }`}
                           >
                             {isLeadBusy ? (
@@ -314,7 +314,7 @@ export function OperatorPermissionsPanel({
                             ) : hasLeadAccess ? (
                               <CheckIcon className="w-3.5 h-3.5" />
                             ) : (
-                              <LockIcon className="w-3.5 h-3.5 text-slate-400" />
+                              <LockIcon className="w-3.5 h-3.5 text-fg-subtle" />
                             )}
                             <span>
                               {hasLeadAccess
@@ -323,7 +323,7 @@ export function OperatorPermissionsPanel({
                             </span>
                           </button>
                         ) : (
-                          <span className="text-[11px] text-slate-400">
+                          <span className="text-[11px] text-fg-subtle">
                             Requires Dispatcher role
                           </span>
                         )}

@@ -35,39 +35,39 @@ const CATEGORY_CONFIG: Record<
 > = {
   airport: {
     label: 'Airport',
-    bgClass: 'bg-blue-50',
-    textClass: 'text-blue-700',
-    borderClass: 'border-blue-200',
+    bgClass: 'bg-status-info-bg',
+    textClass: 'text-status-info-fg',
+    borderClass: 'border-status-info-border',
   },
   landmark: {
     label: 'Landmark',
-    bgClass: 'bg-amber-50',
-    textClass: 'text-amber-700',
-    borderClass: 'border-amber-200',
+    bgClass: 'bg-status-warning-bg',
+    textClass: 'text-status-warning-fg',
+    borderClass: 'border-status-warning-border',
   },
   venue: {
     label: 'Venue / Arena',
-    bgClass: 'bg-purple-50',
+    bgClass: 'bg-status-staged-bg',
     textClass: 'text-purple-700',
-    borderClass: 'border-purple-200',
+    borderClass: 'border-status-staged-border',
   },
   hospital: {
     label: 'Hospital / Medical',
-    bgClass: 'bg-rose-50',
-    textClass: 'text-rose-700',
-    borderClass: 'border-rose-200',
+    bgClass: 'bg-status-danger-bg',
+    textClass: 'text-status-danger-fg',
+    borderClass: 'border-status-danger-border',
   },
   shopping: {
     label: 'Shopping / Retail',
-    bgClass: 'bg-emerald-50',
-    textClass: 'text-emerald-700',
-    borderClass: 'border-emerald-200',
+    bgClass: 'bg-status-success-bg',
+    textClass: 'text-status-success-fg',
+    borderClass: 'border-status-success-border',
   },
   transit: {
     label: 'Transit / Station',
-    bgClass: 'bg-cyan-50',
-    textClass: 'text-cyan-700',
-    borderClass: 'border-cyan-200',
+    bgClass: 'bg-status-info-bg',
+    textClass: 'text-status-info-fg',
+    borderClass: 'border-status-info-border',
   },
   hotel: {
     label: 'Hotel / Lodging',
@@ -77,15 +77,15 @@ const CATEGORY_CONFIG: Record<
   },
   corporate: {
     label: 'Corporate Account',
-    bgClass: 'bg-indigo-50',
-    textClass: 'text-indigo-700',
-    borderClass: 'border-indigo-200',
+    bgClass: 'bg-status-staged-bg',
+    textClass: 'text-status-staged-fg',
+    borderClass: 'border-status-staged-border',
   },
   custom: {
     label: 'Special Place',
-    bgClass: 'bg-slate-50',
-    textClass: 'text-slate-700',
-    borderClass: 'border-slate-200',
+    bgClass: 'bg-surface-subtle',
+    textClass: 'text-fg-secondary',
+    borderClass: 'border-border-subtle',
   },
 };
 
@@ -289,18 +289,18 @@ export function SpecialPlacesAdminPanel() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Top Banner */}
-      <div className="p-3.5 sm:p-4.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+      <div className="p-3.5 sm:p-4.5 rounded-2xl bg-surface-subtle border border-border-subtle flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="text-sm sm:text-base font-bold text-fg-primary flex items-center gap-2">
               <MapPinIcon className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>Special Places &amp; Landmarks</span>
             </h2>
-            <Badge variant="outline" className="bg-emerald-50 text-emerald-800 border-emerald-300 text-[10px]">
+            <Badge variant="outline" className="bg-status-success-bg text-status-success-fg border-status-success-border text-[10px]">
               Site-Wide Autocomplete
             </Badge>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-fg-muted mt-0.5">
             Landmarks, airports, hospitals, venues, and corporate pickup zones displayed at the top of location inputs site-wide.
           </p>
         </div>
@@ -311,7 +311,7 @@ export function SpecialPlacesAdminPanel() {
             variant="outline"
             size="sm"
             onClick={handleResetDefaults}
-            className="flex-1 sm:flex-none justify-center text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
+            className="flex-1 sm:flex-none justify-center text-xs border-border-strong bg-surface-card text-fg-secondary hover:bg-surface-subtle shadow-2xs"
           >
             Reset Defaults
           </Button>
@@ -320,7 +320,7 @@ export function SpecialPlacesAdminPanel() {
             variant="outline"
             size="sm"
             onClick={handleSyncFirestore}
-            className="flex-1 sm:flex-none justify-center text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs"
+            className="flex-1 sm:flex-none justify-center text-xs border-border-strong bg-surface-card text-fg-secondary hover:bg-surface-subtle shadow-2xs"
           >
             Cloud Sync
           </Button>
@@ -341,8 +341,8 @@ export function SpecialPlacesAdminPanel() {
         <div
           className={`p-3 rounded-xl border text-xs flex items-center gap-2 shadow-2xs ${
             feedbackMsg.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              : 'bg-rose-50 border-rose-200 text-rose-900'
+              ? 'bg-status-success-bg border-status-success-border text-status-success-fg'
+              : 'bg-status-danger-bg border-status-danger-border text-status-danger-fg'
           }`}
         >
           {feedbackMsg.type === 'success' ? (
@@ -356,18 +356,18 @@ export function SpecialPlacesAdminPanel() {
 
       {/* Editing / Creation Drawer Modal */}
       {isEditing && (
-        <form onSubmit={handleSave} className="p-5 rounded-xl bg-white border border-slate-300 shadow-md space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+        <form onSubmit={handleSave} className="p-5 rounded-xl bg-surface-card border border-border-strong shadow-md space-y-4">
+          <div className="flex items-center justify-between border-b border-border-faint pb-3">
+            <h3 className="text-sm font-bold text-fg-primary flex items-center gap-2">
               <SparklesIcon className="w-4 h-4 text-emerald-600" />
               {editingId ? 'Edit Special Place' : 'Create New Special Place'}
             </h3>
-            <span className="text-xs text-slate-400 font-mono">ID: {formData.id || 'auto'}</span>
+            <span className="text-xs text-fg-subtle font-mono">ID: {formData.id || 'auto'}</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="md:col-span-2">
-              <label className="text-xs font-medium text-slate-700 block mb-1">
+              <label className="text-xs font-medium text-fg-secondary block mb-1">
                 Full Place Name <span className="text-rose-500">*</span>
               </label>
               <Input
@@ -378,12 +378,12 @@ export function SpecialPlacesAdminPanel() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                className="h-8.5 text-xs bg-white border-slate-300 text-slate-900 font-medium"
+                className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary font-medium"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">
+              <label className="text-xs font-medium text-fg-secondary block mb-1">
                 Short Name / Label
               </label>
               <Input
@@ -393,14 +393,14 @@ export function SpecialPlacesAdminPanel() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setFormData({ ...formData, shortName: e.target.value })
                 }
-                className="h-8.5 text-xs bg-white border-slate-300 text-slate-900"
+                className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div className="md:col-span-2">
-              <label className="text-xs font-medium text-slate-700 block mb-1">
+              <label className="text-xs font-medium text-fg-secondary block mb-1">
                 Street Address <span className="text-rose-500">*</span>
               </label>
               <Input
@@ -411,24 +411,24 @@ export function SpecialPlacesAdminPanel() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setFormData({ ...formData, address: e.target.value })
                 }
-                className="h-8.5 text-xs bg-white border-slate-300 text-slate-900"
+                className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">City</label>
+              <label className="text-xs font-medium text-fg-secondary block mb-1">City</label>
               <Input
                 type="text"
                 value={formData.city}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setFormData({ ...formData, city: e.target.value })
                 }
-                className="h-8.5 text-xs bg-white border-slate-300 text-slate-900"
+                className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">State & Zip</label>
+              <label className="text-xs font-medium text-fg-secondary block mb-1">State & Zip</label>
               <div className="flex gap-2">
                 <Input
                   type="text"
@@ -436,7 +436,7 @@ export function SpecialPlacesAdminPanel() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setFormData({ ...formData, state: e.target.value })
                   }
-                  className="h-8.5 text-xs bg-white border-slate-300 text-slate-900 w-16 uppercase text-center font-bold"
+                  className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary w-16 uppercase text-center font-bold"
                 />
                 <Input
                   type="text"
@@ -445,7 +445,7 @@ export function SpecialPlacesAdminPanel() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setFormData({ ...formData, zip: e.target.value })
                   }
-                  className="h-8.5 text-xs bg-white border-slate-300 text-slate-900 flex-1 font-mono"
+                  className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary flex-1 font-mono"
                 />
               </div>
             </div>
@@ -453,7 +453,7 @@ export function SpecialPlacesAdminPanel() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">Category</label>
+              <label className="text-xs font-medium text-fg-secondary block mb-1">Category</label>
               <Select
                 size="sm"
                 value={formData.category}
@@ -476,7 +476,7 @@ export function SpecialPlacesAdminPanel() {
 
             {formData.category === 'airport' && (
               <div>
-                <label className="text-xs font-medium text-slate-700 block mb-1">Airport Type</label>
+                <label className="text-xs font-medium text-fg-secondary block mb-1">Airport Type</label>
                 <Select
                   size="sm"
                   value={formData.airportType || 'commercial'}
@@ -494,7 +494,7 @@ export function SpecialPlacesAdminPanel() {
             )}
 
             <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">Latitude</label>
+              <label className="text-xs font-medium text-fg-secondary block mb-1">Latitude</label>
               <Input
                 type="number"
                 step="0.0001"
@@ -508,12 +508,12 @@ export function SpecialPlacesAdminPanel() {
                     },
                   })
                 }
-                className="h-8.5 text-xs bg-white border-slate-300 text-slate-900 font-mono"
+                className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary font-mono"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">Longitude</label>
+              <label className="text-xs font-medium text-fg-secondary block mb-1">Longitude</label>
               <Input
                 type="number"
                 step="0.0001"
@@ -527,13 +527,13 @@ export function SpecialPlacesAdminPanel() {
                     },
                   })
                 }
-                className="h-8.5 text-xs bg-white border-slate-300 text-slate-900 font-mono"
+                className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary font-mono"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-700 block mb-1">
+            <label className="text-xs font-medium text-fg-secondary block mb-1">
               Search Aliases & Keywords (comma-separated)
             </label>
             <Input
@@ -541,15 +541,15 @@ export function SpecialPlacesAdminPanel() {
               placeholder="e.g. STL, Lambert, Terminal 1, Terminal 2, Airport"
               value={aliasesRaw}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAliasesRaw(e.target.value)}
-              className="h-8.5 text-xs bg-white border-slate-300 text-slate-900"
+              className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary"
             />
-            <span className="text-[11px] text-slate-500 mt-1 block">
+            <span className="text-[11px] text-fg-muted mt-1 block">
               When a client types any of these aliases, this place will match automatically.
             </span>
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-700 block mb-1">Driver & Dispatch Notes</label>
+            <label className="text-xs font-medium text-fg-secondary block mb-1">Driver & Dispatch Notes</label>
             <Input
               type="text"
               placeholder="e.g. Commercial pickup island outside baggage claim exit 12"
@@ -557,19 +557,19 @@ export function SpecialPlacesAdminPanel() {
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setFormData({ ...formData, notes: e.target.value })
               }
-              className="h-8.5 text-xs bg-white border-slate-300 text-slate-900"
+              className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary"
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-slate-100 text-xs">
-            <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-800">
+          <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-border-faint text-xs">
+            <label className="flex items-center gap-2 cursor-pointer font-medium text-fg-strong">
               <input
                 type="checkbox"
                 checked={formData.isPopular}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setFormData({ ...formData, isPopular: e.target.checked })
                 }
-                className="rounded border-slate-300 text-amber-500 focus:ring-0"
+                className="rounded border-border-strong text-amber-500 focus:ring-0"
               />
               <span className="inline-flex items-center gap-1.5">
                 <StarIcon className="w-3.5 h-3.5 text-amber-500" />
@@ -577,26 +577,26 @@ export function SpecialPlacesAdminPanel() {
               </span>
             </label>
 
-            <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-800">
+            <label className="flex items-center gap-2 cursor-pointer font-medium text-fg-strong">
               <input
                 type="checkbox"
                 checked={formData.isActive}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setFormData({ ...formData, isActive: e.target.checked })
                 }
-                className="rounded border-slate-300 text-emerald-600 focus:ring-0"
+                className="rounded border-border-strong text-emerald-600 focus:ring-0"
               />
               <span>Active in Autocomplete</span>
             </label>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex justify-end gap-2 pt-2 border-t border-border-faint">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => setIsEditing(false)}
-              className="text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+              className="text-xs border-border-strong bg-surface-card text-fg-secondary hover:bg-surface-subtle"
             >
               Cancel
             </Button>
@@ -613,15 +613,15 @@ export function SpecialPlacesAdminPanel() {
       )}
 
       {/* Filter and Search Bar */}
-      <div className="p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-3 shadow-2xs">
+      <div className="p-3.5 rounded-xl bg-surface-card border border-border-subtle flex flex-col md:flex-row items-center justify-between gap-3 shadow-2xs">
         <div className="relative w-full md:w-80">
-          <SearchIcon className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+          <SearchIcon className="w-3.5 h-3.5 absolute left-3 top-2.5 text-fg-subtle" />
           <Input
             type="text"
             placeholder="Search by name, address, alias, or zip..."
             value={searchQuery}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
-            className="h-8.5 text-xs pl-8 bg-white border-slate-300 text-slate-900 w-full"
+            className="h-8.5 text-xs pl-8 bg-surface-card border-border-strong text-fg-primary w-full"
           />
         </div>
 
@@ -647,31 +647,31 @@ export function SpecialPlacesAdminPanel() {
             onClick={() => setPopularOnly(!popularOnly)}
             className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors flex items-center gap-1.5 cursor-pointer ${
               popularOnly
-                ? 'bg-amber-50 border-amber-300 text-amber-900 font-bold'
-                : 'bg-white border-slate-300 text-slate-600 hover:border-slate-400'
+                ? 'bg-status-warning-bg border-status-warning-border text-status-warning-fg font-bold'
+                : 'bg-surface-card border-border-strong text-fg-secondary hover:border-border-emphasis'
             }`}
           >
             <StarIcon className="w-3.5 h-3.5 text-amber-500" />
             <span>Popular Only</span>
           </button>
 
-          <span className="text-xs font-semibold text-slate-500 pl-1">
+          <span className="text-xs font-semibold text-fg-muted pl-1">
             Showing {filteredPlaces.length} of {places.length}
           </span>
         </div>
       </div>
 
       {/* Special Places Cards / Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+      <div className="bg-surface-card rounded-xl border border-border-subtle overflow-hidden shadow-xs">
         {filteredPlaces.length > 0 ? (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border-faint">
             {filteredPlaces.map((place) => {
               const catConfig = CATEGORY_CONFIG[place.category] || CATEGORY_CONFIG.custom;
 
               return (
                 <div
                   key={place.id}
-                  className="p-4 hover:bg-slate-50/60 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3"
+                  className="p-4 hover:bg-surface-subtle/60 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3"
                 >
                   <div className="space-y-1.5 flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -690,12 +690,12 @@ export function SpecialPlacesAdminPanel() {
                         />
                       </button>
 
-                      <span className="text-sm font-bold text-slate-900 truncate">
+                      <span className="text-sm font-bold text-fg-primary truncate">
                         {place.name}
                       </span>
 
                       {place.shortName && (
-                        <span className="text-xs text-slate-500 font-medium">
+                        <span className="text-xs text-fg-muted font-medium">
                           ({place.shortName})
                         </span>
                       )}
@@ -711,8 +711,8 @@ export function SpecialPlacesAdminPanel() {
                         <span
                           className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${
                             place.airportType === 'private'
-                              ? 'bg-purple-50 text-purple-700 border-purple-200'
-                              : 'bg-sky-50 text-sky-700 border-sky-200'
+                              ? 'bg-status-staged-bg text-purple-700 border-status-staged-border'
+                              : 'bg-status-info-bg text-sky-700 border-status-info-border'
                           }`}
                         >
                           <PlaneIcon className="w-3 h-3 shrink-0" />
@@ -721,18 +721,18 @@ export function SpecialPlacesAdminPanel() {
                       )}
 
                       {!place.isActive && (
-                        <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-300 text-[10px]">
+                        <Badge variant="outline" className="bg-surface-muted text-fg-secondary border-border-strong text-[10px]">
                           Disabled
                         </Badge>
                       )}
                     </div>
 
-                    <div className="text-xs text-slate-600 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <div className="text-xs text-fg-secondary flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span className="flex items-center gap-1">
-                        <MapPinIcon className="w-3 h-3 text-slate-400 shrink-0" />
+                        <MapPinIcon className="w-3 h-3 text-fg-subtle shrink-0" />
                         {place.address}, {place.city}, {place.state} {place.zip}
                       </span>
-                      <span className="font-mono text-[11px] text-slate-400">
+                      <span className="font-mono text-[11px] text-fg-subtle">
                         ({place.coordinates.lat.toFixed(4)}, {place.coordinates.lng.toFixed(4)})
                       </span>
                     </div>
@@ -740,13 +740,13 @@ export function SpecialPlacesAdminPanel() {
                     {/* Search Aliases Badges */}
                     {place.aliases && place.aliases.length > 0 && (
                       <div className="flex flex-wrap items-center gap-1 pt-0.5">
-                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mr-1">
+                        <span className="text-[10px] font-semibold text-fg-subtle uppercase tracking-wide mr-1">
                           Aliases:
                         </span>
                         {place.aliases.map((alias, aIdx) => (
                           <span
                             key={aIdx}
-                            className="inline-block px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                            className="inline-block px-1.5 py-0.2 rounded text-[10px] font-medium bg-surface-muted text-fg-secondary border border-border-subtle"
                           >
                             {alias}
                           </span>
@@ -755,7 +755,7 @@ export function SpecialPlacesAdminPanel() {
                     )}
 
                     {place.notes && (
-                      <p className="text-[11px] text-slate-500 italic">
+                      <p className="text-[11px] text-fg-muted italic">
                         Note: {place.notes}
                       </p>
                     )}
@@ -768,14 +768,14 @@ export function SpecialPlacesAdminPanel() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleStartEdit(place)}
-                      className="text-xs border-slate-300 text-slate-700 hover:bg-slate-100 shadow-2xs h-7.5 px-2.5"
+                      className="text-xs border-border-strong text-fg-secondary hover:bg-surface-muted shadow-2xs h-7.5 px-2.5"
                     >
                       Edit
                     </Button>
                     <button
                       type="button"
                       onClick={() => handleDelete(place)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-fg-subtle hover:text-rose-600 hover:bg-status-danger-bg transition-colors cursor-pointer"
                       title="Delete place"
                     >
                       <TrashIcon className="w-4 h-4" />
@@ -786,7 +786,7 @@ export function SpecialPlacesAdminPanel() {
             })}
           </div>
         ) : (
-          <div className="text-center py-12 text-slate-400 text-xs">
+          <div className="text-center py-12 text-fg-subtle text-xs">
             No special places match your current filters.
           </div>
         )}

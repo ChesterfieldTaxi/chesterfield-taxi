@@ -193,14 +193,14 @@ export function PaymentGatewaysPanel({
   };
 
   return (
-    <Card className="rounded-2xl border-slate-200">
-      <CardHeader className="border-b border-slate-100 pb-4">
+    <Card className="rounded-2xl border-border-subtle">
+      <CardHeader className="border-b border-border-faint pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="min-w-0">
-            <CardTitle className="text-base font-extrabold text-slate-900">
+            <CardTitle className="text-base font-extrabold text-fg-primary">
               Card Payment Processing (Stripe &amp; Square)
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
+            <CardDescription className="text-xs text-fg-muted">
               Configure online card payments, pre-authorization holds, 1-tap Pay Links, and in-car card readers. Zero client secret storage.
             </CardDescription>
           </div>
@@ -211,7 +211,7 @@ export function PaymentGatewaysPanel({
       </CardHeader>
 
       <CardContent className="p-4 sm:p-6 space-y-5">
-        <div className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 flex items-start gap-2.5 text-xs text-emerald-900">
+        <div className="p-3.5 rounded-xl border border-status-success-border bg-status-success-bg/50 flex items-start gap-2.5 text-xs text-status-success-fg">
           <ShieldCheckIcon className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
           <div>
             <strong>Zero Client Secret Storage:</strong> Only public publishable/application IDs are saved in configuration.{' '}
@@ -221,10 +221,10 @@ export function PaymentGatewaysPanel({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex items-center justify-between gap-3">
+          <div className="p-4 rounded-xl border border-border-subtle bg-surface-subtle/50 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <h4 className="text-sm font-bold text-slate-900">Stripe In-Car Reader</h4>
-              <p className="text-xs text-slate-500">Allow drivers to accept contactless tap and chip cards</p>
+              <h4 className="text-sm font-bold text-fg-primary">Stripe In-Car Reader</h4>
+              <p className="text-xs text-fg-muted">Allow drivers to accept contactless tap and chip cards</p>
             </div>
             <input
               type="checkbox"
@@ -234,9 +234,9 @@ export function PaymentGatewaysPanel({
             />
           </div>
 
-          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-1">
-            <h4 className="text-sm font-bold text-slate-900">Surcharges &amp; Convenience Fees</h4>
-            <p className="text-xs text-slate-500">
+          <div className="p-4 rounded-xl border border-border-subtle bg-surface-subtle/50 space-y-1">
+            <h4 className="text-sm font-bold text-fg-primary">Surcharges &amp; Convenience Fees</h4>
+            <p className="text-xs text-fg-muted">
               Client-facing surcharges are configured centrally in{' '}
               <a href="/app/admin?tab=rates&sub=surcharges" className="text-blue-600 font-semibold hover:underline">
                 Rates &amp; Pricing → Surcharges
@@ -245,17 +245,17 @@ export function PaymentGatewaysPanel({
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-slate-200 bg-white">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-border-subtle bg-surface-card">
           <div className="min-w-0">
-            <h4 className="text-sm font-bold text-slate-900">Gateway Processing Mode</h4>
-            <p className="text-xs text-slate-500">Switch between Stripe Test Sandbox and Live Production keys.</p>
+            <h4 className="text-sm font-bold text-fg-primary">Gateway Processing Mode</h4>
+            <p className="text-xs text-fg-muted">Switch between Stripe Test Sandbox and Live Production keys.</p>
           </div>
-          <div className="grid grid-cols-2 sm:inline-flex items-center gap-1 bg-slate-100 p-1 rounded-lg w-full sm:w-auto shrink-0">
+          <div className="grid grid-cols-2 sm:inline-flex items-center gap-1 bg-surface-muted p-1 rounded-lg w-full sm:w-auto shrink-0">
             <button
               type="button"
               onClick={() => setStripeMode('test')}
               className={`px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                stripeMode === 'test' ? 'bg-amber-500 text-white shadow-xs' : 'text-slate-600'
+                stripeMode === 'test' ? 'bg-amber-500 text-white shadow-xs' : 'text-fg-secondary'
               }`}
             >
               Test Sandbox
@@ -264,7 +264,7 @@ export function PaymentGatewaysPanel({
               type="button"
               onClick={() => setStripeMode('live')}
               className={`px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                stripeMode === 'live' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600'
+                stripeMode === 'live' ? 'bg-emerald-600 text-white shadow-xs' : 'text-fg-secondary'
               }`}
             >
               Live Production
@@ -273,11 +273,11 @@ export function PaymentGatewaysPanel({
         </div>
 
         {/* Stripe Section */}
-        <div className="p-4 sm:p-5 rounded-2xl border border-indigo-100 bg-indigo-50/20 space-y-4">
+        <div className="p-4 sm:p-5 rounded-2xl border border-indigo-100 bg-status-staged-bg/20 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <CreditCardIcon className="w-5 h-5 text-indigo-600 shrink-0" />
-              <h3 className="font-extrabold text-slate-900 text-sm">Stripe Gateway</h3>
+              <h3 className="font-extrabold text-fg-primary text-sm">Stripe Gateway</h3>
             </div>
             <Badge variant={stripeStatus === 'connected' ? 'success' : stripeStatus === 'error' ? 'danger' : 'neutral'}>
               {stripeStatus === 'connected' ? 'Server Env Connected' : stripeStatus === 'error' ? 'Connection Error' : 'Unverified'}
@@ -286,7 +286,7 @@ export function PaymentGatewaysPanel({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">
+              <label className="text-xs font-bold text-fg-secondary">
                 Publishable Key ({stripeMode === 'live' ? 'pk_live_...' : 'pk_test_...'})
               </label>
               <input
@@ -294,13 +294,13 @@ export function PaymentGatewaysPanel({
                 value={stripePk}
                 onChange={(e) => setStripePk(e.target.value)}
                 placeholder={stripeMode === 'live' ? 'pk_live_...' : 'pk_test_...'}
-                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white"
+                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-border-subtle bg-surface-card"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                <LockIcon className="w-3 h-3 text-slate-400" />
+              <label className="text-xs font-bold text-fg-secondary flex items-center gap-1">
+                <LockIcon className="w-3 h-3 text-fg-subtle" />
                 <span>One-Time Verification Secret (Never Stored)</span>
               </label>
               <input
@@ -308,7 +308,7 @@ export function PaymentGatewaysPanel({
                 value={stripeSk}
                 onChange={(e) => setStripeSk(e.target.value)}
                 placeholder="Optional: paste sk_... to verify live, or leave blank to test server env"
-                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white"
+                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-border-subtle bg-surface-card"
               />
             </div>
           </div>
@@ -319,13 +319,13 @@ export function PaymentGatewaysPanel({
               variant="outline"
               onClick={handleTestStripe}
               disabled={stripeStatus === 'checking'}
-              className="w-full sm:w-auto justify-center text-xs font-bold text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+              className="w-full sm:w-auto justify-center text-xs font-bold text-status-staged-fg border-status-staged-border hover:bg-status-staged-bg"
             >
               {stripeStatus === 'checking' && <SpinnerIcon className="w-3.5 h-3.5 animate-spin mr-1.5" />}
               Verify Stripe API Connection
             </Button>
             {stripeStatusMsg && (
-              <span className={`text-xs font-medium ${stripeStatus === 'connected' ? 'text-emerald-700' : 'text-rose-600'}`}>
+              <span className={`text-xs font-medium ${stripeStatus === 'connected' ? 'text-status-success-fg' : 'text-rose-600'}`}>
                 {stripeStatusMsg}
               </span>
             )}
@@ -333,11 +333,11 @@ export function PaymentGatewaysPanel({
         </div>
 
         {/* Square Section */}
-        <div className="p-4 sm:p-5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-4">
+        <div className="p-4 sm:p-5 rounded-2xl border border-border-subtle bg-surface-subtle/50 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <CreditCardIcon className="w-5 h-5 text-slate-700 shrink-0" />
-              <h3 className="font-extrabold text-slate-900 text-sm">Square Gateway</h3>
+              <CreditCardIcon className="w-5 h-5 text-fg-secondary shrink-0" />
+              <h3 className="font-extrabold text-fg-primary text-sm">Square Gateway</h3>
             </div>
             <Badge variant={squareStatus === 'connected' ? 'success' : squareStatus === 'error' ? 'danger' : 'neutral'}>
               {squareStatus === 'connected' ? 'Server Env Connected' : squareStatus === 'error' ? 'Connection Error' : 'Unverified'}
@@ -346,30 +346,30 @@ export function PaymentGatewaysPanel({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">Application ID</label>
+              <label className="text-xs font-bold text-fg-secondary">Application ID</label>
               <input
                 type="text"
                 value={squareAppId}
                 onChange={(e) => setSquareAppId(e.target.value)}
                 placeholder="sq0idp-..."
-                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white"
+                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-border-subtle bg-surface-card"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">Location ID</label>
+              <label className="text-xs font-bold text-fg-secondary">Location ID</label>
               <input
                 type="text"
                 value={squareLocId}
                 onChange={(e) => setSquareLocId(e.target.value)}
                 placeholder="L..."
-                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white"
+                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-border-subtle bg-surface-card"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                <LockIcon className="w-3 h-3 text-slate-400" />
+              <label className="text-xs font-bold text-fg-secondary flex items-center gap-1">
+                <LockIcon className="w-3 h-3 text-fg-subtle" />
                 <span>Access Token (Never Stored)</span>
               </label>
               <input
@@ -377,7 +377,7 @@ export function PaymentGatewaysPanel({
                 value={squareToken}
                 onChange={(e) => setSquareToken(e.target.value)}
                 placeholder="Optional: verify EAAA... or server env"
-                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 bg-white"
+                className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-border-subtle bg-surface-card"
               />
             </div>
           </div>
@@ -388,13 +388,13 @@ export function PaymentGatewaysPanel({
               variant="outline"
               onClick={handleTestSquare}
               disabled={squareStatus === 'checking'}
-              className="w-full sm:w-auto justify-center text-xs font-bold text-slate-700 border-slate-300 hover:bg-slate-100"
+              className="w-full sm:w-auto justify-center text-xs font-bold text-fg-secondary border-border-strong hover:bg-surface-muted"
             >
               {squareStatus === 'checking' && <SpinnerIcon className="w-3.5 h-3.5 animate-spin mr-1.5" />}
               Verify Square Connection
             </Button>
             {squareStatusMsg && (
-              <span className={`text-xs font-medium ${squareStatus === 'connected' ? 'text-emerald-700' : 'text-rose-600'}`}>
+              <span className={`text-xs font-medium ${squareStatus === 'connected' ? 'text-status-success-fg' : 'text-rose-600'}`}>
                 {squareStatusMsg}
               </span>
             )}

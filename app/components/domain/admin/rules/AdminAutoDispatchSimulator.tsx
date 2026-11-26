@@ -296,7 +296,7 @@ export function AdminAutoDispatchSimulator({
           DIRECT ASSIGN #1
         </span>
       ) : (
-        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
+        <span className="px-2 py-0.5 rounded-full bg-surface-muted text-fg-secondary text-[10px] font-bold">
           Standby #{idx + 1}
         </span>
       );
@@ -308,7 +308,7 @@ export function AdminAutoDispatchSimulator({
           POOL BATCH 1 (Top-{config.broadcastPoolSize})
         </span>
       ) : (
-        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
+        <span className="px-2 py-0.5 rounded-full bg-surface-muted text-fg-secondary text-[10px] font-bold">
           Next Batch #{idx + 1}
         </span>
       );
@@ -317,7 +317,7 @@ export function AdminAutoDispatchSimulator({
       return (
         <span
           className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-            idx === 0 ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-800'
+            idx === 0 ? 'bg-blue-600 text-white' : 'bg-status-info-bg-strong text-status-info-fg'
           }`}
         >
           STEP {idx + 1}/{config.maxCascadeAttempts}
@@ -325,14 +325,14 @@ export function AdminAutoDispatchSimulator({
       );
     }
     return (
-      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
+      <span className="px-2 py-0.5 rounded-full bg-surface-muted text-fg-secondary text-[10px] font-bold">
         {config.fallbackOnExhaustion === 'broadcast_all_eligible' ? 'Fallback Broadcast' : 'Reserve'}
       </span>
     );
   };
 
   return (
-    <div className="rounded-2xl border-2 border-indigo-200 bg-slate-50/70 overflow-hidden">
+    <div className="rounded-2xl border-2 border-status-staged-border bg-surface-subtle/70 overflow-hidden">
       <div className="px-4 py-3 bg-indigo-950 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div className="flex items-center gap-2.5">
           <span className="p-1.5 rounded-lg bg-indigo-800 text-indigo-200 shrink-0">
@@ -353,7 +353,7 @@ export function AdminAutoDispatchSimulator({
           onClick={() => setUseSampleFleet((prev) => !prev)}
           className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold border transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
             useSampleFleet
-              ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-xs'
+              ? 'bg-amber-400 text-slate-950 border-status-warning-border shadow-xs'
               : 'bg-indigo-900 hover:bg-indigo-800 text-indigo-100 border-indigo-700'
           }`}
         >
@@ -368,7 +368,7 @@ export function AdminAutoDispatchSimulator({
 
       <div className="p-4 space-y-4">
         {!useSampleFleet && liveOnDutyCount === 0 && (
-          <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-950">
+          <div className="p-3 rounded-xl bg-status-warning-bg border border-status-warning-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-status-warning-fg">
             <div className="flex items-center gap-2 font-semibold">
               <AlertTriangleIcon className="w-4 h-4 text-amber-600 shrink-0" />
               <span>
@@ -386,9 +386,9 @@ export function AdminAutoDispatchSimulator({
         )}
 
         {/* Scenario Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-white border border-slate-200">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-surface-card border border-border-subtle">
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+            <label className="text-[11px] font-bold text-fg-secondary flex items-center gap-1">
               <MapPinIcon className="w-3.5 h-3.5 text-emerald-600" />
               <span>Simulated Pickup Zone</span>
             </label>
@@ -413,7 +413,7 @@ export function AdminAutoDispatchSimulator({
           </div>
 
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-slate-700 block">
+            <label className="text-[11px] font-bold text-fg-secondary block">
               Requested Vehicle Tier
             </label>
             <Select
@@ -429,9 +429,9 @@ export function AdminAutoDispatchSimulator({
           </div>
 
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+            <label className="text-[11px] font-bold text-fg-secondary flex items-center justify-between">
               <span>Passenger Count</span>
-              <span className="font-mono font-black text-blue-700">{simPassengers} pax</span>
+              <span className="font-mono font-black text-status-info-fg">{simPassengers} pax</span>
             </label>
             <input
               type="range"
@@ -447,9 +447,9 @@ export function AdminAutoDispatchSimulator({
         {/* Side-by-Side Eligible Queue & Excluded Reasons */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Ranked Eligible Queue */}
-          <div className="rounded-xl border border-emerald-200 bg-white overflow-hidden flex flex-col">
-            <div className="px-3.5 py-2.5 bg-emerald-50/80 border-b border-emerald-200 flex items-center justify-between">
-              <span className="text-xs font-black text-emerald-950 flex items-center gap-1.5">
+          <div className="rounded-xl border border-status-success-border bg-surface-card overflow-hidden flex flex-col">
+            <div className="px-3.5 py-2.5 bg-status-success-bg/80 border-b border-status-success-border flex items-center justify-between">
+              <span className="text-xs font-black text-status-success-fg flex items-center gap-1.5">
                 <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Ranked Eligible Queue ({evaluation.eligible.length})</span>
               </span>
@@ -460,8 +460,8 @@ export function AdminAutoDispatchSimulator({
 
             <div className="p-3 space-y-2 flex-1">
               {evaluation.eligible.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-500">
-                  <p className="font-bold text-slate-700">0 eligible drivers matched</p>
+                <div className="py-6 text-center text-xs text-fg-muted">
+                  <p className="font-bold text-fg-secondary">0 eligible drivers matched</p>
                   <p className="text-[11px] mt-0.5">
                     Relax radius, GPS freshness, or score guardrails, or enable the Sample 5-Car Fleet.
                   </p>
@@ -470,25 +470,25 @@ export function AdminAutoDispatchSimulator({
                 evaluation.eligible.map((cand, idx) => (
                   <div
                     key={cand.driverId}
-                    className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/60 flex flex-col gap-1"
+                    className="p-2.5 rounded-xl border border-border-subtle bg-surface-subtle/60 flex flex-col gap-1"
                   >
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-black flex items-center justify-center shrink-0">
+                        <span className="w-5 h-5 rounded-full bg-surface-header text-white text-[10px] font-black flex items-center justify-center shrink-0">
                           #{idx + 1}
                         </span>
-                        <span className="text-xs font-extrabold text-slate-900 truncate">
+                        <span className="text-xs font-extrabold text-fg-primary truncate">
                           {cand.driverLabel}
                         </span>
-                        <span className="text-[10px] font-bold uppercase px-1.5 py-0.2 rounded bg-slate-200/80 text-slate-700">
+                        <span className="text-[10px] font-bold uppercase px-1.5 py-0.2 rounded bg-surface-emphasis/80 text-fg-secondary">
                           {cand.vehicleTier}
                         </span>
                       </div>
                       {getRankActionBadge(idx)}
                     </div>
-                    <div className="flex items-center justify-between gap-2 text-[11px] text-slate-600 pl-7">
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-fg-secondary pl-7">
                       <span className="truncate">{cand.rankReason}</span>
-                      <span className="inline-flex items-center gap-0.5 font-bold text-amber-700 shrink-0">
+                      <span className="inline-flex items-center gap-0.5 font-bold text-status-warning-fg shrink-0">
                         <StarIcon className="w-3 h-3 text-amber-500" />
                         {cand.driverScore}
                       </span>
@@ -500,19 +500,19 @@ export function AdminAutoDispatchSimulator({
           </div>
 
           {/* Excluded Drivers & Exact Reasons */}
-          <div className="rounded-xl border border-rose-200 bg-white overflow-hidden flex flex-col">
-            <div className="px-3.5 py-2.5 bg-rose-50/80 border-b border-rose-200 flex items-center justify-between">
-              <span className="text-xs font-black text-rose-950 flex items-center gap-1.5">
+          <div className="rounded-xl border border-status-danger-border bg-surface-card overflow-hidden flex flex-col">
+            <div className="px-3.5 py-2.5 bg-status-danger-bg/80 border-b border-status-danger-border flex items-center justify-between">
+              <span className="text-xs font-black text-status-danger-fg flex items-center gap-1.5">
                 <BoltIcon className="w-3.5 h-3.5 text-rose-600" />
                 <span>Excluded Drivers &amp; Exact Reasons ({evaluation.excluded.length})</span>
               </span>
-              <span className="text-[10px] font-bold text-rose-700">Guardrail Diagnostics</span>
+              <span className="text-[10px] font-bold text-status-danger-fg">Guardrail Diagnostics</span>
             </div>
 
             <div className="p-3 space-y-2 flex-1 max-h-72 overflow-y-auto">
               {evaluation.excluded.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-500">
-                  <p className="font-bold text-emerald-700">No drivers excluded</p>
+                <div className="py-6 text-center text-xs text-fg-muted">
+                  <p className="font-bold text-status-success-fg">No drivers excluded</p>
                   <p className="text-[11px] mt-0.5">
                     Every evaluated unit passed duty, capacity, radius, GPS, and score guardrails.
                   </p>
@@ -521,15 +521,15 @@ export function AdminAutoDispatchSimulator({
                 evaluation.excluded.map((ex) => (
                   <div
                     key={ex.driverId}
-                    className="p-2.5 rounded-xl border border-rose-100 bg-rose-50/30 flex flex-col gap-1"
+                    className="p-2.5 rounded-xl border border-rose-100 bg-status-danger-bg/30 flex flex-col gap-1"
                   >
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="text-xs font-extrabold text-slate-800">{ex.driverLabel}</span>
-                      <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-200 font-mono text-[9.5px] font-bold">
+                      <span className="text-xs font-extrabold text-fg-strong">{ex.driverLabel}</span>
+                      <span className="px-2 py-0.5 rounded-md bg-status-danger-bg-strong text-status-danger-fg border border-status-danger-border font-mono text-[9.5px] font-bold">
                         {ex.exclusionCode}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 font-medium">{ex.exclusionReason}</p>
+                    <p className="text-[11px] text-fg-secondary font-medium">{ex.exclusionReason}</p>
                   </div>
                 ))
               )}

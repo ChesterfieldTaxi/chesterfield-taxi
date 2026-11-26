@@ -191,15 +191,15 @@ export function WebsiteNavigationTab({
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-card p-4 sm:p-6 rounded-2xl border border-border-subtle shadow-xs">
         <div className="min-w-0">
           <span className="text-xs font-bold uppercase tracking-wider text-blue-600 block">
             Navigation Architecture
           </span>
-          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 mt-0.5">
+          <h2 className="text-lg sm:text-xl font-extrabold text-fg-primary mt-0.5">
             Header Menu, Announcement Bar &amp; Footer Studio
           </h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-fg-muted mt-1">
             Manage public navigation links, emergency alert ribbons, and corporate compliance footers.
           </p>
         </div>
@@ -222,12 +222,12 @@ export function WebsiteNavigationTab({
       )}
 
       {/* 0. Site-Wide "Get App" Buttons & Download Modal */}
-      <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
+      <Card variant="elevated" className="border-border-subtle bg-surface-card shadow-xs">
         <CardHeader className="p-4 sm:p-5">
           <div className="flex items-start sm:items-center justify-between gap-3 sm:gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-base font-extrabold text-slate-900">
+                <CardTitle className="text-base font-extrabold text-fg-primary">
                   Site-Wide &ldquo;Get App&rdquo; Buttons &amp; Download Modal
                 </CardTitle>
                 <Badge
@@ -237,7 +237,7 @@ export function WebsiteNavigationTab({
                   {enableGetAppButtons ? 'Enabled (Visible)' : 'Disabled (Hidden)'}
                 </Badge>
               </div>
-              <CardDescription className="text-xs text-slate-500 mt-1">
+              <CardDescription className="text-xs text-fg-muted mt-1">
                 Show or hide the &ldquo;Get App&rdquo; download buttons and mobile app modal across the public navigation header and mobile menu while the app is in preparation.
               </CardDescription>
             </div>
@@ -258,21 +258,21 @@ export function WebsiteNavigationTab({
                 }}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
+              <div className="w-11 h-6 bg-surface-emphasis peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-card after:border-border-strong after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
             </label>
           </div>
         </CardHeader>
       </Card>
 
       {/* 1. Top Announcement Bar Manager */}
-      <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5">
+      <Card variant="elevated" className="border-border-subtle bg-surface-card shadow-xs">
+        <CardHeader className="border-b border-border-faint bg-surface-subtle/50 p-4 sm:p-5">
           <div className="flex items-start sm:items-center justify-between gap-3">
             <div className="min-w-0">
-              <CardTitle className="text-base font-extrabold text-slate-900">
+              <CardTitle className="text-base font-extrabold text-fg-primary">
                 Site-Wide Announcement &amp; Advisory Ribbon
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+              <CardDescription className="text-xs text-fg-muted">
                 Displays a prominent notice bar above the main navigation header on all public pages.
               </CardDescription>
             </div>
@@ -293,7 +293,7 @@ export function WebsiteNavigationTab({
                 }}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
+              <div className="w-11 h-6 bg-surface-emphasis peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-card after:border-border-strong after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600" />
             </label>
           </div>
         </CardHeader>
@@ -302,7 +302,7 @@ export function WebsiteNavigationTab({
           <CardContent className="p-4 sm:p-6 space-y-4 animate-in fade-in">
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div className="sm:col-span-3">
-                <label className="text-xs font-bold text-slate-700 block mb-1">
+                <label className="text-xs font-bold text-fg-secondary block mb-1">
                   Announcement Message Text
                 </label>
                 <Input
@@ -313,7 +313,7 @@ export function WebsiteNavigationTab({
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Alert Level</label>
+                <label className="text-xs font-bold text-fg-secondary block mb-1">Alert Level</label>
                 <Select
                   size="sm"
                   value={announcementType}
@@ -347,13 +347,13 @@ export function WebsiteNavigationTab({
       </Card>
 
       {/* 2. Header Navigation Links */}
-      <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+      <Card variant="elevated" className="border-border-subtle bg-surface-card shadow-xs">
+        <CardHeader className="border-b border-border-faint bg-surface-subtle/50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="min-w-0">
-            <CardTitle className="text-base font-extrabold text-slate-900">
+            <CardTitle className="text-base font-extrabold text-fg-primary">
               Header Navigation Links &amp; CTAs
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
+            <CardDescription className="text-xs text-fg-muted">
               Configure the items displayed in the desktop and mobile navigation menus.
             </CardDescription>
           </div>
@@ -373,10 +373,10 @@ export function WebsiteNavigationTab({
             {navLinks.map((item, index) => (
               <div
                 key={item.id}
-                className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl"
+                className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 p-3 bg-surface-subtle border border-border-subtle rounded-xl"
               >
                 <div className="flex items-center justify-between sm:justify-start">
-                  <span className="text-xs font-mono font-bold text-slate-400 w-6">
+                  <span className="text-xs font-mono font-bold text-fg-subtle w-6">
                     #{index + 1}
                   </span>
                   <Button
@@ -384,7 +384,7 @@ export function WebsiteNavigationTab({
                     variant="outline"
                     size="sm"
                     onClick={() => handleRemoveLink(item.id)}
-                    className="sm:hidden text-xs text-rose-600 hover:bg-rose-50 border-rose-200"
+                    className="sm:hidden text-xs text-rose-600 hover:bg-status-danger-bg border-status-danger-border"
                   >
                     Delete
                   </Button>
@@ -410,7 +410,7 @@ export function WebsiteNavigationTab({
                   variant="outline"
                   size="sm"
                   onClick={() => handleRemoveLink(item.id)}
-                  className="hidden sm:inline-flex shrink-0 text-xs text-rose-600 hover:bg-rose-50 border-rose-200"
+                  className="hidden sm:inline-flex shrink-0 text-xs text-rose-600 hover:bg-status-danger-bg border-status-danger-border"
                 >
                   Delete
                 </Button>
@@ -418,9 +418,9 @@ export function WebsiteNavigationTab({
             ))}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-border-faint">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-fg-secondary block mb-1">
                 Header Action Button Label
               </label>
               <Input
@@ -430,7 +430,7 @@ export function WebsiteNavigationTab({
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-fg-secondary block mb-1">
                 Header Action Button Target
               </label>
               <Input
@@ -439,8 +439,8 @@ export function WebsiteNavigationTab({
                 className="text-xs font-mono"
               />
             </div>
-            <div className="flex flex-col justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-xs font-bold text-slate-800">Phone Badge in Header</span>
+            <div className="flex flex-col justify-between p-3 bg-surface-subtle rounded-xl border border-border-subtle">
+              <span className="text-xs font-bold text-fg-strong">Phone Badge in Header</span>
               <label className="flex items-center gap-2 cursor-pointer mt-1">
                 <input
                   type="checkbox"
@@ -458,7 +458,7 @@ export function WebsiteNavigationTab({
                   }}
                   className="w-4 h-4 rounded text-blue-600 cursor-pointer shrink-0"
                 />
-                <span className="text-xs text-slate-600 font-medium">
+                <span className="text-xs text-fg-secondary font-medium">
                   Show {settings.company?.phone || COMPANY_CONFIG.phone.dispatch}
                 </span>
               </label>
@@ -466,10 +466,10 @@ export function WebsiteNavigationTab({
           </div>
 
           {/* Sitewide "Get App" Buttons Toggle */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200 mt-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-surface-subtle rounded-xl border border-border-subtle mt-4">
             <div className="space-y-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold text-slate-900">
+                <span className="text-xs font-bold text-fg-primary">
                   Sitewide &ldquo;Get App&rdquo; Buttons &amp; Download Modal
                 </span>
                 <Badge
@@ -479,7 +479,7 @@ export function WebsiteNavigationTab({
                   {enableGetAppButtons ? 'Enabled (Visible)' : 'Disabled (Hidden)'}
                 </Badge>
               </div>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-fg-muted">
                 Show or hide the &ldquo;Get App&rdquo; CTA buttons in the desktop header bar and mobile navigation menu across all pages. Keep disabled while the passenger mobile app is not yet ready.
               </p>
             </div>
@@ -500,26 +500,26 @@ export function WebsiteNavigationTab({
                 }}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
+              <div className="w-11 h-6 bg-surface-emphasis peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-card after:border-border-strong after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
             </label>
           </div>
         </CardContent>
       </Card>
 
       {/* 3. Footer & Legal Compliance */}
-      <Card variant="elevated" className="border-slate-200 bg-white shadow-xs">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5">
-          <CardTitle className="text-base font-extrabold text-slate-900">
+      <Card variant="elevated" className="border-border-subtle bg-surface-card shadow-xs">
+        <CardHeader className="border-b border-border-faint bg-surface-subtle/50 p-4 sm:p-5">
+          <CardTitle className="text-base font-extrabold text-fg-primary">
             Footer Copyright &amp; Social Profile Links
           </CardTitle>
-          <CardDescription className="text-xs text-slate-500">
+          <CardDescription className="text-xs text-fg-muted">
             Global bottom footer text, regulatory municipal licenses, and social media channels.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 sm:p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-fg-secondary block mb-1">
                 Footer Copyright Text
               </label>
               <Input
@@ -530,7 +530,7 @@ export function WebsiteNavigationTab({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-fg-secondary block mb-1">
                 Regulatory Licensing Line
               </label>
               <Input
@@ -541,7 +541,7 @@ export function WebsiteNavigationTab({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-fg-secondary block mb-1">
                 Facebook Profile URL
               </label>
               <Input
@@ -552,7 +552,7 @@ export function WebsiteNavigationTab({
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-fg-secondary block mb-1">
                 LinkedIn Company URL
               </label>
               <Input

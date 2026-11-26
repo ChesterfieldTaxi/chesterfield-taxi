@@ -128,7 +128,7 @@ export function ZipRateMatrixEditor({
         <button
           type="button"
           onClick={() => setEditingId(isEditing ? null : row.id)}
-          className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800"
+          className="p-1 rounded hover:bg-surface-muted text-fg-muted hover:text-fg-strong"
           title={isEditing ? 'Done' : 'Edit Row'}
         >
           {isEditing ? <CheckIcon className="w-3.5 h-3.5 text-emerald-600" /> : <EditIcon className="w-3.5 h-3.5" />}
@@ -139,7 +139,7 @@ export function ZipRateMatrixEditor({
             onChange(columns, removeRow(rows, row.id));
             if (editingId === row.id) setEditingId(null);
           }}
-          className="p-1 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-600"
+          className="p-1 rounded hover:bg-status-danger-bg text-fg-subtle hover:text-rose-600"
           title="Delete Row"
         >
           <TrashIcon className="w-3.5 h-3.5" />
@@ -152,7 +152,7 @@ export function ZipRateMatrixEditor({
     editingId === row.id && !readOnly ? (
       <ZipCellInput column={col} value={row.values[col.key]} onChange={(v) => handleCell(row.id, col.key, v)} />
     ) : (
-      <span className={col.role === 'price' ? 'font-bold text-emerald-700' : col.role === 'zip' ? 'font-semibold text-slate-900' : ''}>
+      <span className={col.role === 'price' ? 'font-bold text-status-success-fg' : col.role === 'zip' ? 'font-semibold text-fg-primary' : ''}>
         {formatCellValue(col, row.values[col.key])}
       </span>
     );
@@ -161,18 +161,18 @@ export function ZipRateMatrixEditor({
 
   return (
     <div className="space-y-4">
-      <div className="p-3.5 sm:p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+      <div className="p-3.5 sm:p-4 rounded-xl bg-status-warning-bg/70 border border-status-warning-border/80 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
         <div className="space-y-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-amber-900 font-bold text-sm flex items-center gap-1.5">
-              <ShieldCheckIcon className="w-4 h-4 text-amber-700 shrink-0" />
+            <span className="text-status-warning-fg font-bold text-sm flex items-center gap-1.5">
+              <ShieldCheckIcon className="w-4 h-4 text-status-warning-fg shrink-0" />
               <span>Postal / Zip Flat-Rate Matrix</span>
             </span>
-            <Badge variant="outline" className="bg-amber-100 text-amber-900 border-amber-300 text-[10px]">
+            <Badge variant="outline" className="bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border text-[10px]">
               Flat Zip Pricing
             </Badge>
           </div>
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-fg-secondary">
             Define fixed client fares by destination or pickup 5-digit ZIP code. Columns are fully customizable;
             only the <strong>Zip</strong> and <strong>Price</strong> columns affect pricing.
           </p>
@@ -188,9 +188,9 @@ export function ZipRateMatrixEditor({
                   setShowColumns((v) => !v);
                   setShowImport(false);
                 }}
-                className="text-xs border-slate-300 bg-white text-slate-700"
+                className="text-xs border-border-strong bg-surface-card text-fg-secondary"
               >
-                <SettingsIcon className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                <SettingsIcon className="w-3.5 h-3.5 mr-1 text-fg-muted" />
                 Manage Columns
               </Button>
               <Button
@@ -201,15 +201,15 @@ export function ZipRateMatrixEditor({
                   setShowImport((v) => !v);
                   setShowColumns(false);
                 }}
-                className="text-xs border-slate-300 bg-white text-slate-700"
+                className="text-xs border-border-strong bg-surface-card text-fg-secondary"
               >
-                <FileTextIcon className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                <FileTextIcon className="w-3.5 h-3.5 mr-1 text-fg-muted" />
                 Import CSV
               </Button>
             </>
           )}
-          <Button type="button" variant="outline" size="sm" onClick={handleExport} className="text-xs border-slate-300 bg-white text-slate-700">
-            <DownloadIcon className="w-3.5 h-3.5 mr-1 text-slate-500" />
+          <Button type="button" variant="outline" size="sm" onClick={handleExport} className="text-xs border-border-strong bg-surface-card text-fg-secondary">
+            <DownloadIcon className="w-3.5 h-3.5 mr-1 text-fg-muted" />
             Export CSV
           </Button>
           {!readOnly && (
@@ -230,35 +230,35 @@ export function ZipRateMatrixEditor({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         {(
           [
-            ['Defined Zips', String(stats.count), 'text-slate-900'],
-            ['Min Price', `$${stats.min.toFixed(2)}`, 'text-emerald-700'],
-            ['Average Price', `$${stats.avg.toFixed(2)}`, 'text-blue-700'],
+            ['Defined Zips', String(stats.count), 'text-fg-primary'],
+            ['Min Price', `$${stats.min.toFixed(2)}`, 'text-status-success-fg'],
+            ['Average Price', `$${stats.avg.toFixed(2)}`, 'text-status-info-fg'],
             ['Max Price', `$${stats.max.toFixed(2)}`, 'text-purple-700'],
           ] as const
         ).map(([label, value, tone]) => (
-          <div key={label} className="p-3 rounded-xl bg-white border border-slate-200 text-center shadow-2xs">
-            <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block">{label}</span>
+          <div key={label} className="p-3 rounded-xl bg-surface-card border border-border-subtle text-center shadow-2xs">
+            <span className="text-[10px] text-fg-muted font-semibold uppercase tracking-wider block">{label}</span>
             <span className={`text-base font-bold ${tone}`}>{value}</span>
           </div>
         ))}
       </div>
 
       {problems.length > 0 && (
-        <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">
+        <div className="p-2.5 rounded-lg bg-status-danger-bg border border-status-danger-border text-xs text-status-danger-fg">
           {problems.length} problem{problems.length === 1 ? '' : 's'} found (e.g. {problems[0].message}). Fix before saving.
         </div>
       )}
 
       {isAddingNew && !readOnly && (
-        <form onSubmit={handleAdd} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3 shadow-2xs">
-          <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+        <form onSubmit={handleAdd} className="p-4 rounded-xl bg-surface-subtle border border-border-subtle space-y-3 shadow-2xs">
+          <h4 className="text-xs font-bold text-fg-strong flex items-center gap-1.5 uppercase tracking-wider">
             <PlusIcon className="w-3.5 h-3.5 text-emerald-600" />
             Add Row
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
             {sortedColumns.map((col) => (
               <div key={col.key}>
-                <label className="text-[10px] font-medium text-slate-600 block mb-0.5">
+                <label className="text-[10px] font-medium text-fg-secondary block mb-0.5">
                   {col.label}
                   {col.required ? ' *' : ''}
                 </label>
@@ -267,7 +267,7 @@ export function ZipRateMatrixEditor({
             ))}
           </div>
           {draftErrors.length > 0 && (
-            <ul className="text-xs text-rose-700 list-disc pl-4">
+            <ul className="text-xs text-status-danger-fg list-disc pl-4">
               {draftErrors.map((m, i) => (
                 <li key={i}>{m}</li>
               ))}
@@ -286,27 +286,27 @@ export function ZipRateMatrixEditor({
 
       <div className="space-y-2">
         <div className="relative">
-          <SearchIcon className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+          <SearchIcon className="w-3.5 h-3.5 absolute left-3 top-2.5 text-fg-subtle" />
           <Input
             type="text"
             placeholder="Search by zip or text columns..."
             value={searchQuery}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
-            className="pl-8 h-8 text-xs bg-white border-slate-300 text-slate-900 w-full"
+            className="pl-8 h-8 text-xs bg-surface-card border-border-strong text-fg-primary w-full"
           />
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
+        <div className="rounded-xl border border-border-subtle bg-surface-card overflow-hidden shadow-2xs">
           {/* Mobile cards */}
-          <div className="md:hidden max-h-[480px] overflow-y-auto divide-y divide-slate-100">
+          <div className="md:hidden max-h-[480px] overflow-y-auto divide-y divide-border-faint">
             {visibleRows.length === 0 ? (
-              <div className="text-center py-8 text-slate-500 text-xs">No matching rows</div>
+              <div className="text-center py-8 text-fg-muted text-xs">No matching rows</div>
             ) : (
               visibleRows.map((row) => (
-                <div key={row.id} className={`p-3 space-y-2 text-xs ${problemRowIds.has(row.id) ? 'bg-rose-50/50' : ''}`}>
+                <div key={row.id} className={`p-3 space-y-2 text-xs ${problemRowIds.has(row.id) ? 'bg-status-danger-bg/50' : ''}`}>
                   {sortedColumns.map((col) => (
                     <div key={col.key} className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] uppercase text-slate-500">{col.label}</span>
+                      <span className="text-[10px] uppercase text-fg-muted">{col.label}</span>
                       <div className="min-w-0">{renderCell(row, col)}</div>
                     </div>
                   ))}
@@ -319,7 +319,7 @@ export function ZipRateMatrixEditor({
           {/* Desktop table */}
           <div className="hidden md:block max-h-[480px] overflow-auto custom-scrollbar">
             <table className="w-full text-left text-xs min-w-[600px]">
-              <thead className="bg-slate-50 text-slate-600 text-[11px] font-semibold uppercase tracking-wider sticky top-0 z-10 border-b border-slate-200">
+              <thead className="bg-surface-subtle text-fg-secondary text-[11px] font-semibold uppercase tracking-wider sticky top-0 z-10 border-b border-border-subtle">
                 <tr>
                   {sortedColumns.map((col) => (
                     <th key={col.key} className={`py-2.5 px-3 ${alignRight(col) ? 'text-right' : ''}`}>
@@ -329,9 +329,9 @@ export function ZipRateMatrixEditor({
                   {!readOnly && <th className="py-2.5 px-3 text-center">Actions</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-mono">
+              <tbody className="divide-y divide-border-faint font-mono">
                 {visibleRows.map((row) => (
-                  <tr key={row.id} className={`hover:bg-slate-50/80 ${problemRowIds.has(row.id) ? 'bg-rose-50/50' : ''}`}>
+                  <tr key={row.id} className={`hover:bg-surface-subtle/80 ${problemRowIds.has(row.id) ? 'bg-status-danger-bg/50' : ''}`}>
                     {sortedColumns.map((col) => (
                       <td key={col.key} className={`py-2 px-3 ${alignRight(col) ? 'text-right' : ''}`}>
                         {renderCell(row, col)}
@@ -342,7 +342,7 @@ export function ZipRateMatrixEditor({
                 ))}
                 {visibleRows.length === 0 && (
                   <tr>
-                    <td colSpan={sortedColumns.length + 1} className="text-center py-8 text-slate-500 font-sans text-xs">
+                    <td colSpan={sortedColumns.length + 1} className="text-center py-8 text-fg-muted font-sans text-xs">
                       No matching rows
                     </td>
                   </tr>
@@ -352,7 +352,7 @@ export function ZipRateMatrixEditor({
           </div>
         </div>
         {filteredRows.length > MAX_RENDERED_ROWS && (
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-fg-muted">
             Showing first {MAX_RENDERED_ROWS} of {filteredRows.length} rows. Use search to narrow.
           </p>
         )}

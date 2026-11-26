@@ -92,9 +92,9 @@ export function DriverPayoutsPanel({
   return (
     <div className="space-y-4">
       {/* ─── 3-Pill Payee Switcher + Period Selector + Comms & Integrations Link ─── */}
-      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
+      <div className="bg-surface-card p-3.5 sm:p-4 rounded-2xl border border-border-subtle/90 shadow-xs space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
-          <div className="grid grid-cols-3 sm:inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
+          <div className="grid grid-cols-3 sm:inline-flex bg-surface-muted p-1 rounded-xl border border-border-subtle text-xs font-bold">
             {(
               [
                 ['driver', `Drivers (${driverRollups.length})`],
@@ -108,8 +108,8 @@ export function DriverPayoutsPanel({
                 onClick={() => setActivePayeeTab(key)}
                 className={`px-3 py-1.5 rounded-lg transition-all text-center whitespace-nowrap cursor-pointer ${
                   activePayeeTab === key
-                    ? 'bg-white text-blue-700 shadow-xs font-extrabold'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-surface-card text-status-info-fg shadow-xs font-extrabold'
+                    : 'text-fg-secondary hover:text-fg-primary'
                 }`}
               >
                 {label}
@@ -118,7 +118,7 @@ export function DriverPayoutsPanel({
           </div>
 
           <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
-            <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
+            <div className="inline-flex items-center bg-surface-muted p-1 rounded-xl border border-border-subtle text-[11px] font-bold">
               {PERIOD_OPTIONS.map((opt) => (
                 <button
                   key={opt.key}
@@ -126,8 +126,8 @@ export function DriverPayoutsPanel({
                   onClick={() => setPayoutPeriod(opt.key)}
                   className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
                     payoutPeriod === opt.key
-                      ? 'bg-slate-900 text-white'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-surface-header text-white'
+                      : 'text-fg-secondary hover:text-fg-primary'
                   }`}
                 >
                   {opt.label}
@@ -148,13 +148,13 @@ export function DriverPayoutsPanel({
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pt-2 border-t border-border-faint text-[11px] text-fg-muted">
           <span>
             Paid settlements post automatically to QuickBooks GL (<code>5010</code> / <code>5020</code> / <code>5030</code>).
           </span>
           <Link
             to="/app/admin?tab=integrations&sub=gateways"
-            className="inline-flex items-center gap-1 font-bold text-indigo-600 hover:text-indigo-800 shrink-0"
+            className="inline-flex items-center gap-1 font-bold text-indigo-600 hover:text-status-staged-fg shrink-0"
           >
             <span>Manage payment &amp; comms credentials in Comms &amp; Integrations &rarr;</span>
             <ExternalLinkIcon className="w-3 h-3" />
@@ -164,18 +164,18 @@ export function DriverPayoutsPanel({
 
       {/* ─── Tab 1: Drivers Rollup Table ─── */}
       {activePayeeTab === 'driver' && (
-        <Card className="border border-slate-200/90 shadow-xs overflow-hidden">
-          <CardHeader className="pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <Card className="border border-border-subtle/90 shadow-xs overflow-hidden">
+          <CardHeader className="pb-3 border-b border-border-faint flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div>
-              <CardTitle className="text-sm font-black text-slate-900">
+              <CardTitle className="text-sm font-black text-fg-primary">
                 Driver Earnings Rollup &amp; Commission Split
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+              <CardDescription className="text-xs text-fg-muted">
                 Drivers retain {billingDraft.driverDefaultCommissionPercent}% of base/wait/extras plus 100% of tips &amp; tolls.
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-700">Default Driver %:</span>
+              <span className="text-xs font-bold text-fg-secondary">Default Driver %:</span>
               <input
                 type="number"
                 min="0"
@@ -187,7 +187,7 @@ export function DriverPayoutsPanel({
                     driverDefaultCommissionPercent: Number(e.target.value) || 0,
                   }))
                 }
-                className="w-16 h-8 px-2 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold"
+                className="w-16 h-8 px-2 bg-surface-card border border-border-strong rounded-lg text-xs font-mono font-bold"
               />
               <Button
                 type="button"
@@ -204,7 +204,7 @@ export function DriverPayoutsPanel({
           </CardHeader>
           <CardContent className="p-0 overflow-x-auto">
             <table className="w-full text-left text-xs min-w-[760px]">
-              <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-500">
+              <thead className="bg-surface-subtle border-b border-border-subtle text-[10px] font-bold uppercase text-fg-muted">
                 <tr>
                   <th className="px-4 py-2.5">Driver</th>
                   <th className="px-3 py-2.5 text-right">Trips</th>
@@ -217,10 +217,10 @@ export function DriverPayoutsPanel({
                   <th className="px-4 py-2.5 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border-faint">
                 {driverRollups.map((row) => (
-                  <tr key={row.driverId} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-2.5 font-bold text-slate-900">
+                  <tr key={row.driverId} className="hover:bg-surface-subtle/70">
+                    <td className="px-4 py-2.5 font-bold text-fg-primary">
                       {row.driverName}{' '}
                       {row.cabNumber && (
                         <span className="font-mono text-[11px] text-blue-600">#{row.cabNumber}</span>
@@ -240,19 +240,19 @@ export function DriverPayoutsPanel({
                             [row.driverId]: Number(e.target.value) || 0,
                           }))
                         }
-                        className="w-14 px-1.5 py-1 border border-slate-200 rounded text-center font-mono text-xs"
+                        className="w-14 px-1.5 py-1 border border-border-subtle rounded text-center font-mono text-xs"
                       />
                     </td>
-                    <td className="px-3 py-2.5 text-right font-mono text-emerald-700">
+                    <td className="px-3 py-2.5 text-right font-mono text-status-success-fg">
                       ${(row.tips + row.tollsReimbursed).toFixed(2)}
                     </td>
-                    <td className="px-3 py-2.5 text-right font-mono text-slate-500">
+                    <td className="px-3 py-2.5 text-right font-mono text-fg-muted">
                       ${row.platformFee.toFixed(2)}
                     </td>
-                    <td className="px-3 py-2.5 text-right font-mono text-slate-500">
+                    <td className="px-3 py-2.5 text-right font-mono text-fg-muted">
                       ${row.alreadySettledAmount.toFixed(2)}
                     </td>
-                    <td className="px-3 py-2.5 text-right font-mono font-black text-emerald-700">
+                    <td className="px-3 py-2.5 text-right font-mono font-black text-status-success-fg">
                       ${row.netPayout.toFixed(2)}
                     </td>
                     <td className="px-4 py-2.5 text-right">
@@ -278,7 +278,7 @@ export function DriverPayoutsPanel({
                             paymentMethod: 'ach',
                           })
                         }
-                        className="text-[11px] font-bold text-blue-700 border-blue-200 hover:bg-blue-50 cursor-pointer"
+                        className="text-[11px] font-bold text-status-info-fg border-status-info-border hover:bg-status-info-bg cursor-pointer"
                       >
                         Record Payout
                       </Button>

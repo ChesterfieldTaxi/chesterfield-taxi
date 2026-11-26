@@ -34,7 +34,7 @@ export function VehicleImagePicker({
   return (
     <div className={`space-y-2 ${className}`}>
       <div className="flex items-center justify-between">
-        <label className="block text-xs font-bold text-slate-700">
+        <label className="block text-xs font-bold text-fg-secondary">
           {label}
         </label>
         <div className="flex items-center gap-2">
@@ -42,7 +42,7 @@ export function VehicleImagePicker({
             <button
               type="button"
               onClick={() => handleUrlChange(classImageUrl)}
-              className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 hover:underline"
+              className="text-[11px] font-bold text-blue-600 hover:text-status-info-fg flex items-center gap-1 hover:underline"
             >
               <CarIcon className="w-3.5 h-3.5" />
               <span>Use Class Photo</span>
@@ -51,7 +51,7 @@ export function VehicleImagePicker({
           <button
             type="button"
             onClick={() => setShowPresets(!showPresets)}
-            className="text-[11px] font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1 hover:underline"
+            className="text-[11px] font-bold text-amber-600 hover:text-status-warning-fg flex items-center gap-1 hover:underline"
           >
             <SparklesIcon className="w-3.5 h-3.5" />
             <span>{showPresets ? 'Hide Presets' : 'Choose Preset'}</span>
@@ -61,7 +61,7 @@ export function VehicleImagePicker({
 
       <div className="flex gap-2.5 items-start">
         {/* Live Thumbnail Preview */}
-        <div className="w-20 h-14 shrink-0 rounded-xl border border-slate-200 bg-slate-100 overflow-hidden relative flex items-center justify-center shadow-2xs">
+        <div className="w-20 h-14 shrink-0 rounded-xl border border-border-subtle bg-surface-muted overflow-hidden relative flex items-center justify-center shadow-2xs">
           {value && !imageError ? (
             <img
               src={value}
@@ -70,8 +70,8 @@ export function VehicleImagePicker({
               onError={() => setImageError(true)}
             />
           ) : (
-            <div className="flex flex-col items-center justify-center text-slate-400 p-1 text-center">
-              <CarIcon className="w-5 h-5 text-slate-400" />
+            <div className="flex flex-col items-center justify-center text-fg-subtle p-1 text-center">
+              <CarIcon className="w-5 h-5 text-fg-subtle" />
               <span className="text-[9px] font-bold mt-0.5">No Image</span>
             </div>
           )}
@@ -80,7 +80,7 @@ export function VehicleImagePicker({
               type="button"
               onClick={() => handleUrlChange('')}
               title="Remove image"
-              className="absolute top-1 right-1 p-0.5 rounded-full bg-slate-900/70 hover:bg-red-600 text-white transition-colors"
+              className="absolute top-1 right-1 p-0.5 rounded-full bg-surface-overlay/70 hover:bg-red-600 text-white transition-colors"
             >
               <TrashIcon className="w-2.5 h-2.5" />
             </button>
@@ -96,7 +96,7 @@ export function VehicleImagePicker({
             onChange={(e) => handleUrlChange(e.target.value)}
             className="text-xs h-9"
           />
-          <p className="text-[10px] text-slate-400">
+          <p className="text-[10px] text-fg-subtle">
             {helperText}
           </p>
         </div>
@@ -104,13 +104,13 @@ export function VehicleImagePicker({
 
       {/* Preset Chooser Carousel / Pills */}
       {showPresets && (
-        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 animate-in fade-in duration-150">
-          <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+        <div className="p-3 bg-surface-subtle border border-border-subtle rounded-xl space-y-2 animate-in fade-in duration-150">
+          <div className="flex items-center justify-between text-[11px] font-bold text-fg-secondary">
             <span>Select a Stock Preset:</span>
             <button
               type="button"
               onClick={() => setShowPresets(false)}
-              className="text-slate-400 hover:text-slate-600 text-xs font-semibold"
+              className="text-fg-subtle hover:text-fg-secondary text-xs font-semibold"
             >
               ✕
             </button>
@@ -128,18 +128,18 @@ export function VehicleImagePicker({
                   }}
                   className={`flex items-center gap-2 p-1.5 rounded-lg border text-left transition-all ${
                     isSelected
-                      ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500'
-                      : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-2xs'
+                      ? 'border-blue-500 bg-status-info-bg ring-1 ring-blue-500'
+                      : 'border-border-subtle bg-surface-card hover:border-border-strong hover:shadow-2xs'
                   }`}
                 >
                   <img
                     src={preset.url}
                     alt={preset.label}
-                    className="w-10 h-7 rounded object-cover shrink-0 bg-slate-100"
+                    className="w-10 h-7 rounded object-cover shrink-0 bg-surface-muted"
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-bold text-slate-800 truncate">{preset.label}</p>
-                    <p className="text-[9px] text-slate-400 capitalize">{preset.category}</p>
+                    <p className="text-[11px] font-bold text-fg-strong truncate">{preset.label}</p>
+                    <p className="text-[9px] text-fg-subtle capitalize">{preset.category}</p>
                   </div>
                 </button>
               );

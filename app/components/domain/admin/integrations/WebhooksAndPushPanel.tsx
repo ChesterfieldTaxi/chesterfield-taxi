@@ -87,15 +87,15 @@ export function WebhooksAndPushPanel() {
   return (
     <div className="space-y-6">
       {/* CARD 1: STRIPE WEBHOOK DIAGNOSTICS */}
-      <Card className="rounded-2xl border-slate-200">
-        <CardHeader className="border-b border-slate-100 pb-4">
+      <Card className="rounded-2xl border-border-subtle">
+        <CardHeader className="border-b border-border-faint pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div>
-              <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <CardTitle className="text-base font-extrabold text-fg-primary flex items-center gap-2">
                 <CreditCardIcon className="w-5 h-5 text-indigo-600 shrink-0" />
                 <span>Stripe Payment &amp; Corporate Invoice Webhook</span>
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+              <CardDescription className="text-xs text-fg-muted">
                 HMAC-SHA256 verified webhook reconciling pre-auth holds, 1-tap Pay Links, B2B invoices, and general ledger entries.
               </CardDescription>
             </div>
@@ -111,19 +111,19 @@ export function WebhooksAndPushPanel() {
         </CardHeader>
 
         <CardContent className="p-4 sm:p-6 space-y-5">
-          <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-2">
+          <div className="p-4 rounded-xl border border-status-staged-border bg-status-staged-bg/40 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-extrabold text-slate-900">Stripe Webhook Endpoint URL (POST):</span>
-              <span className="text-[11px] font-mono text-indigo-700">
+              <span className="text-xs font-extrabold text-fg-primary">Stripe Webhook Endpoint URL (POST):</span>
+              <span className="text-[11px] font-mono text-status-staged-fg">
                 Replay Window: {webhookDiag?.toleranceSeconds ?? 300}s &middot; Mode: {(webhookDiag?.stripeMode || 'unconfigured').toUpperCase()}
               </span>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <code className="flex-1 text-xs font-mono bg-white p-2.5 rounded-lg border border-indigo-200 text-slate-800 select-all break-all">
+              <code className="flex-1 text-xs font-mono bg-surface-card p-2.5 rounded-lg border border-status-staged-border text-fg-strong select-all break-all">
                 {stripeWebhookEndpointUrl}
               </code>
-              <Button type="button" variant="outline" size="sm" onClick={() => copyText('stripe', stripeWebhookEndpointUrl)} className="bg-white border-indigo-300 text-indigo-800 font-bold text-xs px-3 py-2">
-                {copiedKey === 'stripe' ? <CheckIcon className="w-3.5 h-3.5 mr-1 text-emerald-700" /> : <CopyIcon className="w-3.5 h-3.5 mr-1" />}
+              <Button type="button" variant="outline" size="sm" onClick={() => copyText('stripe', stripeWebhookEndpointUrl)} className="bg-surface-card border-status-staged-border text-status-staged-fg font-bold text-xs px-3 py-2">
+                {copiedKey === 'stripe' ? <CheckIcon className="w-3.5 h-3.5 mr-1 text-status-success-fg" /> : <CopyIcon className="w-3.5 h-3.5 mr-1" />}
                 {copiedKey === 'stripe' ? 'Copied' : 'Copy URL'}
               </Button>
             </div>
@@ -131,7 +131,7 @@ export function WebhooksAndPushPanel() {
 
           <div className="flex flex-wrap gap-1.5">
             {subscribedList.map((evtName) => (
-              <span key={evtName} className="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 font-mono text-[11px] font-semibold text-slate-800">
+              <span key={evtName} className="px-2.5 py-1 rounded-lg bg-surface-muted border border-border-subtle font-mono text-[11px] font-semibold text-fg-strong">
                 {evtName}
               </span>
             ))}
@@ -139,20 +139,20 @@ export function WebhooksAndPushPanel() {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800">
+              <span className="text-xs font-bold text-fg-strong">
                 Recent Processed Webhook Events ({webhookDiag?.totalProcessedCount ?? 0})
               </span>
-              <span className="text-[11px] text-slate-400">Deduplicated via /paymentWebhookEvents</span>
+              <span className="text-[11px] text-fg-subtle">Deduplicated via /paymentWebhookEvents</span>
             </div>
 
             {!webhookDiag?.recentEvents || webhookDiag.recentEvents.length === 0 ? (
-              <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/50 text-center text-xs text-slate-500">
+              <div className="p-5 rounded-xl border border-border-subtle bg-surface-subtle/50 text-center text-xs text-fg-muted">
                 {isLoadingWebhook ? 'Loading processed webhook log...' : 'No Stripe webhook deliveries recorded yet.'}
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-xl overflow-x-auto">
+              <div className="border border-border-subtle rounded-xl overflow-x-auto">
                 <table className="w-full text-left text-xs min-w-[600px]">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <thead className="bg-surface-subtle border-b border-border-subtle text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
                     <tr>
                       <th className="px-3.5 py-2.5">Processed At</th>
                       <th className="px-3.5 py-2.5">Event ID</th>
@@ -162,22 +162,22 @@ export function WebhooksAndPushPanel() {
                       <th className="px-3.5 py-2.5">Outcome</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-border-faint">
                     {webhookDiag.recentEvents.map((ev) => (
-                      <tr key={ev.id} className="hover:bg-slate-50/70">
-                        <td className="px-3.5 py-2 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                      <tr key={ev.id} className="hover:bg-surface-subtle/70">
+                        <td className="px-3.5 py-2 font-mono text-[11px] text-fg-secondary whitespace-nowrap">
                           {ev.processedAt ? new Date(ev.processedAt).toLocaleString() : '—'}
                         </td>
-                        <td className="px-3.5 py-2 font-mono text-[11px] font-bold text-slate-800 whitespace-nowrap">{ev.id}</td>
-                        <td className="px-3.5 py-2 font-mono text-[11px] text-indigo-700 whitespace-nowrap">{ev.eventType}</td>
-                        <td className="px-3.5 py-2 font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                        <td className="px-3.5 py-2 font-mono text-[11px] font-bold text-fg-strong whitespace-nowrap">{ev.id}</td>
+                        <td className="px-3.5 py-2 font-mono text-[11px] text-status-staged-fg whitespace-nowrap">{ev.eventType}</td>
+                        <td className="px-3.5 py-2 font-mono text-[11px] text-fg-secondary whitespace-nowrap">
                           {ev.targetType && ev.targetId ? `${ev.targetType.toUpperCase()}: ${ev.targetId}` : '—'}
                         </td>
-                        <td className="px-3.5 py-2 font-mono font-bold text-right text-slate-900 whitespace-nowrap">
+                        <td className="px-3.5 py-2 font-mono font-bold text-right text-fg-primary whitespace-nowrap">
                           {typeof ev.amount === 'number' ? `$${ev.amount.toFixed(2)}` : '—'}
                         </td>
                         <td className="px-3.5 py-2">
-                          <span className="inline-block px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold text-[10px]">
+                          <span className="inline-block px-2 py-0.5 rounded bg-status-success-bg border border-status-success-border text-status-success-fg font-semibold text-[10px]">
                             {ev.outcome.replace(/_/g, ' ')}
                           </span>
                         </td>
@@ -192,15 +192,15 @@ export function WebhooksAndPushPanel() {
       </Card>
 
       {/* CARD 2: VAPID WEB PUSH & FCM STATUS */}
-      <Card className="rounded-2xl border-slate-200">
-        <CardHeader className="border-b border-slate-100 pb-4">
+      <Card className="rounded-2xl border-border-subtle">
+        <CardHeader className="border-b border-border-faint pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div>
-              <CardTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <CardTitle className="text-base font-extrabold text-fg-primary flex items-center gap-2">
                 <BellIcon className="w-5 h-5 text-amber-600 shrink-0" />
                 <span>Web Push, VAPID &amp; Firebase Cloud Messaging (`/api/push`)</span>
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+              <CardDescription className="text-xs text-fg-muted">
                 Real-time Driver offer alerts and Dispatch console background notifications via FCM HTTP v1 &amp; Service Workers.
               </CardDescription>
             </div>
@@ -217,42 +217,42 @@ export function WebhooksAndPushPanel() {
 
         <CardContent className="p-4 sm:p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1">
-              <span className="text-xs font-extrabold text-slate-900 block">VAPID Public Key</span>
-              <p className="text-[11px] text-slate-600">
+            <div className="p-3.5 rounded-xl border border-border-subtle bg-surface-subtle/70 space-y-1">
+              <span className="text-xs font-extrabold text-fg-primary block">VAPID Public Key</span>
+              <p className="text-[11px] text-fg-secondary">
                 {pushDiag?.vapidConfigured ? 'VITE_FIREBASE_VAPID_KEY Configured' : 'Unset (Browser Notification API fallback)'}
               </p>
             </div>
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1">
-              <span className="text-xs font-extrabold text-slate-900 block">FCM Server Sender</span>
-              <p className="text-[11px] text-slate-600">
+            <div className="p-3.5 rounded-xl border border-border-subtle bg-surface-subtle/70 space-y-1">
+              <span className="text-xs font-extrabold text-fg-primary block">FCM Server Sender</span>
+              <p className="text-[11px] text-fg-secondary">
                 {pushDiag?.fcmServerConfigured ? 'FIREBASE_SERVICE_ACCOUNT_JSON Ready' : 'Local Service Worker Dispatch'}
               </p>
             </div>
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1">
-              <span className="text-xs font-extrabold text-slate-900 block">Firebase Project</span>
-              <p className="text-[11px] font-mono text-slate-700">{pushDiag?.projectId || 'chesterfield-taxi'}</p>
+            <div className="p-3.5 rounded-xl border border-border-subtle bg-surface-subtle/70 space-y-1">
+              <span className="text-xs font-extrabold text-fg-primary block">Firebase Project</span>
+              <p className="text-[11px] font-mono text-fg-secondary">{pushDiag?.projectId || 'chesterfield-taxi'}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* CARD 3: API & WEBHOOK ENDPOINT REFERENCE */}
-      <Card className="rounded-2xl border-slate-200">
-        <CardHeader className="border-b border-slate-100 pb-4">
-          <CardTitle className="text-base font-extrabold text-slate-900">
+      <Card className="rounded-2xl border-border-subtle">
+        <CardHeader className="border-b border-border-faint pb-4">
+          <CardTitle className="text-base font-extrabold text-fg-primary">
             Platform Webhook &amp; Resource Route Reference
           </CardTitle>
-          <CardDescription className="text-xs text-slate-500">
+          <CardDescription className="text-xs text-fg-muted">
             Copyable serverless endpoints for Twilio Voice/SMS, Resend Inbound Email, and `/track` self-service.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 sm:p-6 space-y-2.5">
           {ENDPOINT_REFERENCES.map((ep) => (
-            <div key={ep.key} className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div key={ep.key} className="p-3 rounded-xl border border-border-subtle bg-surface-subtle/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="min-w-0">
-                <span className="text-xs font-bold text-slate-800 block">{ep.label}</span>
-                <code className="text-[11px] font-mono text-slate-600 break-all">{ep.url}</code>
+                <span className="text-xs font-bold text-fg-strong block">{ep.label}</span>
+                <code className="text-[11px] font-mono text-fg-secondary break-all">{ep.url}</code>
               </div>
               <Button type="button" variant="outline" size="sm" onClick={() => copyText(ep.key, ep.url)} className="text-xs font-bold shrink-0">
                 {copiedKey === ep.key ? 'Copied' : 'Copy'}

@@ -163,7 +163,7 @@ export function AdminRulesTab({ initialSection = 'auto-dispatch' }: AdminRulesTa
   return (
     <div className="space-y-6 max-w-6xl pb-16">
       {saveStatus && (
-        <div className={`p-4 rounded-xl border text-xs font-bold ${saveStatus.includes('Error') ? 'bg-rose-50 text-rose-800 border-rose-300' : 'bg-emerald-50 text-emerald-800 border-emerald-300'}`}>
+        <div className={`p-4 rounded-xl border text-xs font-bold ${saveStatus.includes('Error') ? 'bg-status-danger-bg text-status-danger-fg border-status-danger-border' : 'bg-status-success-bg text-status-success-fg border-status-success-border'}`}>
           {saveStatus}
         </div>
       )}
@@ -174,13 +174,13 @@ export function AdminRulesTab({ initialSection = 'auto-dispatch' }: AdminRulesTa
             config={dispatchAutomation} zones={zones} isSaving={isSaving}
             onChange={setDispatchAutomation} onSave={handleSave}
           />
-          <Card className="border border-slate-200 bg-white shadow-xs">
+          <Card className="border border-border-subtle bg-surface-card shadow-xs">
             <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
               <div className="flex items-start gap-2.5">
                 <ClockIcon className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                 <div>
-                  <span className="font-extrabold text-slate-900 block">Fleet Tactical Alerts Auto-Dismiss Timer</span>
-                  <span className="text-[11px] text-slate-500">Automatically dismisses non-pinned Dispatch Console tactical alerts after the selected TTL.</span>
+                  <span className="font-extrabold text-fg-primary block">Fleet Tactical Alerts Auto-Dismiss Timer</span>
+                  <span className="text-[11px] text-fg-muted">Automatically dismisses non-pinned Dispatch Console tactical alerts after the selected TTL.</span>
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">

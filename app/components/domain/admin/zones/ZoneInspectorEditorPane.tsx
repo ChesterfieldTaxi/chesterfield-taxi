@@ -81,12 +81,12 @@ export function ZoneInspectorEditorPane({
     <>
       {/* ─── Create / Edit Zone Drawer ─── */}
       {isEditingZone && activeSubTab === 'zones' && (
-        <Card variant="elevated" className="border-blue-300 bg-blue-50/20 shadow-md">
-          <CardHeader className="p-4 border-b border-blue-200/60 bg-blue-50/50">
-            <CardTitle className="text-sm font-bold text-blue-950">
+        <Card variant="elevated" className="border-status-info-border bg-status-info-bg/20 shadow-md">
+          <CardHeader className="p-4 border-b border-status-info-border/60 bg-status-info-bg/50">
+            <CardTitle className="text-sm font-bold text-status-info-fg">
               {zoneFormData.id ? `Edit Zone: ${zoneFormData.name}` : 'Create Service Zone'}
             </CardTitle>
-            <CardDescription className="text-xs text-slate-600">
+            <CardDescription className="text-xs text-fg-secondary">
               Configure perimeter boundaries, flat fees, and surcharge multipliers.
             </CardDescription>
           </CardHeader>
@@ -102,7 +102,7 @@ export function ZoneInspectorEditorPane({
                 />
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-fg-secondary mb-1">
                     Zone Type
                   </label>
                   <Select
@@ -135,13 +135,13 @@ export function ZoneInspectorEditorPane({
 
               {/* RADIUS ZONE CONTROLS */}
               {zoneFormData.type === 'radius' && (
-                <div className="p-3 rounded-xl bg-white border border-blue-200 space-y-2.5">
+                <div className="p-3 rounded-xl bg-surface-card border border-status-info-border space-y-2.5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800 inline-flex items-center gap-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-status-info-fg inline-flex items-center gap-1.5">
                       <CompassIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                       <span>Radius Center &amp; Perimeter</span>
                     </span>
-                    <span className="text-[10px] font-medium text-slate-500">
+                    <span className="text-[10px] font-medium text-fg-muted">
                       Tap map or drag circle to reposition
                     </span>
                   </div>
@@ -197,10 +197,10 @@ export function ZoneInspectorEditorPane({
 
               {/* POLYGON ZONE DRAWING & VERTEX EDITOR */}
               {zoneFormData.type === 'polygon' && (
-                <div className="p-3 rounded-xl bg-white border border-indigo-200 space-y-2.5">
+                <div className="p-3 rounded-xl bg-surface-card border border-status-staged-border space-y-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-800 flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-status-staged-fg flex items-center gap-1.5">
                         <span className="inline-flex items-center gap-1.5">
                           <RulerIcon className="w-3.5 h-3.5 text-indigo-600" />
                           <span>Polygon Boundary Vertices</span>
@@ -208,14 +208,14 @@ export function ZoneInspectorEditorPane({
                         <span
                           className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
                             (zoneFormData.vertices?.length || 0) >= 3
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-amber-100 text-amber-800'
+                              ? 'bg-status-success-bg-strong text-status-success-fg'
+                              : 'bg-status-warning-bg-strong text-status-warning-fg'
                           }`}
                         >
                           {zoneFormData.vertices?.length || 0} pts (min 3)
                         </span>
                       </span>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
+                      <p className="text-[10px] text-fg-muted mt-0.5">
                         Click anywhere on the map on the right to drop polygon corner points.
                       </p>
                     </div>
@@ -230,7 +230,7 @@ export function ZoneInspectorEditorPane({
                           }))
                         }
                         disabled={(zoneFormData.vertices?.length || 0) === 0}
-                        className="px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 disabled:opacity-40 text-[10px] font-bold text-slate-700"
+                        className="px-2 py-1 rounded-lg border border-border-subtle bg-surface-subtle hover:bg-surface-muted disabled:opacity-40 text-[10px] font-bold text-fg-secondary"
                       >
                         Undo Point
                       </button>
@@ -242,7 +242,7 @@ export function ZoneInspectorEditorPane({
                             vertices: generateBoxVertices(prev.center || { lat: 38.6631, lng: -90.5771 }),
                           }))
                         }
-                        className="px-2 py-1 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-[10px] font-bold text-indigo-700"
+                        className="px-2 py-1 rounded-lg border border-status-staged-border bg-status-staged-bg hover:bg-status-staged-bg-strong text-[10px] font-bold text-status-staged-fg"
                       >
                         4-Pt Box Preset
                       </button>
@@ -255,7 +255,7 @@ export function ZoneInspectorEditorPane({
                           }))
                         }
                         disabled={(zoneFormData.vertices?.length || 0) === 0}
-                        className="px-2 py-1 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-[10px] font-bold text-rose-700"
+                        className="px-2 py-1 rounded-lg border border-status-danger-border bg-status-danger-bg hover:bg-status-danger-bg-strong disabled:opacity-40 text-[10px] font-bold text-status-danger-fg"
                       >
                         Clear
                       </button>
@@ -277,7 +277,7 @@ export function ZoneInspectorEditorPane({
                             };
                           })
                         }
-                        className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-[10px] font-bold text-white"
+                        className="px-2 py-1 rounded-lg bg-surface-header hover:bg-surface-header-elevated text-[10px] font-bold text-white"
                       >
                         + Add Coord
                       </button>
@@ -285,7 +285,7 @@ export function ZoneInspectorEditorPane({
                   </div>
 
                   {(zoneFormData.vertices?.length || 0) === 0 ? (
-                    <div className="p-3 rounded-lg bg-indigo-50/70 border border-dashed border-indigo-200 text-center text-[11px] font-semibold text-indigo-800">
+                    <div className="p-3 rounded-lg bg-status-staged-bg/70 border border-dashed border-status-staged-border text-center text-[11px] font-semibold text-status-staged-fg">
                       Click on the interactive map canvas to place your first polygon vertex, or click &ldquo;4-Pt Box Preset&rdquo; to start with a rectangle and drag its corners.
                     </div>
                   ) : (
@@ -293,9 +293,9 @@ export function ZoneInspectorEditorPane({
                       {(zoneFormData.vertices || []).map((v, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 text-xs"
+                          className="flex items-center gap-1.5 bg-surface-subtle px-2 py-1 rounded-lg border border-border-subtle text-xs"
                         >
-                          <span className="w-6 text-[10px] font-extrabold text-indigo-700">
+                          <span className="w-6 text-[10px] font-extrabold text-status-staged-fg">
                             #{idx + 1}
                           </span>
                           <input
@@ -310,7 +310,7 @@ export function ZoneInspectorEditorPane({
                                 return { ...prev, vertices: next };
                               });
                             }}
-                            className="w-full h-7 px-2 rounded border border-slate-300 bg-white font-mono text-[11px] text-slate-800"
+                            className="w-full h-7 px-2 rounded border border-border-strong bg-surface-card font-mono text-[11px] text-fg-strong"
                             title="Latitude"
                           />
                           <input
@@ -325,7 +325,7 @@ export function ZoneInspectorEditorPane({
                                 return { ...prev, vertices: next };
                               });
                             }}
-                            className="w-full h-7 px-2 rounded border border-slate-300 bg-white font-mono text-[11px] text-slate-800"
+                            className="w-full h-7 px-2 rounded border border-border-strong bg-surface-card font-mono text-[11px] text-fg-strong"
                             title="Longitude"
                           />
                           <button
@@ -336,7 +336,7 @@ export function ZoneInspectorEditorPane({
                                 vertices: (prev.vertices || []).filter((_, i) => i !== idx),
                               }))
                             }
-                            className="px-1.5 py-0.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 font-bold"
+                            className="px-1.5 py-0.5 rounded text-fg-subtle hover:text-rose-600 hover:bg-status-danger-bg font-bold"
                             title="Remove Vertex"
                           >
                             ×
@@ -348,14 +348,14 @@ export function ZoneInspectorEditorPane({
                 </div>
               )}
 
-              <div className="p-2.5 rounded-lg bg-blue-50/70 border border-blue-200/80 text-[11px] text-blue-900">
+              <div className="p-2.5 rounded-lg bg-status-info-bg/70 border border-status-info-border/80 text-[11px] text-status-info-fg">
                 Zone fees, corridor overrides, and rate routing are managed centrally in{' '}
                 <strong>Rates &amp; Tariffs → Rules &amp; Routing</strong>.
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-blue-200/60">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-status-info-border/60">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-fg-secondary mb-1">
                     Map Highlight Color
                   </label>
                   <div className="flex items-center gap-2">
@@ -365,7 +365,7 @@ export function ZoneInspectorEditorPane({
                       onChange={(e) =>
                         setZoneFormData((prev) => ({ ...prev, color: e.target.value }))
                       }
-                      className="w-10 h-10 rounded-xl border border-slate-300 cursor-pointer p-1 bg-white shadow-xs"
+                      className="w-10 h-10 rounded-xl border border-border-strong cursor-pointer p-1 bg-surface-card shadow-xs"
                     />
                     <Input
                       value={zoneFormData.color || '#3b82f6'}
@@ -378,7 +378,7 @@ export function ZoneInspectorEditorPane({
                 </div>
 
                 <div className="flex items-center justify-between sm:justify-end gap-3 pt-4 sm:pt-0">
-                  <span className="text-xs font-semibold text-slate-700">Zone Enabled</span>
+                  <span className="text-xs font-semibold text-fg-secondary">Zone Enabled</span>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
                       type="checkbox"
@@ -388,12 +388,12 @@ export function ZoneInspectorEditorPane({
                       }
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
+                    <div className="w-11 h-6 bg-surface-emphasis peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-card after:border-border-strong after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
                   </label>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-blue-200/60">
+              <div className="flex justify-end gap-2 pt-3 border-t border-status-info-border/60">
                 <Button
                   type="button"
                   variant="outline"
@@ -418,12 +418,12 @@ export function ZoneInspectorEditorPane({
 
       {/* ─── Create / Edit Zone Group Drawer ─── */}
       {isEditingGroup && activeSubTab === 'groups' && (
-        <Card variant="elevated" className="border-indigo-300 bg-indigo-50/20 shadow-md">
-          <CardHeader className="p-4 border-b border-indigo-200/60 bg-indigo-50/50">
-            <CardTitle className="text-sm font-bold text-indigo-950">
+        <Card variant="elevated" className="border-status-staged-border bg-status-staged-bg/20 shadow-md">
+          <CardHeader className="p-4 border-b border-status-staged-border/60 bg-status-staged-bg/50">
+            <CardTitle className="text-sm font-bold text-status-staged-fg">
               {groupFormData.id ? `Edit Zone Group: ${groupFormData.name}` : 'Create Zone Group'}
             </CardTitle>
-            <CardDescription className="text-xs text-slate-600">
+            <CardDescription className="text-xs text-fg-secondary">
               Cluster multiple service zones together for grouped pricing conditions and inheritance rules.
             </CardDescription>
           </CardHeader>
@@ -446,17 +446,17 @@ export function ZoneInspectorEditorPane({
 
               {/* Member Zones Checkboxes */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold text-fg-secondary mb-1.5">
                   Included Operational Zones ({groupFormData.zoneIds.length} Selected)
                 </label>
-                <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-xl p-2 bg-white space-y-1.5">
+                <div className="max-h-40 overflow-y-auto border border-border-subtle rounded-xl p-2 bg-surface-card space-y-1.5">
                   {zones.map((zone) => {
                     const isChecked = groupFormData.zoneIds.includes(zone.id);
                     return (
                       <label
                         key={zone.id}
-                        className={`flex items-center gap-2.5 p-1.5 rounded-lg text-xs cursor-pointer hover:bg-slate-50 transition-colors ${
-                          isChecked ? 'bg-indigo-50/60 font-semibold text-indigo-950' : 'text-slate-700'
+                        className={`flex items-center gap-2.5 p-1.5 rounded-lg text-xs cursor-pointer hover:bg-surface-subtle transition-colors ${
+                          isChecked ? 'bg-status-staged-bg/60 font-semibold text-status-staged-fg' : 'text-fg-secondary'
                         }`}
                       >
                         <input
@@ -475,14 +475,14 @@ export function ZoneInspectorEditorPane({
                               }));
                             }
                           }}
-                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                          className="rounded border-border-strong text-indigo-600 focus:ring-indigo-500"
                         />
                         <span
                           className="w-2.5 h-2.5 rounded-full"
                           style={{ backgroundColor: zone.color || '#3b82f6' }}
                         />
                         <span>{zone.name}</span>
-                        <span className="text-[10px] text-slate-400">({zone.type})</span>
+                        <span className="text-[10px] text-fg-subtle">({zone.type})</span>
                       </label>
                     );
                   })}
@@ -490,13 +490,13 @@ export function ZoneInspectorEditorPane({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                <div className="p-2.5 rounded-lg bg-blue-50/70 border border-blue-200/80 text-[11px] text-blue-900">
+                <div className="p-2.5 rounded-lg bg-status-info-bg/70 border border-status-info-border/80 text-[11px] text-status-info-fg">
                   Zone group pricing &amp; surcharge rules are configured in{' '}
                   <strong>Rates &amp; Tariffs → Rules &amp; Routing</strong>.
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-fg-secondary mb-1">
                     Group Color
                   </label>
                   <div className="flex items-center gap-2">
@@ -506,7 +506,7 @@ export function ZoneInspectorEditorPane({
                       onChange={(e) =>
                         setGroupFormData((prev) => ({ ...prev, color: e.target.value }))
                       }
-                      className="w-10 h-10 rounded-xl border border-slate-300 cursor-pointer p-1 bg-white shadow-xs"
+                      className="w-10 h-10 rounded-xl border border-border-strong cursor-pointer p-1 bg-surface-card shadow-xs"
                     />
                     <Input
                       value={groupFormData.color || '#6366f1'}
@@ -519,8 +519,8 @@ export function ZoneInspectorEditorPane({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-indigo-200/60">
-                <span className="text-xs font-semibold text-slate-700">Group Active</span>
+              <div className="flex items-center justify-between pt-2 border-t border-status-staged-border/60">
+                <span className="text-xs font-semibold text-fg-secondary">Group Active</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -530,11 +530,11 @@ export function ZoneInspectorEditorPane({
                     }
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
+                  <div className="w-11 h-6 bg-surface-emphasis peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-card after:border-border-strong after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
                 </label>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-indigo-200/60">
+              <div className="flex justify-end gap-2 pt-3 border-t border-status-staged-border/60">
                 <Button
                   type="button"
                   variant="outline"
@@ -559,12 +559,12 @@ export function ZoneInspectorEditorPane({
 
       {/* ─── Create / Edit Location Collection Drawer ─── */}
       {isEditingCollection && activeSubTab === 'collections' && (
-        <Card variant="elevated" className="border-emerald-300 bg-emerald-50/20 shadow-md">
-          <CardHeader className="p-4 border-b border-emerald-200/60 bg-emerald-50/50">
-            <CardTitle className="text-sm font-bold text-emerald-950">
+        <Card variant="elevated" className="border-status-success-border bg-status-success-bg/20 shadow-md">
+          <CardHeader className="p-4 border-b border-status-success-border/60 bg-status-success-bg/50">
+            <CardTitle className="text-sm font-bold text-status-success-fg">
               {collectionFormData.id ? `Edit Collection: ${collectionFormData.name}` : 'Create Location Collection'}
             </CardTitle>
-            <CardDescription className="text-xs text-slate-600">
+            <CardDescription className="text-xs text-fg-secondary">
               Curate points of interest (airports, arenas, hotels) with proximity buffers.
             </CardDescription>
           </CardHeader>
@@ -580,7 +580,7 @@ export function ZoneInspectorEditorPane({
                 />
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-fg-secondary mb-1">
                     Category
                   </label>
                   <Select
@@ -624,21 +624,21 @@ export function ZoneInspectorEditorPane({
                   helperText="Radius around each point"
                   required
                 />
-                <div className="sm:col-span-2 p-2.5 rounded-lg bg-blue-50/70 border border-blue-200/80 text-[11px] text-blue-900 flex items-center">
+                <div className="sm:col-span-2 p-2.5 rounded-lg bg-status-info-bg/70 border border-status-info-border/80 text-[11px] text-status-info-fg flex items-center">
                   Location collection surcharges &amp; routing are managed in{' '}
                   <strong className="ml-1">Rates &amp; Tariffs → Rules &amp; Routing</strong>.
                 </div>
               </div>
 
               {/* Autocomplete Consolidation Settings */}
-              <div className="pt-3 border-t border-emerald-200/60 space-y-3 bg-amber-50/50 p-3.5 rounded-xl border border-amber-200/80">
+              <div className="pt-3 border-t border-status-success-border/60 space-y-3 bg-status-warning-bg/50 p-3.5 rounded-xl border border-status-warning-border/80">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h5 className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                    <h5 className="text-xs font-bold text-status-warning-fg flex items-center gap-1.5">
                       <ZapIcon className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                       <span>Client Autocomplete Consolidation</span>
                     </h5>
-                    <p className="text-[11px] text-amber-800">
+                    <p className="text-[11px] text-status-warning-fg">
                       Collapse multiple Google Places suggestions (terminals, gates, cargo roads) into ONE canonical entry with deterministic coordinates so fares remain exact.
                     </p>
                   </div>
@@ -660,12 +660,12 @@ export function ZoneInspectorEditorPane({
                       }
                       className="sr-only peer"
                     />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                    <div className="w-9 h-5 bg-surface-emphasis peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-card after:border-border-strong after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
                   </label>
                 </div>
 
                 {collectionFormData.consolidateInAutocomplete && (
-                  <div className="space-y-2.5 pt-2 border-t border-amber-200/60">
+                  <div className="space-y-2.5 pt-2 border-t border-status-warning-border/60">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <Input
                         label="Canonical Suggestion Title"
@@ -683,7 +683,7 @@ export function ZoneInspectorEditorPane({
                             },
                           }))
                         }
-                        className="text-xs h-8 bg-white"
+                        className="text-xs h-8 bg-surface-card"
                         helperText="Single unified suggestion title shown to customers"
                         required={collectionFormData.consolidateInAutocomplete}
                       />
@@ -704,7 +704,7 @@ export function ZoneInspectorEditorPane({
                             },
                           }))
                         }
-                        className="text-xs h-8 bg-white"
+                        className="text-xs h-8 bg-surface-card"
                         helperText="Address stored and routed for dispatch"
                         required={collectionFormData.consolidateInAutocomplete}
                       />
@@ -732,7 +732,7 @@ export function ZoneInspectorEditorPane({
                             },
                           }))
                         }
-                        className="text-xs h-8 bg-white"
+                        className="text-xs h-8 bg-surface-card"
                       />
 
                       <Input
@@ -756,7 +756,7 @@ export function ZoneInspectorEditorPane({
                             },
                           }))
                         }
-                        className="text-xs h-8 bg-white"
+                        className="text-xs h-8 bg-surface-card"
                       />
 
                       <div className="flex items-end">
@@ -778,7 +778,7 @@ export function ZoneInspectorEditorPane({
                             }
                           }}
                           disabled={collectionFormData.locations.length === 0}
-                          className="h-8 w-full text-xs bg-white text-slate-700 border-slate-300"
+                          className="h-8 w-full text-xs bg-surface-card text-fg-secondary border-border-strong"
                         >
                           Copy from 1st POI
                         </Button>
@@ -786,7 +786,7 @@ export function ZoneInspectorEditorPane({
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-medium text-slate-700 block mb-0.5">
+                      <label className="text-[11px] font-medium text-fg-secondary block mb-0.5">
                         Suppressed Search Keywords (comma-separated)
                       </label>
                       <Input
@@ -802,7 +802,7 @@ export function ZoneInspectorEditorPane({
                             suppressKeywords: list,
                           }));
                         }}
-                        className="text-xs h-8 bg-white"
+                        className="text-xs h-8 bg-surface-card"
                         helperText="Any search matching these keywords will be replaced with this single canonical place"
                       />
                     </div>
@@ -811,9 +811,9 @@ export function ZoneInspectorEditorPane({
               </div>
 
               {/* Included POI List */}
-              <div className="pt-2 border-t border-emerald-200/60">
+              <div className="pt-2 border-t border-status-success-border/60">
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-slate-800">
+                  <label className="text-xs font-bold text-fg-strong">
                     Locations in Collection ({collectionFormData.locations.length})
                   </label>
                 </div>
@@ -822,16 +822,16 @@ export function ZoneInspectorEditorPane({
                   {collectionFormData.locations.map((loc) => (
                     <div
                       key={loc.id}
-                      className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200 text-xs"
+                      className="flex items-center justify-between p-2 rounded-lg bg-surface-card border border-border-subtle text-xs"
                     >
                       <div>
-                        <span className="font-bold text-slate-900 mr-2">{loc.name}</span>
-                        <span className="text-[10px] text-slate-400">{loc.address}</span>
+                        <span className="font-bold text-fg-primary mr-2">{loc.name}</span>
+                        <span className="text-[10px] text-fg-subtle">{loc.address}</span>
                       </div>
                       <button
                         type="button"
                         onClick={() => onRemovePoiFromCollection(loc.id)}
-                        className="p-1 rounded text-red-500 hover:bg-red-50"
+                        className="p-1 rounded text-red-500 hover:bg-status-danger-bg"
                         title="Remove POI"
                       >
                         <TrashIcon className="w-3.5 h-3.5" />
@@ -841,8 +841,8 @@ export function ZoneInspectorEditorPane({
                 </div>
 
                 {/* Add POI Mini-form */}
-                <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-2">
-                  <span className="text-[11px] font-bold text-emerald-950 uppercase tracking-wider block">
+                <div className="p-2.5 rounded-xl bg-status-success-bg/70 border border-status-success-border space-y-2">
+                  <span className="text-[11px] font-bold text-status-success-fg uppercase tracking-wider block">
                     Add Location Point
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -900,7 +900,7 @@ export function ZoneInspectorEditorPane({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-emerald-200/60">
+              <div className="flex justify-end gap-2 pt-3 border-t border-status-success-border/60">
                 <Button
                   type="button"
                   variant="outline"
@@ -925,19 +925,19 @@ export function ZoneInspectorEditorPane({
 
       {/* Blacklist Form Drawer */}
       {activeSubTab === 'blacklists' && isEditingBlacklist && (
-        <Card variant="elevated" className="border-red-200 bg-white shadow-md animate-in slide-in-from-bottom-4">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 p-4">
-            <CardTitle className="text-sm font-bold text-slate-800">
+        <Card variant="elevated" className="border-status-danger-border bg-surface-card shadow-md animate-in slide-in-from-bottom-4">
+          <CardHeader className="bg-surface-subtle border-b border-border-faint p-4">
+            <CardTitle className="text-sm font-bold text-fg-strong">
               {blacklistFormData.id ? 'Edit Exclusion Zone' : 'Create Exclusion Zone'}
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
+            <CardDescription className="text-xs text-fg-muted">
               Define a blacklisted address or radius that blocks or flags trips.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 space-y-4">
             <form onSubmit={onSaveBlacklist} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700 uppercase">Name</label>
+                <label className="text-[11px] font-bold text-fg-secondary uppercase">Name</label>
                 <Input
                   required
                   value={blacklistFormData.name}
@@ -947,7 +947,7 @@ export function ZoneInspectorEditorPane({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700 uppercase">Reason / Context</label>
+                <label className="text-[11px] font-bold text-fg-secondary uppercase">Reason / Context</label>
                 <Input
                   required
                   value={blacklistFormData.reasonCode}
@@ -957,7 +957,7 @@ export function ZoneInspectorEditorPane({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700 uppercase">Enforcement Action</label>
+                <label className="text-[11px] font-bold text-fg-secondary uppercase">Enforcement Action</label>
                 <Select
                   size="sm"
                   value={blacklistFormData.action}
@@ -974,7 +974,7 @@ export function ZoneInspectorEditorPane({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Lat</label>
+                  <label className="text-[11px] font-bold text-fg-secondary uppercase">Lat</label>
                   <Input
                     type="number"
                     step="0.0001"
@@ -990,7 +990,7 @@ export function ZoneInspectorEditorPane({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Lng</label>
+                  <label className="text-[11px] font-bold text-fg-secondary uppercase">Lng</label>
                   <Input
                     type="number"
                     step="0.0001"
@@ -1007,7 +1007,7 @@ export function ZoneInspectorEditorPane({
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700 uppercase">Radius (Miles)</label>
+                <label className="text-[11px] font-bold text-fg-secondary uppercase">Radius (Miles)</label>
                 <Input
                   type="number"
                   step="0.1"

@@ -113,7 +113,7 @@ export function UniversalArchiveDrawer({
       case 'location':
         return <MapPinIcon className="w-4 h-4 text-rose-600" />;
       default:
-        return <ArchiveBoxIcon className="w-4 h-4 text-slate-600" />;
+        return <ArchiveBoxIcon className="w-4 h-4 text-fg-secondary" />;
     }
   };
 
@@ -130,31 +130,31 @@ export function UniversalArchiveDrawer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-stretch sm:justify-end bg-slate-950/60 backdrop-blur-xs animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-end sm:items-stretch sm:justify-end bg-surface-overlay/60 backdrop-blur-xs animate-in fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
         style={sheetDrag.sheetStyle}
-        className="w-full sm:max-w-2xl max-h-[92dvh] sm:max-h-none sm:h-full bg-white rounded-t-3xl sm:rounded-none shadow-2xl flex flex-col border-t sm:border-t-0 sm:border-l border-slate-200 overflow-hidden animate-in slide-in-from-bottom sm:slide-in-from-right duration-200 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0"
+        className="w-full sm:max-w-2xl max-h-[92dvh] sm:max-h-none sm:h-full bg-surface-card rounded-t-3xl sm:rounded-none shadow-2xl flex flex-col border-t sm:border-t-0 sm:border-l border-border-subtle overflow-hidden animate-in slide-in-from-bottom sm:slide-in-from-right duration-200 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0"
       >
         {/* Header */}
         <div
           {...sheetDrag.dragHandlers}
-          className="px-4 sm:px-5 pt-2.5 sm:pt-5 pb-3.5 sm:pb-5 border-b border-slate-200 bg-slate-50 shrink-0 touch-none"
+          className="px-4 sm:px-5 pt-2.5 sm:pt-5 pb-3.5 sm:pb-5 border-b border-border-subtle bg-surface-subtle shrink-0 touch-none"
         >
-          <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
+          <div className="w-10 h-1 rounded-full bg-surface-strong mx-auto mb-2.5 sm:hidden" aria-hidden="true" />
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2 sm:p-2.5 bg-slate-200 text-slate-800 rounded-xl shrink-0">
+              <div className="p-2 sm:p-2.5 bg-surface-emphasis text-fg-strong rounded-xl shrink-0">
                 <ArchiveBoxIcon className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-sm sm:text-base font-black text-slate-900 truncate">
+                <h3 className="text-sm sm:text-base font-black text-fg-primary truncate">
                   Universal Archive &amp; Governance Center
                 </h3>
-                <p className="text-xs text-slate-500 font-medium truncate">
+                <p className="text-xs text-fg-muted font-medium truncate">
                   Soft-deleted entities across Trips, Passengers, Fleet, Drivers, and Zones
                 </p>
               </div>
@@ -163,7 +163,7 @@ export function UniversalArchiveDrawer({
               type="button"
               onClick={onClose}
               aria-label="Close archive drawer"
-              className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200 transition-colors shrink-0 cursor-pointer"
+              className="p-2 text-fg-subtle hover:text-fg-secondary rounded-lg hover:bg-surface-emphasis transition-colors shrink-0 cursor-pointer"
             >
               <XIcon className="w-5 h-5" />
             </button>
@@ -171,7 +171,7 @@ export function UniversalArchiveDrawer({
         </div>
 
         {/* Sub-Tabs */}
-        <div className="px-5 pt-3 pb-2 border-b border-slate-200 bg-white flex flex-wrap gap-1.5">
+        <div className="px-5 pt-3 pb-2 border-b border-border-subtle bg-surface-card flex flex-wrap gap-1.5">
           {[
             { key: 'all', label: 'All Records', count: counts.all },
             { key: 'trip', label: 'Trips', count: counts.trip },
@@ -185,14 +185,14 @@ export function UniversalArchiveDrawer({
               onClick={() => setSelectedType(tab.key as any)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                 selectedType === tab.key
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? 'bg-surface-header text-white shadow-xs'
+                  : 'bg-surface-muted text-fg-secondary hover:bg-surface-emphasis'
               }`}
             >
               <span>{tab.label}</span>
               <span
                 className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                  selectedType === tab.key ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-700'
+                  selectedType === tab.key ? 'bg-surface-header-muted text-white' : 'bg-surface-emphasis text-fg-secondary'
                 }`}
               >
                 {tab.count}
@@ -202,13 +202,13 @@ export function UniversalArchiveDrawer({
         </div>
 
         {/* Search Bar */}
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+        <div className="p-4 border-b border-border-faint bg-surface-subtle/50 flex items-center gap-3">
           <Input
             type="text"
             placeholder="Search archived entity ID, phone, email, notes..."
             value={searchTerm}
             onChange={(e: any) => setSearchTerm(e.target.value)}
-            className="text-xs bg-white"
+            className="text-xs bg-surface-card"
           />
           <Button
             variant="outline"
@@ -222,7 +222,7 @@ export function UniversalArchiveDrawer({
 
         {/* Toast Feedback */}
         {toastMessage && (
-          <div className="mx-4 mt-3 p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold rounded-xl animate-in fade-in">
+          <div className="mx-4 mt-3 p-3 bg-status-success-bg border border-status-success-border text-status-success-fg text-xs font-bold rounded-xl animate-in fade-in">
             {toastMessage}
           </div>
         )}
@@ -232,8 +232,8 @@ export function UniversalArchiveDrawer({
           {filteredRecords.length === 0 ? (
             <div className="text-center py-16 space-y-3">
               <ArchiveBoxIcon className="w-12 h-12 text-slate-300 mx-auto" />
-              <p className="text-sm font-bold text-slate-600">No archived records found</p>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto">
+              <p className="text-sm font-bold text-fg-secondary">No archived records found</p>
+              <p className="text-xs text-fg-subtle max-w-xs mx-auto">
                 Entities that are soft-deleted from active operations appear here for inspection and 1-click restoration.
               </p>
             </div>
@@ -241,7 +241,7 @@ export function UniversalArchiveDrawer({
             filteredRecords.map((record) => (
               <div
                 key={`${record.entityType}-${record.entityId}`}
-                className="p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
+                className="p-4 rounded-xl border border-border-subtle bg-surface-card hover:border-border-strong transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
@@ -249,19 +249,19 @@ export function UniversalArchiveDrawer({
                     <Badge variant="neutral" size="sm" className="font-mono text-[10px] font-bold uppercase">
                       {record.entityType}
                     </Badge>
-                    <span className="text-xs font-black text-slate-800">
+                    <span className="text-xs font-black text-fg-strong">
                       ID: #{record.entityId}
                     </span>
-                    <Badge variant="outline" size="sm" className="text-[10px] text-slate-500">
+                    <Badge variant="outline" size="sm" className="text-[10px] text-fg-muted">
                       ARCHIVED
                     </Badge>
                   </div>
 
-                  <p className="text-xs text-slate-500 pl-6">
+                  <p className="text-xs text-fg-muted pl-6">
                     {record.blacklistReason || 'Soft-deleted from operational view'}
                   </p>
 
-                  <div className="text-[10px] text-slate-400 pl-6 flex items-center gap-2">
+                  <div className="text-[10px] text-fg-subtle pl-6 flex items-center gap-2">
                     <span>Archived: {new Date(record.updatedAt).toLocaleString()}</span>
                     <span>•</span>
                     <span>By: {record.updatedBy || 'admin'}</span>
@@ -274,7 +274,7 @@ export function UniversalArchiveDrawer({
                     size="sm"
                     disabled={isRestoring === record.entityId}
                     onClick={() => handleRestore(record)}
-                    className="text-xs font-bold bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 transition-colors"
+                    className="text-xs font-bold bg-surface-card hover:bg-status-success-bg hover:text-status-success-fg hover:border-status-success-border transition-colors"
                   >
                     {isRestoring === record.entityId ? (
                       <SpinnerIcon className="w-3.5 h-3.5 animate-spin text-emerald-600" />
@@ -290,7 +290,7 @@ export function UniversalArchiveDrawer({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 text-right">
+        <div className="p-4 border-t border-border-subtle bg-surface-subtle text-right">
           <Button variant="outline" size="sm" onClick={onClose} className="font-bold text-xs">
             Close Archive Drawer
           </Button>

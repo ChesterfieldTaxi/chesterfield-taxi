@@ -43,8 +43,8 @@ export function AdminInvoicingSubpage({
     <div className="space-y-5">
       {/* ─── Clean Sub-Tab Utility Bar for Corporate Billing ─── */}
       {activeSub === 'accounts' && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-white p-3 sm:px-4 sm:py-2.5 rounded-2xl border border-slate-200/90 shadow-xs">
-          <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-surface-card p-3 sm:px-4 sm:py-2.5 rounded-2xl border border-border-subtle/90 shadow-xs">
+          <div className="text-xs font-bold text-fg-secondary flex items-center gap-2">
             <BuildingIcon className="w-4 h-4 text-blue-600 shrink-0" />
             <span>Corporate Financial &amp; Credit Terms ({actions.corporateAccounts.length} clients)</span>
           </div>
@@ -55,7 +55,7 @@ export function AdminInvoicingSubpage({
               variant="outline"
               size="sm"
               onClick={() => actions.setIsCsvModalOpen(true)}
-              leftIcon={<DownloadIcon className="w-4 h-4 text-slate-600" />}
+              leftIcon={<DownloadIcon className="w-4 h-4 text-fg-secondary" />}
               className="text-xs font-semibold justify-center"
             >
               Import CSV

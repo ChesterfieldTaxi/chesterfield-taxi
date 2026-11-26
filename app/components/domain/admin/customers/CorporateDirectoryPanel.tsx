@@ -160,7 +160,7 @@ export function CorporateDirectoryPanel({
       <CorporateGovernanceCard settings={settings} onSave={onSave} />
 
       {/* ─── Search & PO Filter Toolbar ─── */}
-      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
+      <div className="bg-surface-card p-3 sm:p-4 rounded-2xl border border-border-subtle/90 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-1 min-w-0">
           <div className="relative w-full sm:w-64 lg:w-80">
             <input
@@ -171,7 +171,7 @@ export function CorporateDirectoryPanel({
                 setCorpSearchTerm(e.target.value);
                 setCorpPage(1);
               }}
-              className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              className="w-full pl-3 pr-8 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs text-fg-strong placeholder-fg-subtle focus:bg-surface-card focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             />
             {corpSearchTerm && (
               <button
@@ -181,14 +181,14 @@ export function CorporateDirectoryPanel({
                   setCorpPage(1);
                 }}
                 aria-label="Clear corporate search"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-secondary cursor-pointer"
               >
                 <XIcon className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
-          <div className="grid grid-cols-3 sm:inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold w-full sm:w-auto">
+          <div className="grid grid-cols-3 sm:inline-flex bg-surface-muted p-1 rounded-xl border border-border-subtle text-xs font-semibold w-full sm:w-auto">
             {(['all', 'po_enforced', 'po_disabled'] as const).map((mode) => (
               <button
                 key={mode}
@@ -199,8 +199,8 @@ export function CorporateDirectoryPanel({
                 }}
                 className={`px-2.5 py-1.5 sm:py-1 rounded-lg transition-colors text-center whitespace-nowrap cursor-pointer ${
                   corpFilter === mode
-                    ? 'bg-white text-slate-900 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-surface-card text-fg-primary shadow-xs font-bold'
+                    : 'text-fg-secondary hover:text-fg-primary'
                 }`}
               >
                 {mode === 'all' && `All (${activeCorporateClients.length})`}
@@ -250,13 +250,13 @@ export function CorporateDirectoryPanel({
           return (
             <Card
               key={corp.id}
-              className="border border-slate-200/90 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all"
+              className="border border-border-subtle/90 shadow-xs flex flex-col justify-between hover:border-border-strong transition-all"
             >
               <div>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <CardTitle className="text-sm font-black text-slate-900 line-clamp-1">
+                      <CardTitle className="text-sm font-black text-fg-primary line-clamp-1">
                         {corp.companyName}
                       </CardTitle>
                       <CardDescription className="text-xs font-mono font-bold text-blue-600">
@@ -273,7 +273,7 @@ export function CorporateDirectoryPanel({
                           <button
                             type="button"
                             onClick={() => onEditCorporate(corp)}
-                            className="p-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                            className="p-1 rounded-lg text-fg-subtle hover:text-blue-600 hover:bg-status-info-bg transition-colors cursor-pointer"
                             title="Edit Corporate Directory Profile"
                           >
                             <EditIcon className="w-3.5 h-3.5" />
@@ -282,7 +282,7 @@ export function CorporateDirectoryPanel({
                             <button
                               type="button"
                               onClick={() => void openArchiveModal(corp)}
-                              className="p-1 rounded-lg text-slate-400 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+                              className="p-1 rounded-lg text-fg-subtle hover:text-status-warning-fg hover:bg-status-warning-bg transition-colors cursor-pointer"
                               title="Archive Corporate Account"
                             >
                               <ArchiveBoxIcon className="w-3.5 h-3.5" />
@@ -296,9 +296,9 @@ export function CorporateDirectoryPanel({
 
                 <CardContent className="space-y-2.5 text-xs">
                   {/* PO Security Box */}
-                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+                  <div className="p-2.5 bg-surface-subtle rounded-xl border border-border-subtle/80 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-fg-muted flex items-center gap-1">
                         <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-600" />
                         Authorized PO Number
                       </span>
@@ -311,15 +311,15 @@ export function CorporateDirectoryPanel({
                       </Badge>
                     </div>
 
-                    <div className="flex items-center justify-between bg-white px-2 py-1.5 rounded-lg border border-slate-200">
-                      <span className="font-mono font-bold text-slate-900 text-xs">
+                    <div className="flex items-center justify-between bg-surface-card px-2 py-1.5 rounded-lg border border-border-subtle">
+                      <span className="font-mono font-bold text-fg-primary text-xs">
                         {corp.currentPoNumber || 'None'}
                       </span>
                       {corp.currentPoNumber && (
                         <button
                           type="button"
                           onClick={() => handleCopyPo(corp.currentPoNumber!, corp.id)}
-                          className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 cursor-pointer"
+                          className="text-[10px] text-blue-600 hover:text-status-info-fg font-semibold flex items-center gap-1 cursor-pointer"
                         >
                           {copiedPoId === corp.id ? (
                             <>
@@ -344,7 +344,7 @@ export function CorporateDirectoryPanel({
                           setSelectedPoAccount(corp);
                           setIsRegeneratePoOpen(true);
                         }}
-                        className="text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200 flex-1 py-1 h-auto cursor-pointer"
+                        className="text-[10px] font-bold text-status-warning-fg bg-status-warning-bg hover:bg-status-warning-bg-strong border-status-warning-border flex-1 py-1 h-auto cursor-pointer"
                       >
                         <RefreshCwIcon className="w-3 h-3 mr-1" />
                         Regenerate PO
@@ -355,7 +355,7 @@ export function CorporateDirectoryPanel({
                           size="sm"
                           variant="ghost"
                           onClick={() => onTogglePoRequired(corp)}
-                          className="text-[10px] text-slate-600 hover:text-slate-900 py-1 h-auto px-2 cursor-pointer"
+                          className="text-[10px] text-fg-secondary hover:text-fg-primary py-1 h-auto px-2 cursor-pointer"
                         >
                           {corp.poRequired ? 'Disable PO' : 'Enforce PO'}
                         </Button>
@@ -369,7 +369,7 @@ export function CorporateDirectoryPanel({
                             setSelectedPoAccount(corp);
                             setIsBookingPinOpen(true);
                           }}
-                          className="text-[10px] text-indigo-700 hover:text-indigo-900 py-1 h-auto px-2 cursor-pointer"
+                          className="text-[10px] text-status-staged-fg hover:text-status-staged-fg py-1 h-auto px-2 cursor-pointer"
                         >
                           {corp.bookingPin ? `PIN (${corp.bookingPin.length})` : 'Set PIN'}
                         </Button>
@@ -383,7 +383,7 @@ export function CorporateDirectoryPanel({
                             setSelectedPoAccount(corp);
                             setIsPoHistoryOpen(true);
                           }}
-                          className="text-[10px] text-blue-600 hover:text-blue-800 py-1 h-auto px-2 cursor-pointer"
+                          className="text-[10px] text-blue-600 hover:text-status-info-fg py-1 h-auto px-2 cursor-pointer"
                         >
                           History ({corp.poNumberHistory.length})
                         </Button>
@@ -392,56 +392,56 @@ export function CorporateDirectoryPanel({
                   </div>
 
                   {/* Directory Contact & Saved Assets Summary */}
-                  <div className="p-2.5 bg-slate-50 rounded-xl space-y-1 text-[11px]">
-                    <div className="font-bold text-slate-800 truncate">
+                  <div className="p-2.5 bg-surface-subtle rounded-xl space-y-1 text-[11px]">
+                    <div className="font-bold text-fg-strong truncate">
                       {corp.billingContactName || 'Travel Desk Contact'}
                     </div>
                     <div className="text-blue-600 truncate">{corp.billingContactEmail || 'No email'}</div>
                     {corp.billingContactPhone && (
-                      <div className="text-slate-600 font-mono text-[10px]">{corp.billingContactPhone}</div>
+                      <div className="text-fg-secondary font-mono text-[10px]">{corp.billingContactPhone}</div>
                     )}
                     {corp.billingAddress && (
-                      <div className="text-slate-500 truncate text-[10px] flex items-center gap-1">
-                        <MapPinIcon className="w-3 h-3 text-slate-400 shrink-0" />
+                      <div className="text-fg-muted truncate text-[10px] flex items-center gap-1">
+                        <MapPinIcon className="w-3 h-3 text-fg-subtle shrink-0" />
                         <span className="truncate">{corp.billingAddress}</span>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold text-slate-600">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100">
-                      <UsersIcon className="w-3 h-3 text-slate-500" />
+                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold text-fg-secondary">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-muted">
+                      <UsersIcon className="w-3 h-3 text-fg-muted" />
                       {riderCount} Rider{riderCount === 1 ? '' : 's'}
                     </span>
-                    <span className="px-2 py-0.5 rounded-md bg-slate-100">
+                    <span className="px-2 py-0.5 rounded-md bg-surface-muted">
                       {locCount} Place{locCount === 1 ? '' : 's'}
                     </span>
-                    <span className="px-2 py-0.5 rounded-md bg-slate-100">
+                    <span className="px-2 py-0.5 rounded-md bg-surface-muted">
                       {ccCount} Cost Ctr{ccCount === 1 ? '' : 's'}
                     </span>
                     {mgrCount > 0 && (
-                      <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-bold">
+                      <span className="px-2 py-0.5 rounded-md bg-status-staged-bg text-status-staged-fg font-bold">
                         {mgrCount} Portal Mgr{mgrCount === 1 ? '' : 's'}
                       </span>
                     )}
                   </div>
 
                   {/* Portal Access + Billing & Credit Deep-Link */}
-                  <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                  <div className="pt-2 border-t border-border-faint space-y-1.5">
                     <div className="flex items-center gap-1.5">
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
                         onClick={() => onOpenProvisionModal(corp)}
-                        className="text-[10px] font-bold text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 border-indigo-200 flex-1 py-1.5 h-auto cursor-pointer"
+                        className="text-[10px] font-bold text-status-staged-fg bg-status-staged-bg/70 hover:bg-status-staged-bg-strong border-status-staged-border flex-1 py-1.5 h-auto cursor-pointer"
                       >
                         <UserCheckIcon className="w-3.5 h-3.5 mr-1 shrink-0" />
                         <span>Portal Manager</span>
                       </Button>
                       <Link
                         to={`/app/corporate?accountId=${encodeURIComponent(corp.id)}`}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-indigo-300 bg-white hover:bg-indigo-50 text-[10px] font-bold text-slate-700 hover:text-indigo-700 transition-colors shrink-0"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border-subtle hover:border-status-staged-border bg-surface-card hover:bg-status-staged-bg text-[10px] font-bold text-fg-secondary hover:text-status-staged-fg transition-colors shrink-0"
                         title="Open /app/corporate Travel Desk Portal"
                       >
                         <span>Portal</span>
@@ -451,7 +451,7 @@ export function CorporateDirectoryPanel({
 
                     <Link
                       to={`/app/admin?tab=invoicing&sub=accounts&accountId=${encodeURIComponent(corp.id)}`}
-                      className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50/60 hover:bg-blue-100/70 text-[11px] font-bold text-blue-700 transition-colors"
+                      className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-status-info-border bg-status-info-bg/60 hover:bg-status-info-bg-strong/70 text-[11px] font-bold text-status-info-fg transition-colors"
                     >
                       <CreditCardIcon className="w-3.5 h-3.5 shrink-0" />
                       <span>Billing &amp; Credit &rarr;</span>
@@ -464,8 +464,8 @@ export function CorporateDirectoryPanel({
         })}
 
         {filteredCorp.length === 0 && (
-          <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-slate-200">
-            <p className="text-slate-400 font-medium text-xs">
+          <div className="col-span-full py-12 text-center bg-surface-card rounded-2xl border border-border-subtle">
+            <p className="text-fg-subtle font-medium text-xs">
               No corporate accounts found matching &ldquo;{corpSearchTerm}&rdquo;.
             </p>
           </div>
@@ -474,8 +474,8 @@ export function CorporateDirectoryPanel({
 
       {/* Pagination */}
       {totalCorpPages > 1 && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white px-4 py-3 rounded-2xl border border-slate-200/90 text-xs">
-          <span className="text-slate-500 font-medium text-center sm:text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-surface-card px-4 py-3 rounded-2xl border border-border-subtle/90 text-xs">
+          <span className="text-fg-muted font-medium text-center sm:text-left">
             Showing {(corpPage - 1) * CORP_PAGE_SIZE + 1}–
             {Math.min(corpPage * CORP_PAGE_SIZE, filteredCorp.length)} of {filteredCorp.length} corporate accounts
           </span>
@@ -489,7 +489,7 @@ export function CorporateDirectoryPanel({
             >
               Previous
             </Button>
-            <span className="text-xs font-bold text-slate-700 px-2">
+            <span className="text-xs font-bold text-fg-secondary px-2">
               {corpPage} / {totalCorpPages}
             </span>
             <Button
@@ -558,18 +558,18 @@ export function CorporateDirectoryPanel({
       )}
 
       {archivingCorp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-overlay/50 backdrop-blur-xs p-4">
+          <div className="bg-surface-card rounded-2xl border border-border-subtle shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="px-5 py-4 border-b border-border-faint flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-status-warning-bg-strong text-status-warning-fg flex items-center justify-center">
                   <ArchiveBoxIcon className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-slate-900">
+                  <h3 className="text-sm font-extrabold text-fg-primary">
                     Archive Corporate Account
                   </h3>
-                  <p className="text-[11px] font-mono text-slate-500">
+                  <p className="text-[11px] font-mono text-fg-muted">
                     {archivingCorp.companyName} ({archivingCorp.accountNumber})
                   </p>
                 </div>
@@ -578,7 +578,7 @@ export function CorporateDirectoryPanel({
                 type="button"
                 onClick={closeArchiveModal}
                 disabled={isArchiving}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="p-1 rounded-lg text-fg-subtle hover:text-fg-secondary cursor-pointer"
               >
                 <XIcon className="w-4 h-4" />
               </button>
@@ -586,25 +586,25 @@ export function CorporateDirectoryPanel({
 
             <div className="p-5 space-y-3.5 text-xs">
               {isCheckingExposure ? (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600">
-                  <SpinnerIcon className="w-4 h-4 animate-spin text-slate-500" />
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-surface-subtle border border-border-subtle text-fg-secondary">
+                  <SpinnerIcon className="w-4 h-4 animate-spin text-fg-muted" />
                   <span>Checking open invoices and unbilled rides...</span>
                 </div>
               ) : (
                 archiveExposure?.hasExposure && (
-                  <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 space-y-1.5">
-                    <div className="flex items-center gap-1.5 font-extrabold text-amber-900">
+                  <div className="p-3.5 rounded-xl bg-status-warning-bg border border-status-warning-border text-status-warning-fg space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-extrabold text-status-warning-fg">
                       <AlertTriangleIcon className="w-4 h-4 text-amber-600 shrink-0" />
                       <span>Open Billing Exposure Detected</span>
                     </div>
-                    <ul className="list-disc pl-5 space-y-0.5 text-[11px] text-amber-900">
+                    <ul className="list-disc pl-5 space-y-0.5 text-[11px] text-status-warning-fg">
                       {archiveExposure.openInvoiceCount > 0 && (
                         <li>
                           <strong>{archiveExposure.openInvoiceCount}</strong> open invoice
                           {archiveExposure.openInvoiceCount === 1 ? '' : 's'} totaling{' '}
                           <strong>${archiveExposure.openInvoiceBalance.toFixed(2)}</strong>
                           {archiveExposure.overdueInvoiceCount > 0 && (
-                            <span className="text-rose-700 font-bold">
+                            <span className="text-status-danger-fg font-bold">
                               {' '}
                               ({archiveExposure.overdueInvoiceCount} overdue)
                             </span>
@@ -619,7 +619,7 @@ export function CorporateDirectoryPanel({
                         </li>
                       )}
                     </ul>
-                    <p className="text-[11px] text-amber-800 pt-0.5">
+                    <p className="text-[11px] text-status-warning-fg pt-0.5">
                       Historical trips, invoices, and AR balances will remain intact in Invoicing &amp;
                       Analytics. You can still proceed with archival.
                     </p>
@@ -627,9 +627,9 @@ export function CorporateDirectoryPanel({
                 )
               )}
 
-              <p className="text-slate-600 leading-relaxed">
+              <p className="text-fg-secondary leading-relaxed">
                 Archiving immediately blocks new bookings, public{' '}
-                <code className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">
+                <code className="font-mono text-[11px] bg-surface-muted px-1 py-0.5 rounded">
                   /api/corporate/verify
                 </code>{' '}
                 checks, Dispatch selection, and Corporate Portal access. You can restore this account
@@ -637,7 +637,7 @@ export function CorporateDirectoryPanel({
               </p>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">
+                <label className="font-semibold text-fg-secondary block mb-1">
                   Archive Reason (Optional)
                 </label>
                 <input
@@ -645,12 +645,12 @@ export function CorporateDirectoryPanel({
                   value={archiveReason}
                   onChange={(e) => setArchiveReason(e.target.value)}
                   placeholder="e.g. Contract ended, account consolidated..."
-                  className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                  className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs"
                 />
               </div>
             </div>
 
-            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+            <div className="px-5 py-3.5 bg-surface-subtle border-t border-border-faint flex items-center justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"

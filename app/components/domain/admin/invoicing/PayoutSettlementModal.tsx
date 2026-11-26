@@ -125,26 +125,26 @@ export function PayoutSettlementModal({
       >
         {settlementDraft && (
           <div className="space-y-4 text-xs">
-            <div className="p-3.5 rounded-2xl bg-slate-900 text-white space-y-2">
-              <div className="flex items-center justify-between text-slate-400 text-[11px]">
+            <div className="p-3.5 rounded-2xl bg-surface-header text-white space-y-2">
+              <div className="flex items-center justify-between text-fg-subtle text-[11px]">
                 <span>Gross Base / Share</span>
                 <span className="font-mono text-white">${settlementDraft.grossAmount.toFixed(2)}</span>
               </div>
-              <div className="flex items-center justify-between text-slate-400 text-[11px]">
+              <div className="flex items-center justify-between text-fg-subtle text-[11px]">
                 <span>Pass-Through Tips / Tolls / Bonus</span>
                 <span className="font-mono text-emerald-400">
                   +${settlementDraft.tipsOrBonusAmount.toFixed(2)}
                 </span>
               </div>
               {settlementDraft.deductionsOrPlatformFee > 0 && (
-                <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                <div className="flex items-center justify-between text-fg-subtle text-[11px]">
                   <span>Platform Commission / Prior Settled</span>
                   <span className="font-mono text-amber-300">
                     ${settlementDraft.deductionsOrPlatformFee.toFixed(2)}
                   </span>
                 </div>
               )}
-              <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+              <div className="pt-2 border-t border-border-header flex items-center justify-between">
                 <span className="font-bold text-xs">Authoritative Net Payout</span>
                 <span className="font-mono text-lg font-black text-emerald-400">
                   ${computedNet.toFixed(2)}
@@ -154,7 +154,7 @@ export function PayoutSettlementModal({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Settlement Status</label>
+                <label className="font-bold text-fg-secondary block mb-1">Settlement Status</label>
                 <Select
                   size="sm"
                   value={status}
@@ -166,7 +166,7 @@ export function PayoutSettlementModal({
                 </Select>
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Payment Method</label>
+                <label className="font-bold text-fg-secondary block mb-1">Payment Method</label>
                 <Select
                   size="sm"
                   value={paymentMethod}
@@ -183,39 +183,39 @@ export function PayoutSettlementModal({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Adjustments ($ +/-)</label>
+                <label className="font-bold text-fg-secondary block mb-1">Adjustments ($ +/-)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={adjustments}
                   onChange={(e) => setAdjustments(Number(e.target.value) || 0)}
-                  className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                  className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs font-mono"
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Reference / Check #</label>
+                <label className="font-bold text-fg-secondary block mb-1">Reference / Check #</label>
                 <input
                   type="text"
                   value={referenceNumber}
                   onChange={(e) => setReferenceNumber(e.target.value)}
                   placeholder="ACH-90421 / Chk #1082"
-                  className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                  className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs font-mono"
                 />
               </div>
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">Disbursement Memo</label>
+              <label className="font-bold text-fg-secondary block mb-1">Disbursement Memo</label>
               <input
                 type="text"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Optional memo for QuickBooks General Ledger..."
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs"
               />
             </div>
 
-            <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-[11px] text-blue-800">
+            <div className="p-2.5 rounded-xl bg-status-info-bg border border-status-info-border text-[11px] text-status-info-fg">
               GL Account Mapping:{' '}
               <strong className="font-mono">
                 {resolvePayoutLedgerMapping(settlementDraft.payeeType).accountCode}
@@ -270,20 +270,20 @@ export function PayoutSettlementModal({
         {editingPayee && (
           <div className="space-y-3.5 text-xs">
             <div>
-              <label className="font-bold text-slate-700 block mb-1">Payee / Vendor Name *</label>
+              <label className="font-bold text-fg-secondary block mb-1">Payee / Vendor Name *</label>
               <input
                 type="text"
                 required
                 value={payeeName}
                 onChange={(e) => setPayeeName(e.target.value)}
                 placeholder="e.g. Ritz-Carlton Concierge Desk / Midwest Fleet Care"
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs"
               />
             </div>
 
             <div className="grid grid-cols-3 gap-2.5">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Category</label>
+                <label className="font-bold text-fg-secondary block mb-1">Category</label>
                 <Select
                   size="sm"
                   value={payeeCategory}
@@ -296,7 +296,7 @@ export function PayoutSettlementModal({
                 </Select>
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Rate Type</label>
+                <label className="font-bold text-fg-secondary block mb-1">Rate Type</label>
                 <Select
                   size="sm"
                   value={rateType}
@@ -308,49 +308,49 @@ export function PayoutSettlementModal({
                 </Select>
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Default Rate</label>
+                <label className="font-bold text-fg-secondary block mb-1">Default Rate</label>
                 <input
                   type="number"
                   step="0.5"
                   min="0"
                   value={rateValue}
                   onChange={(e) => setRateValue(Number(e.target.value) || 0)}
-                  className="w-full h-9 px-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono"
+                  className="w-full h-9 px-2.5 bg-surface-card border border-border-strong rounded-xl text-xs font-mono"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Email</label>
+                <label className="font-bold text-fg-secondary block mb-1">Email</label>
                 <input
                   type="email"
                   value={payeeEmail}
                   onChange={(e) => setPayeeEmail(e.target.value)}
                   placeholder="billing@partner.com"
-                  className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                  className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs"
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Phone</label>
+                <label className="font-bold text-fg-secondary block mb-1">Phone</label>
                 <input
                   type="tel"
                   value={payeePhone}
                   onChange={(e) => setPayeePhone(e.target.value)}
                   placeholder="(314) 555-0180"
-                  className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                  className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs"
                 />
               </div>
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">Notes</label>
+              <label className="font-bold text-fg-secondary block mb-1">Notes</label>
               <input
                 type="text"
                 value={payeeNotes}
                 onChange={(e) => setPayeeNotes(e.target.value)}
                 placeholder="Payment instructions, 1099 / W-9 notes..."
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs"
+                className="w-full h-9 px-3 bg-surface-card border border-border-strong rounded-xl text-xs"
               />
             </div>
 
@@ -361,7 +361,7 @@ export function PayoutSettlementModal({
                 onChange={(e) => setPayeeActive(e.target.checked)}
                 className="w-4 h-4 rounded text-blue-600"
               />
-              <span className="font-bold text-slate-800">Active Payee</span>
+              <span className="font-bold text-fg-strong">Active Payee</span>
             </label>
           </div>
         )}

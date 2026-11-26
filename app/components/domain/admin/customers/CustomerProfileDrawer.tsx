@@ -197,7 +197,7 @@ export function CustomerProfileDrawer({
           />
         )}
 
-        <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-slate-200/75 border border-slate-200">
+        <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-surface-emphasis/75 border border-border-subtle">
           {([
             {
               id: 'profile' as const,
@@ -221,7 +221,7 @@ export function CustomerProfileDrawer({
               id: 'governance' as const,
               label: 'Governance',
               count: null,
-              icon: <ShieldIcon className="w-3.5 h-3.5 text-slate-700 shrink-0" />,
+              icon: <ShieldIcon className="w-3.5 h-3.5 text-fg-secondary shrink-0" />,
             },
           ] as const).map((tab) => (
             <button
@@ -230,14 +230,14 @@ export function CustomerProfileDrawer({
               onClick={() => setActiveTab(tab.id)}
               className={`py-1.5 px-2 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer flex items-center justify-center gap-1 ${
                 activeTab === tab.id
-                  ? 'bg-white text-slate-900 shadow-2xs ring-1 ring-slate-200/80'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-surface-card text-fg-primary shadow-2xs ring-1 ring-border-subtle/80'
+                  : 'text-fg-secondary hover:text-fg-primary'
               }`}
             >
               {tab.icon}
               <span>{tab.label}</span>
               {tab.count !== null && tab.count > 0 && (
-                <span className="px-1.5 rounded-full bg-slate-100 text-slate-600 text-[9.5px] font-bold">
+                <span className="px-1.5 rounded-full bg-surface-muted text-fg-secondary text-[9.5px] font-bold">
                   {tab.count}
                 </span>
               )}
@@ -274,16 +274,16 @@ export function CustomerProfileDrawer({
         {activeTab === 'trips' && (
           <div className="space-y-3">
             {(selectedCustomer.corporateAccountName || selectedCustomer.hasInvoicesOrCorporate) && (
-              <div className="p-3 bg-blue-50/50 border border-blue-200/80 rounded-xl flex items-center justify-between gap-2">
+              <div className="p-3 bg-status-info-bg/50 border border-status-info-border/80 rounded-xl flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <span className="text-[10px] font-bold uppercase text-slate-500 block">Corporate / Invoices</span>
-                  <span className="font-bold text-slate-900 truncate block">
+                  <span className="text-[10px] font-bold uppercase text-fg-muted block">Corporate / Invoices</span>
+                  <span className="font-bold text-fg-primary truncate block">
                     {selectedCustomer.corporateAccountName || 'Invoice History Available'}
                   </span>
                 </div>
                 <Link
                   to="/app/admin?tab=invoicing&sub=ledger"
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 font-bold text-[11px] shrink-0"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-card border border-status-info-border text-status-info-fg hover:bg-status-info-bg font-bold text-[11px] shrink-0"
                 >
                   <span>View Invoices &rarr;</span>
                   <ExternalLinkIcon className="w-3 h-3" />
@@ -295,17 +295,17 @@ export function CustomerProfileDrawer({
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between px-0.5">
-                <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+                <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-fg-muted">
                   Recent Trips ({page.visibleTrips.length} of {pastTrips.length})
                 </span>
               </div>
 
               {page.visibleTrips.length === 0 ? (
-                <div className="p-6 text-center bg-white rounded-xl border border-slate-200 text-slate-400 font-medium">
+                <div className="p-6 text-center bg-surface-card rounded-xl border border-border-subtle text-fg-subtle font-medium">
                   No historical trips recorded for this client yet.
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100 bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-2xs">
+                <div className="divide-y divide-border-faint bg-surface-card rounded-xl border border-border-subtle/90 overflow-hidden shadow-2xs">
                   {page.visibleTrips.map((trip) => {
                     const vehicleLabel = formatTripVehicleColumnDisplay(trip, vehicleList, driverList);
                     const fare = Number(trip.pricing?.totalFare || 0).toFixed(2);
@@ -314,20 +314,20 @@ export function CustomerProfileDrawer({
                     return (
                       <div
                         key={trip.id}
-                        className="p-2.5 hover:bg-slate-50/90 transition-colors flex items-center justify-between gap-2.5"
+                        className="p-2.5 hover:bg-surface-subtle/90 transition-colors flex items-center justify-between gap-2.5"
                       >
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <DispatchStatusBadge status={trip.status} trip={trip} compact />
-                            <span className="font-mono font-bold text-[10.5px] text-slate-700">#{shortId}</span>
-                            <span className="font-bold text-slate-800 text-[11px]">
+                            <span className="font-mono font-bold text-[10.5px] text-fg-secondary">#{shortId}</span>
+                            <span className="font-bold text-fg-strong text-[11px]">
                               {formatCompactTripDate(trip)}
                             </span>
-                            <span className="text-[10.5px] font-semibold text-slate-500">· {vehicleLabel}</span>
-                            <span className="font-mono font-extrabold text-slate-900 text-[11px]">· ${fare}</span>
+                            <span className="text-[10.5px] font-semibold text-fg-muted">· {vehicleLabel}</span>
+                            <span className="font-mono font-extrabold text-fg-primary text-[11px]">· ${fare}</span>
                           </div>
 
-                          <div className="flex items-center gap-1 text-[11px] text-slate-600 truncate">
+                          <div className="flex items-center gap-1 text-[11px] text-fg-secondary truncate">
                             <MapPinIcon className="w-3 h-3 text-emerald-600 shrink-0" />
                             <span className="truncate">
                               {trip.pickupLocation?.address || 'Pickup'} &rarr;{' '}
@@ -338,7 +338,7 @@ export function CustomerProfileDrawer({
 
                         <Link
                           to={`/app/dispatch?tripId=${encodeURIComponent(trip.id)}`}
-                          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-blue-50 text-blue-700 font-bold text-[10.5px] border border-blue-200 transition-colors"
+                          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface-card hover:bg-status-info-bg text-status-info-fg font-bold text-[10.5px] border border-status-info-border transition-colors"
                           title="Open trip in Dispatch Console"
                         >
                           <span>Open in Dispatch</span>
@@ -354,7 +354,7 @@ export function CustomerProfileDrawer({
                 <button
                   type="button"
                   onClick={() => setVisibleCount(page.nextVisibleCount)}
-                  className="w-full py-2 rounded-xl bg-white hover:bg-blue-50 text-blue-700 font-extrabold text-xs border border-blue-200 shadow-2xs transition-colors cursor-pointer"
+                  className="w-full py-2 rounded-xl bg-surface-card hover:bg-status-info-bg text-status-info-fg font-extrabold text-xs border border-status-info-border shadow-2xs transition-colors cursor-pointer"
                 >
                   Load More Trips (+{Math.min(CLIENT_TRIPS_PAGE_SIZE, page.remainingCount)})
                 </button>
@@ -377,19 +377,19 @@ export function CustomerProfileDrawer({
         )}
 
         {activeTab === 'governance' && (
-          <section className="bg-white rounded-2xl border border-slate-200/90 p-4 space-y-3">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-              <ShieldIcon className="w-4 h-4 text-slate-600" />
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">Governance</h3>
+          <section className="bg-surface-card rounded-2xl border border-border-subtle/90 p-4 space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-border-faint">
+              <ShieldIcon className="w-4 h-4 text-fg-secondary" />
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-fg-strong">Governance</h3>
             </div>
 
             {selectedCustomer.isBlacklisted && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800">
+              <div className="p-3 bg-status-danger-bg border border-status-danger-border rounded-xl text-status-danger-fg">
                 <div className="font-black flex items-center gap-1.5">
                   <AlertTriangleIcon className="w-3.5 h-3.5 text-rose-600" />
                   <span>BLOCKED CLIENT</span>
                 </div>
-                <p className="text-[11px] text-rose-700 mt-0.5">
+                <p className="text-[11px] text-status-danger-fg mt-0.5">
                   Reason: {selectedCustomer.blacklistReason || 'Blocked by Admin'}
                 </p>
               </div>
@@ -414,8 +414,8 @@ export function CustomerProfileDrawer({
                 }}
                 className={`text-xs font-bold cursor-pointer ${
                   selectedCustomer.isBlacklisted
-                    ? 'text-emerald-700 border-emerald-300'
-                    : 'text-rose-700 border-rose-300'
+                    ? 'text-status-success-fg border-status-success-border'
+                    : 'text-status-danger-fg border-status-danger-border'
                 }`}
               >
                 <span className="inline-flex items-center gap-1.5">
@@ -447,7 +447,7 @@ export function CustomerProfileDrawer({
                   );
                   onGovernanceMutated({ ...selectedCustomer, isArchived: nextArchived });
                 }}
-                className="text-xs font-bold text-slate-700 border-slate-300 cursor-pointer"
+                className="text-xs font-bold text-fg-secondary border-border-strong cursor-pointer"
               >
                 {selectedCustomer.isArchived ? 'Unarchive' : 'Archive'}
               </Button>
@@ -458,7 +458,7 @@ export function CustomerProfileDrawer({
                   variant="outline"
                   size="sm"
                   onClick={() => setConfirmPurge((v) => !v)}
-                  className="text-xs font-bold text-rose-700 border-rose-300 bg-rose-50 hover:bg-rose-100 cursor-pointer"
+                  className="text-xs font-bold text-status-danger-fg border-status-danger-border bg-status-danger-bg hover:bg-status-danger-bg-strong cursor-pointer"
                 >
                   <span className="inline-flex items-center gap-1.5">
                     <TrashIcon className="w-3.5 h-3.5" />
@@ -469,8 +469,8 @@ export function CustomerProfileDrawer({
             </div>
 
             {confirmPurge && selectedCustomer.isBlacklisted && onPurgeCustomer && (
-              <div className="p-3 rounded-xl bg-rose-50/80 border border-rose-200 space-y-2">
-                <p className="text-[11px] font-semibold text-rose-800">
+              <div className="p-3 rounded-xl bg-status-danger-bg/80 border border-status-danger-border space-y-2">
+                <p className="text-[11px] font-semibold text-status-danger-fg">
                   Purging removes saved contact PII and hides this passenger from the directory while keeping
                   historical trip records intact.
                 </p>
@@ -481,7 +481,7 @@ export function CustomerProfileDrawer({
                     size="sm"
                     disabled={isPurging}
                     onClick={() => setConfirmPurge(false)}
-                    className="text-xs font-bold text-slate-600 border-slate-300 cursor-pointer"
+                    className="text-xs font-bold text-fg-secondary border-border-strong cursor-pointer"
                   >
                     Cancel
                   </Button>
@@ -508,13 +508,13 @@ export function CustomerProfileDrawer({
             )}
 
             {showBlacklistInput && !selectedCustomer.isBlacklisted && (
-              <div className="p-3 rounded-xl bg-rose-50/80 border border-rose-200 space-y-2">
+              <div className="p-3 rounded-xl bg-status-danger-bg/80 border border-status-danger-border space-y-2">
                 <input
                   type="text"
                   value={blacklistReasonDraft}
                   onChange={(e) => setBlacklistReasonDraft(e.target.value)}
                   placeholder="Reason for blacklisting..."
-                  className="w-full px-3 py-2 text-xs bg-white border border-rose-300 rounded-lg"
+                  className="w-full px-3 py-2 text-xs bg-surface-card border border-status-danger-border rounded-lg"
                 />
                 <div className="flex justify-end gap-2">
                   <Button

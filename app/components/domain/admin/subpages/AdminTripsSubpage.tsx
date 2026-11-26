@@ -48,7 +48,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
       {ctrl.activeSub === 'standing-orders' ? (
         <Suspense
           fallback={
-            <div className="p-12 bg-white rounded-2xl border border-slate-200 flex items-center justify-center gap-2 text-xs text-slate-500">
+            <div className="p-12 bg-surface-card rounded-2xl border border-border-subtle flex items-center justify-center gap-2 text-xs text-fg-muted">
               <SpinnerIcon className="w-5 h-5 animate-spin text-blue-600" />
               <span>Loading Standing Orders Series Manager...</span>
             </div>
@@ -64,28 +64,28 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
       ) : (
         <>
           {/* Unified Trips Toolbar */}
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white px-4 py-3 rounded-2xl border border-slate-200/90 shadow-xs">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-surface-card px-4 py-3 rounded-2xl border border-border-subtle/90 shadow-xs">
             <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
               <div className="w-full sm:w-72 relative">
-                <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <SearchIcon className="w-4 h-4 text-fg-subtle absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Search passenger, phone, address, trip ID..."
                   value={ctrl.searchTerm}
                   onChange={(e) => ctrl.setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white outline-hidden"
+                  className="w-full pl-9 pr-3 py-2 bg-surface-subtle border border-border-subtle rounded-xl text-xs focus:bg-surface-card outline-hidden"
                 />
               </div>
 
               {(ctrl.activeSub === 'dispatch' || ctrl.activeSub === 'exceptions') && (
-                <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-0.5 text-[11px]">
+                <div className="inline-flex rounded-xl border border-border-subtle bg-surface-subtle p-0.5 text-[11px]">
                   <button
                     type="button"
                     onClick={() => ctrl.setAssignMode('send_to_driver')}
                     className={`px-2.5 py-1 rounded-lg font-extrabold cursor-pointer transition-colors ${
                       ctrl.assignMode === 'send_to_driver'
                         ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
+                        : 'text-fg-secondary hover:text-fg-primary'
                     }`}
                   >
                     Send to Driver
@@ -96,7 +96,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                     className={`px-2.5 py-1 rounded-lg font-extrabold cursor-pointer transition-colors ${
                       ctrl.assignMode === 'stage_hold'
                         ? 'bg-indigo-600 text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
+                        : 'text-fg-secondary hover:text-fg-primary'
                     }`}
                   >
                     📌 Hold (Stage)
@@ -123,7 +123,7 @@ export function AdminTripsSubpage({ initialSubTab = 'dispatch' }: AdminTripsSubp
                     size="sm"
                     checked={ctrl.includeArchivedInHistory}
                     onChange={(checked) => ctrl.setIncludeArchivedInHistory(checked)}
-                    label={<span className="text-xs font-semibold text-slate-700">Include Archived</span>}
+                    label={<span className="text-xs font-semibold text-fg-secondary">Include Archived</span>}
                     className="w-auto!"
                   />
                 </>

@@ -230,12 +230,12 @@ export function RatesPanel({
   const currentCancel = workingCopy?.cancellationPolicy || DEFAULT_RATE_CANCELLATION_POLICY;
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-[620px] border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
+    <div className="flex flex-col lg:flex-row min-h-[620px] border border-border-subtle rounded-xl overflow-hidden bg-surface-card shadow-xs">
       {/* Left Sidebar: Service Rates List */}
-      <div className="w-full lg:w-72 border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col bg-slate-50/80 shrink-0">
-        <div className="p-3.5 border-b border-slate-200 space-y-2.5 bg-white">
+      <div className="w-full lg:w-72 border-b lg:border-b-0 lg:border-r border-border-subtle flex flex-col bg-surface-subtle/80 shrink-0">
+        <div className="p-3.5 border-b border-border-subtle space-y-2.5 bg-surface-card">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <h3 className="text-xs font-bold text-fg-strong uppercase tracking-wider flex items-center gap-1.5">
               <DollarSignIcon className="w-3.5 h-3.5 text-blue-600" />
               Service Rates ({tariffs.length})
             </h3>
@@ -251,13 +251,13 @@ export function RatesPanel({
           </div>
 
           <div className="relative">
-            <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
+            <SearchIcon className="w-3.5 h-3.5 absolute left-2.5 top-2 text-fg-subtle" />
             <Input
               type="text"
               placeholder="Search rates..."
               value={searchQuery}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
-              className="h-7.5 text-xs pl-7.5 bg-white border-slate-200 text-slate-800 w-full"
+              className="h-7.5 text-xs pl-7.5 bg-surface-card border-border-subtle text-fg-strong w-full"
             />
           </div>
         </div>
@@ -283,30 +283,30 @@ export function RatesPanel({
                 onClick={() => handleSelectTariff(t.id)}
                 className={`w-full text-left p-3 rounded-xl border transition-all cursor-pointer ${
                   isSelected
-                    ? 'bg-blue-50/90 border-blue-400 shadow-2xs'
-                    : 'bg-white border-slate-200 hover:border-slate-300'
+                    ? 'bg-status-info-bg/90 border-blue-400 shadow-2xs'
+                    : 'bg-surface-card border-border-subtle hover:border-border-strong'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <span
                     className={`text-xs font-bold leading-tight ${
-                      isSelected ? 'text-blue-950' : 'text-slate-900'
+                      isSelected ? 'text-status-info-fg' : 'text-fg-primary'
                     }`}
                   >
                     {t.name}
                   </span>
                   <Badge
                     variant="outline"
-                    className="text-[9px] px-1.5 py-0 border-slate-200 bg-slate-50 text-slate-600 shrink-0 font-bold"
+                    className="text-[9px] px-1.5 py-0 border-border-subtle bg-surface-subtle text-fg-secondary shrink-0 font-bold"
                   >
                     {modelBadge}
                   </Badge>
                 </div>
 
-                <p className="text-[11px] text-slate-500 font-mono truncate">{summaryLine}</p>
+                <p className="text-[11px] text-fg-muted font-mono truncate">{summaryLine}</p>
 
-                <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100">
-                  <span className="text-[10px] text-slate-400">
+                <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-border-faint">
+                  <span className="text-[10px] text-fg-subtle">
                     {t.rounding?.fareMode === 'exact_cents'
                       ? 'Exact cents'
                       : t.rounding?.fareMode === 'nearest_half_dollar'
@@ -317,13 +317,13 @@ export function RatesPanel({
                   </span>
                   <div className="flex items-center gap-1.5">
                     {t.isDefault && (
-                      <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                      <span className="text-[9px] font-bold bg-status-success-bg-strong text-status-success-fg px-1.5 py-0.5 rounded">
                         Default
                       </span>
                     )}
                     <span
                       className={`inline-block w-2 h-2 rounded-full ${
-                        t.isActive ? 'bg-emerald-500' : 'bg-slate-300'
+                        t.isActive ? 'bg-emerald-500' : 'bg-surface-strong'
                       }`}
                     />
                   </div>
@@ -335,35 +335,35 @@ export function RatesPanel({
       </div>
 
       {/* Main Editor Pane */}
-      <div className="flex-1 flex flex-col bg-white overflow-y-auto custom-scrollbar min-w-0">
+      <div className="flex-1 flex flex-col bg-surface-card overflow-y-auto custom-scrollbar min-w-0">
         {workingCopy ? (
           <div className="p-5 space-y-5">
             {/* Sticky-feeling Header & Action Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border-subtle">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg font-bold text-slate-950">{workingCopy.name}</h2>
-                  <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  <h2 className="text-lg font-bold text-fg-primary">{workingCopy.name}</h2>
+                  <span className="text-[11px] font-mono text-fg-muted bg-surface-muted px-2 py-0.5 rounded border border-border-subtle">
                     {workingCopy.id}
                   </span>
                   {isDirty && (
                     <Badge
                       variant="warning"
                       size="sm"
-                      className="text-[10px] bg-amber-100 text-amber-800 border-amber-300"
+                      className="text-[10px] bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border"
                     >
                       Unsaved Draft
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-fg-muted mt-1">
                   Base fare formula, rounding settings, and no-show or cancellation fees. Zone rules and surcharges are managed in <strong>Pricing Rules</strong>.
                 </p>
               </div>
 
               <div className="flex items-center gap-2 shrink-0 flex-wrap">
                 {saveSuccessMsg && (
-                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1">
+                  <span className="text-xs font-semibold text-status-success-fg bg-status-success-bg px-2.5 py-1 rounded-lg border border-status-success-border flex items-center gap-1">
                     <CheckIcon className="w-3.5 h-3.5" />
                     {saveSuccessMsg}
                   </span>
@@ -375,7 +375,7 @@ export function RatesPanel({
                     variant="outline"
                     size="sm"
                     onClick={() => setConfirmDeleteId(workingCopy.id)}
-                    className="h-8 text-xs border-rose-200 text-rose-700 hover:bg-rose-50 bg-white cursor-pointer"
+                    className="h-8 text-xs border-status-danger-border text-status-danger-fg hover:bg-status-danger-bg bg-surface-card cursor-pointer"
                   >
                     <TrashIcon className="w-3.5 h-3.5 mr-1" />
                     Delete
@@ -383,8 +383,8 @@ export function RatesPanel({
                 )}
 
                 {confirmDeleteId === workingCopy.id && (
-                  <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1">
-                    <span className="text-[11px] font-semibold text-rose-800">Delete rate?</span>
+                  <div className="flex items-center gap-1.5 bg-status-danger-bg border border-status-danger-border rounded-lg px-2 py-1">
+                    <span className="text-[11px] font-semibold text-status-danger-fg">Delete rate?</span>
                     <Button
                       type="button"
                       size="sm"
@@ -398,7 +398,7 @@ export function RatesPanel({
                       variant="outline"
                       size="sm"
                       onClick={() => setConfirmDeleteId(null)}
-                      className="h-6 px-2 text-[11px] bg-white"
+                      className="h-6 px-2 text-[11px] bg-surface-card"
                     >
                       Cancel
                     </Button>
@@ -411,7 +411,7 @@ export function RatesPanel({
                   size="sm"
                   disabled={!isDirty}
                   onClick={() => selectedTariff && setWorkingCopy(JSON.parse(JSON.stringify(selectedTariff)))}
-                  className="h-8 text-xs border-slate-300 bg-white text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  className="h-8 text-xs border-border-strong bg-surface-card text-fg-secondary hover:bg-surface-subtle cursor-pointer"
                 >
                   Discard
                 </Button>
@@ -430,21 +430,21 @@ export function RatesPanel({
             </div>
 
             {/* 1. Identity, Calculation Model & Default Flag */}
-            <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 space-y-3.5">
+            <div className="p-4 rounded-xl bg-surface-subtle/80 border border-border-subtle space-y-3.5">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Rate Name</label>
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">Rate Name</label>
                   <Input
                     type="text"
                     value={workingCopy.name}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setWorkingCopy({ ...workingCopy, name: e.target.value })
                     }
-                    className="bg-white border-slate-300 text-slate-900 h-8 text-xs font-semibold"
+                    className="bg-surface-card border-border-strong text-fg-primary h-8 text-xs font-semibold"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Calculation Model</label>
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">Calculation Model</label>
                   <Select
                     size="sm"
                     value={workingCopy.rateModel || 'taximeter'}
@@ -459,36 +459,36 @@ export function RatesPanel({
                   </Select>
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">Description</label>
+                  <label className="text-[11px] font-semibold text-fg-secondary block mb-1">Description</label>
                   <Input
                     type="text"
                     value={workingCopy.description || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setWorkingCopy({ ...workingCopy, description: e.target.value })
                     }
-                    className="bg-white border-slate-300 text-slate-900 h-8 text-xs"
+                    className="bg-surface-card border-border-strong text-fg-primary h-8 text-xs"
                   />
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-200/80">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-border-subtle/80">
                 <div className="flex flex-wrap items-center gap-5 text-xs">
-                  <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                  <label className="flex items-center gap-2 cursor-pointer text-fg-secondary font-medium">
                     <input
                       type="checkbox"
                       checked={workingCopy.isActive}
                       onChange={(e) => setWorkingCopy({ ...workingCopy, isActive: e.target.checked })}
-                      className="rounded border-slate-300 text-blue-600 focus:ring-0"
+                      className="rounded border-border-strong text-blue-600 focus:ring-0"
                     />
                     <span>Active Rate</span>
                   </label>
 
-                  <label className="flex items-center gap-2 cursor-pointer text-slate-700 font-medium">
+                  <label className="flex items-center gap-2 cursor-pointer text-fg-secondary font-medium">
                     <input
                       type="checkbox"
                       checked={Boolean(workingCopy.isDefault)}
                       onChange={(e) => setWorkingCopy({ ...workingCopy, isDefault: e.target.checked })}
-                      className="rounded border-slate-300 text-emerald-600 focus:ring-0"
+                      className="rounded border-border-strong text-emerald-600 focus:ring-0"
                     />
                     <span>Default Rate (used when no Rule selects another Rate)</span>
                   </label>
@@ -496,20 +496,20 @@ export function RatesPanel({
 
                 {/* Linked Rules Cross-Reference */}
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] font-semibold text-slate-500">Routed by Rules:</span>
+                  <span className="text-[11px] font-semibold text-fg-muted">Routed by Rules:</span>
                   {linkedRules.length > 0 ? (
                     linkedRules.map((r) => (
                       <button
                         key={r.id}
                         type="button"
                         onClick={() => onNavigateToRule?.(r.id)}
-                        className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100 transition-colors cursor-pointer"
+                        className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-status-staged-bg text-status-staged-fg border border-status-staged-border hover:bg-status-staged-bg-strong transition-colors cursor-pointer"
                       >
                         P{r.priority} · {r.name}
                       </button>
                     ))
                   ) : (
-                    <span className="text-[11px] text-slate-400 italic">
+                    <span className="text-[11px] text-fg-subtle italic">
                       {workingCopy.isDefault ? 'Default fallback for all rides' : 'None yet (assign in Rules tab)'}
                     </span>
                   )}
@@ -570,18 +570,18 @@ export function RatesPanel({
             </div>
 
             {/* 3. Per-Rate Rounding Settings */}
-            <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2.5">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <div className="p-4 rounded-xl bg-surface-card border border-border-subtle shadow-2xs space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-border-faint pb-2.5">
+                <h3 className="text-xs font-bold text-fg-strong uppercase tracking-wider flex items-center gap-2">
                   <SlidersIcon className="w-4 h-4 text-blue-600 shrink-0" />
                   <span>Rounding Settings</span>
                 </h3>
-                <span className="text-[11px] text-slate-500">Applies specifically to trips billed on this Rate</span>
+                <span className="text-[11px] text-fg-muted">Applies specifically to trips billed on this Rate</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">Distance Rounding</label>
+                  <label className="text-xs font-medium text-fg-secondary block mb-1">Distance Rounding</label>
                   <Select
                     size="sm"
                     value={currentRounding.distanceMode}
@@ -599,13 +599,13 @@ export function RatesPanel({
                     <option value="half_mile_up">Round Up to Next 0.5 Mile</option>
                     <option value="whole_mile_up">Round Up to Next Whole Mile (1.0 mi)</option>
                   </Select>
-                  <p className="text-[11px] text-slate-500 mt-1">
+                  <p className="text-[11px] text-fg-muted mt-1">
                     Controls whether route mileage is rounded before applying distance steps.
                   </p>
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">Final Fare Rounding</label>
+                  <label className="text-xs font-medium text-fg-secondary block mb-1">Final Fare Rounding</label>
                   <Select
                     size="sm"
                     value={currentRounding.fareMode}
@@ -624,7 +624,7 @@ export function RatesPanel({
                     <option value="nearest_half_dollar">Round to Nearest $0.50</option>
                     <option value="exact_cents">Exact Cents ($0.01 — no rounding)</option>
                   </Select>
-                  <p className="text-[11px] text-slate-500 mt-1">
+                  <p className="text-[11px] text-fg-muted mt-1">
                     Applied once at the end of the quote after extras, surcharges, and discounts.
                   </p>
                 </div>
@@ -632,18 +632,18 @@ export function RatesPanel({
             </div>
 
             {/* 4. Per-Rate No-Show & Late Cancellation Policy */}
-            <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2.5">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <div className="p-4 rounded-xl bg-surface-card border border-border-subtle shadow-2xs space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-border-faint pb-2.5">
+                <h3 className="text-xs font-bold text-fg-strong uppercase tracking-wider flex items-center gap-2">
                   <ShieldCheckIcon className="w-4 h-4 text-rose-600 shrink-0" />
                   <span>No-Show &amp; Late Cancellation Policy</span>
                 </h3>
-                <span className="text-[11px] text-slate-500">Protection fees tied to this Rate</span>
+                <span className="text-[11px] text-fg-muted">Protection fees tied to this Rate</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                  <label className="text-xs font-medium text-fg-secondary block mb-1">
                     Free Cancellation Window (min)
                   </label>
                   <Input
@@ -660,15 +660,15 @@ export function RatesPanel({
                         },
                       })
                     }
-                    className="bg-white border-slate-300 text-slate-900 h-9 text-xs font-semibold"
+                    className="bg-surface-card border-border-strong text-fg-primary h-9 text-xs font-semibold"
                   />
-                  <span className="text-[11px] text-slate-500 mt-1 block">
+                  <span className="text-[11px] text-fg-muted mt-1 block">
                     Minutes before scheduled pickup (e.g., 60 min)
                   </span>
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                  <label className="text-xs font-medium text-fg-secondary block mb-1">
                     Late Cancellation Fee ($)
                   </label>
                   <Input
@@ -685,15 +685,15 @@ export function RatesPanel({
                         },
                       })
                     }
-                    className="bg-white border-slate-300 text-rose-800 h-9 text-xs font-bold"
+                    className="bg-surface-card border-border-strong text-status-danger-fg h-9 text-xs font-bold"
                   />
-                  <span className="text-[11px] text-slate-500 mt-1 block">
+                  <span className="text-[11px] text-fg-muted mt-1 block">
                     Charged if canceled inside the free window
                   </span>
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-slate-700 block mb-1">
+                  <label className="text-xs font-medium text-fg-secondary block mb-1">
                     Passenger No-Show Fee ($)
                   </label>
                   <Input
@@ -710,9 +710,9 @@ export function RatesPanel({
                         },
                       })
                     }
-                    className="bg-white border-slate-300 text-rose-800 h-9 text-xs font-bold"
+                    className="bg-surface-card border-border-strong text-status-danger-fg h-9 text-xs font-bold"
                   />
-                  <span className="text-[11px] text-slate-500 mt-1 block">
+                  <span className="text-[11px] text-fg-muted mt-1 block">
                     Charged when passenger fails to appear at pickup
                   </span>
                 </div>
@@ -720,7 +720,7 @@ export function RatesPanel({
             </div>
 
             {!workingCopy.isDefault && linkedRules.length === 0 && (
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+              <div className="p-3 rounded-xl bg-status-warning-bg border border-status-warning-border text-xs text-status-warning-fg flex items-start gap-2">
                 <AlertTriangleIcon className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <span>
                   This Rate is not set as Default and no Rule currently routes to it. Create a Rule in{' '}
@@ -730,7 +730,7 @@ export function RatesPanel({
             )}
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-400 text-sm p-12">
+          <div className="flex-1 flex items-center justify-center text-fg-subtle text-sm p-12">
             Select a Rate from the left panel or click &ldquo;+ New Rate&rdquo;
           </div>
         )}

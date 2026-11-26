@@ -101,10 +101,10 @@ export function CompanyProfilePanel({
   return (
     <form onSubmit={handleSave} className="space-y-6">
       {/* Contextual Top Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-3 sm:px-4 sm:py-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-surface-card p-3 sm:px-4 sm:py-2.5 rounded-2xl border border-border-subtle/80 shadow-xs">
         <div className="flex items-center gap-2 min-w-0">
           <BuildingIcon className="w-4 h-4 text-blue-600 shrink-0" />
-          <span className="text-xs font-bold text-slate-700 truncate">
+          <span className="text-xs font-bold text-fg-secondary truncate">
             Company Identity, Dispatch Contacts &amp; Operating Hours
           </span>
         </div>
@@ -134,13 +134,13 @@ export function CompanyProfilePanel({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left: Official Business Credentials */}
         <div className="lg:col-span-7">
-          <Card variant="elevated" className="border-slate-200 shadow-xs">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50">
-              <CardTitle className="text-base text-slate-900 flex items-center gap-2">
+          <Card variant="elevated" className="border-border-subtle shadow-xs">
+            <CardHeader className="border-b border-border-faint bg-surface-subtle/50">
+              <CardTitle className="text-base text-fg-primary flex items-center gap-2">
                 <BuildingIcon className="w-4 h-4 text-blue-600" />
                 Company Details &amp; Legal Identity
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
+              <CardDescription className="text-xs text-fg-muted">
                 Rendered on corporate invoices, passenger email receipts, /track pages, and public footer.
               </CardDescription>
             </CardHeader>
@@ -215,12 +215,12 @@ export function CompanyProfilePanel({
                   placeholder={COMPANY_CONFIG.address.formatted}
                   required
                 />
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-fg-muted">
                   <span>
                     Displayed on Contact &amp; Support page, structured LocalBusiness JSON-LD, receipts, and Dispatch HQ Map Pin.
                   </span>
                   {company.headquartersCoordinates && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900 text-amber-300 font-mono text-[10px] font-bold">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-header text-amber-300 font-mono text-[10px] font-bold">
                       HQ Pin: {company.headquartersCoordinates.lat.toFixed(4)},{' '}
                       {company.headquartersCoordinates.lng.toFixed(4)}
                     </span>
@@ -228,7 +228,7 @@ export function CompanyProfilePanel({
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="bg-slate-50/50 px-5 py-3.5 border-t border-slate-100 flex justify-end">
+            <CardFooter className="bg-surface-subtle/50 px-5 py-3.5 border-t border-border-faint flex justify-end">
               <Button
                 type="submit"
                 variant="primary"
@@ -244,15 +244,15 @@ export function CompanyProfilePanel({
 
         {/* Right: Operating Hours & Advance Booking Horizon */}
         <div className="lg:col-span-5">
-          <Card variant="elevated" className="border-slate-200 shadow-xs">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50">
+          <Card variant="elevated" className="border-border-subtle shadow-xs">
+            <CardHeader className="border-b border-border-faint bg-surface-subtle/50">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <CardTitle className="text-base text-slate-900 flex items-center gap-2">
+                  <CardTitle className="text-base text-fg-primary flex items-center gap-2">
                     <ClockIcon className="w-4 h-4 text-amber-500 shrink-0" />
                     Operating Hours &amp; Horizon
                   </CardTitle>
-                  <CardDescription className="text-xs text-slate-500">
+                  <CardDescription className="text-xs text-fg-muted">
                     Public schedule label and advance reservation ceiling.
                   </CardDescription>
                 </div>
@@ -266,12 +266,12 @@ export function CompanyProfilePanel({
               </div>
             </CardHeader>
             <CardContent className="p-5 sm:p-6 space-y-4">
-              <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200">
+              <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-status-success-bg/60 border border-status-success-border">
                 <div className="min-w-0">
-                  <h4 className="text-xs font-extrabold text-slate-900">
+                  <h4 className="text-xs font-extrabold text-fg-primary">
                     24/7 Continuous Operations
                   </h4>
-                  <p className="text-[11px] text-slate-600 mt-0.5">
+                  <p className="text-[11px] text-fg-secondary mt-0.5">
                     Dispatchers and drivers operate round-the-clock for early STL &amp; SUS flights.
                   </p>
                 </div>
@@ -284,7 +284,7 @@ export function CompanyProfilePanel({
                     }
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600" />
+                  <div className="w-11 h-6 bg-surface-emphasis peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-card after:border-border-strong after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600" />
                 </label>
               </div>
 
