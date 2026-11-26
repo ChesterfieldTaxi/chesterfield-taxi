@@ -106,6 +106,7 @@ export interface TripLocation {
   address: string;
   formattedAddress?: string;
   placeId?: string;
+  zipCode?: string;
   coordinates?: GeoPoint;
   unitOrApt?: string;
   notes?: string;
