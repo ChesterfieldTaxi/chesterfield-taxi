@@ -18,7 +18,7 @@ import {
 import type { CorporateUnbilledTransaction } from '../types/invoicing';
 import { getAdminConfigService } from './config/admin-config.service';
 import { isFirebaseConfigured, getFirestoreDb } from './firebase';
-import { deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteField, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
 import { sanitizePayload } from './firestore-sanitizer';
 import { getInvoicingService } from './invoicing.service';
 
@@ -280,7 +280,49 @@ export async function hashCorporateLookupValue(raw: string): Promise<string> {
   return `${(h1 >>> 0).toString(16).padStart(8, '0')}${(h2 >>> 0).toString(16).padStart(8, '0')}`;
 }
 
+const CORP_ACCOUNTS_CACHE_KEY = 'chesterfield_corporate_accounts_cache';
+
 export class CorporateAccountService {
+  public getCachedCorporateAccounts(): CorporateAccountConfig[] {
+    if (typeof window === 'undefined' || !window.localStorage) return [];
+    try {
+      const raw = window.localStorage.getItem(CORP_ACCOUNTS_CACHE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? (parsed as CorporateAccountConfig[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  public cacheCorporateAccounts(accounts: ReadonlyArray<CorporateAccountConfig>): void {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(CORP_ACCOUNTS_CACHE_KEY, JSON.stringify(accounts));
+    } catch {
+      // Ignore storage quota warnings
+    }
+  }
+
+  public async syncAllCorporateAccountsFromFirestore(): Promise<CorporateAccountConfig[]> {
+    if (!isFirebaseConfigured()) return this.getCachedCorporateAccounts();
+    try {
+      const db = getFirestoreDb();
+      const snap = await getDocs(collection(db, 'corporateAccounts'));
+      const list: CorporateAccountConfig[] = [];
+      snap.forEach((docSnap) => {
+        const data = docSnap.data() as CorporateAccountConfig | undefined;
+        if (!data || !docSnap.id) return;
+        list.push({ ...data, id: data.id || docSnap.id });
+      });
+      if (list.length > 0) {
+        this.cacheCorporateAccounts(list);
+      }
+      return list;
+    } catch {
+      return this.getCachedCorporateAccounts();
+    }
+  }
   /**
    * Generates a collision-resistant, formatted PO number.
    * e.g., "PO-LMG-842910" or "PO-BAY-918234"

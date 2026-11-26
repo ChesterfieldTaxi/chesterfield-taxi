@@ -27,6 +27,10 @@ import {
 
 export type { CustomersSubTab, AdminCustomersSubpageProps };
 
+const DIRECTORY_SYNC_TTL_MS = 60_000;
+let lastDirectorySyncAtMs = 0;
+let cachedDirectoryTrips: Trip[] | null = null;
+
 export function AdminCustomersSubpage({
   settings,
   initialSubTab = 'directory',
@@ -35,13 +39,23 @@ export function AdminCustomersSubpage({
   const [activeSub, setActiveSub] = useState<CustomersSubTab>(initialSubTab);
   const [searchTerm, setSearchTerm] = useState('');
   const [archiveFilter, setArchiveFilter] = useState<CustomerArchiveFilter>('active');
-  const [trips, setTrips] = useState<Trip[]>([]);
+  const [trips, setTrips] = useState<Trip[]>(() => cachedDirectoryTrips ?? []);
   const [drivers, setDrivers] = useState<DriverRosterItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    if (cachedDirectoryTrips !== null) return false;
+    try {
+      return getContactService().getAllContacts().length === 0;
+    } catch {
+      return true;
+    }
+  });
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerProfile | null>(null);
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [governanceRefreshKey, setGovernanceRefreshKey] = useState(0);
 
+  const [extraCorpAccounts, setExtraCorpAccounts] = useState<CorporateAccountConfig[]>(() =>
+    getCorporateAccountService().getCachedCorporateAccounts()
+  );
   const [editingCorp, setEditingCorp] = useState<CorporateAccountConfig | null>(null);
   const [isNewCorp, setIsNewCorp] = useState(false);
   const [provisioningCorp, setProvisioningCorp] = useState<CorporateAccountConfig | null>(null);
@@ -95,30 +109,47 @@ export function AdminCustomersSubpage({
   }, []);
 
   useEffect(() => {
-    setIsLoading(true);
     const service = getBookingService();
     const govService = getUniversalGovernanceService();
     const contactService = getContactService();
 
-    const tripsPromise = service.getAllTrips
-      ? service
-          .getAllTrips()
-          .then((data) => {
-            setTrips(data);
-          })
-          .catch(() => {})
-      : Promise.resolve();
+    const now = Date.now();
+    const isCacheFresh =
+      cachedDirectoryTrips !== null && now - lastDirectorySyncAtMs < DIRECTORY_SYNC_TTL_MS;
 
-    const syncPromise = Promise.all([
-      govService.syncPassengerGovernanceFromFirestore().catch(() => 0),
-      contactService.syncContactsFromFirestore().catch(() => 0),
-    ]).then(() => {
-      setGovernanceRefreshKey((k) => k + 1);
-    });
-
-    Promise.all([tripsPromise, syncPromise]).finally(() => {
+    // Render cached contacts/trips immediately; only show spinner when neither trips nor contacts exist locally
+    const hasLocalContacts = contactService.getAllContacts().length > 0;
+    if (cachedDirectoryTrips === null && !hasLocalContacts) {
+      setIsLoading(true);
+    } else {
       setIsLoading(false);
-    });
+    }
+
+    if (!isCacheFresh) {
+      lastDirectorySyncAtMs = now;
+      const tripsPromise = service.getAllTrips
+        ? service
+            .getAllTrips()
+            .then((data) => {
+              cachedDirectoryTrips = data;
+              setTrips(data);
+            })
+            .catch(() => {})
+        : Promise.resolve();
+
+      // Background-sync governance & contacts without blocking initial render when cached data exists;
+      // listeners below refresh the directory only if records actually changed.
+      const syncPromise = Promise.all([
+        govService.syncPassengerGovernanceFromFirestore().catch(() => 0),
+        contactService.syncContactsFromFirestore().catch(() => 0),
+      ]);
+
+      // Clear loading as soon as trips resolve; governance & contacts sync in background
+      tripsPromise.finally(() => {
+        setIsLoading(false);
+      });
+      void syncPromise;
+    }
 
     const unsubGov = govService.subscribe(() => {
       setGovernanceRefreshKey((k) => k + 1);
@@ -138,9 +169,10 @@ export function AdminCustomersSubpage({
   }, []);
 
   const allCustomers = useMemo<CustomerProfile[]>(() => {
+    if (activeSub !== 'directory') return [];
     void governanceRefreshKey;
     return buildCustomerProfilesList(trips, settings.invoices || []);
-  }, [trips, settings.invoices, governanceRefreshKey]);
+  }, [activeSub, trips, settings.invoices, governanceRefreshKey]);
 
   const blacklistedCustomers = useMemo(
     () => allCustomers.filter((c) => Boolean(c.isBlacklisted)),
@@ -233,7 +265,41 @@ export function AdminCustomersSubpage({
     setGovernanceRefreshKey((k) => k + 1);
   };
 
-  const corporateClients = settings.corporateAccounts || [];
+  useEffect(() => {
+    if (activeSub !== 'corporate') return;
+    let cancelled = false;
+    getCorporateAccountService()
+      .syncAllCorporateAccountsFromFirestore()
+      .then((accounts) => {
+        if (!cancelled && accounts.length > 0) {
+          setExtraCorpAccounts(accounts);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSub]);
+
+  const corporateClients = useMemo(() => {
+    const base = settings.corporateAccounts || [];
+    if (extraCorpAccounts.length === 0) return base;
+    const byId = new Map<string, CorporateAccountConfig>();
+    for (const acc of extraCorpAccounts) {
+      byId.set(acc.id, acc);
+    }
+    for (const acc of base) {
+      byId.set(acc.id, acc);
+    }
+    return Array.from(byId.values());
+  }, [settings.corporateAccounts, extraCorpAccounts]);
+
+  useEffect(() => {
+    if ((settings.corporateAccounts || []).length > 3) {
+      getCorporateAccountService().cacheCorporateAccounts(settings.corporateAccounts!);
+    }
+  }, [settings.corporateAccounts]);
+
   const portalPolicy = normalizeCorporatePortalPolicy(settings.corporatePortalPolicy);
 
   const handleOpenNewCorp = () => {
@@ -351,6 +417,8 @@ export function AdminCustomersSubpage({
             });
           }}
           onImportCorporateAccounts={async (mergeResult) => {
+            getCorporateAccountService().cacheCorporateAccounts(mergeResult.merged);
+            setExtraCorpAccounts(mergeResult.merged);
             if (!onSave) return;
             await onSave({ corporateAccounts: mergeResult.merged });
             await getCorporateAccountService().syncAccountsBatchToFirestore(

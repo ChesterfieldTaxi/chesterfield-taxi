@@ -81,6 +81,8 @@ export function computeAlphabetCounts(
   return counts;
 }
 
+const NAME_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base' });
+
 export interface FilterAndSortCustomersOptions {
   searchTerm: string;
   vipOnly: boolean;
@@ -119,7 +121,7 @@ export function filterAndSortCustomers(
   filtered.sort((a, b) => {
     let cmp = 0;
     if (options.sortField === 'name') {
-      cmp = (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+      cmp = NAME_COLLATOR.compare(a.name || '', b.name || '');
     } else if (options.sortField === 'tripCount') {
       cmp = (a.tripCount ?? 0) - (b.tripCount ?? 0);
     } else if (options.sortField === 'customerScore') {
@@ -127,7 +129,7 @@ export function filterAndSortCustomers(
     }
     if (cmp !== 0) return cmp * dirMultiplier;
     // Deterministic tie-breaker
-    const nameCmp = (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+    const nameCmp = NAME_COLLATOR.compare(a.name || '', b.name || '');
     return nameCmp !== 0 ? nameCmp : a.id.localeCompare(b.id);
   });
 

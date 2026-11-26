@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import type { AppSettings, CorporateAccountConfig } from '../../../../core/types/config';
 import {
@@ -67,6 +67,7 @@ export function CorporateDirectoryPanel({
   onClearPendingArchiveCorp,
 }: CorporateDirectoryPanelProps) {
   const [corpSearchTerm, setCorpSearchTerm] = useState('');
+  const deferredCorpSearch = useDeferredValue(corpSearchTerm);
   const [corpFilter, setCorpFilter] = useState<'all' | 'po_enforced' | 'po_disabled'>('all');
   const [corpPage, setCorpPage] = useState(1);
   const [copiedPoId, setCopiedPoId] = useState<string | null>(null);
@@ -126,7 +127,16 @@ export function CorporateDirectoryPanel({
     }
   };
 
-  const activeCorporateClients = corporateClients.filter((corp) => !corp.isArchived);
+  const activeCorporateClients = useMemo(
+    () => corporateClients.filter((corp) => !corp.isArchived),
+    [corporateClients]
+  );
+
+  const poEnforcedCount = useMemo(
+    () => activeCorporateClients.filter((a) => a.poRequired).length,
+    [activeCorporateClients]
+  );
+  const poOptionalCount = activeCorporateClients.length - poEnforcedCount;
 
   const handleCopyPo = (po: string, id: string) => {
     navigator.clipboard?.writeText(po);
@@ -134,24 +144,26 @@ export function CorporateDirectoryPanel({
     setTimeout(() => setCopiedPoId(null), 2000);
   };
 
-  const filteredCorp = activeCorporateClients.filter((corp) => {
-    if (corpFilter === 'po_enforced' && !corp.poRequired) return false;
-    if (corpFilter === 'po_disabled' && corp.poRequired) return false;
-    if (!corpSearchTerm.trim()) return true;
-    const q = corpSearchTerm.toLowerCase();
-    return (
-      corp.companyName.toLowerCase().includes(q) ||
-      corp.accountNumber.toLowerCase().includes(q) ||
-      Boolean(corp.currentPoNumber && corp.currentPoNumber.toLowerCase().includes(q)) ||
-      Boolean(corp.billingContactEmail && corp.billingContactEmail.toLowerCase().includes(q)) ||
-      Boolean(corp.billingAddress && corp.billingAddress.toLowerCase().includes(q))
-    );
-  });
+  const filteredCorp = useMemo(() => {
+    const q = deferredCorpSearch.trim().toLowerCase();
+    return activeCorporateClients.filter((corp) => {
+      if (corpFilter === 'po_enforced' && !corp.poRequired) return false;
+      if (corpFilter === 'po_disabled' && corp.poRequired) return false;
+      if (!q) return true;
+      return (
+        corp.companyName.toLowerCase().includes(q) ||
+        corp.accountNumber.toLowerCase().includes(q) ||
+        Boolean(corp.currentPoNumber && corp.currentPoNumber.toLowerCase().includes(q)) ||
+        Boolean(corp.billingContactEmail && corp.billingContactEmail.toLowerCase().includes(q)) ||
+        Boolean(corp.billingAddress && corp.billingAddress.toLowerCase().includes(q))
+      );
+    });
+  }, [activeCorporateClients, corpFilter, deferredCorpSearch]);
 
   const totalCorpPages = Math.max(1, Math.ceil(filteredCorp.length / CORP_PAGE_SIZE));
-  const paginatedCorp = filteredCorp.slice(
-    (corpPage - 1) * CORP_PAGE_SIZE,
-    corpPage * CORP_PAGE_SIZE
+  const paginatedCorp = useMemo(
+    () => filteredCorp.slice((corpPage - 1) * CORP_PAGE_SIZE, corpPage * CORP_PAGE_SIZE),
+    [filteredCorp, corpPage]
   );
 
   return (
@@ -204,10 +216,8 @@ export function CorporateDirectoryPanel({
                 }`}
               >
                 {mode === 'all' && `All (${activeCorporateClients.length})`}
-                {mode === 'po_enforced' &&
-                  `PO Enforced (${activeCorporateClients.filter((a) => a.poRequired).length})`}
-                {mode === 'po_disabled' &&
-                  `PO Optional (${activeCorporateClients.filter((a) => !a.poRequired).length})`}
+                {mode === 'po_enforced' && `PO Enforced (${poEnforcedCount})`}
+                {mode === 'po_disabled' && `PO Optional (${poOptionalCount})`}
               </button>
             ))}
           </div>

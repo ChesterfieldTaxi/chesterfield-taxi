@@ -13,7 +13,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { initializeApp, getApps } from 'firebase/app';
-import { collection, doc, getDoc, getDocs, getFirestore, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, getFirestore, query, where, writeBatch } from 'firebase/firestore';
 import { sanitizePayload } from '../app/core/services/firestore-sanitizer';
 import {
   DEFAULT_BACKFILL_AFTER_ISO,
@@ -347,10 +347,9 @@ async function main(): Promise<void> {
 
   const db = await initFirestoreClient(args.commit, args.email, args.password);
 
-  const [tripsSnap, specialPlacesSnap, contactsSnap] = await Promise.all([
-    getDocs(collection(db, 'trips')),
+  const [tripsSnap, specialPlacesSnap] = await Promise.all([
+    getDocs(query(collection(db, 'trips'), where('pricing.totalFare', '==', 0))),
     getDocs(collection(db, 'specialPlaces')).catch(() => null),
-    getDocs(collection(db, 'contacts')).catch(() => null),
   ]);
 
   const allTrips: Trip[] = tripsSnap.docs.map((d) => ({
@@ -366,10 +365,24 @@ async function main(): Promise<void> {
         }))
       : DEFAULT_SPECIAL_PLACES;
 
+  const selectedTrips = selectEligibleTrips(allTrips, {
+    all: args.all,
+    afterIso: args.afterIso,
+    limit: args.limit,
+  });
+
+  // Only fetch contacts referenced by selectedTrips to minimize Firestore reads
+  const uniqueCustomerIds = Array.from(
+    new Set(selectedTrips.map((t) => t.customerId).filter((id): id is string => Boolean(id)))
+  );
   const contactPlaces: ContactSavedPlaceCandidate[] = [];
-  if (contactsSnap) {
-    for (const d of contactsSnap.docs) {
-      const contact = d.data() as ContactRecord;
+  if (uniqueCustomerIds.length > 0) {
+    const contactSnaps = await Promise.all(
+      uniqueCustomerIds.map((cid) => getDoc(doc(db, 'contacts', cid)).catch(() => null))
+    );
+    for (const snap of contactSnaps) {
+      if (!snap || !snap.exists()) continue;
+      const contact = snap.data() as ContactRecord;
       for (const sp of contact.savedPlaces || []) {
         if (sp.coordinates && sp.address) {
           contactPlaces.push({
@@ -380,12 +393,6 @@ async function main(): Promise<void> {
       }
     }
   }
-
-  const selectedTrips = selectEligibleTrips(allTrips, {
-    all: args.all,
-    afterIso: args.afterIso,
-    limit: args.limit,
-  });
 
   const estimate = estimateBackfillPlan(allTrips, selectedTrips, {
     specialPlaces,

@@ -32,6 +32,22 @@ import {
 
 export type TripsSubTab = 'dispatch' | 'standing-orders' | 'exceptions' | 'history';
 
+const LOCAL_TRIPS_CACHE_KEY = 'chesterfield_taxi_mock_trips';
+let cachedAdminTrips: Trip[] | null = null;
+
+function readInitialCachedTrips(): Trip[] {
+  if (cachedAdminTrips !== null) return cachedAdminTrips;
+  if (typeof window === 'undefined' || !window.localStorage) return [];
+  try {
+    const raw = window.localStorage.getItem(LOCAL_TRIPS_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as Trip[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function normalizeTripsSubTab(raw?: string): TripsSubTab {
   if (raw === 'standing-orders' || raw === 'exceptions' || raw === 'history') {
     return raw;
@@ -43,11 +59,11 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
   const [activeSub, setActiveSub] = useState<TripsSubTab>(() =>
     normalizeTripsSubTab(initialSubTab)
   );
-  const [trips, setTrips] = useState<Trip[]>([]);
+  const [trips, setTrips] = useState<Trip[]>(() => readInitialCachedTrips());
   const [drivers, setDrivers] = useState<DriverRosterItem[]>([]);
   const [appSettings, setAppSettings] = useState(() => getAdminConfigService().getCachedSettings());
   const [assignMode, setAssignMode] = useState<'send_to_driver' | 'stage_hold'>('send_to_driver');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => readInitialCachedTrips().length === 0);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const deferredSearchTerm = useDeferredValue(searchTerm);
@@ -89,11 +105,14 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
   }, []);
 
   useEffect(() => {
-    setIsLoading(true);
+    if (readInitialCachedTrips().length === 0) {
+      setIsLoading(true);
+    }
     const service = getBookingService();
     if (service.subscribeToAllTrips) {
       return service.subscribeToAllTrips(
         (updatedTrips) => {
+          cachedAdminTrips = updatedTrips;
           setTrips(updatedTrips);
           setIsLoading(false);
           setSelectedTrip((prev) =>
@@ -107,6 +126,7 @@ export function useAdminTripsController(initialSubTab?: TripsSubTab | string) {
       service
         .getAllTrips()
         .then((data) => {
+          cachedAdminTrips = data;
           setTrips(data);
           setIsLoading(false);
         })
