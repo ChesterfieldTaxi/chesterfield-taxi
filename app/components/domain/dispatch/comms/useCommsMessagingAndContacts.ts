@@ -45,6 +45,9 @@ export function useCommsMessagingAndContacts({
   const [retryingSmsId, setRetryingSmsId] = useState<string | null>(null);
   const [isGeneratingPayLink, setIsGeneratingPayLink] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [highlightedTimelineEvent, setHighlightedTimelineEvent] = useState<{ eventId: string; nonce: number } | null>(null);
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipNextBottomScrollRef = useRef(false);
   const [activeContactRecord, setActiveContactRecord] = useState<ContactRecord | null>(null);
   const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(initialNewSmsSheetOpen);
   const [newMsgRecipientPhone, setNewMsgRecipientPhone] = useState('');
@@ -161,8 +164,36 @@ export function useCommsMessagingAndContacts({
     });
   }, [selectedContactPhone, activeContactSummary?.contactName, activeUnifiedThread]);
 
+  useEffect(() => () => {
+    if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+  }, []);
+
+  const selectContactWithFocus = (target: string | null, focusEventId?: string) => {
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = null;
+    }
+    if (target && focusEventId) {
+      skipNextBottomScrollRef.current = true;
+      setHighlightedTimelineEvent({ eventId: focusEventId, nonce: Date.now() });
+      highlightTimeoutRef.current = setTimeout(() => {
+        setHighlightedTimelineEvent(null);
+        highlightTimeoutRef.current = null;
+      }, 5000);
+    } else {
+      skipNextBottomScrollRef.current = false;
+      setHighlightedTimelineEvent(null);
+    }
+    setSelectedContactPhone(target);
+  };
+
   useEffect(() => {
-    if (selectedContactPhone && messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (!selectedContactPhone) return;
+    if (skipNextBottomScrollRef.current) {
+      skipNextBottomScrollRef.current = false;
+      return;
+    }
+    if (messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [selectedContactPhone, allSelectedContactInteractions.length]);
 
   const threadCrmContext = useMemo(() => {
@@ -349,7 +380,7 @@ export function useCommsMessagingAndContacts({
   };
 
   return {
-    selectedContactPhone, setSelectedContactPhone, threadTab, setThreadTab, timelineFilters, setTimelineFilters,
+    selectedContactPhone, setSelectedContactPhone, selectContactWithFocus, highlightedTimelineEvent, threadTab, setThreadTab, timelineFilters, setTimelineFilters,
     activeUnifiedThread, allSelectedContactInteractions, activeContactSummary, activeContactRecord, threadCrmContext,
     messagesEndRef, noteDraftText, setNoteDraftText, smsReplyText, setSmsReplyText,
     isSendingSms, smsStatusMessage, retryingSmsId, isGeneratingPayLink,

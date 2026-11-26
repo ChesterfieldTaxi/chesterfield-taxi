@@ -468,12 +468,14 @@ export function matchesQueueStatusFilter(
     }
     const normalizedObjStatus = String(tripOrStatus.status || '').trim().toLowerCase();
     return (
+      (normalizedObjStatus === 'unconfirmed' && selectedSet.size > 0) ||
       selectedSet.has(normalizedObjStatus as CanonicalQueueStatusKey) ||
       (normalizedObjStatus === 'pending' && selectedSet.has('confirmed'))
     );
   }
   const normalizedTripStatus = String(tripOrStatus || '').trim().toLowerCase();
   return (
+    (normalizedTripStatus === 'unconfirmed' && selectedSet.size > 0) ||
     selectedSet.has(normalizedTripStatus as CanonicalQueueStatusKey) ||
     (normalizedTripStatus === 'pending' && selectedSet.has('confirmed'))
   );
@@ -800,6 +802,7 @@ export interface FilterDispatchQueueTripsInput {
   trips: Trip[];
   statusFilter: string;
   pillFilter: 'all' | 'unconfirmed' | 'pending' | 'assigned' | 'completed' | 'cancelled' | 'unassigned';
+  unconfirmedOnly?: boolean;
   dateTimeRange: DateTimeRange;
   filterStartDate: string;
   filterEndDate: string;
@@ -820,6 +823,7 @@ export function filterDispatchQueueTrips({
   trips,
   statusFilter,
   pillFilter,
+  unconfirmedOnly = false,
   dateTimeRange,
   filterStartDate,
   filterEndDate,
@@ -855,18 +859,21 @@ export function filterDispatchQueueTrips({
       if (!sla || !sla.isEligible || sla.level === 'normal') return false;
     }
 
-    if (!matchesQueueStatusFilter(trip, statusFilter, nowMs)) {
-      return false;
-    }
+    const isUnconfirmedQuickFilter = Boolean(unconfirmedOnly) || pillFilter === 'unconfirmed';
+    if (isUnconfirmedQuickFilter) {
+      const normalizedStatus = String(trip.status || '').trim().toLowerCase();
+      if (normalizedStatus !== 'unconfirmed') return false;
+    } else {
+      if (!matchesQueueStatusFilter(trip, statusFilter, nowMs)) {
+        return false;
+      }
 
-    if (pillFilter === 'unconfirmed' && trip.status !== 'UNCONFIRMED' && trip.status !== 'unconfirmed') {
-      return false;
+      if (pillFilter === 'pending' && trip.status !== 'pending') return false;
+      if (pillFilter === 'assigned' && trip.status !== 'assigned') return false;
+      if (pillFilter === 'completed' && trip.status !== 'completed') return false;
+      if (pillFilter === 'cancelled' && trip.status !== 'cancelled') return false;
+      if (pillFilter === 'unassigned' && trip.assignedDriverId) return false;
     }
-    if (pillFilter === 'pending' && trip.status !== 'pending') return false;
-    if (pillFilter === 'assigned' && trip.status !== 'assigned') return false;
-    if (pillFilter === 'completed' && trip.status !== 'completed') return false;
-    if (pillFilter === 'cancelled' && trip.status !== 'cancelled') return false;
-    if (pillFilter === 'unassigned' && trip.assignedDriverId) return false;
 
     if (dateTimeRange.startDate || dateTimeRange.endDate) {
       const tripDateStr = trip.scheduledPickupTime || trip.createdAt;

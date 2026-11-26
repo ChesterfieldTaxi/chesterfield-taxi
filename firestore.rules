@@ -413,6 +413,33 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────────────────────────
+    // 2F. Real-Time Dispatch Fleet Alerts & App Suite Workspace
+    // ─────────────────────────────────────────────────────────────
+    match /dispatch_alerts/{alertId} {
+      allow read, write: if isDispatcher();
+    }
+
+    match /dispatch_notes/{noteId} {
+      allow read, write: if isDispatcher();
+    }
+
+    match /dispatch_documents/{docId} {
+      allow read, write: if isDispatcher();
+    }
+
+    match /dispatch_calendar/{eventId} {
+      allow read, write: if isDispatcher();
+    }
+
+    match /dispatch_tasks/{taskId} {
+      allow read, write: if isDispatcher();
+    }
+
+    match /dispatch_presence/{presenceId} {
+      allow read, write: if isDispatcher();
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // 3. Driver Shift Tracking & Vehicle Assignments (/vehicleAssignments)
     // ─────────────────────────────────────────────────────────────
     match /vehicleAssignments/{assignmentId} {

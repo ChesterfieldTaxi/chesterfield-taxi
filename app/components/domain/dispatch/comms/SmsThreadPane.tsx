@@ -10,6 +10,7 @@ import { formatDisplayPhone } from '../../../../core/utils/phone';
 import { AlertTriangleIcon, CheckIcon, ChevronDownIcon, ExternalLinkIcon, MailIcon, MailOpenIcon, MicIcon, PauseIcon, PencilIcon, PhoneIcon, PlayIcon, RefreshCwIcon, SpinnerIcon, UserIcon } from '../../../ui/Icons';
 import { DispatchStatusBadge } from '../queue/DispatchStatusBadge';
 import { CommsComposerBar } from './CommsComposerBar';
+import { CommsChannelDirectionIcon, CommsContactAvatar, CommsTimestampWithHoverReadToggle } from './CommsContactAvatar';
 import { buildOmnichannelTimelineItems, buildReturnTripDraftPayload, cleanCommsEmailSnippet, formatShortRouteEndpoint, formatShortTripId, formatTripTimelineDateTime, hasPlayableCallAudio, resolveTripCabBadgeLabel } from './comms-timeline.util';
 import { formatMessageTimestamp, type InteractionEvent, type PlaybackSpeed, type ThreadTab, type ThreadTimelineType } from './comms-types';
 import { useLongPressSelection } from './useLongPressSelection';
@@ -33,7 +34,8 @@ export interface SmsThreadPaneProps {
   onInsertTrackingLink?: () => void; onInsertPayLink?: () => void; isGeneratingPayLink?: boolean; noteDraftText?: string; onChangeNoteDraftText?: (val: string) => void; onAddInternalNote?: () => void;
   smsReplyText: string; onChangeSmsReplyText: (val: string) => void; isSendingSms: boolean; onSendSms: () => void; smsStatusMessage: string | null;
   conversationRows?: CommsConversationRowSummary[]; messageConversations?: InteractionEvent[]; threadUnreadCountMap?: Map<string, number>;
-  onSelectContact: (selectorTarget: string) => void; onOpenFreshNewMessageModal: () => void;
+  onSelectContact: (selectorTarget: string, focusEventId?: string) => void; onOpenFreshNewMessageModal: () => void;
+  highlightedEvent?: { eventId: string; nonce: number } | null;
   selectedRowKeys?: ReadonlySet<string>; onToggleSelectRow?: (threadId: string) => void;
   onToggleRowReadStatus?: (threadId: string, currentlyUnread: boolean) => void;
 }
@@ -57,9 +59,29 @@ export function SmsThreadPane({
   timelineFilters, onChangeTimelineFilters, selectedInteractions, messagesEndRef, playingCallId, onTogglePlayCall, playingVoicemailId, onTogglePlayVoicemail, playbackSpeed,
   onCyclePlaybackSpeed, onStartCall, onConvertVoicemailToBooking, onOpenEmailInDock, onRetrySms, retryingSmsId, onInsertTrackingLink, onInsertPayLink, isGeneratingPayLink = false,
   noteDraftText = '', onChangeNoteDraftText, onAddInternalNote, smsReplyText, onChangeSmsReplyText, isSendingSms, onSendSms, smsStatusMessage, conversationRows,
-  messageConversations = [], threadUnreadCountMap, onSelectContact, onOpenFreshNewMessageModal,
+  messageConversations = [], threadUnreadCountMap, onSelectContact, onOpenFreshNewMessageModal, highlightedEvent,
   selectedRowKeys, onToggleSelectRow, onToggleRowReadStatus,
 }: SmsThreadPaneProps) {
+  const [expandedVoicemailIds, setExpandedVoicemailIds] = useState<Set<string>>(() => new Set());
+  const toggleVoicemailExpanded = useCallback((id: string) => {
+    setExpandedVoicemailIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const timelineContainerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (mode !== 'thread' || !highlightedEvent?.eventId) return;
+    const container = timelineContainerRef.current;
+    if (!container) return;
+    const escapedId = typeof CSS !== 'undefined' && typeof CSS.escape === 'function' ? CSS.escape(highlightedEvent.eventId) : highlightedEvent.eventId;
+    const target = container.querySelector(`[data-timeline-event-id="${escapedId}"]`) as HTMLElement | null;
+    if (target && typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [mode, highlightedEvent?.eventId, highlightedEvent?.nonce]);
   const isSelectionMode = Boolean(selectedRowKeys && selectedRowKeys.size > 0);
   const { getRowGestureProps } = useLongPressSelection({
     isSelectionMode,
@@ -169,7 +191,7 @@ export function SmsThreadPane({
           </div>
         )}
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2 bg-slate-50/30">
+        <div ref={timelineContainerRef} className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2 bg-slate-50/30">
           {timeline.items.map((item) => {
             if (item.kind === 'trip') {
               const tr = item.trip;
@@ -197,11 +219,13 @@ export function SmsThreadPane({
             }
             const evt = item.event;
             const playable = hasPlayableCallAudio(evt);
+            const isHighlighted = highlightedEvent?.eventId === evt.id;
+            const glowCls = isHighlighted ? 'ring-2 ring-amber-400 shadow-[0_0_16px_rgba(251,191,36,0.45)] transition-all duration-500' : '';
             if (evt.type.startsWith('call_')) {
               const callLabel = evt.type === 'call_inbound' ? 'Inbound Call' : evt.type === 'call_outbound' ? 'Outbound Call' : 'Missed Call';
               const dur = evt.audioDuration || (evt.durationSeconds ? `${Math.floor(evt.durationSeconds / 60)}:${String(evt.durationSeconds % 60).padStart(2, '0')}` : '0:00');
               return (
-                <div key={evt.id} data-call-row={evt.id} className="min-h-[36px] px-2.5 py-1 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-2 text-[11px]">
+                <div key={evt.id} data-call-row={evt.id} data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`min-h-[36px] px-2.5 py-1 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-2 text-[11px] ${glowCls}`}>
                   <div className="flex items-center gap-1.5 min-w-0">
                     <PhoneIcon className={`w-3.5 h-3.5 shrink-0 ${evt.type === 'call_missed' ? 'text-rose-600' : 'text-emerald-600'}`} />
                     <span className="font-bold text-slate-800 truncate">{callLabel}</span>
@@ -221,23 +245,40 @@ export function SmsThreadPane({
               );
             }
             if (evt.type === 'voicemail') {
+              const isVmExpanded = expandedVoicemailIds.has(evt.id);
               return (
-                <div key={evt.id} className="rounded-xl border border-amber-200 bg-amber-50/70 p-2.5 space-y-1.5 text-xs">
+                <div key={evt.id} data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`rounded-xl border border-amber-200 bg-amber-50/70 p-2.5 space-y-1.5 text-xs ${glowCls}`}>
                   <div className="flex items-center justify-between gap-2 text-[11px]">
                     <span className="font-bold text-amber-900 inline-flex items-center gap-1"><MicIcon className="w-3 h-3" />Voicemail · {formatMessageTimestamp(evt.timestampMs, evt.timestamp)} · {evt.audioDuration || '0:30'}</span>
                     <div className="flex items-center gap-1">
+                      {evt.transcription && (
+                        <button
+                          type="button"
+                          data-voicemail-expand-toggle={evt.id}
+                          aria-expanded={isVmExpanded}
+                          aria-label={isVmExpanded ? 'Collapse transcription' : 'Expand transcription'}
+                          onClick={() => toggleVoicemailExpanded(evt.id)}
+                          className="p-0.5 rounded hover:bg-amber-200/60 text-amber-800 cursor-pointer"
+                        >
+                          <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isVmExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+                      )}
                       {playable && <button type="button" onClick={() => onTogglePlayVoicemail(evt.id)} className="w-6 h-6 rounded-full bg-amber-600 text-white flex items-center justify-center cursor-pointer">{playingVoicemailId === evt.id ? <PauseIcon className="w-3 h-3" /> : <PlayIcon className="w-3 h-3" />}</button>}
                       <button type="button" onClick={() => onConvertVoicemailToBooking(evt.suggestedBooking)} className="px-2 py-0.5 rounded-md bg-blue-600 text-white text-[10.5px] font-bold cursor-pointer">Book</button>
                     </div>
                   </div>
-                  {evt.transcription && <p className="text-[11px] text-slate-700 italic line-clamp-2">&ldquo;{evt.transcription}&rdquo;</p>}
+                  {evt.transcription && (
+                    <p className={`text-[11px] text-slate-700 italic ${isVmExpanded ? 'whitespace-pre-wrap leading-relaxed' : 'line-clamp-2'}`}>
+                      &ldquo;{evt.transcription}&rdquo;
+                    </p>
+                  )}
                 </div>
               );
             }
             if (evt.type.startsWith('email_')) {
               const badge = resolveCommsEmailDeliveryBadge(evt.deliveryStatus, evt.type === 'email_outbound' ? 'outbound' : 'inbound');
               return (
-                <div key={evt.id} data-email-card={evt.id} className="rounded-xl border border-indigo-200/80 bg-white p-2.5 space-y-1 text-xs">
+                <div key={evt.id} data-email-card={evt.id} data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`rounded-xl border border-indigo-200/80 bg-white p-2.5 space-y-1 text-xs ${glowCls}`}>
                   <div className="flex items-center justify-between gap-2 text-[10.5px]">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="font-extrabold text-indigo-900 inline-flex items-center gap-1 truncate"><MailIcon className="w-3 h-3 text-indigo-600 shrink-0" />{evt.subject || (evt.type === 'email_outbound' ? 'Sent Email' : 'Inbound Email')}</span>
@@ -252,7 +293,7 @@ export function SmsThreadPane({
             }
             if (evt.type === 'internal_note') {
               return (
-                <div key={evt.id} className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs">
+                <div key={evt.id} data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs ${glowCls}`}>
                   <div className="flex items-center justify-between text-[10px] font-bold text-amber-800"><span>Note · {evt.actorName || 'Dispatcher'}</span><span className="font-mono">{formatMessageTimestamp(evt.timestampMs, evt.timestamp)}</span></div>
                   <p className="text-slate-800 mt-0.5 whitespace-pre-wrap">{evt.bodyText || evt.snippet}</p>
                 </div>
@@ -262,7 +303,7 @@ export function SmsThreadPane({
             const isFailed = isOut && (evt.deliveryStatus === 'failed' || evt.deliveryStatus === 'undelivered');
             return (
               <div key={evt.id} className={`flex flex-col ${isOut ? 'items-end' : 'items-start'}`}>
-                <div className={`max-w-[84%] rounded-2xl px-3 py-2 text-xs shadow-2xs ${isOut ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'}`}>
+                <div data-timeline-event-id={evt.id} data-timeline-highlighted={isHighlighted ? 'true' : undefined} className={`max-w-[84%] rounded-2xl px-3 py-2 text-xs shadow-2xs ${isOut ? 'bg-blue-600 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'} ${glowCls}`}>
                   <p className="whitespace-pre-wrap leading-relaxed">{evt.bodyText || evt.snippet}</p>
                   <div className={`flex items-center justify-end gap-1.5 mt-1 text-[9.5px] ${isOut ? 'text-blue-200' : 'text-slate-400'}`}>
                     <span className="font-mono">{formatMessageTimestamp(evt.timestampMs, evt.timestamp)}</span>
@@ -333,14 +374,20 @@ export function SmsThreadPane({
       ) : rows.map((row) => {
         const isUnread = row.unreadCountTotal > 0 || Boolean(row.latestEvent.isUnread);
         const isSelected = Boolean(selectedRowKeys?.has(row.threadId));
+        const isLatestVoicemail = row.latestEvent.type === 'voicemail';
+        const isVmExpanded = isLatestVoicemail && expandedVoicemailIds.has(row.latestEvent.id);
+        const vmTranscript = isLatestVoicemail ? row.latestEvent.transcription : undefined;
+        const row2Snippet = isLatestVoicemail
+          ? `${row.latestEvent.audioDuration || '0:30'} · ${vmTranscript || cleanCommsEmailSnippet(row.latestEvent.snippet) || 'Voicemail message'}`
+          : cleanCommsEmailSnippet(row.latestEvent.snippet);
         const gestureProps = getRowGestureProps(row.threadId, () => {
-          if (row.selectorTarget) onSelectContact(row.selectorTarget);
+          if (row.selectorTarget) onSelectContact(row.selectorTarget, row.latestEvent.id);
         });
         return (
           <div
             key={row.threadId}
             {...gestureProps}
-            className={`group min-h-[52px] px-3 py-1.5 flex items-center gap-2.5 cursor-pointer transition-colors select-none ${
+            className={`group min-h-[52px] px-3 py-1.5 cursor-pointer transition-colors select-none ${
               isSelected
                 ? 'bg-blue-100/70 hover:bg-blue-100'
                 : isUnread
@@ -348,66 +395,71 @@ export function SmsThreadPane({
                 : 'bg-white hover:bg-slate-50'
             }`}
           >
-            <div className="relative w-8 h-8 shrink-0">
-              <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center">
-                {(row.contactName || '#').charAt(0).toUpperCase()}
-              </div>
-              {onToggleSelectRow && (
-                <button
-                  type="button"
-                  data-row-checkbox={row.threadId}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleSelectRow(row.threadId);
-                  }}
-                  aria-label={isSelected ? 'Deselect conversation' : 'Select conversation'}
-                  className={`absolute inset-0 rounded-full flex items-center justify-center transition-opacity cursor-pointer ${
-                    isSelected || isSelectionMode
-                      ? 'opacity-100 bg-white/95'
-                      : 'opacity-0 group-hover:opacity-100 bg-white/95'
-                  }`}
-                >
-                  <span
-                    className={`w-4 h-4 rounded-[4px] border flex items-center justify-center transition-colors ${
-                      isSelected
-                        ? 'bg-blue-600 border-blue-600 text-white'
-                        : 'bg-white border-slate-400'
-                    }`}
-                  >
-                    {isSelected && <CheckIcon className="w-2.5 h-2.5 stroke-[3]" />}
-                  </span>
-                </button>
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-1.5">
-                <div className="flex items-center gap-1 min-w-0">
-                  <span className={`text-xs truncate ${isUnread ? 'font-extrabold text-slate-900' : 'font-semibold text-slate-800'}`}>{row.contactName}</span>
-                  {row.isVip && <span className="px-1 rounded bg-amber-100 text-amber-800 text-[9px] font-black uppercase shrink-0">VIP</span>}
-                  {row.contactType === 'driver' && <span className="px-1 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold shrink-0">Driver</span>}
-                  {row.contactType === 'corporate' && <span className="px-1 rounded bg-indigo-100 text-indigo-800 text-[9px] font-bold shrink-0">Corp</span>}
-                  {row.unreadCountTotal > 0 && <span className="px-1.5 rounded-full bg-blue-600 text-white text-[9.5px] font-black shrink-0">{row.unreadCountTotal}</span>}
+            <div className="flex items-center gap-2.5">
+              <CommsContactAvatar
+                name={row.contactName}
+                phone={row.primaryPhone}
+                email={row.primaryEmail}
+                fallbackId={row.threadId}
+                rowKey={row.threadId}
+                isSelected={isSelected}
+                isSelectionMode={isSelectionMode}
+                onToggleSelect={onToggleSelectRow}
+                selectionAriaLabel={isSelected ? 'Deselect conversation' : 'Select conversation'}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className={`text-xs truncate ${isUnread ? 'font-extrabold text-slate-900' : 'font-semibold text-slate-800'}`}>{row.contactName}</span>
+                    {row.isVip && <span className="px-1 rounded bg-amber-100 text-amber-800 text-[9px] font-black uppercase shrink-0">VIP</span>}
+                    {row.contactType === 'driver' && <span className="px-1 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold shrink-0">Driver</span>}
+                    {row.contactType === 'corporate' && <span className="px-1 rounded bg-indigo-100 text-indigo-800 text-[9px] font-bold shrink-0">Corp</span>}
+                    {row.unreadCountTotal > 0 && <span className="px-1.5 rounded-full bg-blue-600 text-white text-[9.5px] font-black shrink-0">{row.unreadCountTotal}</span>}
+                  </div>
+                  <CommsTimestampWithHoverReadToggle
+                    rowKey={row.threadId}
+                    timestampLabel={row.latestEvent.timestamp}
+                    isUnread={isUnread}
+                    onToggleRowReadStatus={onToggleRowReadStatus}
+                  />
                 </div>
-                <span className="text-[10px] text-slate-400 font-mono shrink-0">{row.latestEvent.timestamp}</span>
+                <div className="flex items-center justify-between gap-2 mt-0.5">
+                  <div className="flex items-center gap-1 min-w-0 flex-1">
+                    <CommsChannelDirectionIcon type={row.latestEvent.type} />
+                    <p className={`text-[11px] truncate ${isUnread ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>{row2Snippet}</p>
+                    {isLatestVoicemail && vmTranscript && (
+                      <button
+                        type="button"
+                        data-voicemail-expand-toggle={row.latestEvent.id}
+                        aria-expanded={isVmExpanded}
+                        aria-label={isVmExpanded ? 'Collapse transcription' : 'Expand transcription'}
+                        title={isVmExpanded ? 'Collapse transcription' : 'Expand transcription'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleVoicemailExpanded(row.latestEvent.id);
+                        }}
+                        className="p-0.5 rounded hover:bg-amber-100 text-amber-700 shrink-0 cursor-pointer"
+                      >
+                        <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isVmExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {row.primaryPhone && <button type="button" onClick={() => onStartCall(row.primaryPhone, row.contactName)} title={`Call ${row.contactName}`} aria-label={`Call ${row.contactName}`} className="w-6 h-6 rounded-md bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white flex items-center justify-center cursor-pointer"><PhoneIcon className="w-3 h-3" /></button>}
+                    <button type="button" onClick={() => getWorkspaceBus().publish('OPEN_CLIENT_PROFILE', { phone: row.primaryPhone, email: row.primaryEmail, name: row.contactName, source: 'comms_hub' })} title="Profile" aria-label="Profile" className="w-6 h-6 rounded-md bg-slate-100 hover:bg-indigo-600 text-slate-600 hover:text-white flex items-center justify-center cursor-pointer"><UserIcon className="w-3 h-3" /></button>
+                  </div>
+                </div>
               </div>
-              <p className={`text-[11px] truncate ${isUnread ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>{cleanCommsEmailSnippet(row.latestEvent.snippet)}</p>
             </div>
-            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-              {onToggleRowReadStatus && (
-                <button
-                  type="button"
-                  data-row-read-toggle={row.threadId}
-                  onClick={() => onToggleRowReadStatus(row.threadId, isUnread)}
-                  title={isUnread ? 'Mark as Read' : 'Mark as Unread'}
-                  aria-label={isUnread ? 'Mark as Read' : 'Mark as Unread'}
-                  className="p-1.5 rounded-md bg-slate-100 hover:bg-blue-600 text-slate-600 hover:text-white cursor-pointer"
-                >
-                  {isUnread ? <MailOpenIcon className="w-3 h-3" /> : <MailIcon className="w-3 h-3" />}
-                </button>
-              )}
-              {row.primaryPhone && <button type="button" onClick={() => onStartCall(row.primaryPhone, row.contactName)} title="Call" className="p-1.5 rounded-md bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white cursor-pointer"><PhoneIcon className="w-3 h-3" /></button>}
-              <button type="button" onClick={() => getWorkspaceBus().publish('OPEN_CLIENT_PROFILE', { phone: row.primaryPhone, email: row.primaryEmail, name: row.contactName, source: 'comms_hub' })} title="Profile" className="p-1.5 rounded-md bg-slate-100 hover:bg-indigo-600 text-slate-600 hover:text-white cursor-pointer"><UserIcon className="w-3 h-3" /></button>
-            </div>
+            {isLatestVoicemail && isVmExpanded && vmTranscript && (
+              <div
+                data-voicemail-expanded-body={row.latestEvent.id}
+                onClick={(e) => e.stopPropagation()}
+                className="mt-1.5 ml-[42px] pl-2 border-l-2 border-amber-400 text-[11px] text-slate-700 italic whitespace-pre-wrap leading-relaxed"
+              >
+                &ldquo;{vmTranscript}&rdquo;
+              </div>
+            )}
           </div>
         );
       })}

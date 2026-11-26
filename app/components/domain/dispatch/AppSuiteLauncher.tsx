@@ -4,19 +4,15 @@ import {
   DocumentTextIcon,
   ClockIcon,
   CheckIcon,
-  XIcon,
-  SearchIcon,
   TrashIcon,
 } from '../../ui/Icons';
 import { Select } from '../../ui/Select';
 import {
   dispatchAppSuiteService,
-  type DispatchNote,
   type DispatchDocument,
   type DispatchCalendarEvent,
   type DispatchTaskItem,
   type DispatchAppSuiteState,
-  type AuthorMeta,
 } from '../../../core/services/dispatch/dispatch-app-suite.service';
 
 export type AppSuiteModule = 'calendar' | 'documents' | 'notes' | 'reminders' | 'tasks' | 'help' | null;
@@ -48,7 +44,7 @@ export interface AppSuiteLauncherProps {
   onOpenBookingModal?: () => void;
 }
 
-export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) {
+export function AppSuiteLauncher({ onOpenBookingModal: _onOpenBookingModal }: AppSuiteLauncherProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeModule, setActiveModule] = useState<AppSuiteModule>(null);
 
@@ -57,11 +53,10 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
     dispatchAppSuiteService.getState()
   );
 
-  // Active note selection
+  // Active note selection (empty string when no notes exist)
   const [activeNoteId, setActiveNoteId] = useState<string>(() =>
-    suiteState.notes[0]?.id || 'note-shift-handover'
+    suiteState.notes[0]?.id || ''
   );
-  const [isEditingNoteTitle, setIsEditingNoteTitle] = useState(false);
   const [noteSaveStatus, setNoteSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   // New item inputs
@@ -78,29 +73,44 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
 
   const [isEditingNote, setIsEditingNote] = useState(false);
   const launcherRef = useRef<HTMLDivElement>(null);
-  const saveDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Subscribe to real-time shared state across all dispatch staff
   useEffect(() => {
     const unsubscribe = dispatchAppSuiteService.subscribe((newState) => {
       setSuiteState(newState);
-      if (!newState.notes.some((n) => n.id === activeNoteId) && newState.notes.length > 0) {
-        setActiveNoteId(newState.notes[0].id);
-      }
+      setActiveNoteId((prevId) => {
+        if (newState.notes.length === 0) return '';
+        if (prevId && newState.notes.some((n) => n.id === prevId)) return prevId;
+        return newState.notes[0].id;
+      });
     });
     return () => unsubscribe();
-  }, [activeNoteId]);
+  }, []);
 
   // Presence heartbeat for Dispatch Notes
   useEffect(() => {
-    if (!isOpen || activeModule !== 'notes') return;
+    if (!isOpen || activeModule !== 'notes') {
+      return;
+    }
+    const resolvedNoteId =
+      suiteState.notes.find((n) => n.id === activeNoteId)?.id || suiteState.notes[0]?.id || null;
     const sendHeartbeat = () => {
-      dispatchAppSuiteService.updatePresence(activeNoteId, isEditingNote);
+      dispatchAppSuiteService.updatePresence(resolvedNoteId, isEditingNote);
     };
     sendHeartbeat();
     const interval = setInterval(sendHeartbeat, 5000);
-    return () => clearInterval(interval);
-  }, [isOpen, activeModule, activeNoteId, isEditingNote]);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [isOpen, activeModule, activeNoteId, isEditingNote, suiteState.notes]);
+
+  // Clear presence when closing the App Suite popover
+  useEffect(() => {
+    if (!isOpen) {
+      void dispatchAppSuiteService.clearPresence();
+    }
+  }, [isOpen]);
 
   // Close when clicking outside
   useEffect(() => {
@@ -120,10 +130,16 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
   }, [isOpen]);
 
   const currentAuthor = dispatchAppSuiteService.getCurrentAuthor();
-  const activeNote = suiteState.notes.find((n) => n.id === activeNoteId) || suiteState.notes[0];
+  const activeNote = suiteState.notes.find((n) => n.id === activeNoteId) || suiteState.notes[0] || null;
   const completedTasksCount = suiteState.tasks.filter((t) => t.completed).length;
-  const activePresences = dispatchAppSuiteService.getActivePresences(activeNote?.id);
-  const peerPresences = activePresences.filter((p) => p.uid !== currentAuthor.uid);
+  const pendingCalendarEvents = suiteState.calendar.filter((c) => !c.completed);
+  const urgentOpenTasks = suiteState.tasks.filter((t) => t.priority === 'high' && !t.completed);
+  const activePresences = activeNote
+    ? dispatchAppSuiteService.getActivePresences(activeNote.id)
+    : dispatchAppSuiteService.getActivePresences();
+  const peerPresences = activePresences.filter(
+    (p) => p.uid && p.uid !== currentAuthor.uid
+  );
 
   // ─── NOTE EDIT HANDLER WITH DEBOUNCED AUTO-SAVE ───
   const handleNoteContentChange = (content: string) => {
@@ -137,8 +153,9 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
     }));
 
     if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current);
+    const targetId = activeNote.id;
     saveDebounceRef.current = setTimeout(async () => {
-      await dispatchAppSuiteService.updateNote(activeNote.id, { content });
+      await dispatchAppSuiteService.updateNote(targetId, { content });
       setNoteSaveStatus('saved');
       setTimeout(() => setNoteSaveStatus('idle'), 2000);
     }, 400);
@@ -180,11 +197,16 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
       category: newDocCategory,
       status: 'active',
       version: '1.0',
-      validThrough: 'Dec 31, 2026',
+      validThrough: 'Permanent',
     });
     setNewDocTitle('');
     setNewDocSummary('');
     setShowAddDocForm(false);
+  };
+
+  const handleDeleteDocument = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await dispatchAppSuiteService.deleteDocument(id);
   };
 
   // ─── CALENDAR ACTIONS ───
@@ -201,6 +223,11 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
     setNewCalTitle('');
     setNewCalTime('');
     setShowAddCalForm(false);
+  };
+
+  const handleDeleteCalendarEvent = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await dispatchAppSuiteService.deleteCalendarEvent(id);
   };
 
   return (
@@ -247,7 +274,7 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
               </span>
               <span className="inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-emerald-500/30">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Shared Sync
+                Live Sync
               </span>
             </div>
             {activeModule ? (
@@ -317,7 +344,9 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                   <ClockIcon className="w-5 h-5" />
                 </div>
                 <span className="font-extrabold text-xs text-slate-800 group-hover:text-rose-700">Reminders</span>
-                <span className="text-[10px] text-slate-400">Flight & Alarms</span>
+                <span className="text-[10px] text-slate-400">
+                  {pendingCalendarEvents.length + urgentOpenTasks.length} Active
+                </span>
               </button>
 
               {/* Tasks */}
@@ -352,25 +381,29 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
           {activeModule === 'notes' && (
             <div className="p-3.5 space-y-2.5 max-h-[460px] overflow-y-auto">
               {/* Note Tabs & Add Button */}
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pr-1">
-                  {suiteState.notes.map((note) => {
-                    const isActive = note.id === activeNoteId;
-                    return (
-                      <button
-                        key={note.id}
-                        type="button"
-                        onClick={() => setActiveNoteId(note.id)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1 ${
-                          isActive
-                            ? 'bg-purple-600 text-white shadow-2xs'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                        }`}
-                      >
-                        <span>{note.title}</span>
-                      </button>
-                    );
-                  })}
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2 gap-2">
+                <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pr-1 min-w-0">
+                  {suiteState.notes.length === 0 ? (
+                    <span className="text-xs font-semibold text-slate-400">Shared Notes</span>
+                  ) : (
+                    suiteState.notes.map((note) => {
+                      const isActive = activeNote?.id === note.id;
+                      return (
+                        <button
+                          key={note.id}
+                          type="button"
+                          onClick={() => setActiveNoteId(note.id)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1 ${
+                            isActive
+                              ? 'bg-purple-600 text-white shadow-2xs'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                          }`}
+                        >
+                          <span>{note.title}</span>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
                 <button
                   type="button"
@@ -382,7 +415,24 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                 </button>
               </div>
 
-              {activeNote && (
+              {!activeNote ? (
+                <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mx-auto text-lg">
+                    📝
+                  </div>
+                  <p className="text-xs font-bold text-slate-700">No shared dispatch notes yet</p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Create a shift handover pad, gate code list, or airport advisory synced live across all dispatchers.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleCreateNewNote}
+                    className="mt-1 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs cursor-pointer shadow-2xs"
+                  >
+                    + Create First Note
+                  </button>
+                </div>
+              ) : (
                 <>
                   {/* Google Docs-Style Author Attribution Chip + Live Collaborator Avatars */}
                   <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200 flex items-center justify-between gap-2 text-xs">
@@ -407,10 +457,9 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
 
                     {/* Google Docs-Style Live Presence Avatar Stack */}
                     <div className="flex items-center gap-2 shrink-0">
-                      {/* Active Presence Avatars */}
                       <div className="flex items-center -space-x-2 overflow-hidden" title="Live dispatchers currently active on this pad">
                         {activePresences.map((p) => {
-                          const isSelf = p.uid === currentAuthor.uid;
+                          const isSelf = Boolean(currentAuthor.uid && p.uid === currentAuthor.uid);
                           return (
                             <div
                               key={p.uid}
@@ -418,7 +467,7 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                                 p.avatarColor || (isSelf ? 'bg-purple-600' : 'bg-emerald-600')
                               }`}
                               title={`${p.name} (${p.role || 'dispatcher'})${isSelf ? ' (You)' : ''}${
-                                p.isEditing ? ' • ✍️ Typing now' : ' • 👁️ Viewing'
+                                p.isEditing ? ' • Typing now' : ' • Viewing'
                               }`}
                             >
                               <span>{getInitials(p.name)}</span>
@@ -452,7 +501,9 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
                         <span className="font-semibold truncate">
                           <strong>{peerPresences.map((p) => p.name).join(', ')}</strong>{' '}
-                          {peerPresences.some((p) => p.isEditing) ? 'is currently editing this pad...' : 'is viewing this note'}
+                          {peerPresences.some((p) => p.isEditing)
+                            ? 'is currently editing this pad...'
+                            : 'is viewing this note'}
                         </span>
                       </div>
                       <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-200/60 px-1.5 py-0.2 rounded text-emerald-900 shrink-0">
@@ -469,7 +520,7 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                     onBlur={() => setIsEditingNote(false)}
                     onChange={(e) => {
                       const newTitle = e.target.value;
-                      dispatchAppSuiteService.updateNote(activeNote.id, { title: newTitle });
+                      void dispatchAppSuiteService.updateNote(activeNote.id, { title: newTitle });
                     }}
                     className="w-full text-xs font-bold px-2 py-1 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-purple-500"
                     placeholder="Note Title..."
@@ -488,17 +539,15 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
 
                   <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
                     <span>
-                      Created by {activeNote.createdBy?.name || 'Admin'} • Synced live to all dispatchers
+                      Created by {activeNote.createdBy?.name || 'Dispatcher'} • Synced live to all dispatchers
                     </span>
-                    {suiteState.notes.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => dispatchAppSuiteService.deleteNote(activeNote.id)}
-                        className="text-rose-500 hover:text-rose-700 font-bold cursor-pointer"
-                      >
-                        Delete Pad
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => void dispatchAppSuiteService.deleteNote(activeNote.id)}
+                      className="text-rose-500 hover:text-rose-700 font-bold cursor-pointer"
+                    >
+                      Delete Pad
+                    </button>
                   </div>
                 </>
               )}
@@ -531,7 +580,7 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                     type="text"
                     value={newDocTitle}
                     onChange={(e) => setNewDocTitle(e.target.value)}
-                    placeholder="Document Title (e.g. VCU Discharge Protocol)..."
+                    placeholder="Document Title (e.g. Airport Pickup Protocol)..."
                     className="w-full text-xs px-2 py-1.5 rounded-lg border border-amber-300 bg-white"
                     required
                   />
@@ -547,17 +596,18 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                       size="xs"
                       fullWidth={false}
                       value={newDocCategory}
-                      onChange={(e) => setNewDocCategory(e.target.value as any)}
+                      onChange={(e) => setNewDocCategory(e.target.value as DispatchDocument['category'])}
                       triggerClassName="border-amber-300"
                     >
                       <option value="sop">SOP Manual</option>
                       <option value="permit">Permit</option>
                       <option value="tariff">Tariff Card</option>
                       <option value="policy">Company Policy</option>
+                      <option value="insurance">Insurance</option>
                     </Select>
                     <button
                       type="submit"
-                      className="px-3 py-1 bg-amber-700 hover:bg-amber-600 text-white font-bold rounded-lg"
+                      className="px-3 py-1 bg-amber-700 hover:bg-amber-600 text-white font-bold rounded-lg cursor-pointer"
                     >
                       Publish Document
                     </button>
@@ -565,28 +615,55 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                 </form>
               )}
 
-              <div className="space-y-2 text-xs">
-                {suiteState.documents.map((doc) => (
-                  <div key={doc.id} className="p-2.5 rounded-xl border border-slate-200 bg-white hover:border-amber-300 transition-colors space-y-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h5 className="font-bold text-slate-900">{doc.title}</h5>
-                        <p className="text-[11px] text-slate-600 leading-tight mt-0.5">{doc.summary}</p>
+              {suiteState.documents.length === 0 && !showAddDocForm ? (
+                <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 space-y-2">
+                  <DocumentTextIcon className="w-8 h-8 text-amber-500/70 mx-auto" />
+                  <p className="text-xs font-bold text-slate-700">No shared documents yet</p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Publish SOPs, airport permits, or tariff cards so all dispatchers reference the same live documentation.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddDocForm(true)}
+                    className="mt-1 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs cursor-pointer shadow-2xs"
+                  >
+                    + Publish First Document
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2 text-xs">
+                  {suiteState.documents.map((docItem) => (
+                    <div key={docItem.id} className="p-2.5 rounded-xl border border-slate-200 bg-white hover:border-amber-300 transition-colors space-y-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h5 className="font-bold text-slate-900">{docItem.title}</h5>
+                          <p className="text-[11px] text-slate-600 leading-tight mt-0.5">{docItem.summary}</p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            {docItem.status.toUpperCase()}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteDocument(docItem.id, e)}
+                            className="text-slate-300 hover:text-rose-500 p-0.5 rounded cursor-pointer"
+                            title="Delete document"
+                          >
+                            <TrashIcon className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded shrink-0 border border-emerald-200">
-                        {doc.status.toUpperCase()}
-                      </span>
-                    </div>
 
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-500">
-                      <span>Valid: <strong className="text-slate-700">{doc.validThrough || 'Permanent'}</strong> • v{doc.version}</span>
-                      <span className="text-slate-400">
-                        Author: {doc.lastModifiedBy?.name || 'Admin'}
-                      </span>
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px] text-slate-500">
+                        <span>Valid: <strong className="text-slate-700">{docItem.validThrough || 'Permanent'}</strong> • v{docItem.version}</span>
+                        <span className="text-slate-400">
+                          Author: {docItem.lastModifiedBy?.name || 'Dispatcher'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -616,7 +693,7 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                     type="text"
                     value={newCalTitle}
                     onChange={(e) => setNewCalTitle(e.target.value)}
-                    placeholder="Passenger / Event Name (e.g. John Doe DL881)..."
+                    placeholder="Passenger / Event Name (e.g. Flight Arrival DL881)..."
                     className="w-full text-xs px-2 py-1.5 rounded-lg border border-blue-300 bg-white"
                     required
                   />
@@ -633,7 +710,7 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                       size="xs"
                       fullWidth={false}
                       value={newCalCategory}
-                      onChange={(e) => setNewCalCategory(e.target.value as any)}
+                      onChange={(e) => setNewCalCategory(e.target.value as DispatchCalendarEvent['category'])}
                       triggerClassName="border-blue-300"
                     >
                       <option value="airport">Airport</option>
@@ -644,46 +721,73 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs"
+                    className="w-full py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs cursor-pointer"
                   >
-                    Schedule Shared Ride
+                    Schedule Shared Event
                   </button>
                 </form>
               )}
 
-              <div className="space-y-2 text-xs">
-                {suiteState.calendar.map((ev) => (
-                  <div
-                    key={ev.id}
-                    onClick={() => dispatchAppSuiteService.toggleCalendarEvent(ev.id)}
-                    className={`p-2.5 rounded-xl border transition-all cursor-pointer space-y-1 ${
-                      ev.completed
-                        ? 'bg-slate-50 border-slate-200 opacity-60 line-through'
-                        : 'bg-white border-blue-100 shadow-2xs hover:border-blue-300'
-                    }`}
+              {suiteState.calendar.length === 0 && !showAddCalForm ? (
+                <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 space-y-2">
+                  <CalendarIcon className="w-8 h-8 text-blue-500/70 mx-auto" />
+                  <p className="text-xs font-bold text-slate-700">No scheduled events yet</p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Add forward airport pickups, shift handovers, or VIP coordination reminders for the dispatch desk.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCalForm(true)}
+                    className="mt-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer shadow-2xs"
                   >
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-extrabold text-blue-900">{ev.time}</span>
-                      <span className="font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded text-[10px]">
-                        {ev.tag}
-                      </span>
+                    + Schedule First Event
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2 text-xs">
+                  {suiteState.calendar.map((ev) => (
+                    <div
+                      key={ev.id}
+                      onClick={() => void dispatchAppSuiteService.toggleCalendarEvent(ev.id)}
+                      className={`p-2.5 rounded-xl border transition-all cursor-pointer space-y-1 ${
+                        ev.completed
+                          ? 'bg-slate-50 border-slate-200 opacity-60 line-through'
+                          : 'bg-white border-blue-100 shadow-2xs hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-extrabold text-blue-900">{ev.time}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded text-[10px]">
+                            {ev.tag}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteCalendarEvent(ev.id, e)}
+                            className="text-slate-300 hover:text-rose-500 p-0.5 rounded cursor-pointer"
+                            title="Delete event"
+                          >
+                            <TrashIcon className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="font-bold text-slate-900">{ev.title}</p>
+                      {ev.routeSummary && (
+                        <p className="text-[11px] text-slate-600">{ev.routeSummary}</p>
+                      )}
+                      {ev.specialRequests && (
+                        <p className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
+                          Note: {ev.specialRequests}
+                        </p>
+                      )}
+                      <div className="pt-1 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+                        <span>Scheduled by: <strong className="text-slate-600">{ev.createdBy?.name || 'Dispatcher'}</strong></span>
+                        <span>{ev.completed ? '✓ Completed' : 'Pending'}</span>
+                      </div>
                     </div>
-                    <p className="font-bold text-slate-900">{ev.title}</p>
-                    {ev.routeSummary && (
-                      <p className="text-[11px] text-slate-600">{ev.routeSummary}</p>
-                    )}
-                    {ev.specialRequests && (
-                      <p className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
-                        Note: {ev.specialRequests}
-                      </p>
-                    )}
-                    <div className="pt-1 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-                      <span>Scheduled by: <strong className="text-slate-600">{ev.createdBy?.name || 'Dispatcher'}</strong></span>
-                      <span>{ev.completed ? '✓ Completed' : 'Pending'}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -699,46 +803,56 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                   <p className="text-[10px] text-slate-500">Live alarms shared across dispatch shift</p>
                 </div>
                 <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-                  {suiteState.calendar.filter((c) => !c.completed).length + suiteState.tasks.filter((t) => !t.completed && t.priority === 'high').length} Active
+                  {pendingCalendarEvents.length + urgentOpenTasks.length} Active
                 </span>
               </div>
 
-              <div className="space-y-2 text-xs">
-                {suiteState.calendar.slice(0, 3).map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-2.5 rounded-xl border border-rose-100 bg-white shadow-2xs flex items-center justify-between gap-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">⏰</span>
-                      <div>
-                        <span className="font-bold text-xs text-slate-900 block">{item.title}</span>
-                        <span className="text-[10px] text-rose-600 font-mono font-medium">
-                          {item.time} • {item.tag}
-                        </span>
+              {pendingCalendarEvents.length === 0 && urgentOpenTasks.length === 0 ? (
+                <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 space-y-1.5">
+                  <ClockIcon className="w-8 h-8 text-rose-400/80 mx-auto" />
+                  <p className="text-xs font-bold text-slate-700">No active operational alarms</p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Pending calendar events and high-priority shift tasks appear here automatically.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 text-xs">
+                  {pendingCalendarEvents.slice(0, 5).map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-2.5 rounded-xl border border-rose-100 bg-white shadow-2xs flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">⏰</span>
+                        <div>
+                          <span className="font-bold text-xs text-slate-900 block">{item.title}</span>
+                          <span className="text-[10px] text-rose-600 font-mono font-medium">
+                            {item.time} • {item.tag}
+                          </span>
+                        </div>
                       </div>
+                      <span className="text-[10px] text-slate-400">
+                        by {item.createdBy?.name || 'Staff'}
+                      </span>
                     </div>
-                    <span className="text-[10px] text-slate-400">
-                      by {item.createdBy?.name || 'Staff'}
-                    </span>
-                  </div>
-                ))}
+                  ))}
 
-                {suiteState.tasks.filter((t) => t.priority === 'high' && !t.completed).map((task) => (
-                  <div
-                    key={task.id}
-                    className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/40 flex items-center justify-between gap-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">⚠️</span>
-                      <span className="font-bold text-xs text-slate-800">{task.text}</span>
+                  {urgentOpenTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/40 flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">⚠️</span>
+                        <span className="font-bold text-xs text-slate-800">{task.text}</span>
+                      </div>
+                      <span className="text-[9px] font-black uppercase text-rose-700 bg-rose-100 px-1.5 py-0.2 rounded">
+                        High Priority
+                      </span>
                     </div>
-                    <span className="text-[9px] font-black uppercase text-rose-700 bg-rose-100 px-1.5 py-0.2 rounded">
-                      High Priority
-                    </span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -765,53 +879,63 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                {suiteState.tasks.map((task) => (
-                  <div
-                    key={task.id}
-                    onClick={() => handleToggleTask(task.id)}
-                    className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
-                      task.completed
-                        ? 'bg-slate-50 border-slate-200 line-through text-slate-400'
-                        : 'bg-white border-slate-200 text-slate-800 hover:border-emerald-300 shadow-2xs'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <input
-                        type="checkbox"
-                        checked={task.completed}
-                        onChange={() => {}}
-                        className="w-4 h-4 rounded text-emerald-600 cursor-pointer shrink-0"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <span className="text-xs font-medium block truncate">{task.text}</span>
-                        <div className="text-[9px] text-slate-400 flex items-center gap-1">
-                          <span>Added by {task.createdBy?.name || 'Staff'}</span>
-                          {task.completedBy && (
-                            <span>• ✓ Done by {task.completedBy.name}</span>
-                          )}
+              {suiteState.tasks.length === 0 ? (
+                <div className="py-6 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 space-y-1.5">
+                  <CheckIcon className="w-7 h-7 text-emerald-500/70 mx-auto" />
+                  <p className="text-xs font-bold text-slate-700">No shift tasks on the checklist</p>
+                  <p className="text-[11px] text-slate-500">
+                    Add a shared task below to coordinate across dispatchers.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {suiteState.tasks.map((task) => (
+                    <div
+                      key={task.id}
+                      onClick={() => handleToggleTask(task.id)}
+                      className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                        task.completed
+                          ? 'bg-slate-50 border-slate-200 line-through text-slate-400'
+                          : 'bg-white border-slate-200 text-slate-800 hover:border-emerald-300 shadow-2xs'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={task.completed}
+                          onChange={() => {}}
+                          className="w-4 h-4 rounded text-emerald-600 cursor-pointer shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <span className="text-xs font-medium block truncate">{task.text}</span>
+                          <div className="text-[9px] text-slate-400 flex items-center gap-1">
+                            <span>Added by {task.createdBy?.name || 'Staff'}</span>
+                            {task.completedBy && (
+                              <span>• ✓ Done by {task.completedBy.name}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {task.priority === 'high' && (
-                        <span className="text-[9px] font-black uppercase text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
-                          High
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteTask(task.id, e)}
-                        className="text-slate-300 hover:text-rose-500 p-0.5 rounded cursor-pointer"
-                        title="Delete task"
-                      >
-                        <TrashIcon className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {task.priority === 'high' && (
+                          <span className="text-[9px] font-black uppercase text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
+                            High
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteTask(task.id, e)}
+                          className="text-slate-300 hover:text-rose-500 p-0.5 rounded cursor-pointer"
+                          title="Delete task"
+                        >
+                          <TrashIcon className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               {/* Add Task Form */}
               <form onSubmit={handleAddTask} className="pt-2 border-t border-slate-200 flex gap-1.5">
@@ -827,7 +951,7 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                   size="xs"
                   fullWidth={false}
                   value={newTaskPriority}
-                  onChange={(e) => setNewTaskPriority(e.target.value as any)}
+                  onChange={(e) => setNewTaskPriority(e.target.value as DispatchTaskItem['priority'])}
                   triggerClassName="border-slate-300 bg-slate-50"
                 >
                   <option value="high">High</option>
@@ -864,15 +988,6 @@ export function AppSuiteLauncher({ onOpenBookingModal }: AppSuiteLauncherProps) 
                     <div><span className="font-mono font-bold text-slate-900">10-20</span>: Current Location</div>
                     <div><span className="font-mono font-bold text-slate-900">10-33</span>: Emergency Traffic</div>
                     <div><span className="font-mono font-bold text-slate-900">10-76</span>: En Route</div>
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded-xl border border-rose-200 bg-rose-50/40 space-y-1">
-                  <h5 className="font-bold text-rose-900">Emergency & Key Contacts</h5>
-                  <div className="space-y-0.5 text-[11px] text-slate-700">
-                    <div>Chesterfield Police Non-Emergency: <span className="font-mono font-bold">(804) 748-1251</span></div>
-                    <div>RIC Airport Ground Dispatch: <span className="font-mono font-bold">(804) 226-3000</span></div>
-                    <div>Fleet Towing & Roadside: <span className="font-mono font-bold">(804) 555-0191</span></div>
                   </div>
                 </div>
 

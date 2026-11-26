@@ -1110,6 +1110,7 @@ export interface ConfigAuditEntry {
 
 export interface FleetAlertsConfig {
   autoDismissMinutes?: number; // default: 60 (1 hour)
+  tacticalPresets?: string[];
 }
 
 export type DispatchRankingStrategy =

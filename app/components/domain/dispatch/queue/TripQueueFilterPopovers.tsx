@@ -146,6 +146,9 @@ export interface TripStatusMultiSelectDropdownProps {
   statusFilter: string;
   unconfirmedCount?: number;
   showTriggerUnconfirmedBadge?: boolean;
+  showUnconfirmedOption?: boolean;
+  isExternalUnconfirmedActive?: boolean;
+  onToggleUnconfirmedQuickFilter?: () => void;
   onStatusFilterChange: (nextStatusFilter: string) => void;
 }
 
@@ -153,6 +156,9 @@ export function TripStatusMultiSelectDropdown({
   statusFilter,
   unconfirmedCount = 0,
   showTriggerUnconfirmedBadge = true,
+  showUnconfirmedOption = true,
+  isExternalUnconfirmedActive = false,
+  onToggleUnconfirmedQuickFilter,
   onStatusFilterChange,
 }: TripStatusMultiSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -162,14 +168,19 @@ export function TripStatusMultiSelectDropdown({
   });
 
   const prevNonUnconfirmedStatusRef = useRef<string>(DEFAULT_ACTIVE_ONLY_STATUS_FILTER);
-  const isUnconfirmedOnly = isUnconfirmedQuickFilterActive(statusFilter);
+  const isLegacyUnconfirmedOnly = isUnconfirmedQuickFilterActive(statusFilter);
+  const isUnconfirmedRowActive = isExternalUnconfirmedActive || isLegacyUnconfirmedOnly;
   useEffect(() => {
-    if (!isUnconfirmedOnly && statusFilter) {
+    if (!isLegacyUnconfirmedOnly && statusFilter) {
       prevNonUnconfirmedStatusRef.current = statusFilter;
     }
-  }, [isUnconfirmedOnly, statusFilter]);
+  }, [isLegacyUnconfirmedOnly, statusFilter]);
 
   const handleToggleUnconfirmedQuickFilter = () => {
+    if (onToggleUnconfirmedQuickFilter) {
+      onToggleUnconfirmedQuickFilter();
+      return;
+    }
     const { nextStatusFilter, savedPreviousFilter } = computeNextStatusFilterOnUnconfirmedToggle(
       statusFilter,
       prevNonUnconfirmedStatusRef.current
@@ -179,20 +190,20 @@ export function TripStatusMultiSelectDropdown({
   };
 
   const selectedSet = parseStatusFilterSelection(statusFilter);
-  const lifecycleSelectedCount = isUnconfirmedOnly
+  const lifecycleSelectedCount = isLegacyUnconfirmedOnly
     ? 0
     : STATUS_FILTER_OPTIONS.filter((o) => selectedSet.has(o.key)).length;
-  const allSelected = !isUnconfirmedOnly && lifecycleSelectedCount === STATUS_FILTER_OPTIONS.length;
-  const noneSelected = !isUnconfirmedOnly && lifecycleSelectedCount === 0;
-  const someSelected = !isUnconfirmedOnly && lifecycleSelectedCount > 0 && !allSelected;
+  const allSelected = !isLegacyUnconfirmedOnly && lifecycleSelectedCount === STATUS_FILTER_OPTIONS.length;
+  const noneSelected = !isLegacyUnconfirmedOnly && lifecycleSelectedCount === 0;
+  const someSelected = !isLegacyUnconfirmedOnly && lifecycleSelectedCount > 0 && !allSelected;
   const isNeutral = allSelected;
 
   const isActivePresetSelected =
-    !isUnconfirmedOnly &&
+    !isLegacyUnconfirmedOnly &&
     selectedSet.size === ACTIVE_QUEUE_STATUS_KEYS.length &&
     ACTIVE_QUEUE_STATUS_KEYS.every((k) => selectedSet.has(k));
 
-  const buttonLabel = isUnconfirmedOnly
+  const buttonLabel = isLegacyUnconfirmedOnly
     ? 'Unconfirmed'
     : isNeutral
     ? 'All Status'
@@ -205,7 +216,7 @@ export function TripStatusMultiSelectDropdown({
     : `Status (${lifecycleSelectedCount})`;
 
   const toggleStatusKey = (key: CanonicalQueueStatusKey) => {
-    if (isUnconfirmedOnly) {
+    if (isLegacyUnconfirmedOnly) {
       onStatusFilterChange(serializeStatusFilterSelection([key]));
       return;
     }
@@ -220,8 +231,17 @@ export function TripStatusMultiSelectDropdown({
 
   const handleTriggerClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isOpen) { setCoords(null); setIsOpen(false); }
-    else { const initial = computeCoords(); if (initial) setCoords(initial); setIsOpen(true); }
+    if (isOpen) {
+      setCoords(null);
+      setIsOpen(false);
+    } else {
+      if (isExternalUnconfirmedActive && !showUnconfirmedOption && onToggleUnconfirmedQuickFilter) {
+        onToggleUnconfirmedQuickFilter();
+      }
+      const initial = computeCoords();
+      if (initial) setCoords(initial);
+      setIsOpen(true);
+    }
   };
 
   return (
@@ -230,20 +250,28 @@ export function TripStatusMultiSelectDropdown({
         ref={triggerRef} type="button" onClick={handleTriggerClick}
         className={`h-7 px-2 sm:px-2.5 border rounded-lg text-xs shadow-2xs cursor-pointer flex items-center gap-1.5 max-w-[155px] sm:max-w-[185px] transition-all ${
           isOpen ? 'bg-blue-50 border-blue-400 text-blue-700 font-bold ring-2 ring-blue-500/20'
-            : isUnconfirmedOnly ? 'bg-rose-50 border-rose-400 text-rose-800 font-bold'
+            : isExternalUnconfirmedActive ? 'bg-slate-100/80 hover:bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-600 font-medium opacity-75'
+            : isLegacyUnconfirmedOnly ? 'bg-rose-50 border-rose-400 text-rose-800 font-bold'
             : isActivePresetSelected ? 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700 font-semibold'
             : !isNeutral ? 'bg-blue-50 border-blue-500 text-blue-800 font-bold'
             : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700 font-semibold'
         }`}
         title={
-          unconfirmedCount > 0
+          isExternalUnconfirmedActive
+            ? `Unconfirmed quick-filter is active (saved status filter: ${buttonLabel}) — select a status to switch`
+            : unconfirmedCount > 0
             ? `Filter trips by lifecycle status (${unconfirmedCount} unconfirmed awaiting review)`
             : 'Filter trips by lifecycle status'
         }
         aria-haspopup="true" aria-expanded={isOpen}
       >
         {isActivePresetSelected && (
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
+          <span
+            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+              isExternalUnconfirmedActive ? 'bg-slate-300' : 'bg-emerald-500'
+            }`}
+            aria-hidden="true"
+          />
         )}
         <span className="truncate">{buttonLabel}</span>
         {showTriggerUnconfirmedBadge && unconfirmedCount > 0 && (
@@ -276,7 +304,7 @@ export function TripStatusMultiSelectDropdown({
               <button
                 type="button" onClick={() => onStatusFilterChange(serializeStatusFilterSelection(ACTIVE_QUEUE_STATUS_KEYS))}
                 className={`px-2 py-0.5 rounded-md text-[10px] font-bold border cursor-pointer transition-colors normal-case tracking-normal ${
-                  isActivePresetSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-blue-50 text-blue-700 border-blue-200'
+                  isActivePresetSelected && !isExternalUnconfirmedActive ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-blue-50 text-blue-700 border-blue-200'
                 }`}
                 title="Check only live/open statuses (hide Completed, Cancelled, Declined)"
               >
@@ -285,29 +313,31 @@ export function TripStatusMultiSelectDropdown({
             </div>
 
             <div className="max-h-72 overflow-y-auto py-1">
-              <button
-                type="button"
-                onClick={handleToggleUnconfirmedQuickFilter}
-                className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer border-b border-slate-100 mb-0.5 ${
-                  isUnconfirmedOnly
-                    ? 'font-bold text-rose-700 bg-rose-50/90 hover:bg-rose-100/70'
-                    : 'font-semibold text-slate-700 hover:bg-rose-50/60 hover:text-rose-700'
-                }`}
-              >
-                <span className="flex items-center gap-2 min-w-0">
-                  <MenuCheckIndicator checked={isUnconfirmedOnly} />
-                  <span className="w-2 h-2 rounded-full shrink-0 bg-rose-600" />
-                  <span className="truncate">Unconfirmed</span>
-                </span>
-                {unconfirmedCount > 0 && (
-                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-black tabular-nums inline-flex items-center justify-center leading-none shrink-0">
-                    {unconfirmedCount}
+              {showUnconfirmedOption && (
+                <button
+                  type="button"
+                  onClick={handleToggleUnconfirmedQuickFilter}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-xs transition-colors cursor-pointer border-b border-slate-100 mb-0.5 ${
+                    isUnconfirmedRowActive
+                      ? 'font-bold text-rose-700 bg-rose-50/90 hover:bg-rose-100/70'
+                      : 'font-semibold text-slate-700 hover:bg-rose-50/60 hover:text-rose-700'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 min-w-0">
+                    <MenuCheckIndicator checked={isUnconfirmedRowActive} />
+                    <span className="w-2 h-2 rounded-full shrink-0 bg-rose-600" />
+                    <span className="truncate">Unconfirmed</span>
                   </span>
-                )}
-              </button>
+                  {unconfirmedCount > 0 && (
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-black tabular-nums inline-flex items-center justify-center leading-none shrink-0">
+                      {unconfirmedCount}
+                    </span>
+                  )}
+                </button>
+              )}
 
               {STATUS_FILTER_OPTIONS.map((opt) => {
-                const checked = !isUnconfirmedOnly && selectedSet.has(opt.key);
+                const checked = !isLegacyUnconfirmedOnly && selectedSet.has(opt.key);
                 return (
                   <button
                     key={opt.key} type="button" onClick={() => toggleStatusKey(opt.key)}

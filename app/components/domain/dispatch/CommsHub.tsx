@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getCommsThreadService } from '../../../core/services/comms/comms-thread.service';
 import { getWorkspaceBus } from '../../../core/services/workspace-bus.service';
-import { ChatBubbleLeftRightIcon, ExternalLinkIcon, KeypadGridIcon, LayersIcon, PhoneIcon, PlusIcon, SpinnerIcon, VoicemailIcon, XIcon } from '../../ui/Icons';
+import { ChatBubbleLeftRightIcon, ExternalLinkIcon, KeypadGridIcon, LayersIcon, PhoneIcon, SpinnerIcon, VoicemailIcon, XIcon } from '../../ui/Icons';
 import { CommsFilterToolbar } from './comms/CommsFilterToolbar';
 import { AgentPhoneSetupModal, CommsBottomNewSmsSheet } from './comms/CommsModals';
 import { SmsThreadPane } from './comms/SmsThreadPane';
@@ -336,7 +336,7 @@ function CommsHubComponent({
   const sharedSmsProps = {
     threadTab: messaging.threadTab, onChangeThreadTab: messaging.setThreadTab,
     timelineFilters: messaging.timelineFilters, onChangeTimelineFilters: messaging.setTimelineFilters,
-    onBackFromThread: () => messaging.setSelectedContactPhone(null),
+    onBackFromThread: () => messaging.selectContactWithFocus(null),
     onOpenContactEdit: messaging.handleOpenContactEdit, onOpenClientProfile: messaging.handleOpenClientProfile,
     onBookContactRide: messaging.handleBookContactRide, playingCallId: sync.playingCallId,
     onTogglePlayCall: sync.handleTogglePlayCall, playingVoicemailId: sync.playingVoicemailId,
@@ -345,7 +345,7 @@ function CommsHubComponent({
     onConvertVoicemailToBooking: messaging.handleConvertVoicemailToBooking,
     smsReplyText: messaging.smsReplyText, onChangeSmsReplyText: messaging.setSmsReplyText,
     isSendingSms: messaging.isSendingSms, onSendSms: messaging.handleSendSms,
-    smsStatusMessage: messaging.smsStatusMessage, onSelectContact: messaging.setSelectedContactPhone,
+    smsStatusMessage: messaging.smsStatusMessage, onSelectContact: messaging.selectContactWithFocus,
     onOpenFreshNewMessageModal: messaging.handleOpenFreshNewMessageModal,
   };
 
@@ -453,6 +453,7 @@ function CommsHubComponent({
             onOpenTripById={messaging.handleOpenTripById} onOpenTripDetails={onOpenTripDetails}
             onFocusTripOnMap={messaging.handleFocusTripOnMap} onRebookLastRide={messaging.handleRebookFromCrm}
             selectedInteractions={messaging.allSelectedContactInteractions} messagesEndRef={messaging.messagesEndRef}
+            highlightedEvent={messaging.highlightedTimelineEvent}
             onOpenEmailInDock={messaging.handleOpenEmailInDock} onRetrySms={messaging.handleRetrySms}
             retryingSmsId={messaging.retryingSmsId} onInsertTrackingLink={() => messaging.handleInsertTrackingLink('thread')}
             onInsertPayLink={() => messaging.handleInsertPayLink('thread')} isGeneratingPayLink={messaging.isGeneratingPayLink}
@@ -492,7 +493,7 @@ function CommsHubComponent({
             playingVoicemailId={sync.playingVoicemailId} onTogglePlayVoicemail={sync.handleTogglePlayVoicemail}
             playingCallId={sync.playingCallId} onTogglePlayCall={sync.handleTogglePlayCall}
             playbackSpeed={sync.playbackSpeed} onCyclePlaybackSpeed={sync.handleCyclePlaybackSpeed}
-            onStartCall={softphone.handleStartCall} onSelectContact={messaging.setSelectedContactPhone}
+            onStartCall={softphone.handleStartCall} onSelectContact={messaging.selectContactWithFocus}
             onConvertVoicemailToBooking={messaging.handleConvertVoicemailToBooking} onOpenEmailInDock={messaging.handleOpenEmailInDock}
             selectedRowKeys={selectedRowKeys} onToggleSelectRow={handleToggleSelectRow}
             onToggleRowReadStatus={handleToggleRowReadStatus}
@@ -508,9 +509,10 @@ function CommsHubComponent({
               data-comms-keypad-fab="true"
               onClick={openKeypadView}
               title="Open Softphone Keypad"
-              className="h-9 px-3.5 rounded-full bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-extrabold shadow-lg ring-1 ring-emerald-700/20 inline-flex items-center gap-1.5 cursor-pointer"
+              aria-label="Open Softphone Keypad"
+              className="w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white shadow-lg ring-1 ring-emerald-700/20 inline-flex items-center justify-center cursor-pointer"
             >
-              <KeypadGridIcon className="w-3.5 h-3.5" /><span>Keypad</span>
+              <KeypadGridIcon className="w-4 h-4" />
             </button>
           )}
           {showNewMsgFab && (
@@ -519,9 +521,10 @@ function CommsHubComponent({
               data-comms-new-sms-fab="true"
               onClick={messaging.handleOpenFreshNewMessageModal}
               title="Compose New Message"
-              className="h-9 px-3.5 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-extrabold shadow-lg ring-1 ring-blue-700/20 inline-flex items-center gap-1.5 cursor-pointer"
+              aria-label="Compose New Message"
+              className="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white shadow-lg ring-1 ring-blue-700/20 inline-flex items-center justify-center cursor-pointer"
             >
-              <PlusIcon className="w-3.5 h-3.5" /><span>New Message</span>
+              <ChatBubbleLeftRightIcon className="w-4 h-4" />
             </button>
           )}
         </div>

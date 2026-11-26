@@ -1,18 +1,31 @@
 /**
  * Dispatch App Suite Service
- * 
- * Provides a single shared source of truth across all staff with dispatch roles
- * for shift handover notes, fleet documents, scheduled calendar rides, and operations tasks.
- * 
- * Features:
- * - Google Docs-style author tracking (who created, who last modified, timestamps, contributor lists)
- * - Real-time Firestore synchronization with multi-tab BroadcastChannel fallback
- * - Cross-dispatcher collaboration with persistent state
+ *
+ * Provides real-time synchronized collaboration across all dispatch staff via dedicated
+ * per-entity Firestore collections (`dispatch_notes`, `dispatch_documents`,
+ * `dispatch_calendar`, `dispatch_tasks`, and `dispatch_presence`).
+ *
+ * Architectural Guarantees:
+ * - Zero hardcoded mock data or simulated collaborators
+ * - Per-document Firestore writes (`setDoc` / `deleteDoc`) so concurrent dispatcher edits never clobber one another
+ * - Auth-aware `onSnapshot` subscriptions with multi-tab BroadcastChannel fallback when offline
  */
 
-import { doc, getDoc, setDoc, onSnapshot, getFirestore } from 'firebase/firestore';
-import { getFirebaseApp, isFirebaseConfigured } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import {
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  setDoc,
+} from 'firebase/firestore';
+import {
+  getFirebaseAuth,
+  getFirestoreDb,
+  isFirebaseConfigured,
+} from '../firebase';
 import { getAdminAuthService } from '../auth/admin-auth.service';
+import { sanitizeFirestoreDocument } from '../firestore-sanitizer';
 
 export interface AuthorMeta {
   uid: string;
@@ -74,8 +87,8 @@ export interface DispatchTaskItem {
   createdAt: string;
   updatedAt: string;
   createdBy: AuthorMeta;
-  completedBy?: AuthorMeta;
-  completedAt?: string;
+  completedBy?: AuthorMeta | null;
+  completedAt?: string | null;
 }
 
 export interface DispatcherPresence {
@@ -98,228 +111,64 @@ export interface DispatchAppSuiteState {
   presences?: DispatcherPresence[];
 }
 
-const STORAGE_KEY = 'cf_dispatch_app_suite_v2';
-const BROADCAST_CHANNEL_NAME = 'cf_dispatch_app_suite_channel';
+const COLLECTIONS = {
+  notes: 'dispatch_notes',
+  documents: 'dispatch_documents',
+  calendar: 'dispatch_calendar',
+  tasks: 'dispatch_tasks',
+  presence: 'dispatch_presence',
+} as const;
 
-// Default seed records with rich operational details
-const DEFAULT_AUTHOR: AuthorMeta = {
-  uid: 'system-ops',
-  name: 'Operations Dispatch',
-  email: 'dispatch@chesterfieldtaxi.com',
-  role: 'dispatcher',
-};
+const OFFLINE_CACHE_KEY = 'cf_dispatch_app_suite_v3';
+const BROADCAST_CHANNEL_NAME = 'cf_dispatch_app_suite_channel_v3';
+const PRESENCE_STALE_MS = 30_000;
 
-const INITIAL_NOTES: DispatchNote[] = [
-  {
-    id: 'note-shift-handover',
-    title: 'Shift Handover & Airport Protocol',
-    category: 'shift_handover',
-    content: `DISPATCH HANDOVER MEMO - ${new Date().toLocaleDateString()}
-• Richmond Int'l Airport (RIC) construction on lower arrivals loop; direct inbound drivers to Baggage Door 3.
-• Corporate account #CP-8821 (Capital One) has 2 executive sedans requested tomorrow morning.
-• Tarrington gated community entrance code: #4492 (call guard box if callbox offline).
-• Car #12 scheduled for fleet safety inspection & oil service at 2:00 PM.
-• VCU Health discharge gate: use 12th St ambulance bay ramp for non-emergency wheelchair transports.`,
-    createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-    updatedAt: new Date(Date.now() - 1800000).toISOString(),
-    createdBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-    lastModifiedBy: { uid: 'u-disp-1', name: 'Sarah J.', email: 'dispatch@chesterfieldtaxi.com', role: 'dispatcher' },
-    contributors: [
-      { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-      { uid: 'u-disp-1', name: 'Sarah J.', email: 'dispatch@chesterfieldtaxi.com', role: 'dispatcher' },
-    ],
-    isPinned: true,
-  },
-  {
-    id: 'note-gate-codes',
-    title: 'Regional Gate & Access Codes',
-    category: 'gate_codes',
-    content: `KEY CODES & FACILITY ACCESS:
-• Hallsley Clubhouse: #9901
-• The Jefferson Hotel Valet Service Lane: Ring buzzer twice
-• Capital One West Creek Campus - Building 3 VIP Gate: #8831
-• Brandermill Country Club Member Gate: #1420
-• Salisbury Estates Service Entrance: Code 7721*`,
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-    createdBy: { uid: 'u-disp-1', name: 'Sarah J.', email: 'dispatch@chesterfieldtaxi.com', role: 'dispatcher' },
-    lastModifiedBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-  },
-];
+function createEmptySuiteState(): DispatchAppSuiteState {
+  return {
+    notes: [],
+    documents: [],
+    calendar: [],
+    tasks: [],
+    presences: [],
+  };
+}
 
-const INITIAL_DOCUMENTS: DispatchDocument[] = [
-  {
-    id: 'doc-ric-permit',
-    title: 'RIC Airport Ground Operator Permit',
-    category: 'permit',
-    summary: 'Commercial Ground Transportation Operator Agreement with Capital Region Airport Commission.',
-    documentNumber: 'RIC-TAXI-2026-A',
-    validThrough: 'Dec 31, 2026',
-    status: 'active',
-    version: '2.4',
-    createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
-    updatedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-    createdBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-    lastModifiedBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-  },
-  {
-    id: 'doc-franchise-cert',
-    title: 'City Medallion Franchise Certificate',
-    category: 'permit',
-    summary: 'Chesterfield & Henrico County Joint Operating Certificate for 24/7 Taxicab Service.',
-    documentNumber: 'CH-TAXI-8841',
-    validThrough: 'Oct 31, 2026',
-    status: 'active',
-    version: '1.0',
-    createdAt: new Date(Date.now() - 86400000 * 60).toISOString(),
-    updatedAt: new Date(Date.now() - 86400000 * 20).toISOString(),
-    createdBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-    lastModifiedBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-  },
-  {
-    id: 'doc-fleet-insurance',
-    title: 'Commercial Fleet Insurance ($1M CSL)',
-    category: 'insurance',
-    summary: 'Travelers Commercial Transportation Liability Policy covering all active medallion cabs.',
-    documentNumber: 'TRV-882910-FL',
-    validThrough: 'Aug 15, 2027',
-    status: 'active',
-    version: '3.1',
-    createdAt: new Date(Date.now() - 86400000 * 45).toISOString(),
-    updatedAt: new Date(Date.now() - 86400000 * 10).toISOString(),
-    createdBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-    lastModifiedBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-  },
-  {
-    id: 'doc-tariff-schedule',
-    title: 'Standard Taxi Meter Tariff Schedule',
-    category: 'tariff',
-    summary: 'County-authorized rates: Base $3.50, $2.80/mi, $0.50/min wait time, $1.50 evening surcharge.',
-    documentNumber: 'TAR-2026-V1',
-    validThrough: 'Indefinite',
-    status: 'active',
-    version: '1.2',
-    createdAt: new Date(Date.now() - 86400000 * 90).toISOString(),
-    updatedAt: new Date(Date.now() - 86400000 * 15).toISOString(),
-    createdBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-    lastModifiedBy: { uid: 'u-disp-1', name: 'Sarah J.', email: 'dispatch@chesterfieldtaxi.com', role: 'dispatcher' },
-  },
-];
+function sortNotes(items: DispatchNote[]): DispatchNote[] {
+  return [...items].sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    return (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || '');
+  });
+}
 
-const INITIAL_CALENDAR: DispatchCalendarEvent[] = [
-  {
-    id: 'cal-1',
-    title: 'Amanda Vance (Flight DL 1492)',
-    time: '08:30 AM Tomorrow',
-    category: 'flight',
-    tag: 'Pre-booked',
-    passengerName: 'Amanda Vance',
-    routeSummary: 'RIC Airport Arrivals → Capital One West Creek',
-    specialRequests: 'Driver meet inside baggage claim with name placard',
-    completed: false,
-    createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    createdBy: { uid: 'u-disp-1', name: 'Sarah J.', email: 'dispatch@chesterfieldtaxi.com', role: 'dispatcher' },
-    lastModifiedBy: { uid: 'u-disp-1', name: 'Sarah J.', email: 'dispatch@chesterfieldtaxi.com', role: 'dispatcher' },
-  },
-  {
-    id: 'cal-2',
-    title: 'Dr. Elena Rossi (Wheelchair Assist)',
-    time: '11:00 AM Tomorrow',
-    category: 'medical',
-    tag: 'Medical Priority',
-    passengerName: 'Dr. Elena Rossi',
-    routeSummary: 'VCU Health Gateway → 4421 Patterson Ave',
-    specialRequests: 'Foldable ramp van requested; patient escort to clinic desk',
-    completed: false,
-    createdAt: new Date(Date.now() - 3600000 * 18).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 18).toISOString(),
-    createdBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-    lastModifiedBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-  },
-  {
-    id: 'cal-3',
-    title: 'The Jefferson Hotel Executive Departure',
-    time: '02:15 PM Tomorrow',
-    category: 'airport',
-    tag: 'VIP Outbound',
-    passengerName: 'Marcus Sterling',
-    routeSummary: 'The Jefferson Hotel (Main St) → RIC Airport Gate A',
-    specialRequests: 'Clean black sedan requested; flight departing 04:00 PM',
-    completed: false,
-    createdAt: new Date(Date.now() - 3600000 * 22).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 22).toISOString(),
-    createdBy: { uid: 'u-disp-1', name: 'Sarah J.', email: 'dispatch@chesterfieldtaxi.com', role: 'dispatcher' },
-    lastModifiedBy: { uid: 'u-disp-1', name: 'Sarah J.', email: 'dispatch@chesterfieldtaxi.com', role: 'dispatcher' },
-  },
-];
+function sortByUpdatedDesc<T extends { updatedAt?: string; createdAt?: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) =>
+    (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || '')
+  );
+}
 
-const INITIAL_TASKS: DispatchTaskItem[] = [
-  {
-    id: 't-1',
-    text: 'Verify morning airport pre-bookings with RIC operations lower loop',
-    completed: true,
-    priority: 'high',
-    createdAt: new Date(Date.now() - 3600000 * 6).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    createdBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-    completedBy: { uid: 'u-disp-1', name: 'Sarah J.', email: 'dispatch@chesterfieldtaxi.com', role: 'dispatcher' },
-    completedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-  },
-  {
-    id: 't-2',
-    text: 'Audit daily card terminal settlement batches with Stripe vault',
-    completed: true,
-    priority: 'med',
-    createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-    createdBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-    completedBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-    completedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-  },
-  {
-    id: 't-3',
-    text: 'Check driver medallion & quarterly inspection compliance logs for Unit #12',
-    completed: false,
-    priority: 'high',
-    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-    createdBy: { uid: 'u-disp-1', name: 'Sarah J.', email: 'dispatch@chesterfieldtaxi.com', role: 'dispatcher' },
-  },
-  {
-    id: 't-4',
-    text: 'Restock printed receipt paper rolls & fleet fuel cards at base office',
-    completed: false,
-    priority: 'low',
-    createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-    createdBy: { uid: 'u-disp-1', name: 'Sarah J.', email: 'dispatch@chesterfieldtaxi.com', role: 'dispatcher' },
-  },
-  {
-    id: 't-5',
-    text: 'Send weekly corporate accounts summary to Capital One & VCU Health',
-    completed: false,
-    priority: 'med',
-    createdAt: new Date(Date.now() - 3600000 * 7).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 7).toISOString(),
-    createdBy: { uid: 'u-admin-1', name: 'Zemene G.', email: 'admin@chesterfieldtaxi.com', role: 'admin' },
-  },
-];
+function sortByCreatedDesc<T extends { createdAt?: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+}
 
 export class DispatchAppSuiteService {
   private static instance: DispatchAppSuiteService;
   private state: DispatchAppSuiteState;
   private listeners = new Set<(state: DispatchAppSuiteState) => void>();
   private broadcastChannel: BroadcastChannel | null = null;
-  private unsubscribeFirestore: (() => void) | null = null;
+  private firestoreUnsubs: Array<() => void> = [];
+  private authUnsub: (() => void) | null = null;
   private isConfigured: boolean;
+  private realtimeAttached = false;
   private presences = new Map<string, DispatcherPresence>();
+  private stalePresenceTimer: ReturnType<typeof setInterval> | null = null;
 
   private constructor() {
     this.isConfigured = isFirebaseConfigured();
-    this.state = this.loadInitialState();
+    this.state = this.isConfigured ? createEmptySuiteState() : this.loadOfflineCache();
     this.setupBroadcastChannel();
     this.setupFirestoreSync();
+    this.setupStalePresenceSweep();
   }
 
   public static getInstance(): DispatchAppSuiteService {
@@ -330,11 +179,11 @@ export class DispatchAppSuiteService {
   }
 
   /**
-   * Resolves the current author metadata from adminAuthService
+   * Resolves the authenticated staff author metadata without any mock user fallback.
    */
   public getCurrentAuthor(): AuthorMeta {
     const user = getAdminAuthService().getCurrentUser();
-    if (user) {
+    if (user && user.uid) {
       const name = user.displayName || user.email?.split('@')[0] || 'Dispatcher';
       const role = user.role || (user.roles && user.roles[0]) || 'dispatcher';
       return {
@@ -344,35 +193,76 @@ export class DispatchAppSuiteService {
         role,
       };
     }
-    return DEFAULT_AUTHOR;
-  }
 
-  private loadInitialState(): DispatchAppSuiteState {
-    if (typeof window !== 'undefined') {
+    if (this.isConfigured && typeof window !== 'undefined') {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && Array.isArray(parsed.notes) && Array.isArray(parsed.tasks)) {
-            return {
-              notes: parsed.notes.length > 0 ? parsed.notes : INITIAL_NOTES,
-              documents: parsed.documents?.length > 0 ? parsed.documents : INITIAL_DOCUMENTS,
-              calendar: parsed.calendar?.length > 0 ? parsed.calendar : INITIAL_CALENDAR,
-              tasks: parsed.tasks?.length > 0 ? parsed.tasks : INITIAL_TASKS,
-            };
-          }
+        const fbUser = getFirebaseAuth().currentUser;
+        if (fbUser && fbUser.uid) {
+          return {
+            uid: fbUser.uid,
+            name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Dispatcher',
+            email: fbUser.email,
+            role: 'dispatcher',
+          };
         }
-      } catch (err) {
-        console.warn('[DispatchAppSuiteService] Error loading localStorage state:', err);
+      } catch {
+        // Ignore prior to Firebase Auth initialization
       }
     }
 
     return {
-      notes: INITIAL_NOTES,
-      documents: INITIAL_DOCUMENTS,
-      calendar: INITIAL_CALENDAR,
-      tasks: INITIAL_TASKS,
+      uid: '',
+      name: 'Dispatcher',
+      email: null,
+      role: 'dispatcher',
     };
+  }
+
+  private loadOfflineCache(): DispatchAppSuiteState {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(OFFLINE_CACHE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Partial<DispatchAppSuiteState>;
+          return {
+            notes: Array.isArray(parsed?.notes) ? sortNotes(parsed.notes) : [],
+            documents: Array.isArray(parsed?.documents) ? sortByUpdatedDesc(parsed.documents) : [],
+            calendar: Array.isArray(parsed?.calendar) ? sortByCreatedDesc(parsed.calendar) : [],
+            tasks: Array.isArray(parsed?.tasks) ? sortByCreatedDesc(parsed.tasks) : [],
+            presences: [],
+          };
+        }
+      } catch (err) {
+        console.warn('[DispatchAppSuiteService] Error reading offline cache:', err);
+      }
+    }
+
+    return createEmptySuiteState();
+  }
+
+  private saveOfflineCache(broadcast: boolean = true): void {
+    if (typeof window !== 'undefined') {
+      try {
+        const cacheable: DispatchAppSuiteState = {
+          notes: this.state.notes,
+          documents: this.state.documents,
+          calendar: this.state.calendar,
+          tasks: this.state.tasks,
+        };
+        localStorage.setItem(OFFLINE_CACHE_KEY, JSON.stringify(cacheable));
+      } catch (err) {
+        console.warn('[DispatchAppSuiteService] Error writing offline cache:', err);
+      }
+    }
+
+    if (broadcast && this.broadcastChannel) {
+      try {
+        this.broadcastChannel.postMessage({
+          type: 'SUITE_STATE_UPDATED',
+          state: this.state,
+        });
+      } catch {}
+    }
   }
 
   private setupBroadcastChannel(): void {
@@ -381,14 +271,23 @@ export class DispatchAppSuiteService {
     try {
       this.broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
       this.broadcastChannel.onmessage = (event) => {
-        if (event.data && event.data.type === 'SUITE_STATE_UPDATED') {
-          this.state = event.data.state;
+        if (!this.realtimeAttached && event.data?.type === 'SUITE_STATE_UPDATED' && event.data.state) {
+          this.state = {
+            ...event.data.state,
+            presences: this.getActivePresences(),
+          };
           this.notifyListeners();
-        } else if (event.data && event.data.type === 'PRESENCE_HEARTBEAT') {
+        } else if (event.data?.type === 'PRESENCE_HEARTBEAT') {
           const p = event.data.presence as DispatcherPresence;
           if (p && p.uid) {
             this.presences.set(p.uid, p);
             this.cleanupStalePresences();
+            this.syncStatePresences();
+            this.notifyListeners();
+          }
+        } else if (event.data?.type === 'PRESENCE_CLEARED' && typeof event.data.uid === 'string') {
+          if (this.presences.delete(event.data.uid)) {
+            this.syncStatePresences();
             this.notifyListeners();
           }
         }
@@ -396,30 +295,32 @@ export class DispatchAppSuiteService {
     } catch (e) {
       console.warn('[DispatchAppSuiteService] BroadcastChannel unavailable:', e);
     }
-
-    // Storage event for older browsers or cross-origin tabs
-    window.addEventListener('storage', (e) => {
-      if (e.key === STORAGE_KEY && e.newValue) {
-        try {
-          this.state = JSON.parse(e.newValue);
-          this.notifyListeners();
-        } catch {}
-      }
-    });
   }
 
-  // ─── LIVE PRESENCE TRACKING ───
+  private setupStalePresenceSweep(): void {
+    if (typeof window === 'undefined') return;
+    this.stalePresenceTimer = setInterval(() => {
+      if (this.cleanupStalePresences()) {
+        this.syncStatePresences();
+        this.notifyListeners();
+      }
+    }, 10_000);
+  }
+
+  // ─── LIVE PRESENCE TRACKING (`dispatch_presence`) ───
 
   public updatePresence(activeNoteId?: string | null, isEditing?: boolean): void {
     const author = this.getCurrentAuthor();
+    if (!author.uid) return;
+
     const presence: DispatcherPresence = {
       uid: author.uid,
       name: author.name,
       role: author.role,
-      email: author.email,
+      email: author.email ?? null,
       avatarColor: this.getAvatarColor(author.name),
-      activeNoteId: activeNoteId ?? null,
-      isEditing: !!isEditing,
+      activeNoteId: activeNoteId || null,
+      isEditing: Boolean(isEditing),
       lastSeen: Date.now(),
     };
     this.presences.set(author.uid, presence);
@@ -434,40 +335,73 @@ export class DispatchAppSuiteService {
     }
 
     this.cleanupStalePresences();
+    this.syncStatePresences();
     this.notifyListeners();
+
+    if (this.isConfigured && typeof window !== 'undefined') {
+      const db = getFirestoreDb();
+      const presenceRef = doc(db, COLLECTIONS.presence, author.uid);
+      void setDoc(
+        presenceRef,
+        sanitizeFirestoreDocument(presence as unknown as Record<string, unknown>),
+        { merge: true }
+      ).catch((err) => {
+        console.warn('[DispatchAppSuiteService] Failed to sync presence:', err);
+      });
+    }
   }
 
-  private cleanupStalePresences(): void {
-    const cutoff = Date.now() - 25000;
-    for (const [uid, pres] of this.presences.entries()) {
-      if (pres.lastSeen < cutoff) {
-        this.presences.delete(uid);
+  public async clearPresence(): Promise<void> {
+    const author = this.getCurrentAuthor();
+    if (!author.uid) return;
+
+    const removed = this.presences.delete(author.uid);
+    if (this.broadcastChannel) {
+      try {
+        this.broadcastChannel.postMessage({
+          type: 'PRESENCE_CLEARED',
+          uid: author.uid,
+        });
+      } catch {}
+    }
+
+    if (removed) {
+      this.syncStatePresences();
+      this.notifyListeners();
+    }
+
+    if (this.isConfigured && typeof window !== 'undefined') {
+      try {
+        const db = getFirestoreDb();
+        await deleteDoc(doc(db, COLLECTIONS.presence, author.uid));
+      } catch {
+        // Ignore cleanup errors on sign-out or unload
       }
     }
+  }
+
+  private cleanupStalePresences(): boolean {
+    const cutoff = Date.now() - PRESENCE_STALE_MS;
+    let changed = false;
+    for (const [uid, pres] of this.presences.entries()) {
+      if (!pres.lastSeen || pres.lastSeen < cutoff) {
+        this.presences.delete(uid);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  private syncStatePresences(): void {
+    this.state = {
+      ...this.state,
+      presences: Array.from(this.presences.values()),
+    };
   }
 
   public getActivePresences(noteId?: string): DispatcherPresence[] {
     this.cleanupStalePresences();
     const all = Array.from(this.presences.values());
-
-    const currentAuthor = this.getCurrentAuthor();
-    const otherPresences = all.filter((p) => p.uid !== currentAuthor.uid);
-
-    // If no other dispatchers are connected in multi-tab, include simulated team presence
-    // so dispatchers immediately see team presence and avatar cursors
-    if (otherPresences.length === 0) {
-      all.push({
-        uid: 'u-disp-sarah',
-        name: 'Sarah J.',
-        role: 'dispatcher',
-        email: 'sarah.j@chesterfieldtaxi.com',
-        avatarColor: 'bg-emerald-600',
-        activeNoteId: noteId || 'note-shift-handover',
-        isEditing: false,
-        lastSeen: Date.now(),
-      });
-    }
-
     if (noteId) {
       return all.filter((p) => p.activeNoteId === noteId);
     }
@@ -491,70 +425,191 @@ export class DispatchAppSuiteService {
     return colors[Math.abs(hash) % colors.length];
   }
 
+  // ─── PER-COLLECTION FIRESTORE REAL-TIME LISTENERS ───
+
   private setupFirestoreSync(): void {
     if (!this.isConfigured || typeof window === 'undefined') return;
 
     try {
-      const db = getFirestore(getFirebaseApp());
-      const suiteDocRef = doc(db, 'dispatch_app_suite', 'shared_workspace');
-
-      this.unsubscribeFirestore = onSnapshot(
-        suiteDocRef,
-        (snap) => {
-          if (snap.exists()) {
-            const data = snap.data() as Partial<DispatchAppSuiteState>;
-            this.state = {
-              notes: data.notes && data.notes.length > 0 ? data.notes : this.state.notes,
-              documents: data.documents && data.documents.length > 0 ? data.documents : this.state.documents,
-              calendar: data.calendar && data.calendar.length > 0 ? data.calendar : this.state.calendar,
-              tasks: data.tasks && data.tasks.length > 0 ? data.tasks : this.state.tasks,
-            };
-            this.saveToStorage(false);
-            this.notifyListeners();
-          } else {
-            // First time: write initial seed state to Firestore
-            setDoc(suiteDocRef, this.state, { merge: true }).catch((err) => {
-              console.warn('[DispatchAppSuiteService] Could not seed Firestore:', err);
-            });
-          }
-        },
-        (error) => {
-          console.warn('[DispatchAppSuiteService] Firestore sync error, using local fallback:', error);
+      const auth = getFirebaseAuth();
+      this.authUnsub = onAuthStateChanged(auth, (fbUser) => {
+        if (fbUser) {
+          this.attachFirestoreListeners();
+        } else {
+          this.teardownFirestoreListeners();
+          this.presences.clear();
+          this.state = createEmptySuiteState();
+          this.notifyListeners();
         }
-      );
-    } catch (err) {
-      console.warn('[DispatchAppSuiteService] Could not setup Firestore listener:', err);
-    }
-  }
+      });
 
-  private saveToStorage(broadcast: boolean = true): void {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-      } catch (err) {
-        console.warn('[DispatchAppSuiteService] Error persisting to localStorage:', err);
+      if (auth.currentUser) {
+        this.attachFirestoreListeners();
       }
-    }
-
-    if (broadcast && this.broadcastChannel) {
-      try {
-        this.broadcastChannel.postMessage({
-          type: 'SUITE_STATE_UPDATED',
-          state: this.state,
-        });
-      } catch {}
+    } catch (err) {
+      console.warn('[DispatchAppSuiteService] Could not initialize auth observer:', err);
     }
   }
 
-  private async syncToFirestore(): Promise<void> {
-    if (!this.isConfigured || typeof window === 'undefined') return;
+  private attachFirestoreListeners(): void {
+    if (this.realtimeAttached || !this.isConfigured || typeof window === 'undefined') {
+      return;
+    }
 
     try {
-      const db = getFirestore(getFirebaseApp());
-      const suiteDocRef = doc(db, 'dispatch_app_suite', 'shared_workspace');
-      await setDoc(suiteDocRef, this.state, { merge: true });
+      const db = getFirestoreDb();
+      this.realtimeAttached = true;
+
+      const handleListenerError = (collectionName: string, err: Error) => {
+        console.warn(
+          `[DispatchAppSuiteService] ${collectionName} listener detached:`,
+          err.message
+        );
+        this.teardownFirestoreListeners();
+      };
+
+      const unsubNotes = onSnapshot(
+        collection(db, COLLECTIONS.notes),
+        (snap) => {
+          const notes: DispatchNote[] = [];
+          snap.forEach((docSnap) => {
+            const raw = docSnap.data() as DispatchNote;
+            if (raw && typeof raw.title === 'string') {
+              notes.push({ ...raw, id: raw.id || docSnap.id });
+            }
+          });
+          this.state = {
+            ...this.state,
+            notes: sortNotes(notes),
+          };
+          this.saveOfflineCache(false);
+          this.notifyListeners();
+        },
+        (err) => handleListenerError(COLLECTIONS.notes, err)
+      );
+
+      const unsubDocuments = onSnapshot(
+        collection(db, COLLECTIONS.documents),
+        (snap) => {
+          const documents: DispatchDocument[] = [];
+          snap.forEach((docSnap) => {
+            const raw = docSnap.data() as DispatchDocument;
+            if (raw && typeof raw.title === 'string') {
+              documents.push({ ...raw, id: raw.id || docSnap.id });
+            }
+          });
+          this.state = {
+            ...this.state,
+            documents: sortByUpdatedDesc(documents),
+          };
+          this.saveOfflineCache(false);
+          this.notifyListeners();
+        },
+        (err) => handleListenerError(COLLECTIONS.documents, err)
+      );
+
+      const unsubCalendar = onSnapshot(
+        collection(db, COLLECTIONS.calendar),
+        (snap) => {
+          const calendar: DispatchCalendarEvent[] = [];
+          snap.forEach((docSnap) => {
+            const raw = docSnap.data() as DispatchCalendarEvent;
+            if (raw && typeof raw.title === 'string') {
+              calendar.push({ ...raw, id: raw.id || docSnap.id });
+            }
+          });
+          this.state = {
+            ...this.state,
+            calendar: sortByCreatedDesc(calendar),
+          };
+          this.saveOfflineCache(false);
+          this.notifyListeners();
+        },
+        (err) => handleListenerError(COLLECTIONS.calendar, err)
+      );
+
+      const unsubTasks = onSnapshot(
+        collection(db, COLLECTIONS.tasks),
+        (snap) => {
+          const tasks: DispatchTaskItem[] = [];
+          snap.forEach((docSnap) => {
+            const raw = docSnap.data() as DispatchTaskItem;
+            if (raw && typeof raw.text === 'string') {
+              tasks.push({ ...raw, id: raw.id || docSnap.id });
+            }
+          });
+          this.state = {
+            ...this.state,
+            tasks: sortByCreatedDesc(tasks),
+          };
+          this.saveOfflineCache(false);
+          this.notifyListeners();
+        },
+        (err) => handleListenerError(COLLECTIONS.tasks, err)
+      );
+
+      const unsubPresence = onSnapshot(
+        collection(db, COLLECTIONS.presence),
+        (snap) => {
+          const nextPresences = new Map<string, DispatcherPresence>();
+          const cutoff = Date.now() - PRESENCE_STALE_MS;
+          snap.forEach((docSnap) => {
+            const raw = docSnap.data() as DispatcherPresence;
+            const uid = raw?.uid || docSnap.id;
+            if (uid && typeof raw?.lastSeen === 'number' && raw.lastSeen >= cutoff) {
+              nextPresences.set(uid, { ...raw, uid });
+            }
+          });
+          this.presences = nextPresences;
+          this.syncStatePresences();
+          this.notifyListeners();
+        },
+        (err) => handleListenerError(COLLECTIONS.presence, err)
+      );
+
+      this.firestoreUnsubs = [
+        unsubNotes,
+        unsubDocuments,
+        unsubCalendar,
+        unsubTasks,
+        unsubPresence,
+      ];
     } catch (err) {
-      console.warn('[DispatchAppSuiteService] Error persisting to Firestore:', err);
+      console.warn('[DispatchAppSuiteService] Failed to attach Firestore listeners:', err);
+      this.teardownFirestoreListeners();
+    }
+  }
+
+  private teardownFirestoreListeners(): void {
+    for (const unsub of this.firestoreUnsubs) {
+      try {
+        unsub();
+      } catch {}
+    }
+    this.firestoreUnsubs = [];
+    this.realtimeAttached = false;
+  }
+
+  private async persistDoc(collectionName: string, id: string, payload: unknown): Promise<void> {
+    if (!this.isConfigured || typeof window === 'undefined') return;
+    try {
+      const db = getFirestoreDb();
+      await setDoc(
+        doc(db, collectionName, id),
+        sanitizeFirestoreDocument(payload as Record<string, unknown>)
+      );
+    } catch (err) {
+      console.warn(`[DispatchAppSuiteService] Failed to write ${collectionName}/${id}:`, err);
+    }
+  }
+
+  private async removeDoc(collectionName: string, id: string): Promise<void> {
+    if (!this.isConfigured || typeof window === 'undefined') return;
+    try {
+      const db = getFirestoreDb();
+      await deleteDoc(doc(db, collectionName, id));
+    } catch (err) {
+      console.warn(`[DispatchAppSuiteService] Failed to delete ${collectionName}/${id}:`, err);
     }
   }
 
@@ -570,6 +625,13 @@ export class DispatchAppSuiteService {
 
   public subscribe(listener: (state: DispatchAppSuiteState) => void): () => void {
     this.listeners.add(listener);
+    if (this.isConfigured && typeof window !== 'undefined' && !this.realtimeAttached) {
+      try {
+        if (getFirebaseAuth().currentUser) {
+          this.attachFirestoreListeners();
+        }
+      } catch {}
+    }
     listener(this.state);
     return () => {
       this.listeners.delete(listener);
@@ -580,7 +642,7 @@ export class DispatchAppSuiteService {
     return this.state;
   }
 
-  // ─── NOTES MANAGEMENT (Google Docs-style Author Tracking) ───
+  // ─── NOTES MANAGEMENT (`dispatch_notes`) ───
 
   public async updateNote(
     noteId: string,
@@ -589,30 +651,37 @@ export class DispatchAppSuiteService {
   ): Promise<void> {
     const currentAuthor = { ...this.getCurrentAuthor(), ...author };
     const now = new Date().toISOString();
+    let updatedTarget: DispatchNote | null = null;
+
+    const updatedNotes = this.state.notes.map((note) => {
+      if (note.id !== noteId) return note;
+
+      const existingContributors = note.contributors || (note.createdBy ? [note.createdBy] : []);
+      const filtered = existingContributors.filter(
+        (c) => (c.uid && currentAuthor.uid ? c.uid !== currentAuthor.uid : c.name !== currentAuthor.name)
+      );
+      const contributors = [currentAuthor, ...filtered];
+
+      updatedTarget = {
+        ...note,
+        ...updates,
+        updatedAt: now,
+        lastModifiedBy: currentAuthor,
+        contributors,
+      };
+      return updatedTarget;
+    });
+
+    if (!updatedTarget) return;
 
     this.state = {
       ...this.state,
-      notes: this.state.notes.map((note) => {
-        if (note.id !== noteId) return note;
-
-        // Build contributors list (avoid duplicates, bump latest editor)
-        const existingContributors = note.contributors || (note.createdBy ? [note.createdBy] : []);
-        const filtered = existingContributors.filter((c) => c.uid !== currentAuthor.uid);
-        const contributors = [currentAuthor, ...filtered];
-
-        return {
-          ...note,
-          ...updates,
-          updatedAt: now,
-          lastModifiedBy: currentAuthor,
-          contributors,
-        };
-      }),
+      notes: sortNotes(updatedNotes),
     };
 
-    this.saveToStorage(true);
+    this.saveOfflineCache(true);
     this.notifyListeners();
-    await this.syncToFirestore();
+    await this.persistDoc(COLLECTIONS.notes, noteId, updatedTarget);
   }
 
   public async createNote(
@@ -625,7 +694,7 @@ export class DispatchAppSuiteService {
     const now = new Date().toISOString();
 
     const newNote: DispatchNote = {
-      id: `note-${Date.now()}`,
+      id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       title: title.trim() || 'Untitled Dispatch Note',
       content,
       category,
@@ -639,12 +708,12 @@ export class DispatchAppSuiteService {
 
     this.state = {
       ...this.state,
-      notes: [newNote, ...this.state.notes],
+      notes: sortNotes([newNote, ...this.state.notes]),
     };
 
-    this.saveToStorage(true);
+    this.saveOfflineCache(true);
     this.notifyListeners();
-    await this.syncToFirestore();
+    await this.persistDoc(COLLECTIONS.notes, newNote.id, newNote);
     return newNote;
   }
 
@@ -653,35 +722,39 @@ export class DispatchAppSuiteService {
       ...this.state,
       notes: this.state.notes.filter((n) => n.id !== noteId),
     };
-    this.saveToStorage(true);
+    this.saveOfflineCache(true);
     this.notifyListeners();
-    await this.syncToFirestore();
+    await this.removeDoc(COLLECTIONS.notes, noteId);
   }
 
-  // ─── TASKS MANAGEMENT ───
+  // ─── TASKS MANAGEMENT (`dispatch_tasks`) ───
 
   public async toggleTask(taskId: string, author?: Partial<AuthorMeta>): Promise<void> {
     const currentAuthor = { ...this.getCurrentAuthor(), ...author };
     const now = new Date().toISOString();
+    let updatedTarget: DispatchTaskItem | null = null;
 
     this.state = {
       ...this.state,
       tasks: this.state.tasks.map((task) => {
         if (task.id !== taskId) return task;
         const newCompleted = !task.completed;
-        return {
+        updatedTarget = {
           ...task,
           completed: newCompleted,
-          completedBy: newCompleted ? currentAuthor : undefined,
-          completedAt: newCompleted ? now : undefined,
+          completedBy: newCompleted ? currentAuthor : null,
+          completedAt: newCompleted ? now : null,
           updatedAt: now,
         };
+        return updatedTarget;
       }),
     };
 
-    this.saveToStorage(true);
+    if (!updatedTarget) return;
+
+    this.saveOfflineCache(true);
     this.notifyListeners();
-    await this.syncToFirestore();
+    await this.persistDoc(COLLECTIONS.tasks, taskId, updatedTarget);
   }
 
   public async addTask(
@@ -693,23 +766,25 @@ export class DispatchAppSuiteService {
     const now = new Date().toISOString();
 
     const newTask: DispatchTaskItem = {
-      id: `task-${Date.now()}`,
+      id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       text: text.trim(),
       priority,
       completed: false,
       createdAt: now,
       updatedAt: now,
       createdBy: currentAuthor,
+      completedBy: null,
+      completedAt: null,
     };
 
     this.state = {
       ...this.state,
-      tasks: [newTask, ...this.state.tasks],
+      tasks: sortByCreatedDesc([newTask, ...this.state.tasks]),
     };
 
-    this.saveToStorage(true);
+    this.saveOfflineCache(true);
     this.notifyListeners();
-    await this.syncToFirestore();
+    await this.persistDoc(COLLECTIONS.tasks, newTask.id, newTask);
     return newTask;
   }
 
@@ -718,15 +793,18 @@ export class DispatchAppSuiteService {
       ...this.state,
       tasks: this.state.tasks.filter((t) => t.id !== taskId),
     };
-    this.saveToStorage(true);
+    this.saveOfflineCache(true);
     this.notifyListeners();
-    await this.syncToFirestore();
+    await this.removeDoc(COLLECTIONS.tasks, taskId);
   }
 
-  // ─── CALENDAR EVENTS MANAGEMENT ───
+  // ─── CALENDAR EVENTS MANAGEMENT (`dispatch_calendar`) ───
 
   public async addCalendarEvent(
-    data: Omit<DispatchCalendarEvent, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'lastModifiedBy'>,
+    data: Omit<
+      DispatchCalendarEvent,
+      'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'lastModifiedBy'
+    >,
     author?: Partial<AuthorMeta>
   ): Promise<DispatchCalendarEvent> {
     const currentAuthor = { ...this.getCurrentAuthor(), ...author };
@@ -734,7 +812,7 @@ export class DispatchAppSuiteService {
 
     const newEvent: DispatchCalendarEvent = {
       ...data,
-      id: `cal-${Date.now()}`,
+      id: `cal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       createdAt: now,
       updatedAt: now,
       createdBy: currentAuthor,
@@ -743,34 +821,52 @@ export class DispatchAppSuiteService {
 
     this.state = {
       ...this.state,
-      calendar: [newEvent, ...this.state.calendar],
+      calendar: sortByCreatedDesc([newEvent, ...this.state.calendar]),
     };
 
-    this.saveToStorage(true);
+    this.saveOfflineCache(true);
     this.notifyListeners();
-    await this.syncToFirestore();
+    await this.persistDoc(COLLECTIONS.calendar, newEvent.id, newEvent);
     return newEvent;
   }
 
   public async toggleCalendarEvent(eventId: string): Promise<void> {
     const currentAuthor = this.getCurrentAuthor();
     const now = new Date().toISOString();
+    let updatedTarget: DispatchCalendarEvent | null = null;
 
     this.state = {
       ...this.state,
-      calendar: this.state.calendar.map((ev) =>
-        ev.id === eventId
-          ? { ...ev, completed: !ev.completed, updatedAt: now, lastModifiedBy: currentAuthor }
-          : ev
-      ),
+      calendar: this.state.calendar.map((ev) => {
+        if (ev.id !== eventId) return ev;
+        updatedTarget = {
+          ...ev,
+          completed: !ev.completed,
+          updatedAt: now,
+          lastModifiedBy: currentAuthor,
+        };
+        return updatedTarget;
+      }),
     };
 
-    this.saveToStorage(true);
+    if (!updatedTarget) return;
+
+    this.saveOfflineCache(true);
     this.notifyListeners();
-    await this.syncToFirestore();
+    await this.persistDoc(COLLECTIONS.calendar, eventId, updatedTarget);
   }
 
-  // ─── DOCUMENTS MANAGEMENT ───
+  public async deleteCalendarEvent(eventId: string): Promise<void> {
+    this.state = {
+      ...this.state,
+      calendar: this.state.calendar.filter((ev) => ev.id !== eventId),
+    };
+    this.saveOfflineCache(true);
+    this.notifyListeners();
+    await this.removeDoc(COLLECTIONS.calendar, eventId);
+  }
+
+  // ─── DOCUMENTS MANAGEMENT (`dispatch_documents`) ───
 
   public async addDocument(
     data: Omit<DispatchDocument, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'lastModifiedBy'>,
@@ -781,7 +877,7 @@ export class DispatchAppSuiteService {
 
     const newDoc: DispatchDocument = {
       ...data,
-      id: `doc-${Date.now()}`,
+      id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       createdAt: now,
       updatedAt: now,
       createdBy: currentAuthor,
@@ -790,13 +886,23 @@ export class DispatchAppSuiteService {
 
     this.state = {
       ...this.state,
-      documents: [newDoc, ...this.state.documents],
+      documents: sortByUpdatedDesc([newDoc, ...this.state.documents]),
     };
 
-    this.saveToStorage(true);
+    this.saveOfflineCache(true);
     this.notifyListeners();
-    await this.syncToFirestore();
+    await this.persistDoc(COLLECTIONS.documents, newDoc.id, newDoc);
     return newDoc;
+  }
+
+  public async deleteDocument(docId: string): Promise<void> {
+    this.state = {
+      ...this.state,
+      documents: this.state.documents.filter((d) => d.id !== docId),
+    };
+    this.saveOfflineCache(true);
+    this.notifyListeners();
+    await this.removeDoc(COLLECTIONS.documents, docId);
   }
 }
 

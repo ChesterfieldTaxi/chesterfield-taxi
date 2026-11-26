@@ -84,6 +84,8 @@ export interface TripQueueToolbarProps {
   onDateTimeRangeChange: (newRange: DateTimeRange) => void;
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
+  isUnconfirmedQuickFilterActive?: boolean;
+  onToggleUnconfirmedQuickFilter?: () => void;
 
   // Filters
   isAddFilterOpen: boolean;
@@ -161,6 +163,8 @@ export function TripQueueToolbar({
   onDateTimeRangeChange,
   statusFilter,
   onStatusFilterChange,
+  isUnconfirmedQuickFilterActive: isUnconfirmedQuickFilterActiveProp,
+  onToggleUnconfirmedQuickFilter,
   isAddFilterOpen,
   onAddFilterOpenChange,
   isMobileFiltersOpen,
@@ -243,14 +247,19 @@ export function TripQueueToolbar({
   const tiers = resolveTripQueueToolbarInlineTiers(effectiveToolbarWidthPx);
 
   const prevNonUnconfirmedStatusRef = React.useRef<string>(DEFAULT_ACTIVE_ONLY_STATUS_FILTER);
-  const isUnconfirmedOnly = isUnconfirmedQuickFilterActive(statusFilter);
+  const isLegacyUnconfirmedOnly = isUnconfirmedQuickFilterActive(statusFilter);
+  const isUnconfirmedOnly = isUnconfirmedQuickFilterActiveProp ?? isLegacyUnconfirmedOnly;
   React.useEffect(() => {
-    if (!isUnconfirmedOnly && statusFilter) {
+    if (!isLegacyUnconfirmedOnly && statusFilter) {
       prevNonUnconfirmedStatusRef.current = statusFilter;
     }
-  }, [isUnconfirmedOnly, statusFilter]);
+  }, [isLegacyUnconfirmedOnly, statusFilter]);
 
   const handleToggleUnconfirmedQuickFilter = () => {
+    if (onToggleUnconfirmedQuickFilter) {
+      onToggleUnconfirmedQuickFilter();
+      return;
+    }
     const { nextStatusFilter, savedPreviousFilter } = computeNextStatusFilterOnUnconfirmedToggle(
       statusFilter,
       prevNonUnconfirmedStatusRef.current
@@ -301,11 +310,14 @@ export function TripQueueToolbar({
           />
         </div>
 
-        {/* 2. Multi-Select Lifecycle Status Dropdown (badge hidden when Tier 1 Unconfirmed pill is inline) */}
+        {/* 2. Multi-Select Lifecycle Status Dropdown (badge & Unconfirmed row hidden when Tier 1 Unconfirmed pill is inline) */}
         <TripStatusMultiSelectDropdown
           statusFilter={statusFilter}
           unconfirmedCount={unconfirmedCount}
           showTriggerUnconfirmedBadge={!tiers.showUnconfirmedPill}
+          showUnconfirmedOption={!tiers.showUnconfirmedPill}
+          isExternalUnconfirmedActive={isUnconfirmedOnly}
+          onToggleUnconfirmedQuickFilter={handleToggleUnconfirmedQuickFilter}
           onStatusFilterChange={onStatusFilterChange}
         />
 

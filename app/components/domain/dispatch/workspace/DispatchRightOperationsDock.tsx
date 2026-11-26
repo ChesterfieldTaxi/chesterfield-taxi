@@ -499,23 +499,13 @@ export function DispatchRightOperationsDock({
               <div className="flex items-center gap-1 bg-slate-200/70 p-0.5 rounded-lg">
                 <button
                   type="button"
-                  onClick={() => onAlertsFilterChange('all')}
-                  className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors cursor-pointer ${
-                    alertsFilter === 'all'
-                      ? 'bg-white text-blue-700 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  All ({activeAndSortedMessages.length})
-                </button>
-                <button
-                  type="button"
                   onClick={() => onAlertsFilterChange('unread')}
                   className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors cursor-pointer ${
                     alertsFilter === 'unread'
                       ? 'bg-white text-blue-700 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
+                  title="Active unread alerts (read alerts auto-hide)"
                 >
                   Unread ({unreadAlertsCount})
                 </button>
@@ -532,6 +522,18 @@ export function DispatchRightOperationsDock({
                     <FlagIcon className="w-3 h-3 shrink-0" />
                     <span>Pinned ({pinnedAlertsCount})</span>
                   </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAlertsFilterChange('all')}
+                  className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors cursor-pointer ${
+                    alertsFilter === 'all'
+                      ? 'bg-white text-blue-700 shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="All active and previously read alerts within retention window"
+                >
+                  All / History ({activeAndSortedMessages.length})
                 </button>
               </div>
 
@@ -563,8 +565,13 @@ export function DispatchRightOperationsDock({
 
             <div className="px-3 py-1 bg-slate-100/70 border-b border-slate-200 flex items-center justify-between text-[10px] text-slate-600 shrink-0">
               <span>
-                Showing {alertsFilter === 'all' ? 'all' : alertsFilter} alerts (
-                {filteredAlertMessages.length})
+                Showing{' '}
+                {alertsFilter === 'unread'
+                  ? 'unread (read auto-hidden)'
+                  : alertsFilter === 'pinned'
+                  ? 'pinned'
+                  : 'all / history'}{' '}
+                ({filteredAlertMessages.length})
               </span>
               <div className="flex items-center gap-2">
                 {unreadAlertsCount > 0 && (
@@ -592,17 +599,29 @@ export function DispatchRightOperationsDock({
               {filteredAlertMessages.length === 0 ? (
                 <div className="text-center py-8 text-slate-400">
                   <BellIcon className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p className="text-xs font-semibold">
+                  <p className="text-xs font-semibold text-slate-600">
                     {alertsFilter === 'unread'
                       ? 'No unread alerts'
                       : alertsFilter === 'pinned'
                       ? 'No pinned alerts'
-                      : 'No active alerts'}
+                      : 'No alerts in history'}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Non-pinned alerts auto-dismiss after{' '}
-                    {alertDismissMinutes === 0 ? 'infinite' : `${alertDismissMinutes}m`}.
+                    {alertsFilter === 'unread' && activeAndSortedMessages.length > unreadAlertsCount
+                      ? `${activeAndSortedMessages.length - unreadAlertsCount} read alert(s) auto-hidden from active view.`
+                      : `Non-pinned alerts auto-dismiss after ${
+                          alertDismissMinutes === 0 ? 'infinite' : `${alertDismissMinutes}m`
+                        }.`}
                   </p>
+                  {alertsFilter === 'unread' && activeAndSortedMessages.length > unreadAlertsCount && (
+                    <button
+                      type="button"
+                      onClick={() => onAlertsFilterChange('all')}
+                      className="mt-2.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-blue-700 font-bold text-[11px] transition-colors cursor-pointer"
+                    >
+                      View All / History ({activeAndSortedMessages.length})
+                    </button>
+                  )}
                 </div>
               ) : (
                 filteredAlertMessages.map((m) => (

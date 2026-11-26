@@ -851,6 +851,11 @@ export class AdminConfigService implements IAdminConfigService {
       tariffGroups: incoming.tariffGroups && incoming.tariffGroups.length > 0
         ? incoming.tariffGroups
         : DEFAULT_APP_SETTINGS.tariffGroups,
+      fleetAlertsConfig: {
+        ...DEFAULT_FLEET_ALERTS_CONFIG,
+        ...(this.cachedSettings?.fleetAlertsConfig || {}),
+        ...(incoming.fleetAlertsConfig || {}),
+      },
       integrations: normalizeIntegrationsConfig(
         incoming.integrations,
         this.cachedSettings?.integrations || DEFAULT_APP_SETTINGS.integrations
@@ -1083,6 +1088,13 @@ export class AdminConfigService implements IAdminConfigService {
           }
         : (this.cachedSettings.securityControls || DEFAULT_SECURITY_CONTROLS),
       configAuditTrail: updatedAuditTrail,
+      fleetAlertsConfig: updates.fleetAlertsConfig
+        ? {
+            ...DEFAULT_FLEET_ALERTS_CONFIG,
+            ...(this.cachedSettings.fleetAlertsConfig || {}),
+            ...updates.fleetAlertsConfig,
+          }
+        : (this.cachedSettings.fleetAlertsConfig || { ...DEFAULT_FLEET_ALERTS_CONFIG }),
       vehicles: updates.vehicles || this.cachedSettings.vehicles,
       fleet: updates.fleet || this.cachedSettings.fleet,
       cms: updates.cms

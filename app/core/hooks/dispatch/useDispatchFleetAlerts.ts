@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { AdminUser } from '../../services/auth/admin-auth.service';
 import { getAdminConfigService } from '../../services/config/admin-config.service';
+import { dispatchAlertsService } from '../../services/dispatch/dispatch-alerts.service';
 import type { AppSettings } from '../../types/config';
 import type { DispatchMessageItem } from '../../../components/domain/dispatch/FleetAlertCard';
 
@@ -13,29 +14,19 @@ const DEFAULT_TACTICAL_PRESETS: string[] = [
   'Priority VIP pickup waiting at Lambert Main.',
 ];
 
-function createDefaultFleetMessages(): DispatchMessageItem[] {
-  return [
-    {
-      id: 'msg-1',
-      to: 'All Drivers',
-      text: 'Morning briefing: Lambert Airport terminal arrivals surge active until 11:30 AM.',
-      timestamp: '08:15 AM',
-      createdAt: 0,
-      priority: 'normal',
-      isPinned: true,
-      isRead: false,
-    },
-    {
-      id: 'msg-2',
-      to: 'Driver 104 (Sarah K.)',
-      text: 'Terminal 1 pickup confirmed for passenger Johnson.',
-      timestamp: '08:32 AM',
-      createdAt: 0,
-      priority: 'normal',
-      isPinned: false,
-      isRead: false,
-    },
-  ];
+const TTL_CACHE_KEY = 'chesterfield_alerts_ttl_minutes';
+const PRESETS_CACHE_KEY = 'chesterfield_tactical_presets';
+
+function sanitizePresetsList(raw?: string[] | null): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const cleaned = Array.from(
+    new Set(
+      raw
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter((item) => item.length > 0)
+    )
+  );
+  return cleaned.length > 0 ? cleaned : null;
 }
 
 export interface UseDispatchFleetAlertsParams {
@@ -47,201 +38,213 @@ export function useDispatchFleetAlerts({ settings, user }: UseDispatchFleetAlert
   const [alertDismissMinutes, setAlertDismissMinutes] = useState<number>(
     settings.fleetAlertsConfig?.autoDismissMinutes ?? 60
   );
-  const [messages, setMessages] = useState<DispatchMessageItem[]>(() => createDefaultFleetMessages());
+  const [messages, setMessages] = useState<DispatchMessageItem[]>([]);
   const [msgRecipient, setMsgRecipient] = useState<string>('All Drivers');
   const [msgText, setMsgText] = useState<string>('');
   const [msgPriority, setMsgPriority] = useState<'normal' | 'urgent'>('normal');
-  const [alertsFilter, setAlertsFilter] = useState<'all' | 'unread' | 'pinned'>('all');
-  const [tacticalPresets, setTacticalPresets] = useState<string[]>(DEFAULT_TACTICAL_PRESETS);
+  // Default to 'unread' so read alerts automatically hide from the active view
+  const [alertsFilter, setAlertsFilter] = useState<'all' | 'unread' | 'pinned'>('unread');
+  const [tacticalPresets, setTacticalPresets] = useState<string[]>(
+    () => sanitizePresetsList(settings.fleetAlertsConfig?.tacticalPresets) ?? DEFAULT_TACTICAL_PRESETS
+  );
   const [isAddingPreset, setIsAddingPreset] = useState<boolean>(false);
   const [newPresetText, setNewPresetText] = useState<string>('');
-  const hasHydratedRef = useRef<boolean>(false);
+  const [nowTick, setNowTick] = useState<number>(0);
 
-  // Hydrate persisted alerts, TTL & tactical presets post-mount for deterministic SSR parity
+  // Subscribe to real-time Firestore-backed dispatch_alerts
+  useEffect(() => {
+    setNowTick(Date.now());
+    const unsubscribe = dispatchAlertsService.subscribe((liveAlerts) => {
+      setMessages(liveAlerts);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Hydrate non-authoritative localStorage cache only when server settings are unset
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const now = Date.now();
     try {
-      const savedTtl = localStorage.getItem('chesterfield_alerts_ttl_minutes');
-      if (savedTtl) {
-        const parsedTtl = parseInt(savedTtl, 10);
-        if (!isNaN(parsedTtl)) setAlertDismissMinutes(parsedTtl);
-      }
-
-      const savedAlerts = localStorage.getItem('chesterfield_dispatch_alerts');
-      if (savedAlerts) {
-        const parsed: DispatchMessageItem[] = JSON.parse(savedAlerts);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setMessages(parsed);
-        } else {
-          setMessages([
-            {
-              id: 'msg-1',
-              to: 'All Drivers',
-              text: 'Morning briefing: Lambert Airport terminal arrivals surge active until 11:30 AM.',
-              timestamp: '08:15 AM',
-              createdAt: now - 15 * 60 * 1000,
-              priority: 'normal',
-              isPinned: true,
-              isRead: false,
-            },
-            {
-              id: 'msg-2',
-              to: 'Driver 104 (Sarah K.)',
-              text: 'Terminal 1 pickup confirmed for passenger Johnson.',
-              timestamp: '08:32 AM',
-              createdAt: now - 5 * 60 * 1000,
-              priority: 'normal',
-              isPinned: false,
-              isRead: false,
-            },
-          ]);
+      if (settings.fleetAlertsConfig?.autoDismissMinutes === undefined) {
+        const savedTtl = localStorage.getItem(TTL_CACHE_KEY);
+        if (savedTtl !== null) {
+          const parsedTtl = parseInt(savedTtl, 10);
+          if (!Number.isNaN(parsedTtl) && parsedTtl >= 0) {
+            setAlertDismissMinutes(parsedTtl);
+          }
         }
-      } else {
-        setMessages((prev) =>
-          prev.map((m, idx) =>
-            m.createdAt === 0 ? { ...m, createdAt: now - (idx === 0 ? 15 : 5) * 60 * 1000 } : m
-          )
-        );
       }
 
-      const savedPresets = localStorage.getItem('chesterfield_tactical_presets');
-      if (savedPresets) {
-        const parsedPresets = JSON.parse(savedPresets);
-        if (Array.isArray(parsedPresets) && parsedPresets.length > 0) {
-          setTacticalPresets(parsedPresets);
+      if (!sanitizePresetsList(settings.fleetAlertsConfig?.tacticalPresets)) {
+        const savedPresets = localStorage.getItem(PRESETS_CACHE_KEY);
+        if (savedPresets) {
+          const parsedPresets = sanitizePresetsList(JSON.parse(savedPresets));
+          if (parsedPresets) {
+            setTacticalPresets(parsedPresets);
+          }
         }
       }
     } catch {
-      // Ignore storage errors
+      // Ignore non-authoritative cache errors
     }
-    hasHydratedRef.current = true;
+  }, [
+    settings.fleetAlertsConfig?.autoDismissMinutes,
+    settings.fleetAlertsConfig?.tacticalPresets,
+  ]);
+
+  // Keep TTL & tactical presets synchronized with AppSettings / admin-config.service
+  useEffect(() => {
+    if (settings.fleetAlertsConfig?.autoDismissMinutes !== undefined) {
+      setAlertDismissMinutes(settings.fleetAlertsConfig.autoDismissMinutes);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(
+            TTL_CACHE_KEY,
+            String(settings.fleetAlertsConfig.autoDismissMinutes)
+          );
+        } catch {}
+      }
+    }
+  }, [settings.fleetAlertsConfig?.autoDismissMinutes]);
+
+  useEffect(() => {
+    const serverPresets = sanitizePresetsList(settings.fleetAlertsConfig?.tacticalPresets);
+    if (serverPresets) {
+      setTacticalPresets(serverPresets);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(PRESETS_CACHE_KEY, JSON.stringify(serverPresets));
+        } catch {}
+      }
+    }
+  }, [settings.fleetAlertsConfig?.tacticalPresets]);
+
+  // Subscribe to live AdminConfigService updates so presets & TTL sync across dispatchers
+  useEffect(() => {
+    const configSvc = getAdminConfigService();
+    if (!configSvc.subscribeToSettings) return;
+    const unsubscribe = configSvc.subscribeToSettings((liveSettings) => {
+      if (liveSettings.fleetAlertsConfig?.autoDismissMinutes !== undefined) {
+        setAlertDismissMinutes(liveSettings.fleetAlertsConfig.autoDismissMinutes);
+      }
+      const syncedPresets = sanitizePresetsList(liveSettings.fleetAlertsConfig?.tacticalPresets);
+      if (syncedPresets) {
+        setTacticalPresets(syncedPresets);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (typeof window === 'undefined' || !hasHydratedRef.current) return;
-    try {
-      localStorage.setItem('chesterfield_dispatch_alerts', JSON.stringify(messages));
-    } catch {}
-  }, [messages]);
-
+  // Periodic clock tick for client-side TTL expiry filtering
   useEffect(() => {
     if (alertDismissMinutes === 0) return;
-    const checkAndPrune = () => {
-      const now = Date.now();
-      const ttlMs = alertDismissMinutes * 60 * 1000;
-      setMessages((prev) => {
-        const unexpired = prev.filter((m) => m.isPinned || !m.createdAt || now - m.createdAt < ttlMs);
-        return unexpired.length !== prev.length ? unexpired : prev;
-      });
-    };
-    const interval = setInterval(checkAndPrune, 30_000);
+    const interval = setInterval(() => {
+      setNowTick(Date.now());
+    }, 30_000);
     return () => clearInterval(interval);
   }, [alertDismissMinutes]);
 
   const handleTogglePinAlert = useCallback((id: string) => {
-    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isPinned: !m.isPinned } : m)));
+    void dispatchAlertsService.togglePin(id);
   }, []);
 
   const handleToggleReadAlert = useCallback((id: string) => {
-    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isRead: !m.isRead } : m)));
+    void dispatchAlertsService.toggleRead(id);
   }, []);
 
   const handleDismissAlert = useCallback((id: string) => {
-    setMessages((prev) => prev.filter((m) => m.id !== id));
+    void dispatchAlertsService.dismissAlert(id);
   }, []);
 
   const handleMarkAllAlertsRead = useCallback(() => {
-    setMessages((prev) => prev.map((m) => ({ ...m, isRead: true })));
+    void dispatchAlertsService.markAllRead();
   }, []);
 
   const handleClearUnpinnedAlerts = useCallback(() => {
-    setMessages((prev) => prev.filter((m) => m.isPinned));
+    void dispatchAlertsService.clearUnpinned();
   }, []);
 
   const handleUpdateAlertDismissMinutes = useCallback(
     async (mins: number) => {
       setAlertDismissMinutes(mins);
       try {
-        localStorage.setItem('chesterfield_alerts_ttl_minutes', String(mins));
+        localStorage.setItem(TTL_CACHE_KEY, String(mins));
       } catch {}
-      if (user?.role === 'admin') {
+      if (user) {
         try {
           await getAdminConfigService().updateSettings({
-            fleetAlertsConfig: { autoDismissMinutes: mins },
+            fleetAlertsConfig: {
+              ...(settings.fleetAlertsConfig || {}),
+              autoDismissMinutes: mins,
+              tacticalPresets,
+            },
+            updatedBy: user.email || user.uid,
           });
         } catch (e) {
           console.warn('Failed to persist alerts autoDismissMinutes setting to server', e);
         }
       }
     },
-    [user]
+    [user, settings.fleetAlertsConfig, tacticalPresets]
   );
 
   const handleSendMessage = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      if (!msgText.trim()) return;
+      const trimmed = msgText.trim();
+      if (!trimmed) return;
 
-      const newMsg: DispatchMessageItem = {
-        id: `msg-${Date.now()}`,
-        to: msgRecipient,
-        text: msgText.trim(),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        createdAt: Date.now(),
-        priority: msgPriority,
-        isPinned: false,
-        isRead: false,
-      };
-      setMessages((prev) => [newMsg, ...prev]);
       setMsgText('');
+      void dispatchAlertsService.sendAlert({
+        to: msgRecipient,
+        text: trimmed,
+        priority: msgPriority,
+        createdByUid: user?.uid ?? null,
+        createdByName: user?.displayName || user?.email || null,
+      });
     },
-    [msgRecipient, msgText, msgPriority]
+    [msgRecipient, msgText, msgPriority, user]
   );
 
   const handleSaveNewPreset = useCallback(() => {
-    if (!newPresetText.trim()) return;
-    const updated = [...tacticalPresets, newPresetText.trim()];
+    const trimmed = newPresetText.trim();
+    if (!trimmed) return;
+    const updated = Array.from(new Set([...tacticalPresets, trimmed]));
     setTacticalPresets(updated);
     try {
-      localStorage.setItem('chesterfield_tactical_presets', JSON.stringify(updated));
+      localStorage.setItem(PRESETS_CACHE_KEY, JSON.stringify(updated));
     } catch {}
-    setMsgText(newPresetText.trim());
+    if (user) {
+      void getAdminConfigService()
+        .updateSettings({
+          fleetAlertsConfig: {
+            ...(settings.fleetAlertsConfig || {}),
+            autoDismissMinutes: alertDismissMinutes,
+            tacticalPresets: updated,
+          },
+          updatedBy: user.email || user.uid,
+        })
+        .catch((e) => {
+          console.warn('Failed to persist tacticalPresets setting to server', e);
+        });
+    }
+    setMsgText(trimmed);
     setNewPresetText('');
     setIsAddingPreset(false);
-  }, [newPresetText, tacticalPresets]);
+  }, [newPresetText, tacticalPresets, user, settings.fleetAlertsConfig, alertDismissMinutes]);
 
   const pushSystemAlert = useCallback(
-    (text: string, toLabel: string = 'Dispatch Operations') => {
+    (text: string, toLabel: string = 'Dispatch Operations', dedupeKey?: string) => {
       if (!text.trim()) return;
-      const now = Date.now();
-      const item: DispatchMessageItem = {
-        id: `sys-alert-${now}-${Math.random().toString(36).slice(2, 6)}`,
-        to: toLabel,
-        text: text.trim(),
-        timestamp: new Date(now).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        createdAt: now,
-        priority: 'urgent',
-        isPinned: false,
-        isRead: false,
-      };
-      setMessages((prev) => {
-        if (prev.some((m) => m.text === item.text && !m.isRead)) return prev;
-        const next = [item, ...prev].slice(0, 100);
-        try {
-          localStorage.setItem('chesterfield_dispatch_alerts', JSON.stringify(next));
-        } catch {}
-        return next;
+      void dispatchAlertsService.pushSystemAlert(text, toLabel, {
+        dedupeKey,
+        ttlMinutes: alertDismissMinutes,
       });
     },
-    []
+    [alertDismissMinutes]
   );
 
   const activeAndSortedMessages = useMemo(() => {
-    const now = Date.now();
+    const now = nowTick || Date.now();
     const ttlMs = alertDismissMinutes * 60 * 1000;
     return messages
       .filter((m) => {
@@ -255,7 +258,7 @@ export function useDispatchFleetAlerts({ settings, user }: UseDispatchFleetAlert
         if (!a.isPinned && b.isPinned) return 1;
         return (b.createdAt || 0) - (a.createdAt || 0);
       });
-  }, [messages, alertDismissMinutes]);
+  }, [messages, alertDismissMinutes, nowTick]);
 
   const unreadAlertsCount = useMemo(
     () => activeAndSortedMessages.filter((m) => !m.isRead).length,

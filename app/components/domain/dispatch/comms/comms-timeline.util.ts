@@ -38,6 +38,71 @@ export interface ActiveRideSmsPassengerChip {
   status: Trip['status'];
 }
 
+export const COMMS_AVATAR_PASTEL_PALETTE = [
+  'bg-sky-100 text-sky-800',
+  'bg-rose-100 text-rose-800',
+  'bg-emerald-100 text-emerald-800',
+  'bg-violet-100 text-violet-800',
+  'bg-amber-100 text-amber-800',
+  'bg-teal-100 text-teal-800',
+  'bg-indigo-100 text-indigo-800',
+  'bg-fuchsia-100 text-fuchsia-800',
+] as const;
+
+export interface ContactAvatarSpec {
+  initials: string | null;
+  toneClass: string;
+  paletteIndex: number;
+}
+
+export interface ResolveContactAvatarInput {
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  fallbackId?: string | null;
+}
+
+function extractContactInitials(rawName?: string | null): string | null {
+  const clean = String(rawName || '').trim();
+  if (!clean) return null;
+  const lower = clean.toLowerCase();
+  if (lower === 'unknown caller' || lower === 'unknown') return null;
+  if (clean.includes('@')) return null;
+  if (/^[+(\d]/.test(clean) && /^[\d\s().+-]+$/.test(clean)) return null;
+  const words = clean.split(/\s+/).filter((w) => /[a-zA-Z0-9]/.test(w));
+  if (words.length === 0) return null;
+  const firstChar = words[0].replace(/^[^a-zA-Z0-9]+/, '').charAt(0).toUpperCase();
+  if (!firstChar) return null;
+  if (words.length === 1) return firstChar;
+  const lastChar = words[words.length - 1].replace(/^[^a-zA-Z0-9]+/, '').charAt(0).toUpperCase();
+  return lastChar ? `${firstChar}${lastChar}` : firstChar;
+}
+
+export function resolveContactAvatarSpec(input: ResolveContactAvatarInput): ContactAvatarSpec {
+  const normPhone = extractLast10Digits(input.phone);
+  const normEmail = normalizeEmailLower(input.email);
+  const rawName = String(input.name || '').trim();
+  const normName = rawName.toLowerCase();
+  const hashKey =
+    normPhone ||
+    normEmail ||
+    (normName && normName !== 'unknown caller' ? normName : '') ||
+    String(input.fallbackId || '').trim() ||
+    'unknown';
+
+  let hash = 2166136261;
+  for (let i = 0; i < hashKey.length; i++) {
+    hash ^= hashKey.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const paletteIndex = (hash >>> 0) % COMMS_AVATAR_PASTEL_PALETTE.length;
+  return {
+    initials: extractContactInitials(rawName),
+    toneClass: COMMS_AVATAR_PASTEL_PALETTE[paletteIndex],
+    paletteIndex,
+  };
+}
+
 export function hasPlayableCallAudio(
   evt: Pick<InteractionEvent, 'type' | 'audioUrl' | 'recordingSid'> | null | undefined
 ): boolean {

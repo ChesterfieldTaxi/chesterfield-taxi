@@ -90,9 +90,17 @@ export default function DispatchRoute() {
   );
   const [filterStartDate, setFilterStartDate] = useState<string>('');
   const [filterEndDate, setFilterEndDate] = useState<string>('');
-  const [pillFilter] = useState<
+  const [pillFilter, setPillFilter] = useState<
     'all' | 'unconfirmed' | 'pending' | 'assigned' | 'completed' | 'cancelled' | 'unassigned'
   >('all');
+  const isUnconfirmedQuickFilterActive = pillFilter === 'unconfirmed';
+  const handleToggleUnconfirmedQuickFilter = useCallback(() => {
+    setPillFilter((prev) => (prev === 'unconfirmed' ? 'all' : 'unconfirmed'));
+  }, []);
+  const handleStatusFilterChange = useCallback((nextStatusFilter: string) => {
+    setStatusFilter(nextStatusFilter);
+    setPillFilter((prev) => (prev === 'unconfirmed' ? 'all' : prev));
+  }, []);
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -1121,7 +1129,9 @@ export default function DispatchRoute() {
               setFilterEndDate(newRange.endDate);
             }}
             statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
+            onStatusFilterChange={handleStatusFilterChange}
+            isUnconfirmedQuickFilterActive={isUnconfirmedQuickFilterActive}
+            onToggleUnconfirmedQuickFilter={handleToggleUnconfirmedQuickFilter}
             isAddFilterOpen={isAddFilterOpen}
             onAddFilterOpenChange={setIsAddFilterOpen}
             isMobileFiltersOpen={isMobileFiltersOpen}

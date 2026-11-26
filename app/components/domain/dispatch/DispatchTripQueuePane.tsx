@@ -57,6 +57,8 @@ export interface DispatchTripQueuePaneProps {
   onDateTimeRangeChange: (newRange: DateTimeRange) => void;
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
+  isUnconfirmedQuickFilterActive?: boolean;
+  onToggleUnconfirmedQuickFilter?: () => void;
 
   // Filters
   isAddFilterOpen: boolean;
@@ -148,6 +150,8 @@ export function DispatchTripQueuePane({
   onDateTimeRangeChange,
   statusFilter,
   onStatusFilterChange,
+  isUnconfirmedQuickFilterActive,
+  onToggleUnconfirmedQuickFilter,
   isAddFilterOpen,
   onAddFilterOpenChange,
   isMobileFiltersOpen,
@@ -270,6 +274,8 @@ export function DispatchTripQueuePane({
         onDateTimeRangeChange={onDateTimeRangeChange}
         statusFilter={statusFilter}
         onStatusFilterChange={onStatusFilterChange}
+        isUnconfirmedQuickFilterActive={isUnconfirmedQuickFilterActive}
+        onToggleUnconfirmedQuickFilter={onToggleUnconfirmedQuickFilter}
         isAddFilterOpen={isAddFilterOpen}
         onAddFilterOpenChange={onAddFilterOpenChange}
         isMobileFiltersOpen={isMobileFiltersOpen}
