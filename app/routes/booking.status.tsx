@@ -290,8 +290,8 @@ export default function BookingStatusRoute() {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center">
         <SpinnerIcon className="w-10 h-10 text-blue-600 animate-spin mb-4" />
-        <h2 className="text-xl font-bold text-slate-800">Loading Live Trip Status...</h2>
-        <p className="text-sm text-slate-500 mt-1">Getting the latest driver and ETA updates.</p>
+        <h2 className="text-xl font-bold text-fg-strong">Loading Live Trip Status...</h2>
+        <p className="text-sm text-fg-muted mt-1">Getting the latest driver and ETA updates.</p>
       </div>
     );
   }
@@ -300,22 +300,22 @@ export default function BookingStatusRoute() {
   if (!trip && !publicTracking) {
     const isVerifyingSpecificId = Boolean(normalizedTripId && !error);
     return (
-      <div className="max-w-md mx-auto my-12 p-6 sm:p-8 bg-white rounded-3xl border border-slate-200 text-center shadow-xl">
+      <div className="max-w-md mx-auto my-12 p-6 sm:p-8 bg-surface-card rounded-3xl border border-border-subtle text-center shadow-xl">
         <div
           className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4 text-xl font-bold ${
-            error ? 'bg-rose-100 text-rose-600' : isVerifyingSpecificId ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'
+            error ? 'bg-status-danger-bg-strong text-rose-600' : isVerifyingSpecificId ? 'bg-status-warning-bg text-amber-600' : 'bg-status-info-bg text-blue-600'
           }`}
         >
           {error ? '!' : isVerifyingSpecificId ? <PhoneIcon className="w-6 h-6" /> : <SearchIcon className="w-6 h-6" />}
         </div>
-        <h1 className="text-xl font-black text-slate-900">
+        <h1 className="text-xl font-black text-fg-primary">
           {error
             ? 'Tracking Link Unavailable'
             : isVerifyingSpecificId
             ? 'Verify Last 4 Phone Digits'
             : 'Track Your Ride'}
         </h1>
-        <p className="text-xs text-slate-600 mt-2 mb-6 leading-relaxed">
+        <p className="text-xs text-fg-secondary mt-2 mb-6 leading-relaxed">
           {error ||
             (isVerifyingSpecificId
               ? `To protect your privacy for Trip #${normalizedTripId}, enter the last 4 digits of the phone number on the booking (or open the tracking link from your text or email).`
@@ -323,14 +323,14 @@ export default function BookingStatusRoute() {
         </p>
 
         {verifyError && (
-          <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700 text-left">
+          <div className="mb-4 p-3 rounded-xl bg-status-danger-bg border border-status-danger-border text-xs font-semibold text-status-danger-fg text-left">
             {verifyError}
           </div>
         )}
 
         <form onSubmit={handleGuestLookupSubmit} className="mb-6 space-y-3 text-left">
           <div>
-            <label htmlFor="track-trip-id" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+            <label htmlFor="track-trip-id" className="block text-xs font-bold text-fg-secondary uppercase tracking-wider mb-1">
               Trip #
             </label>
             <input
@@ -340,11 +340,11 @@ export default function BookingStatusRoute() {
               value={searchRef}
               onChange={(e) => setSearchRef(e.target.value.toUpperCase())}
               placeholder="e.g. CT-4821-9034"
-              className="w-full px-3.5 py-2.5 text-base sm:text-sm font-mono border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+              className="w-full px-3.5 py-2.5 text-base sm:text-sm font-mono border border-border-strong rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-fg-strong"
             />
           </div>
           <div>
-            <label htmlFor="track-phone-last4" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+            <label htmlFor="track-phone-last4" className="block text-xs font-bold text-fg-secondary uppercase tracking-wider mb-1">
               Last 4 Digits of Phone Number
             </label>
             <input
@@ -355,19 +355,19 @@ export default function BookingStatusRoute() {
               value={phoneLast4Input}
               onChange={(e) => setPhoneLast4Input(e.target.value)}
               placeholder="e.g. 0199 (or full phone number)"
-              className="w-full px-3.5 py-2.5 text-base sm:text-sm font-mono border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800"
+              className="w-full px-3.5 py-2.5 text-base sm:text-sm font-mono border border-border-strong rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-fg-strong"
             />
           </div>
           <button
             type="submit"
             disabled={isVerifying}
-            className="w-full py-3 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-sm cursor-pointer"
+            className="w-full py-3 bg-surface-header text-white font-bold text-sm rounded-xl hover:bg-surface-header-elevated disabled:opacity-50 transition-colors shadow-sm cursor-pointer"
           >
             {isVerifying ? 'Verifying...' : 'Track Live Status'}
           </button>
         </form>
 
-        <div className="flex items-center justify-center gap-3 pt-4 border-t border-slate-100">
+        <div className="flex items-center justify-center gap-3 pt-4 border-t border-border-faint">
           <Link
             to="/book"
             className="px-4 py-2 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700 transition-colors"
@@ -376,7 +376,7 @@ export default function BookingStatusRoute() {
           </Link>
           <a
             href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
-            className="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-200 transition-colors"
+            className="px-4 py-2 bg-surface-muted text-fg-secondary font-bold text-sm rounded-xl hover:bg-surface-emphasis transition-colors"
           >
             Call Dispatch
           </a>
@@ -439,10 +439,10 @@ export default function BookingStatusRoute() {
     : null;
 
   return (
-    <div className="py-4 sm:py-10 bg-gradient-to-b from-slate-50 via-white to-blue-50/20 flex-1 pb-24 sm:pb-28">
+    <div className="py-4 sm:py-10 bg-gradient-to-b from-surface-subtle via-surface-card to-status-info-bg/20 flex-1 pb-24 sm:pb-28">
       <div className="max-w-2xl mx-auto px-3 sm:px-4">
         {/* Header Summary (Compact on mobile so Live Map appears immediately) */}
-        <div className="bg-slate-900 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-xl mb-4 sm:mb-6 relative overflow-hidden">
+        <div className="bg-surface-header text-white rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-xl mb-4 sm:mb-6 relative overflow-hidden">
           <div className="flex items-center justify-between gap-2 mb-3">
             <span className="text-[11px] font-mono uppercase tracking-wider text-blue-400 flex items-center gap-1.5 min-w-0 truncate">
               <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -460,7 +460,7 @@ export default function BookingStatusRoute() {
                 <ClockIcon className="w-5 h-5 text-blue-400 shrink-0" />
                 <span>{pickupTimeDisplay}</span>
               </h1>
-              <p className="text-xs font-mono text-slate-400 mt-0.5 break-all">
+              <p className="text-xs font-mono text-fg-subtle mt-0.5 break-all">
                 Trip #{displayTripId}
               </p>
             </>
@@ -487,21 +487,21 @@ export default function BookingStatusRoute() {
             </p>
           )}
 
-          <div className="mt-4 pt-3.5 sm:mt-5 sm:pt-5 border-t border-slate-800 grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="mt-4 pt-3.5 sm:mt-5 sm:pt-5 border-t border-border-header grid grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <span className="text-[10.5px] text-slate-400 uppercase font-mono block">Vehicle</span>
+              <span className="text-[10.5px] text-fg-subtle uppercase font-mono block">Vehicle</span>
               <span className="text-sm font-bold text-white">{vehicleDisplayName}</span>
             </div>
             {trip ? (
               <div className="text-right">
-                <span className="text-[10.5px] text-slate-400 uppercase font-mono block">Fare Total</span>
+                <span className="text-[10.5px] text-fg-subtle uppercase font-mono block">Fare Total</span>
                 <span className="text-lg font-black text-amber-400 font-mono">
                   ${trip.pricing?.totalFare?.toFixed(2) || '0.00'}
                 </span>
               </div>
             ) : (
               <div className="text-right">
-                <span className="text-[10.5px] text-slate-400 uppercase font-mono block">Privacy</span>
+                <span className="text-[10.5px] text-fg-subtle uppercase font-mono block">Privacy</span>
                 <span className="text-xs font-bold text-emerald-400">Personal Info Protected</span>
               </div>
             )}
@@ -517,8 +517,8 @@ export default function BookingStatusRoute() {
         />
 
         {/* Real-time Status Timeline */}
-        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-4 sm:p-7 shadow-lg mb-4 sm:mb-6">
-          <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-5 flex items-center justify-between">
+        <div className="bg-surface-card rounded-2xl sm:rounded-3xl border border-border-subtle/80 p-4 sm:p-7 shadow-lg mb-4 sm:mb-6">
+          <h2 className="text-sm font-black text-fg-primary uppercase tracking-wider mb-5 flex items-center justify-between">
             <span>Ride Progress</span>
             <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold normal-case">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
@@ -527,14 +527,14 @@ export default function BookingStatusRoute() {
           </h2>
 
           {isCancelled ? (
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-sm">
+            <div className="p-4 bg-status-danger-bg border border-status-danger-border rounded-2xl text-status-danger-fg text-sm">
               <strong className="block font-bold">This trip was cancelled / declined.</strong>
               {trip?.cancellationReason && (
-                <p className="text-xs mt-1 text-rose-700">Reason: {trip.cancellationReason}</p>
+                <p className="text-xs mt-1 text-status-danger-fg">Reason: {trip.cancellationReason}</p>
               )}
             </div>
           ) : (
-            <div className="relative pl-6 sm:pl-8 space-y-5 sm:space-y-6 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+            <div className="relative pl-6 sm:pl-8 space-y-5 sm:space-y-6 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-surface-emphasis">
               {LIFECYCLE_STEPS.map((step, idx) => {
                 const isPassed = idx < currentStepIdx;
                 const isCurrent = idx === currentStepIdx;
@@ -547,7 +547,7 @@ export default function BookingStatusRoute() {
                           ? 'bg-blue-600 text-white ring-4 ring-blue-100'
                           : isPassed
                           ? 'bg-emerald-500 text-white'
-                          : 'bg-slate-200 text-slate-400')
+                          : 'bg-surface-emphasis text-fg-subtle')
                       }
                     >
                       {isPassed ? <CheckIcon className="w-3.5 h-3.5" /> : idx + 1}
@@ -556,12 +556,12 @@ export default function BookingStatusRoute() {
                       <h4
                         className={
                           'text-sm font-bold ' +
-                          (isCurrent ? 'text-blue-600' : isPassed ? 'text-slate-900' : 'text-slate-400')
+                          (isCurrent ? 'text-blue-600' : isPassed ? 'text-fg-primary' : 'text-fg-subtle')
                         }
                       >
                         {step.label}
                       </h4>
-                      <p className="text-xs text-slate-500 mt-0.5">{step.desc}</p>
+                      <p className="text-xs text-fg-muted mt-0.5">{step.desc}</p>
                     </div>
                   </div>
                 );
@@ -571,43 +571,43 @@ export default function BookingStatusRoute() {
         </div>
 
         {/* Route Details Card (includes Intermediate Stops!) */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-lg mb-6 space-y-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+        <div className="bg-surface-card rounded-3xl border border-border-subtle/80 p-6 shadow-lg mb-6 space-y-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-fg-subtle">
             Route Details
           </h3>
 
           <div className="flex items-start gap-3">
-            <div className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+            <div className="w-6 h-6 rounded-full bg-status-success-bg text-emerald-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
               P
             </div>
             <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase block">Pickup</span>
-              <p className="text-sm font-semibold text-slate-900">{displayPickup}</p>
+              <span className="text-[11px] font-bold text-fg-subtle uppercase block">Pickup</span>
+              <p className="text-sm font-semibold text-fg-primary">{displayPickup}</p>
             </div>
           </div>
 
           {displayStops.length > 0 &&
             displayStops.map((stopAddr, idx) => (
               <div key={idx} className="flex items-start gap-3 pl-2">
-                <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                <div className="w-5 h-5 rounded-full bg-status-info-bg text-blue-600 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
                   {idx + 1}
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                  <span className="text-[10px] font-bold text-fg-subtle uppercase block">
                     Stop {idx + 1}
                   </span>
-                  <p className="text-xs font-semibold text-slate-800">{stopAddr}</p>
+                  <p className="text-xs font-semibold text-fg-strong">{stopAddr}</p>
                 </div>
               </div>
             ))}
 
           <div className="flex items-start gap-3">
-            <div className="w-6 h-6 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+            <div className="w-6 h-6 rounded-full bg-status-danger-bg text-rose-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
               D
             </div>
             <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase block">Destination</span>
-              <p className="text-sm font-semibold text-slate-900">{displayDropoff}</p>
+              <span className="text-[11px] font-bold text-fg-subtle uppercase block">Destination</span>
+              <p className="text-sm font-semibold text-fg-primary">{displayDropoff}</p>
             </div>
           </div>
         </div>
@@ -639,9 +639,9 @@ export default function BookingStatusRoute() {
 
         {/* Guest to User Account Linking CTA */}
         {!currentUser && (
-          <div className="bg-blue-50 border border-blue-200 rounded-3xl p-6 shadow-md mb-6 text-center">
-            <h3 className="text-sm font-black text-blue-900 mb-2">View Full Receipt &amp; Manage Rides</h3>
-            <p className="text-xs text-blue-700 mb-4">
+          <div className="bg-status-info-bg border border-status-info-border rounded-3xl p-6 shadow-md mb-6 text-center">
+            <h3 className="text-sm font-black text-status-info-fg mb-2">View Full Receipt &amp; Manage Rides</h3>
+            <p className="text-xs text-status-info-fg mb-4">
               Sign in or create a free account with your booking email to view itemized receipts, rebook in two taps, and save favorite addresses.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2.5">
@@ -653,7 +653,7 @@ export default function BookingStatusRoute() {
               </Link>
               <Link
                 to={`/app/login?claimTrip=${encodeURIComponent(displayTripId)}`}
-                className="px-5 py-2.5 bg-white text-blue-700 border border-blue-200 font-bold text-sm rounded-xl hover:bg-blue-50 transition-colors"
+                className="px-5 py-2.5 bg-surface-card text-status-info-fg border border-status-info-border font-bold text-sm rounded-xl hover:bg-status-info-bg transition-colors"
               >
                 Sign In
               </Link>
@@ -662,11 +662,11 @@ export default function BookingStatusRoute() {
         )}
 
         {/* Need Help CTA */}
-        <div className="text-center text-xs text-slate-500 space-y-2">
+        <div className="text-center text-xs text-fg-muted space-y-2">
           <p>Questions about your trip? Call 24/7 Chesterfield Dispatch Desk:</p>
           <a
             href={'tel:' + COMPANY_CONFIG.phone.primaryRaw}
-            className="inline-flex items-center gap-1.5 font-bold text-slate-900 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-xs hover:bg-slate-50 transition-colors"
+            className="inline-flex items-center gap-1.5 font-bold text-fg-primary bg-surface-card px-4 py-2 rounded-xl border border-border-subtle shadow-xs hover:bg-surface-subtle transition-colors"
           >
             <PhoneIcon className="w-3.5 h-3.5 text-blue-600" />
             <span>{COMPANY_CONFIG.phone.primary}</span>

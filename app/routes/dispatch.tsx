@@ -57,6 +57,11 @@ const DispatchTripDetailsDrawer = React.lazy(() =>
     default: m.DispatchTripDetailsDrawer,
   }))
 );
+const HelpDrawer = React.lazy(() =>
+  import('../components/domain/common/HelpDrawer').then((m) => ({
+    default: m.HelpDrawer,
+  }))
+);
 
 export type { DriverRosterItem, DesktopDockTab };
 
@@ -109,6 +114,12 @@ export default function DispatchRoute() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [hasOpenedHelp, setHasOpenedHelp] = useState(false);
+  const handleOpenHelp = useCallback(() => {
+    setHasOpenedHelp(true);
+    setIsHelpOpen(true);
+  }, []);
   const [selectedQueueTripId, setSelectedQueueTripId] = useState<string | null>(null);
   const [selectedMapTrip, setSelectedMapTrip] = useState<Trip | null>(null);
   const [shouldZoomMap, setShouldZoomMap] = useState<boolean>(false);
@@ -1003,6 +1014,8 @@ export default function DispatchRoute() {
         user={user}
         onToggleAutoPilotPause={handleToggleAutoPilotPause}
         onUpdateLeadWindows={handleUpdateDispatchLeadWindows}
+        isHelpOpen={isHelpOpen}
+        onOpenHelp={handleOpenHelp}
       />
 
       {/* 2. Slide-Out Drawer & Mobile 5-Tab Bottom Navigation */}
@@ -1585,6 +1598,30 @@ export default function DispatchRoute() {
             </button>
           </div>
         </div>
+      )}
+      {hasOpenedHelp && (
+        <Suspense fallback={null}>
+          <HelpDrawer
+            isOpen={isHelpOpen}
+            onClose={() => setIsHelpOpen(false)}
+            role="dispatch"
+            userRoles={user?.roles || (user?.role ? [user.role] : undefined)}
+            context={{
+              portal: 'dispatch',
+              tab: isDesktop
+                ? activeDockTab === 'none'
+                  ? 'main'
+                  : activeDockTab
+                : activeMobileTab,
+              sub:
+                activeDockTab === 'phone' ||
+                activeDockTab === 'comms' ||
+                activeMobileTab === 'comms'
+                  ? commsActiveTab
+                  : undefined,
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

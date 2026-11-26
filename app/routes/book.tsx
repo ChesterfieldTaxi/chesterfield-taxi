@@ -55,15 +55,15 @@ export default function BookRoute() {
   const routeQueryKey = location.search || 'default';
 
   return (
-    <div className="py-5 sm:py-8 bg-gradient-to-b from-slate-50 via-white to-blue-50/20 flex-1 pb-28 lg:pb-16">
+    <div className="py-5 sm:py-8 bg-gradient-to-b from-surface-subtle via-surface-card to-status-info-bg/20 flex-1 pb-28 lg:pb-16">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Compact Header Bar - Hidden on Confirmation */}
         {!isConfirmed && (
           <div className="text-center mb-5 space-y-1.5">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-fg-primary tracking-tight">
               Book Your Ride
             </h1>
-            <p className="text-sm text-slate-600 max-w-xl mx-auto">
+            <p className="text-sm text-fg-secondary max-w-xl mx-auto">
               Upfront fare estimates, 24/7 local Chesterfield dispatch, and STL flight tracking.
             </p>
           </div>
@@ -80,13 +80,13 @@ export default function BookRoute() {
         </div>
 
         {/* Live Support Footnote */}
-        <div className="mt-10 text-center text-xs text-slate-500 space-y-1">
+        <div className="mt-10 text-center text-xs text-fg-muted space-y-1">
           <p>Need a pickup right away or booking for a large group?</p>
-          <p className="font-semibold text-slate-700">
+          <p className="font-semibold text-fg-secondary">
             Call {COMPANY_CONFIG.name} 24/7 at{' '}
             <a
               href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
-              className="text-blue-600 hover:text-blue-700 underline font-bold"
+              className="text-blue-600 hover:text-status-info-fg underline font-bold"
             >
               {COMPANY_CONFIG.phone.dispatch}
             </a>

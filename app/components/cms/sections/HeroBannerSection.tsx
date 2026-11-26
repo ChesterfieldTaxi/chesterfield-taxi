@@ -17,7 +17,7 @@ export const HeroBannerSection: React.FC<HeroBannerSectionProps> = ({
   backgroundImageUrl,
 }) => {
   return (
-    <section className="relative py-24 bg-slate-900 text-white flex items-center justify-center min-h-[400px]" style={{
+    <section className="relative py-24 bg-surface-header text-white flex items-center justify-center min-h-[400px]" style={{
       backgroundImage: backgroundImageUrl ? `url(${backgroundImageUrl})` : undefined,
       backgroundSize: 'cover',
       backgroundPosition: 'center',

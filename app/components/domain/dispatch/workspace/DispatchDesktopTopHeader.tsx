@@ -10,6 +10,7 @@ import type { LiveFleetDriver } from '../../../../core/hooks/useDispatchFleet';
 import { COMPANY_CONFIG } from '../../../../config/companyConfig';
 import { useTheme } from '../../../../hooks/useTheme';
 import { AppearanceToggle } from '../../../ui/AppearanceToggle';
+import { HelpTriggerButton } from '../../common/HelpTriggerButton';
 import { DispatchHeaderCallHud } from '../DispatchHeaderCallHud';
 import { FleetAlertCard, type DispatchMessageItem } from '../FleetAlertCard';
 import {
@@ -131,6 +132,8 @@ export interface DispatchDesktopTopHeaderProps {
     autoReleaseStagedDrivers?: boolean;
     stagedAutoReleaseLeadMinutes?: number;
   }) => void | Promise<void>;
+  isHelpOpen?: boolean;
+  onOpenHelp?: () => void;
 }
 
 export function DispatchDesktopTopHeader({
@@ -186,6 +189,8 @@ export function DispatchDesktopTopHeader({
   user,
   onToggleAutoPilotPause,
   onUpdateLeadWindows,
+  isHelpOpen,
+  onOpenHelp,
 }: DispatchDesktopTopHeaderProps) {
   const { preferences: mapPrefs, togglePreference: toggleMapPref } = useDispatchMapPreferences();
   const { preference: themePreference, setPreference: setThemePreference } = useTheme({
@@ -978,6 +983,13 @@ export function DispatchDesktopTopHeader({
               </div>
             )}
           </div>
+
+          {onOpenHelp && (
+            <HelpTriggerButton
+              onClick={onOpenHelp}
+              isOpen={Boolean(isHelpOpen)}
+            />
+          )}
 
           {/* App Suite Launcher (9-Dot Grid) */}
           <Suspense

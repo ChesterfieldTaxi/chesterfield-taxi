@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import {
@@ -30,8 +30,15 @@ import {
 } from '../components/domain/BookingEngineV2';
 import { DispatchLocationInput } from '../components/domain/dispatch/DispatchLocationInput';
 import { RoleViewSwitcher } from '../components/domain/common/RoleViewSwitcher';
+import { HelpTriggerButton } from '../components/domain/common/HelpTriggerButton';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
 import { AppearanceToggle } from '../components/ui/AppearanceToggle';
+
+const HelpDrawer = React.lazy(() =>
+  import('../components/domain/common/HelpDrawer').then((m) => ({
+    default: m.HelpDrawer,
+  }))
+);
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
@@ -206,6 +213,12 @@ export default function CorporatePortalRoute() {
   const [isAdminSuperuser, setIsAdminSuperuser] = useState(false);
   const [adminAccountsList, setAdminAccountsList] = useState<CorporateAccountConfig[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [hasOpenedHelp, setHasOpenedHelp] = useState(false);
+  const handleOpenHelp = useCallback(() => {
+    setHasOpenedHelp(true);
+    setIsHelpOpen(true);
+  }, []);
 
   // Portal Navigation & Data State
   const initialTab = (searchParams.get('tab') as CorporateTabKey) || 'overview';
@@ -919,6 +932,11 @@ export default function CorporatePortalRoute() {
               preference={themePreference}
               onChange={setThemePreference}
               className="!bg-slate-900 !border-slate-800 !text-slate-300 hover:!text-white hover:!bg-slate-800"
+            />
+            <HelpTriggerButton
+              onClick={handleOpenHelp}
+              isOpen={isHelpOpen}
+              variant="dark"
             />
             <RoleViewSwitcher currentView="corporate" user={currentUser} variant="dark" />
             <UserDropdown
@@ -2413,6 +2431,23 @@ export default function CorporatePortalRoute() {
             )}
           </div>
         </div>
+      )}
+
+      {hasOpenedHelp && (
+        <Suspense fallback={null}>
+          <HelpDrawer
+            isOpen={isHelpOpen}
+            onClose={() => setIsHelpOpen(false)}
+            role="corporate"
+            userRoles={
+              currentUser?.roles || (currentUser?.role ? [currentUser.role] : undefined)
+            }
+            context={{
+              portal: 'corporate',
+              tab: activeTab,
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

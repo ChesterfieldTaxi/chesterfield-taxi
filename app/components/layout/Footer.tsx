@@ -11,6 +11,8 @@ import {
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { getAdminConfigService } from '../../core/services/config/admin-config.service';
 import type { AppSettings, CompanyConfig } from '../../core/types/config';
+import { AppearanceToggle } from '../ui/AppearanceToggle';
+import { useTheme } from '../../hooks/useTheme';
 
 const QUICK_LINKS = [
   { label: 'Home', path: '/' },
@@ -35,6 +37,7 @@ const FEATURED_CORRIDOR_LINKS = [
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const { preference, setPreference } = useTheme({ applyToDom: false });
   const [company, setCompany] = React.useState<CompanyConfig>({
     name: COMPANY_CONFIG.name,
     phone: COMPANY_CONFIG.phone.dispatch,
@@ -74,7 +77,7 @@ export function Footer() {
   const emailDisplay = company?.email?.trim() || COMPANY_CONFIG.email.dispatch;
 
   return (
-    <footer className="bg-slate-950 text-slate-300 border-t border-slate-800">
+    <footer className="bg-surface-header text-slate-300 border-t border-border-header">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           
@@ -100,7 +103,7 @@ export function Footer() {
               </div>
             </Link>
             
-            <p className="text-sm text-slate-400 leading-relaxed">
+            <p className="text-sm text-fg-subtle leading-relaxed">
               West St. Louis County&apos;s premier licensed taxi and private transportation service.
               Delivering dependable, upfront-priced rides {COMPANY_CONFIG.operatingHours.toLowerCase()}.
             </p>
@@ -121,9 +124,9 @@ export function Footer() {
                 <li key={link.path}>
                   <Link
                     to={link.path}
-                    className="text-slate-400 hover:text-white transition-colors flex items-center gap-2 group"
+                    className="text-fg-subtle hover:text-white transition-colors flex items-center gap-2 group"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-700 group-hover:bg-blue-400 transition-colors" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-surface-header-muted group-hover:bg-blue-400 transition-colors" />
                     <span>{link.label}</span>
                   </Link>
                 </li>
@@ -138,7 +141,7 @@ export function Footer() {
                 Service Areas &amp; Corridors
               </Link>
             </h3>
-            <ul className="space-y-2 text-xs text-slate-400">
+            <ul className="space-y-2 text-xs text-fg-subtle">
               {FEATURED_CORRIDOR_LINKS.map((corridor) => (
                 <li key={corridor.path}>
                   <Link
@@ -170,13 +173,13 @@ export function Footer() {
             <div className="space-y-3">
               <a
                 href={`tel:${phoneRaw}`}
-                className="flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-blue-500/50 transition-all group"
+                className="flex items-center gap-3 p-3 bg-surface-header border border-border-header rounded-xl hover:border-blue-500/50 transition-all group"
               >
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
                   <PhoneIcon className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 block">24/7 Dispatch</span>
+                  <span className="text-[11px] text-fg-subtle block">24/7 Dispatch</span>
                   <span className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
                     {phoneDisplay}
                   </span>
@@ -185,13 +188,13 @@ export function Footer() {
 
               <a
                 href={`mailto:${emailDisplay}`}
-                className="flex items-center gap-3 p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-blue-500/50 transition-all group"
+                className="flex items-center gap-3 p-3 bg-surface-header border border-border-header rounded-xl hover:border-blue-500/50 transition-all group"
               >
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
                   <MailIcon className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 block">Support &amp; Accounts</span>
+                  <span className="text-[11px] text-fg-subtle block">Support &amp; Accounts</span>
                   <span className="text-xs font-medium text-white truncate group-hover:text-blue-400 transition-colors">
                     {emailDisplay}
                   </span>
@@ -199,8 +202,8 @@ export function Footer() {
               </a>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-slate-500 pt-1">
-              <ClockIcon className="w-4 h-4 text-slate-600 shrink-0" />
+            <div className="flex items-center gap-2 text-xs text-fg-on-header-muted pt-1">
+              <ClockIcon className="w-4 h-4 text-fg-on-header-muted shrink-0" />
               <span>Available {COMPANY_CONFIG.operatingHours}</span>
             </div>
           </div>
@@ -208,11 +211,17 @@ export function Footer() {
         </div>
 
         {/* Bottom Sub-footer */}
-        <div className="mt-12 pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div className="mt-12 pt-8 border-t border-border-header flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-fg-on-header-muted">
           <p>
             &copy; {currentYear} {COMPANY_CONFIG.legalName}. All rights reserved. Registered in Missouri.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-6">
+            <AppearanceToggle
+              preference={preference}
+              onChange={setPreference}
+              variant="selector"
+              className="w-52"
+            />
             <Link to="/book" className="hover:text-blue-400 transition-colors">
               Book a Ride
             </Link>

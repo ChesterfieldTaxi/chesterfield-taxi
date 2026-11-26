@@ -205,7 +205,7 @@ export default function ServiceAreaCorridorRoute() {
   };
 
   return (
-    <div className="py-8 sm:py-12 bg-gradient-to-b from-slate-50 via-white to-blue-50/25 flex-1">
+    <div className="py-8 sm:py-12 bg-gradient-to-b from-surface-subtle via-surface-card to-status-info-bg/25 flex-1">
       {/* Structured Data (XSS-Safe Escaped JSON-LD) */}
       <script
         type="application/ld+json"
@@ -224,24 +224,24 @@ export default function ServiceAreaCorridorRoute() {
         {/* Breadcrumbs */}
         <nav
           aria-label="Breadcrumb"
-          className="flex flex-wrap items-center gap-2 text-xs text-slate-500"
+          className="flex flex-wrap items-center gap-2 text-xs text-fg-muted"
         >
           <Link to="/" className="hover:text-blue-600 font-medium transition-colors">
             Home
           </Link>
-          <ChevronRightIcon className="w-3.5 h-3.5 text-slate-400" />
+          <ChevronRightIcon className="w-3.5 h-3.5 text-fg-subtle" />
           <Link to="/service-areas" className="hover:text-blue-600 font-medium transition-colors">
             Service Areas
           </Link>
-          <ChevronRightIcon className="w-3.5 h-3.5 text-slate-400" />
-          <span className="font-bold text-slate-900">{corridor.shortTitle}</span>
+          <ChevronRightIcon className="w-3.5 h-3.5 text-fg-subtle" />
+          <span className="font-bold text-fg-primary">{corridor.shortTitle}</span>
         </nav>
 
         {/* Hero + Instant Corridor Fare Calculator Split */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
           {/* Left Column: Corridor Overview & Highlights */}
           <div className="lg:col-span-6 space-y-6">
-            <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-blue-200">
+            <div className="inline-flex items-center gap-2 bg-status-info-bg text-status-info-fg text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-status-info-border">
               {corridor.category === 'fbo' ? (
                 <SparklesIcon className="w-3.5 h-3.5 text-indigo-600" />
               ) : corridor.category === 'corporate' ? (
@@ -258,42 +258,42 @@ export default function ServiceAreaCorridorRoute() {
               </span>
             </div>
 
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight leading-tight">
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-fg-primary tracking-tight leading-tight">
               {corridor.heroHeadline}
             </h1>
 
-            <p className="text-base text-slate-600 leading-relaxed">{corridor.heroSubheadline}</p>
+            <p className="text-base text-fg-secondary leading-relaxed">{corridor.heroSubheadline}</p>
 
             {/* Quick Corridor Telemetry Badges */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              <div className="p-3.5 rounded-2xl bg-surface-card border border-border-subtle/80 shadow-2xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">
                   Distance
                 </span>
-                <span className="text-base sm:text-lg font-extrabold text-slate-950">
+                <span className="text-base sm:text-lg font-extrabold text-fg-primary">
                   {corridor.distanceMiles} mi
                 </span>
               </div>
-              <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              <div className="p-3.5 rounded-2xl bg-surface-card border border-border-subtle/80 shadow-2xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">
                   Typical Time
                 </span>
-                <span className="text-base sm:text-lg font-extrabold text-slate-950">
+                <span className="text-base sm:text-lg font-extrabold text-fg-primary">
                   ~{corridor.typicalDurationMinutes} min
                 </span>
               </div>
-              <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              <div className="p-3.5 rounded-2xl bg-surface-card border border-border-subtle/80 shadow-2xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">
                   Dispatch
                 </span>
-                <span className="text-base sm:text-lg font-extrabold text-emerald-700">
+                <span className="text-base sm:text-lg font-extrabold text-status-success-fg">
                   24/7 Live
                 </span>
               </div>
             </div>
 
             {/* Service Guarantees */}
-            <ul className="space-y-2.5 pt-2 text-sm text-slate-700">
+            <ul className="space-y-2.5 pt-2 text-sm text-fg-secondary">
               <li className="flex items-start gap-2.5">
                 <CheckIcon className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                 <span>
@@ -320,7 +320,7 @@ export default function ServiceAreaCorridorRoute() {
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <a
                 href={`tel:${phoneRaw}`}
-                className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 hover:text-blue-600 bg-white border border-slate-200 px-4 py-2.5 rounded-xl shadow-2xs transition-colors"
+                className="inline-flex items-center gap-2 text-xs font-bold text-fg-secondary hover:text-blue-600 bg-surface-card border border-border-subtle px-4 py-2.5 rounded-xl shadow-2xs transition-colors"
               >
                 <PhoneIcon className="w-4 h-4 text-blue-600" />
                 <span>24/7 Dispatch Desk: {phoneDisplay}</span>
@@ -332,14 +332,14 @@ export default function ServiceAreaCorridorRoute() {
           <div className="lg:col-span-6">
             <Card
               variant="elevated"
-              className="bg-white border-2 border-slate-900/10 rounded-3xl p-5 sm:p-7 shadow-lg space-y-5"
+              className="bg-surface-card border-2 border-slate-900/10 rounded-3xl p-5 sm:p-7 shadow-lg space-y-5"
             >
-              <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="flex items-center justify-between gap-3 border-b border-border-faint pb-4">
                 <div>
                   <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-600 block">
                     Instant Upfront Quote Calculator
                   </span>
-                  <h2 className="text-lg sm:text-xl font-extrabold text-slate-950 tracking-tight">
+                  <h2 className="text-lg sm:text-xl font-extrabold text-fg-primary tracking-tight">
                     Select Direction, Passengers &amp; Vehicle
                   </h2>
                 </div>
@@ -348,7 +348,7 @@ export default function ServiceAreaCorridorRoute() {
                   onClick={() =>
                     setDirection((prev) => (prev === 'outbound' ? 'inbound' : 'outbound'))
                   }
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-xs font-bold transition-colors cursor-pointer shrink-0"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg border border-status-info-border text-xs font-bold transition-colors cursor-pointer shrink-0"
                   title="Swap pickup and dropoff direction"
                 >
                   <ArrowLeftRightIcon className="w-3.5 h-3.5" />
@@ -358,14 +358,14 @@ export default function ServiceAreaCorridorRoute() {
 
               {/* 2-Way Direction Pills + Active Endpoints */}
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100">
+                <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-surface-muted">
                   <button
                     type="button"
                     onClick={() => setDirection('outbound')}
                     className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer truncate ${
                       direction === 'outbound'
-                        ? 'bg-white text-slate-950 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-surface-card text-fg-primary shadow-xs'
+                        : 'text-fg-secondary hover:text-fg-primary'
                     }`}
                   >
                     Outbound &rarr;
@@ -375,40 +375,40 @@ export default function ServiceAreaCorridorRoute() {
                     onClick={() => setDirection('inbound')}
                     className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer truncate ${
                       direction === 'inbound'
-                        ? 'bg-white text-slate-950 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-surface-card text-fg-primary shadow-xs'
+                        : 'text-fg-secondary hover:text-fg-primary'
                     }`}
                   >
                     &larr; Inbound Return
                   </button>
                 </div>
 
-                <div className="rounded-2xl bg-slate-50 border border-slate-200/80 p-3.5 space-y-2.5 text-xs">
+                <div className="rounded-2xl bg-surface-subtle border border-border-subtle/80 p-3.5 space-y-2.5 text-xs">
                   <div className="flex items-start gap-2.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-500/15 mt-1 shrink-0" />
                     <div className="min-w-0">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">
                         Pickup
                       </span>
-                      <span className="font-bold text-slate-900 block truncate">
+                      <span className="font-bold text-fg-primary block truncate">
                         {liveEstimates.pickup.label}
                       </span>
-                      <span className="text-slate-500 block truncate">
+                      <span className="text-fg-muted block truncate">
                         {liveEstimates.pickup.address}
                       </span>
                     </div>
                   </div>
-                  <div className="border-t border-dashed border-slate-200" />
+                  <div className="border-t border-dashed border-border-subtle" />
                   <div className="flex items-start gap-2.5">
                     <span className="w-2.5 h-2.5 rounded-xs bg-rose-500 ring-4 ring-rose-500/15 mt-1 shrink-0" />
                     <div className="min-w-0">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">
                         Dropoff
                       </span>
-                      <span className="font-bold text-slate-900 block truncate">
+                      <span className="font-bold text-fg-primary block truncate">
                         {liveEstimates.dropoff.label}
                       </span>
-                      <span className="text-slate-500 block truncate">
+                      <span className="text-fg-muted block truncate">
                         {liveEstimates.dropoff.address}
                       </span>
                     </div>
@@ -419,12 +419,12 @@ export default function ServiceAreaCorridorRoute() {
               {/* Passenger Selector (1–6) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-slate-700 inline-flex items-center gap-1.5">
+                  <span className="font-bold text-fg-secondary inline-flex items-center gap-1.5">
                     <UsersIcon className="w-4 h-4 text-blue-600" />
                     <span>Passengers</span>
                   </span>
                   {passengers > 4 && (
-                    <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                    <span className="text-[11px] font-semibold text-status-warning-fg bg-status-warning-bg border border-status-warning-border px-2 py-0.5 rounded-md">
                       5–6 riders require XL SUV / Minivan
                     </span>
                   )}
@@ -441,7 +441,7 @@ export default function ServiceAreaCorridorRoute() {
                         className={`py-2 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ${
                           active
                             ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400'
+                            : 'bg-surface-card text-fg-secondary border-border-subtle hover:border-blue-400'
                         }`}
                       >
                         {count}
@@ -464,10 +464,10 @@ export default function ServiceAreaCorridorRoute() {
                       onClick={() => setSelectedTierId(tier.tierId)}
                       className={`w-full text-left p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
                         disabled
-                          ? 'bg-slate-50 border-slate-200/70 opacity-55 cursor-not-allowed'
+                          ? 'bg-surface-subtle border-border-subtle/70 opacity-55 cursor-not-allowed'
                           : isSelected
-                          ? 'bg-blue-50/70 border-blue-600 ring-2 ring-blue-600/15 cursor-pointer'
-                          : 'bg-white border-slate-200 hover:border-blue-400 cursor-pointer'
+                          ? 'bg-status-info-bg/70 border-blue-600 ring-2 ring-blue-600/15 cursor-pointer'
+                          : 'bg-surface-card border-border-subtle hover:border-blue-400 cursor-pointer'
                       }`}
                     >
                       <div className="flex items-start gap-3 min-w-0">
@@ -475,7 +475,7 @@ export default function ServiceAreaCorridorRoute() {
                           className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
                             isSelected
                               ? 'bg-blue-600 text-white'
-                              : 'bg-slate-100 text-slate-700'
+                              : 'bg-surface-muted text-fg-secondary'
                           }`}
                         >
                           {tier.tierId === 'xl' || tier.tierId === 'premium' ? (
@@ -486,16 +486,16 @@ export default function ServiceAreaCorridorRoute() {
                         </div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-extrabold text-slate-950">
+                            <span className="text-sm font-extrabold text-fg-primary">
                               {tier.shortLabel}
                             </span>
                             {tier.badge && (
-                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-surface-muted text-fg-secondary">
                                 {tier.badge}
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-0.5">
+                          <div className="flex items-center gap-3 text-[11px] text-fg-muted mt-0.5">
                             <span>Up to {tier.maxPassengers} Pax</span>
                             <span className="inline-flex items-center gap-1">
                               <LuggageIcon className="w-3 h-3" />
@@ -506,10 +506,10 @@ export default function ServiceAreaCorridorRoute() {
                       </div>
 
                       <div className="text-right shrink-0">
-                        <span className="text-lg sm:text-xl font-extrabold text-slate-950 block leading-none">
+                        <span className="text-lg sm:text-xl font-extrabold text-fg-primary block leading-none">
                           ${tier.estimatedFareWholeDollars}
                         </span>
-                        <span className="text-[10px] font-semibold text-slate-500 block mt-1">
+                        <span className="text-[10px] font-semibold text-fg-muted block mt-1">
                           {disabled ? `Max ${tier.maxPassengers} Pax` : 'Upfront Est.'}
                         </span>
                       </div>
@@ -519,7 +519,7 @@ export default function ServiceAreaCorridorRoute() {
               </div>
 
               {/* Transparent Surcharge Footnote */}
-              <p className="text-[11px] text-slate-500 leading-relaxed">
+              <p className="text-[11px] text-fg-muted leading-relaxed">
                 {liveEstimates.isAirportCorridor && liveEstimates.airportSurcharge > 0
                   ? `Includes $${liveEstimates.airportSurcharge.toFixed(2)} commercial airport access fee. `
                   : ''}
@@ -544,13 +544,13 @@ export default function ServiceAreaCorridorRoute() {
           {/* Terminal / FBO / Curbside Pickup Guide */}
           <Card
             variant="elevated"
-            className="lg:col-span-7 bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 space-y-5 shadow-xs"
+            className="lg:col-span-7 bg-surface-card border border-border-subtle/80 rounded-3xl p-6 sm:p-8 space-y-5 shadow-xs"
           >
             <div className="space-y-1">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
                 Chauffeur Staging &amp; Terminal Protocol
               </span>
-              <h2 className="text-2xl font-extrabold text-slate-950 tracking-tight">
+              <h2 className="text-2xl font-extrabold text-fg-primary tracking-tight">
                 Airport, FBO &amp; Curbside Pickup Guide
               </h2>
             </div>
@@ -559,12 +559,12 @@ export default function ServiceAreaCorridorRoute() {
               {corridor.pickupInstructions.map((instruction, index) => (
                 <li
                   key={index}
-                  className="flex items-start gap-3.5 p-4 rounded-2xl bg-slate-50 border border-slate-200/70"
+                  className="flex items-start gap-3.5 p-4 rounded-2xl bg-surface-subtle border border-border-subtle/70"
                 >
-                  <span className="w-7 h-7 rounded-xl bg-slate-950 text-white text-xs font-extrabold flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="w-7 h-7 rounded-xl bg-surface-header text-white text-xs font-extrabold flex items-center justify-center shrink-0 mt-0.5">
                     {index + 1}
                   </span>
-                  <p className="text-sm text-slate-700 leading-relaxed">{instruction}</p>
+                  <p className="text-sm text-fg-secondary leading-relaxed">{instruction}</p>
                 </li>
               ))}
             </ol>
@@ -573,20 +573,20 @@ export default function ServiceAreaCorridorRoute() {
           {/* Served ZIP Codes & Local Landmarks */}
           <Card
             variant="elevated"
-            className="lg:col-span-5 bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xs"
+            className="lg:col-span-5 bg-surface-card border border-border-subtle/80 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xs"
           >
             <div className="space-y-3">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
                 Primary Coverage Zones
               </span>
-              <h2 className="text-2xl font-extrabold text-slate-950 tracking-tight">
+              <h2 className="text-2xl font-extrabold text-fg-primary tracking-tight">
                 Served ZIP Codes &amp; Landmarks
               </h2>
               <div className="flex flex-wrap gap-2 pt-1">
                 {corridor.zipCodes.map((zip) => (
                   <span
                     key={zip}
-                    className="font-mono text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200 px-3 py-1.5 rounded-xl"
+                    className="font-mono text-xs font-bold bg-status-info-bg text-status-info-fg border border-status-info-border px-3 py-1.5 rounded-xl"
                   >
                     MO {zip}
                   </span>
@@ -594,15 +594,15 @@ export default function ServiceAreaCorridorRoute() {
               </div>
             </div>
 
-            <div className="space-y-3 pt-2 border-t border-slate-100">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <div className="space-y-3 pt-2 border-t border-border-faint">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-fg-subtle">
                 Popular Pickup &amp; Dropoff Landmarks
               </h3>
               <ul className="space-y-2.5">
                 {corridor.landmarks.map((landmark) => (
                   <li
                     key={landmark}
-                    className="flex items-center gap-2.5 text-sm font-semibold text-slate-800 bg-slate-50 border border-slate-200/70 px-3.5 py-2.5 rounded-xl"
+                    className="flex items-center gap-2.5 text-sm font-semibold text-fg-strong bg-surface-subtle border border-border-subtle/70 px-3.5 py-2.5 rounded-xl"
                   >
                     <LandmarkIcon className="w-4 h-4 text-blue-600 shrink-0" />
                     <span>{landmark}</span>
@@ -614,12 +614,12 @@ export default function ServiceAreaCorridorRoute() {
         </div>
 
         {/* Corridor FAQ Section */}
-        <section className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-10 space-y-6 shadow-xs">
+        <section className="bg-surface-card border border-border-subtle/80 rounded-3xl p-6 sm:p-10 space-y-6 shadow-xs">
           <div className="max-w-2xl space-y-1.5">
             <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
               Corridor Frequently Asked Questions
             </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-fg-primary tracking-tight">
               {corridor.shortTitle} — Travel &amp; Booking FAQs
             </h2>
           </div>
@@ -628,12 +628,12 @@ export default function ServiceAreaCorridorRoute() {
             {corridor.faqs.map((faq) => (
               <div
                 key={faq.question}
-                className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2"
+                className="p-5 rounded-2xl bg-surface-subtle border border-border-subtle/80 space-y-2"
               >
-                <h3 className="text-sm sm:text-base font-extrabold text-slate-950">
+                <h3 className="text-sm sm:text-base font-extrabold text-fg-primary">
                   {faq.question}
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">{faq.answer}</p>
+                <p className="text-xs sm:text-sm text-fg-secondary leading-relaxed">{faq.answer}</p>
               </div>
             ))}
           </div>
@@ -646,13 +646,13 @@ export default function ServiceAreaCorridorRoute() {
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
                 Regional St. Louis Network
               </span>
-              <h2 className="text-2xl font-extrabold text-slate-950 tracking-tight">
+              <h2 className="text-2xl font-extrabold text-fg-primary tracking-tight">
                 Related Airport &amp; West County Service Areas
               </h2>
             </div>
             <Link
               to="/service-areas"
-              className="text-xs font-extrabold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
+              className="text-xs font-extrabold text-blue-600 hover:text-status-info-fg inline-flex items-center gap-1"
             >
               <span>View All 8 Service Corridors</span>
               <ChevronRightIcon className="w-3.5 h-3.5" />
@@ -664,23 +664,23 @@ export default function ServiceAreaCorridorRoute() {
               <Link
                 key={rel.slug}
                 to={`/service-areas/${rel.slug}`}
-                className="group p-5 rounded-2xl bg-white border border-slate-200/80 hover:border-blue-500 shadow-2xs transition-all flex flex-col justify-between gap-4"
+                className="group p-5 rounded-2xl bg-surface-card border border-border-subtle/80 hover:border-blue-500 shadow-2xs transition-all flex flex-col justify-between gap-4"
               >
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2 text-xs">
-                    <span className="font-semibold text-slate-500">
+                    <span className="font-semibold text-fg-muted">
                       {rel.distanceMiles} mi · ~{rel.typicalDurationMinutes} min
                     </span>
-                    <span className="font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
+                    <span className="font-extrabold text-status-info-fg bg-status-info-bg px-2 py-0.5 rounded-md">
                       From ${startingFareWholeDollars}
                     </span>
                   </div>
-                  <h3 className="text-base font-extrabold text-slate-950 group-hover:text-blue-600 transition-colors">
+                  <h3 className="text-base font-extrabold text-fg-primary group-hover:text-blue-600 transition-colors">
                     {rel.shortTitle}
                   </h3>
-                  <p className="text-xs text-slate-600 line-clamp-2">{rel.heroSubheadline}</p>
+                  <p className="text-xs text-fg-secondary line-clamp-2">{rel.heroSubheadline}</p>
                 </div>
-                <span className="text-xs font-bold text-slate-900 group-hover:text-blue-600 inline-flex items-center gap-1">
+                <span className="text-xs font-bold text-fg-primary group-hover:text-blue-600 inline-flex items-center gap-1">
                   <span>View {companyName} Rates</span>
                   <ChevronRightIcon className="w-3.5 h-3.5" />
                 </span>

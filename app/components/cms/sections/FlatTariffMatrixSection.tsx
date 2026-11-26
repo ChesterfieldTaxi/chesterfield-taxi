@@ -14,13 +14,13 @@ export const FlatTariffMatrixSection: React.FC<FlatTariffMatrixSectionProps> = (
   ]
 }) => {
   return (
-    <section className="py-16 bg-white">
+    <section className="py-16 bg-surface-card">
       <div className="container mx-auto px-4 max-w-5xl">
-        <h2 className="text-3xl font-bold text-center text-slate-800 mb-8">{title}</h2>
+        <h2 className="text-3xl font-bold text-center text-fg-strong mb-8">{title}</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-100 text-slate-700">
+              <tr className="bg-surface-muted text-fg-secondary">
                 <th className="py-4 px-6 font-semibold border-b">From</th>
                 <th className="py-4 px-6 font-semibold border-b">To</th>
                 <th className="py-4 px-6 font-semibold border-b text-right">Flat Rate</th>
@@ -28,10 +28,10 @@ export const FlatTariffMatrixSection: React.FC<FlatTariffMatrixSectionProps> = (
             </thead>
             <tbody>
               {tariffs.map((t, idx) => (
-                <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="py-4 px-6 text-slate-700">{t.origin}</td>
-                  <td className="py-4 px-6 text-slate-700">{t.destination}</td>
-                  <td className="py-4 px-6 text-slate-900 font-medium text-right">{t.price}</td>
+                <tr key={idx} className="border-b border-border-faint hover:bg-surface-subtle">
+                  <td className="py-4 px-6 text-fg-secondary">{t.origin}</td>
+                  <td className="py-4 px-6 text-fg-secondary">{t.destination}</td>
+                  <td className="py-4 px-6 text-fg-primary font-medium text-right">{t.price}</td>
                 </tr>
               ))}
             </tbody>

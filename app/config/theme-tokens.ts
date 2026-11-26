@@ -51,7 +51,9 @@ export const APPEARANCE_OPTIONS: readonly AppearanceOption[] = [
  * - Phase 93: `/app/admin`, `/admin`
  * - Phase 94: `/app/passenger`, `/app/login`, `/app/register`, `/app/hub`
  * - Phase 95: `/app/corporate`, `/corporate`
- * - Phase 96: `/` (public live site via brand `darkTokens`)
+ * - Phase 96: `/` and all public live-site routes (`/about`, `/book`, `/booking`, `/contact`,
+ *   `/pay`, `/privacy`, `/register`, `/service-areas`, `/services`, `/signin`, `/terms`,
+ *   `/track`, `/construction`) via brand `darkTokens` (excluding `/driver`)
  */
 export const DARK_MODE_ENABLED_PATH_PREFIXES = [
   '/app/dispatch',
@@ -63,6 +65,20 @@ export const DARK_MODE_ENABLED_PATH_PREFIXES = [
   '/app/register',
   '/app/hub',
   '/app/corporate',
+  '/',
+  '/about',
+  '/book',
+  '/booking',
+  '/construction',
+  '/contact',
+  '/pay',
+  '/privacy',
+  '/register',
+  '/service-areas',
+  '/services',
+  '/signin',
+  '/terms',
+  '/track',
 ] as const;
 
 export function isDarkModeRoutePath(pathname: string): boolean {

@@ -7,8 +7,15 @@ import { isFirebaseConfigured } from '../core/services/firebase';
 import type { AppSettings } from '../core/types/config';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { AdminSidebar } from '../components/domain/admin/navigation/AdminSidebar';
+import { HelpTriggerButton } from '../components/domain/common/HelpTriggerButton';
 import { AppearanceToggle } from '../components/ui/AppearanceToggle';
 import { useTheme } from '../hooks/useTheme';
+
+const HelpDrawer = React.lazy(() =>
+  import('../components/domain/common/HelpDrawer').then((m) => ({
+    default: m.HelpDrawer,
+  }))
+);
 
 const AdminDashboardTab = React.lazy(() =>
   import('../components/domain/admin/AdminDashboardTab').then((m) => ({
@@ -231,6 +238,12 @@ export default function AdminLayout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSystemMenuOpen, setIsSystemMenuOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [hasOpenedHelp, setHasOpenedHelp] = useState(false);
+  const handleOpenHelp = useCallback(() => {
+    setHasOpenedHelp(true);
+    setIsHelpOpen(true);
+  }, []);
   const systemMenuRef = useRef<HTMLDivElement>(null);
   const dismissSystemMenu = useCallback(() => setIsSystemMenuOpen(false), []);
   const systemSheetDrag = useBottomSheetDragToClose({ onClose: dismissSystemMenu });
@@ -453,6 +466,11 @@ export default function AdminLayout() {
                 variant="cycle"
                 preference={themePreference}
                 onChange={setThemePreference}
+              />
+
+              <HelpTriggerButton
+                onClick={handleOpenHelp}
+                isOpen={isHelpOpen}
               />
 
               {/* Compact System Controls Popover (Maintenance, Get App, Cloud Sync) */}
@@ -876,6 +894,21 @@ export default function AdminLayout() {
           </button>
         </nav>
       </div>
+
+      {hasOpenedHelp && (
+        <Suspense fallback={null}>
+          <HelpDrawer
+            isOpen={isHelpOpen}
+            onClose={() => setIsHelpOpen(false)}
+            role="admin"
+            context={{
+              portal: 'admin',
+              tab: normalizedTab,
+              sub: effectiveSub,
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

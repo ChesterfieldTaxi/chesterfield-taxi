@@ -17,6 +17,7 @@ import {
   type ThemePreference,
 } from '../config/theme-tokens';
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
+import type { BrandingConfig } from '../core/types/config';
 
 export interface ThemeStorageLike {
   getItem(key: string): string | null;
@@ -295,5 +296,32 @@ export function subscribeToTheme(listener: ThemeSubscriber): () => void {
   subscribers.add(listener);
   return () => {
     subscribers.delete(listener);
+  };
+}
+
+/**
+ * Resolves effective public-site branding for the active theme (`'light' | 'dark'`).
+ * In dark mode, merges preset/custom `darkTokens` and applies safe dark surface/text
+ * fallbacks for custom brands without `darkTokens`, preserving `primaryColor`, fonts,
+ * and `btnBorderRadius` unless explicitly overridden.
+ */
+export function resolveEffectiveBranding(
+  branding: BrandingConfig,
+  resolvedTheme: ResolvedTheme
+): BrandingConfig {
+  if (resolvedTheme !== 'dark') {
+    return branding;
+  }
+  const dt = branding.darkTokens;
+  return {
+    ...branding,
+    ...dt,
+    headingColor: dt?.headingColor ?? '#f8fafc',
+    bodyTextColor: dt?.bodyTextColor ?? '#cbd5e1',
+    mutedTextColor: dt?.mutedTextColor ?? '#94a3b8',
+    cardBg: dt?.cardBg ?? '#0f172a',
+    navbarBg: dt?.navbarBg ?? '#020617',
+    btnSecondaryBg: dt?.btnSecondaryBg ?? '#1e293b',
+    btnSecondaryText: dt?.btnSecondaryText ?? '#f8fafc',
   };
 }

@@ -35,6 +35,15 @@ export const THEME_PRESETS: ThemePreset[] = [
       navbarBg: '#0f172a',
       cardBg: '#ffffff',
     },
+    darkTokens: {
+      headingColor: '#f8fafc',
+      bodyTextColor: '#cbd5e1',
+      mutedTextColor: '#94a3b8',
+      btnSecondaryBg: '#1e293b',
+      btnSecondaryText: '#f8fafc',
+      navbarBg: '#020617',
+      cardBg: '#0f172a',
+    },
   },
   {
     id: 'vintage_metro_amber',
@@ -57,6 +66,15 @@ export const THEME_PRESETS: ThemePreset[] = [
       btnBorderRadius: '8px',
       navbarBg: '#0f172a',
       cardBg: '#ffffff',
+    },
+    darkTokens: {
+      headingColor: '#fafafa',
+      bodyTextColor: '#d4d4d8',
+      mutedTextColor: '#a1a1aa',
+      btnSecondaryBg: '#27272a',
+      btnSecondaryText: '#fef08a',
+      navbarBg: '#09090b',
+      cardBg: '#18181b',
     },
   },
   {
@@ -81,6 +99,15 @@ export const THEME_PRESETS: ThemePreset[] = [
       navbarBg: '#090d16',
       cardBg: '#ffffff',
     },
+    darkTokens: {
+      headingColor: '#fef3c7',
+      bodyTextColor: '#d1d5db',
+      mutedTextColor: '#9ca3af',
+      btnSecondaryBg: '#1f2937',
+      btnSecondaryText: '#fef3c7',
+      navbarBg: '#030712',
+      cardBg: '#111827',
+    },
   },
   {
     id: 'electric_sapphire',
@@ -103,6 +130,15 @@ export const THEME_PRESETS: ThemePreset[] = [
       btnBorderRadius: '12px',
       navbarBg: '#0b1329',
       cardBg: '#ffffff',
+    },
+    darkTokens: {
+      headingColor: '#f8fafc',
+      bodyTextColor: '#cbd5e1',
+      mutedTextColor: '#94a3b8',
+      btnSecondaryBg: '#1e293b',
+      btnSecondaryText: '#38bdf8',
+      navbarBg: '#020617',
+      cardBg: '#0f172a',
     },
   },
   {
@@ -127,6 +163,15 @@ export const THEME_PRESETS: ThemePreset[] = [
       navbarBg: '#042f2e',
       cardBg: '#ffffff',
     },
+    darkTokens: {
+      headingColor: '#ecfdf5',
+      bodyTextColor: '#d1d5db',
+      mutedTextColor: '#9ca3af',
+      btnSecondaryBg: '#064e3b',
+      btnSecondaryText: '#ecfdf5',
+      navbarBg: '#02120e',
+      cardBg: '#0b1f1a',
+    },
   },
   {
     id: 'monochrome_obsidian',
@@ -149,6 +194,18 @@ export const THEME_PRESETS: ThemePreset[] = [
       btnBorderRadius: '0px',
       navbarBg: '#000000',
       cardBg: '#ffffff',
+    },
+    darkTokens: {
+      primaryColor: '#ffffff',
+      btnPrimaryBg: '#ffffff',
+      btnPrimaryText: '#000000',
+      headingColor: '#ffffff',
+      bodyTextColor: '#d4d4d8',
+      mutedTextColor: '#a1a1aa',
+      btnSecondaryBg: '#27272a',
+      btnSecondaryText: '#ffffff',
+      navbarBg: '#000000',
+      cardBg: '#09090b',
     },
   },
 ];
@@ -185,5 +242,6 @@ export function hydrateBrandingFromSettings(settings: AppSettings): BrandingConf
     btnBorderRadius: settings.branding?.btnBorderRadius || COMPANY_CONFIG.btnBorderRadius || '8px',
     navbarBg: settings.branding?.navbarBg || COMPANY_CONFIG.navbarBg || '#0f172a',
     cardBg: settings.branding?.cardBg || COMPANY_CONFIG.cardBg || '#ffffff',
+    ...(settings.branding?.darkTokens ? { darkTokens: settings.branding.darkTokens } : {}),
   };
 }

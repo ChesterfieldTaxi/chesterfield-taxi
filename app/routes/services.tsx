@@ -31,7 +31,7 @@ function getVehicleIcon(iconType?: string, id?: string) {
   if (type.includes('suv') || type.includes('xl') || type.includes('luxury')) {
     return <SparklesIcon className="w-6 h-6 text-blue-600" />;
   }
-  return <CarIcon className="w-6 h-6 text-slate-900" />;
+  return <CarIcon className="w-6 h-6 text-fg-primary" />;
 }
 
 interface ServiceItem {
@@ -247,18 +247,18 @@ export default function ServicesRoute() {
       : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4';
 
   return (
-    <div className="py-12 bg-slate-50 flex-1">
+    <div className="py-12 bg-surface-subtle flex-1">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
         
         {/* Page Header */}
         <div className="text-center max-w-3xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-blue-200">
+          <div className="inline-flex items-center gap-2 bg-status-info-bg text-status-info-fg text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-status-info-border">
             {companyName} Services
           </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-fg-primary tracking-tight">
             Services &amp; Rates
           </h1>
-          <p className="text-base sm:text-lg text-slate-600 leading-relaxed">
+          <p className="text-base sm:text-lg text-fg-secondary leading-relaxed">
             Airport pickups, local door-to-door rides, corporate accounts, and hourly charters across
             Chesterfield and St. Louis County.
           </p>
@@ -275,20 +275,20 @@ export default function ServicesRoute() {
               <Card
                 key={service.id}
                 variant="elevated"
-                className="border-slate-200/80 hover:border-blue-400/80 transition-all bg-white rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xs"
+                className="border-border-subtle/80 hover:border-blue-400/80 transition-all bg-surface-card rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xs"
               >
                 <div className="space-y-5">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-status-info-bg border border-status-info-border flex items-center justify-center shrink-0">
                       {service.icon}
                     </div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full bg-slate-100 text-slate-700">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full bg-surface-muted text-fg-secondary">
                       {service.badge}
                     </span>
                   </div>
 
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-extrabold text-slate-950 tracking-tight">
+                    <h2 className="text-xl sm:text-2xl font-extrabold text-fg-primary tracking-tight">
                       {service.title}
                     </h2>
                     <p className="text-xs font-semibold text-blue-600 mt-0.5">
@@ -296,16 +296,16 @@ export default function ServicesRoute() {
                     </p>
                   </div>
 
-                  <p className="text-sm text-slate-600 leading-relaxed">
+                  <p className="text-sm text-fg-secondary leading-relaxed">
                     {service.description}
                   </p>
 
                   {/* Key features checklist */}
-                  <div className="space-y-2 pt-2 border-t border-slate-100">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  <div className="space-y-2 pt-2 border-t border-border-faint">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-fg-subtle">
                       Service Inclusions
                     </h4>
-                    <ul className="space-y-1.5 text-xs text-slate-600">
+                    <ul className="space-y-1.5 text-xs text-fg-secondary">
                       {service.features.map((feat, idx) => (
                         <li key={idx} className="flex items-start gap-2">
                           <CheckIcon className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
@@ -316,21 +316,21 @@ export default function ServicesRoute() {
                   </div>
                 </div>
 
-                <div className="pt-6 mt-6 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="pt-6 mt-6 border-t border-border-faint flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div>
-                      <span className="text-[11px] text-slate-400 block font-medium">Recommended Vehicle</span>
-                      <span className="text-xs font-bold text-blue-700">{dynamicRecommended}</span>
+                      <span className="text-[11px] text-fg-subtle block font-medium">Recommended Vehicle</span>
+                      <span className="text-xs font-bold text-status-info-fg">{dynamicRecommended}</span>
                     </div>
                     <div>
-                      <span className="text-[11px] text-slate-400 block font-medium">Pricing Guide</span>
-                      <span className="text-xs font-bold text-slate-800">{service.estimatedPricing}</span>
+                      <span className="text-[11px] text-fg-subtle block font-medium">Pricing Guide</span>
+                      <span className="text-xs font-bold text-fg-strong">{service.estimatedPricing}</span>
                     </div>
                   </div>
 
                   <Link
                     to="/book"
-                    className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-blue-400 hover:text-blue-300 text-xs font-extrabold px-5 py-2.5 rounded-xl transition-colors shadow-xs shrink-0"
+                    className="inline-flex items-center justify-center gap-2 bg-surface-header hover:bg-surface-header-elevated text-blue-400 hover:text-blue-300 text-xs font-extrabold px-5 py-2.5 rounded-xl transition-colors shadow-xs shrink-0"
                   >
                     <span>Book a Ride</span>
                     <ChevronRightIcon className="w-3.5 h-3.5 stroke-[3]" />
@@ -342,15 +342,15 @@ export default function ServicesRoute() {
         </div>
 
         {/* Fleet Categories Section */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-8 sm:p-10 shadow-xs space-y-8">
+        <div className="bg-surface-card rounded-3xl border border-border-subtle/80 p-8 sm:p-10 shadow-xs space-y-8">
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
               Our Fleet
             </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-fg-primary tracking-tight">
               Choose the Right Vehicle for Your Ride
             </h2>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-fg-secondary">
               All vehicles in our fleet are smoke-free, inspected weekly, and climate-controlled.
             </p>
           </div>
@@ -359,11 +359,11 @@ export default function ServicesRoute() {
             {vehicles.map((tier) => (
               <div
                 key={tier.id}
-                className="rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-blue-400/80 transition-all overflow-hidden flex flex-col justify-between shadow-2xs group"
+                className="rounded-2xl bg-surface-subtle border border-border-subtle/80 hover:border-blue-400/80 transition-all overflow-hidden flex flex-col justify-between shadow-2xs group"
               >
                 <div>
                   {tier.imageUrl ? (
-                    <div className="relative h-44 w-full bg-slate-200 overflow-hidden border-b border-slate-200/80">
+                    <div className="relative h-44 w-full bg-surface-emphasis overflow-hidden border-b border-border-subtle/80">
                       <img
                         src={tier.imageUrl}
                         alt={tier.name}
@@ -371,11 +371,11 @@ export default function ServicesRoute() {
                         loading="lazy"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/50 via-transparent to-transparent" />
-                      <div className="absolute top-3 left-3 w-9 h-9 rounded-xl bg-white/95 backdrop-blur-xs border border-slate-200/80 flex items-center justify-center shadow-xs">
+                      <div className="absolute top-3 left-3 w-9 h-9 rounded-xl bg-surface-card/95 backdrop-blur-xs border border-border-subtle/80 flex items-center justify-center shadow-xs">
                         {getVehicleIcon(tier.iconType, tier.id)}
                       </div>
                       {tier.badge && (
-                        <span className="absolute top-3 right-3 text-[10px] font-bold text-blue-800 bg-blue-100/95 backdrop-blur-xs border border-blue-200 px-2.5 py-0.5 rounded-full uppercase shadow-2xs">
+                        <span className="absolute top-3 right-3 text-[10px] font-bold text-status-info-fg bg-status-info-bg-strong/95 backdrop-blur-xs border border-status-info-border px-2.5 py-0.5 rounded-full uppercase shadow-2xs">
                           {tier.badge}
                         </span>
                       )}
@@ -385,23 +385,23 @@ export default function ServicesRoute() {
                   <div className="p-6 space-y-3">
                     {!tier.imageUrl && (
                       <div className="flex items-center justify-between">
-                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-xl bg-surface-card border border-border-subtle flex items-center justify-center">
                           {getVehicleIcon(tier.iconType, tier.id)}
                         </div>
                         {tier.badge && (
-                          <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full uppercase">
+                          <span className="text-[10px] font-bold text-status-info-fg bg-status-info-bg-strong px-2 py-0.5 rounded-full uppercase">
                             {tier.badge}
                           </span>
                         )}
                       </div>
                     )}
                     <div>
-                      <h3 className="text-base font-bold text-slate-900">{tier.name}</h3>
-                      <p className="text-xs font-semibold text-blue-700 mt-0.5">
+                      <h3 className="text-base font-bold text-fg-primary">{tier.name}</h3>
+                      <p className="text-xs font-semibold text-status-info-fg mt-0.5">
                         Up to {tier.maxPassengers} Passengers • {tier.maxLuggage} Bags
                       </p>
                     </div>
-                    <p className="text-xs text-slate-600 leading-relaxed">
+                    <p className="text-xs text-fg-secondary leading-relaxed">
                       {tier.description || 'Clean, comfortable, climate-controlled vehicle.'}
                     </p>
                   </div>
@@ -410,7 +410,7 @@ export default function ServicesRoute() {
                 <div className="px-6 pb-6 pt-2">
                   <Link
                     to={`/book?vehicle=${tier.id === 'xl' ? 'suv' : 'sedan'}`}
-                    className="text-xs font-bold text-slate-900 hover:text-blue-600 inline-flex items-center gap-1 transition-colors"
+                    className="text-xs font-bold text-fg-primary hover:text-blue-600 inline-flex items-center gap-1 transition-colors"
                   >
                     <span>Book This Vehicle</span>
                     <ChevronRightIcon className="w-3 h-3 stroke-[3]" />
@@ -422,15 +422,15 @@ export default function ServicesRoute() {
         </div>
 
         {/* Service Area Coverage Directory */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-8 sm:p-10 shadow-xs space-y-6">
+        <div className="bg-surface-card rounded-3xl border border-border-subtle/80 p-8 sm:p-10 shadow-xs space-y-6">
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
               Service Area Directory
             </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-fg-primary tracking-tight">
               West County &amp; Regional Hubs
             </h2>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-fg-secondary">
               Select any corridor below to view instant upfront quotes, STL terminal door guides,
               and local landmarks:
             </p>
@@ -441,15 +441,15 @@ export default function ServicesRoute() {
               <Link
                 key={zone.slug}
                 to={`/service-areas/${zone.slug}`}
-                className="p-4 rounded-xl bg-slate-50 hover:bg-blue-50/50 border border-slate-200/80 hover:border-blue-400 flex items-start justify-between gap-3 text-sm transition-all group"
+                className="p-4 rounded-xl bg-surface-subtle hover:bg-status-info-bg/50 border border-border-subtle/80 hover:border-blue-400 flex items-start justify-between gap-3 text-sm transition-all group"
               >
                 <div>
-                  <span className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors block">
+                  <span className="font-bold text-fg-primary group-hover:text-status-info-fg transition-colors block">
                     {zone.city}
                   </span>
-                  <span className="text-slate-500 text-xs mt-0.5 block">{zone.note}</span>
+                  <span className="text-fg-muted text-xs mt-0.5 block">{zone.note}</span>
                 </div>
-                <span className="font-mono text-xs text-blue-700 bg-blue-100/70 px-2 py-1 rounded-md font-semibold shrink-0">
+                <span className="font-mono text-xs text-status-info-fg bg-status-info-bg-strong/70 px-2 py-1 rounded-md font-semibold shrink-0">
                   {zone.zip}
                 </span>
               </Link>
@@ -459,7 +459,7 @@ export default function ServicesRoute() {
           <div className="pt-2 text-center">
             <Link
               to="/service-areas"
-              className="inline-flex items-center gap-2 text-xs sm:text-sm font-extrabold text-blue-600 hover:text-blue-700"
+              className="inline-flex items-center gap-2 text-xs sm:text-sm font-extrabold text-blue-600 hover:text-status-info-fg"
             >
               <span>Explore All 8 Pre-Quoted Airport &amp; West County Corridors</span>
               <ChevronRightIcon className="w-4 h-4" />
@@ -487,13 +487,13 @@ export default function ServicesRoute() {
           <div className="flex items-center gap-3 shrink-0">
             <Link
               to="/contact"
-              className="bg-slate-950 hover:bg-slate-900 text-white font-bold text-sm px-6 py-3 rounded-xl transition-colors shadow-xs"
+              className="bg-surface-header hover:bg-surface-header text-white font-bold text-sm px-6 py-3 rounded-xl transition-colors shadow-xs"
             >
               Contact Dispatch
             </Link>
             <Link
               to="/book"
-              className="bg-white hover:bg-slate-100 text-slate-950 font-extrabold text-sm px-6 py-3 rounded-xl transition-colors shadow-xs"
+              className="bg-surface-card hover:bg-surface-muted text-fg-primary font-extrabold text-sm px-6 py-3 rounded-xl transition-colors shadow-xs"
             >
               Book Online Now
             </Link>

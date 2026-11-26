@@ -11,12 +11,12 @@ export const ServiceAreaListSection: React.FC<ServiceAreaListSectionProps> = ({
   areas = COMPANY_CONFIG.serviceAreas
 }) => {
   return (
-    <section className="py-16 bg-white border-t border-slate-100">
+    <section className="py-16 bg-surface-card border-t border-border-faint">
       <div className="container mx-auto px-4 max-w-4xl text-center">
-        <h2 className="text-3xl font-bold text-slate-800 mb-8">{title}</h2>
+        <h2 className="text-3xl font-bold text-fg-strong mb-8">{title}</h2>
         <div className="flex flex-wrap justify-center gap-3">
           {areas.map((area, idx) => (
-            <span key={idx} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-full text-sm font-medium">
+            <span key={idx} className="bg-surface-muted text-fg-secondary px-4 py-2 rounded-full text-sm font-medium">
               {area}
             </span>
           ))}

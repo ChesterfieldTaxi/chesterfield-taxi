@@ -412,19 +412,19 @@ export default function PublicPayLinkCheckoutPage() {
   const isCardSetup = payLink?.targetType === 'card_setup';
 
   return (
-    <div className="min-h-dvh bg-slate-50 text-slate-900 flex flex-col print:bg-white">
+    <div className="min-h-dvh bg-surface-subtle text-fg-primary flex flex-col print:bg-surface-card">
       {/* Executive Clean Standalone Header */}
-      <header className="bg-slate-950 text-white border-b border-slate-800 print:bg-white print:text-slate-900 print:border-slate-200">
+      <header className="bg-surface-header text-white border-b border-border-header print:bg-surface-card print:text-fg-primary print:border-border-subtle">
         <div className="max-w-xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
           <Link to="/" className="flex items-center gap-2.5 min-w-0 group">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-sm shrink-0 print:border print:border-slate-300 print:text-slate-900 print:bg-slate-100">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-sm shrink-0 print:border print:border-border-strong print:text-fg-primary print:bg-surface-muted">
               CT
             </div>
             <div className="min-w-0">
               <div className="font-black text-sm sm:text-base tracking-tight truncate">
                 {COMPANY_CONFIG.name}
               </div>
-              <div className="text-[11px] text-slate-400 print:text-slate-500 flex items-center gap-1">
+              <div className="text-[11px] text-fg-subtle print:text-fg-muted flex items-center gap-1">
                 <LockIcon className="w-3 h-3 text-emerald-400 print:text-emerald-600 shrink-0" />
                 <span>256-Bit Encrypted Payment Portal</span>
               </div>
@@ -433,7 +433,7 @@ export default function PublicPayLinkCheckoutPage() {
 
           <a
             href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 transition-colors shrink-0 print:hidden"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-header hover:bg-surface-header-elevated border border-border-header text-xs font-bold text-fg-on-header transition-colors shrink-0 print:hidden"
           >
             <PhoneIcon className="w-3.5 h-3.5 text-blue-400" />
             <span>{COMPANY_CONFIG.phone.dispatch}</span>
@@ -445,13 +445,13 @@ export default function PublicPayLinkCheckoutPage() {
       <main className="flex-1 w-full max-w-xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         {/* ─── STATE 1: Link Missing ─── */}
         {!payLink ? (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 sm:p-8 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 mx-auto flex items-center justify-center">
+          <div className="bg-surface-card rounded-2xl border border-border-subtle shadow-xs p-6 sm:p-8 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-status-danger-bg border border-status-danger-border text-rose-600 mx-auto flex items-center justify-center">
               <AlertCircleIcon className="w-6 h-6" />
             </div>
             <div className="space-y-1">
-              <h1 className="text-lg font-black text-slate-900">Payment Link Not Found</h1>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              <h1 className="text-lg font-black text-fg-primary">Payment Link Not Found</h1>
+              <p className="text-xs sm:text-sm text-fg-secondary leading-relaxed">
                 This payment link may be invalid or no longer active. Please contact our 24/7 dispatch desk for an updated link.
               </p>
             </div>
@@ -465,7 +465,7 @@ export default function PublicPayLinkCheckoutPage() {
               </a>
               <Link
                 to="/book"
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs inline-flex items-center justify-center"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-border-strong hover:bg-surface-muted text-fg-secondary font-bold text-xs inline-flex items-center justify-center"
               >
                 Book a Ride
               </Link>
@@ -473,12 +473,12 @@ export default function PublicPayLinkCheckoutPage() {
           </div>
         ) : payLink.status === 'paid' ? (
           /* ─── STATE 2: Instant Paid Receipt View ─── */
-          <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden print:border-slate-300 print:shadow-none">
-            <div className="bg-emerald-600 text-white px-6 py-6 text-center space-y-2 print:bg-white print:text-slate-900 print:border-b print:border-slate-200">
-              <div className="w-12 h-12 rounded-full bg-white/20 text-white mx-auto flex items-center justify-center border border-white/40 print:bg-emerald-50 print:text-emerald-700 print:border-emerald-300">
+          <div className="bg-surface-card rounded-2xl border border-status-success-border shadow-sm overflow-hidden print:border-border-strong print:shadow-none">
+            <div className="bg-emerald-600 text-white px-6 py-6 text-center space-y-2 print:bg-surface-card print:text-fg-primary print:border-b print:border-border-subtle">
+              <div className="w-12 h-12 rounded-full bg-white/20 text-white mx-auto flex items-center justify-center border border-white/40 print:bg-status-success-bg print:text-status-success-fg print:border-status-success-border">
                 <CheckIcon className="w-6 h-6" />
               </div>
-              <div className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-100 print:text-emerald-700">
+              <div className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-100 print:text-status-success-fg">
                 {isCardSetup ? 'Card Vault Confirmation' : 'Official Payment Receipt'}
               </div>
               <h1 className="text-2xl font-black tracking-tight">
@@ -491,7 +491,7 @@ export default function PublicPayLinkCheckoutPage() {
                   </>
                 )}
               </h1>
-              <p className="text-xs text-emerald-50 print:text-slate-600">
+              <p className="text-xs text-emerald-50 print:text-fg-secondary">
                 {isCardSetup
                   ? `Saved on file ($0.00 charged today) · Ready for future rides with ${COMPANY_CONFIG.name}`
                   : `Paid in full · Thank you for choosing ${COMPANY_CONFIG.name}`}
@@ -500,41 +500,41 @@ export default function PublicPayLinkCheckoutPage() {
 
             <div className="p-5 sm:p-6 space-y-5 text-xs">
               {/* Receipt Metadata Grid */}
-              <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-surface-subtle border border-border-subtle/80">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">
                     Receipt Number
                   </span>
-                  <span className="font-mono font-extrabold text-slate-900 text-xs">
+                  <span className="font-mono font-extrabold text-fg-primary text-xs">
                     {payLink.receiptNumber || 'RCT-VERIFIED'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">
                     Reference
                   </span>
-                  <span className="font-mono font-extrabold text-blue-700 text-xs">
+                  <span className="font-mono font-extrabold text-status-info-fg text-xs">
                     {payLink.referenceNumber}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">
                     {isInvoice ? 'Organization' : 'Passenger'}
                   </span>
-                  <span className="font-bold text-slate-800">{payLink.customerLabel}</span>
+                  <span className="font-bold text-fg-strong">{payLink.customerLabel}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">
                     Date Paid
                   </span>
-                  <span className="font-mono text-slate-700">
+                  <span className="font-mono text-fg-secondary">
                     {payLink.paidAt ? new Date(payLink.paidAt).toLocaleString() : 'Confirmed'}
                   </span>
                 </div>
                 {payLink.cardLast4 && (
-                  <div className="col-span-2 pt-1 border-t border-slate-200 flex items-center justify-between">
-                    <span className="text-slate-500">Payment Method</span>
-                    <span className="font-mono font-bold text-slate-800 uppercase">
+                  <div className="col-span-2 pt-1 border-t border-border-subtle flex items-center justify-between">
+                    <span className="text-fg-muted">Payment Method</span>
+                    <span className="font-mono font-bold text-fg-strong uppercase">
                       {payLink.cardBrand || 'Card'} •••• {payLink.cardLast4}
                     </span>
                   </div>
@@ -543,34 +543,34 @@ export default function PublicPayLinkCheckoutPage() {
 
               {/* Service Summary */}
               <div className="space-y-2">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
                   {isInvoice ? 'Settled Statement Items' : 'Trip & Fare Summary'}
                 </div>
-                <div className="p-3.5 rounded-xl border border-slate-200 space-y-2.5">
-                  <div className="font-semibold text-slate-800">{payLink.summaryLabel}</div>
-                  <div className="divide-y divide-slate-100 border-t border-slate-100 pt-1">
+                <div className="p-3.5 rounded-xl border border-border-subtle space-y-2.5">
+                  <div className="font-semibold text-fg-strong">{payLink.summaryLabel}</div>
+                  <div className="divide-y divide-border-faint border-t border-border-faint pt-1">
                     {payLink.lineItems.map((item, idx) => (
                       <div key={idx} className="py-2 flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="font-semibold text-slate-800">{item.label}</div>
+                          <div className="font-semibold text-fg-strong">{item.label}</div>
                           {item.detail && (
-                            <div className="text-[11px] text-slate-500">{item.detail}</div>
+                            <div className="text-[11px] text-fg-muted">{item.detail}</div>
                           )}
                         </div>
-                        <span className="font-mono font-bold text-slate-900 shrink-0">
+                        <span className="font-mono font-bold text-fg-primary shrink-0">
                           ${item.amount.toFixed(2)}
                         </span>
                       </div>
                     ))}
                     {(payLink.tipAmount || 0) > 0 && (
-                      <div className="py-2 flex items-center justify-between text-emerald-700 font-bold">
+                      <div className="py-2 flex items-center justify-between text-status-success-fg font-bold">
                         <span>Driver Gratuity (100% Pass-Through)</span>
                         <span className="font-mono">+${(payLink.tipAmount || 0).toFixed(2)}</span>
                       </div>
                     )}
-                    <div className="pt-2.5 flex items-center justify-between text-sm font-black text-slate-900">
+                    <div className="pt-2.5 flex items-center justify-between text-sm font-black text-fg-primary">
                       <span>Total Settled</span>
-                      <span className="font-mono text-emerald-700">
+                      <span className="font-mono text-status-success-fg">
                         ${(payLink.totalPaidAmount ?? payLink.baseAmount + (payLink.tipAmount || 0)).toFixed(2)}{' '}
                         {payLink.currency}
                       </span>
@@ -584,13 +584,13 @@ export default function PublicPayLinkCheckoutPage() {
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="flex-1 py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer transition-colors"
+                  className="flex-1 py-3 px-4 rounded-xl bg-surface-header hover:bg-surface-header-elevated text-white font-bold text-xs cursor-pointer transition-colors"
                 >
                   Print / Save PDF Receipt
                 </button>
                 <Link
                   to="/"
-                  className="py-3 px-4 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs text-center transition-colors"
+                  className="py-3 px-4 rounded-xl border border-border-strong hover:bg-surface-subtle text-fg-secondary font-bold text-xs text-center transition-colors"
                 >
                   Return Home
                 </Link>
@@ -599,18 +599,18 @@ export default function PublicPayLinkCheckoutPage() {
           </div>
         ) : payLink.status !== 'open' ? (
           /* ─── STATE 3: Expired / Cancelled / Refunded Link ─── */
-          <div className="bg-white rounded-2xl border border-amber-200 shadow-xs p-6 sm:p-8 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 mx-auto flex items-center justify-center">
+          <div className="bg-surface-card rounded-2xl border border-status-warning-border shadow-xs p-6 sm:p-8 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-status-warning-bg border border-status-warning-border text-amber-600 mx-auto flex items-center justify-center">
               <AlertCircleIcon className="w-6 h-6" />
             </div>
             <div className="space-y-1">
-              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-100 text-amber-800">
+              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-status-warning-bg-strong text-status-warning-fg">
                 Link {payLink.status}
               </span>
-              <h1 className="text-lg font-black text-slate-900 pt-1">
+              <h1 className="text-lg font-black text-fg-primary pt-1">
                 Payment Link {payLink.status === 'expired' ? 'Expired' : 'Unavailable'}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              <p className="text-xs sm:text-sm text-fg-secondary leading-relaxed">
                 Reference <strong className="font-mono">{payLink.referenceNumber}</strong> is currently marked{' '}
                 <strong>{payLink.status}</strong>. Please contact our 24/7 dispatch desk if you need an updated payment link.
               </p>
@@ -629,8 +629,8 @@ export default function PublicPayLinkCheckoutPage() {
           /* ─── STATE 4: Active Open 1-Tap Checkout ─── */
           <div className="space-y-4">
             {/* Top Summary & Itemized Breakdown Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-              <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between gap-3">
+            <div className="bg-surface-card rounded-2xl border border-border-subtle/90 shadow-xs overflow-hidden">
+              <div className="px-5 py-4 bg-surface-header text-white flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/30 text-blue-300 flex items-center justify-center shrink-0">
                     {isInvoice ? (
@@ -640,7 +640,7 @@ export default function PublicPayLinkCheckoutPage() {
                     )}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
                       {isCardSetup
                         ? 'Card on File Vault Setup'
                         : isInvoice
@@ -659,21 +659,21 @@ export default function PublicPayLinkCheckoutPage() {
               </div>
 
               <div className="p-5 space-y-4 text-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border-faint">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">
                       {isInvoice ? 'Billed Organization' : 'Passenger'}
                     </span>
-                    <span className="font-extrabold text-slate-900 text-sm">
+                    <span className="font-extrabold text-fg-primary text-sm">
                       {payLink.customerLabel}
                     </span>
                   </div>
                   {(payLink.billingPeriod || payLink.serviceDate) && (
                     <div className="text-right">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">
                         {isInvoice ? 'Billing Period' : 'Service Date'}
                       </span>
-                      <span className="font-mono font-semibold text-slate-700">
+                      <span className="font-mono font-semibold text-fg-secondary">
                         {payLink.billingPeriod || payLink.serviceDate}
                       </span>
                     </div>
@@ -682,15 +682,15 @@ export default function PublicPayLinkCheckoutPage() {
 
                 {/* Route Timeline for Trips */}
                 {!isInvoice && (payLink.pickupDisplay || payLink.dropoffDisplay) ? (
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                  <div className="p-3.5 rounded-xl bg-surface-subtle border border-border-subtle/80 space-y-2">
                     {payLink.pickupDisplay && (
                       <div className="flex items-start gap-2.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
                         <div className="min-w-0">
-                          <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                          <span className="text-[10px] font-bold uppercase text-fg-subtle block">
                             Pickup
                           </span>
-                          <span className="font-semibold text-slate-800">
+                          <span className="font-semibold text-fg-strong">
                             {payLink.pickupDisplay}
                           </span>
                         </div>
@@ -700,10 +700,10 @@ export default function PublicPayLinkCheckoutPage() {
                       <div className="flex items-start gap-2.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mt-1 shrink-0" />
                         <div className="min-w-0">
-                          <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                          <span className="text-[10px] font-bold uppercase text-fg-subtle block">
                             Destination
                           </span>
-                          <span className="font-semibold text-slate-800">
+                          <span className="font-semibold text-fg-strong">
                             {payLink.dropoffDisplay}
                           </span>
                         </div>
@@ -711,26 +711,26 @@ export default function PublicPayLinkCheckoutPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 font-semibold text-slate-800">
+                  <div className="p-3 rounded-xl bg-surface-subtle border border-border-subtle/80 font-semibold text-fg-strong">
                     {payLink.summaryLabel}
                   </div>
                 )}
 
                 {/* Itemized Line Items */}
                 <div className="space-y-1.5">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
                     Itemized Breakdown
                   </div>
-                  <div className="divide-y divide-slate-100 border border-slate-200/80 rounded-xl px-3.5 max-h-60 overflow-y-auto">
+                  <div className="divide-y divide-border-faint border border-border-subtle/80 rounded-xl px-3.5 max-h-60 overflow-y-auto">
                     {payLink.lineItems.map((item, idx) => (
                       <div key={idx} className="py-2.5 flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="font-semibold text-slate-800">{item.label}</div>
+                          <div className="font-semibold text-fg-strong">{item.label}</div>
                           {item.detail && (
-                            <div className="text-[11px] text-slate-500 truncate">{item.detail}</div>
+                            <div className="text-[11px] text-fg-muted truncate">{item.detail}</div>
                           )}
                         </div>
-                        <span className="font-mono font-bold text-slate-900 shrink-0">
+                        <span className="font-mono font-bold text-fg-primary shrink-0">
                           ${item.amount.toFixed(2)}
                         </span>
                       </div>
@@ -739,9 +739,9 @@ export default function PublicPayLinkCheckoutPage() {
                 </div>
 
                 {/* Subtotal Row */}
-                <div className="flex items-center justify-between pt-1 text-xs font-bold text-slate-700">
+                <div className="flex items-center justify-between pt-1 text-xs font-bold text-fg-secondary">
                   <span>{isInvoice ? 'Statement Balance' : 'Ride Fare Subtotal'}</span>
-                  <span className="font-mono text-sm font-extrabold text-slate-900">
+                  <span className="font-mono text-sm font-extrabold text-fg-primary">
                     ${payLink.baseAmount.toFixed(2)}
                   </span>
                 </div>
@@ -750,18 +750,18 @@ export default function PublicPayLinkCheckoutPage() {
 
             {/* Optional Driver Gratuity Selector (Trips Only) */}
             {payLink.allowTip && (
-              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-3">
+              <div className="bg-surface-card rounded-2xl border border-border-subtle/90 shadow-xs p-5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                    <h2 className="text-xs font-extrabold text-fg-primary uppercase tracking-wider">
                       Add Driver Gratuity
                     </h2>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-fg-muted">
                       100% of your tip goes directly to your Chesterfield Taxi driver
                     </p>
                   </div>
                   {selectedTipAmount > 0 && (
-                    <span className="font-mono text-xs font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                    <span className="font-mono text-xs font-extrabold text-status-success-fg bg-status-success-bg border border-status-success-border px-2 py-0.5 rounded-lg">
                       +${selectedTipAmount.toFixed(2)}
                     </span>
                   )}
@@ -790,14 +790,14 @@ export default function PublicPayLinkCheckoutPage() {
                         className={`py-2.5 px-1.5 min-h-[48px] rounded-xl border text-center transition-all cursor-pointer ${
                           active
                             ? 'bg-blue-600 border-blue-600 text-white shadow-xs font-extrabold'
-                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-bold'
+                            : 'bg-surface-subtle border-border-subtle text-fg-secondary hover:bg-surface-muted font-bold'
                         }`}
                       >
                         <div className="text-xs">{opt.label}</div>
                         {pctDollar !== null && (
                           <div
                             className={`text-[10px] font-mono ${
-                              active ? 'text-blue-100' : 'text-slate-500'
+                              active ? 'text-blue-100' : 'text-fg-muted'
                             }`}
                           >
                             ${pctDollar.toFixed(2)}
@@ -810,7 +810,7 @@ export default function PublicPayLinkCheckoutPage() {
 
                 {tipMode === 'custom' && (
                   <div className="pt-1 flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-600">Custom Tip ($ USD):</span>
+                    <span className="text-xs font-bold text-fg-secondary">Custom Tip ($ USD):</span>
                     <input
                       type="number"
                       inputMode="decimal"
@@ -819,7 +819,7 @@ export default function PublicPayLinkCheckoutPage() {
                       placeholder="0.00"
                       value={customTipStr}
                       onChange={(e) => setCustomTipStr(e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                      className="flex-1 px-3 py-2 rounded-xl border border-border-strong text-sm font-mono font-bold text-fg-primary focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
                     />
                   </div>
                 )}
@@ -827,18 +827,18 @@ export default function PublicPayLinkCheckoutPage() {
             )}
 
             {/* Payment Element OR Graceful Fallback Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="bg-surface-card rounded-2xl border border-border-subtle/90 shadow-xs p-5 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-border-faint">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-subtle block">
                     Total Due Now
                   </span>
-                  <span className="text-2xl font-black font-mono text-slate-900 tabular-nums">
+                  <span className="text-2xl font-black font-mono text-fg-primary tabular-nums">
                     ${totalToPay.toFixed(2)}{' '}
-                    <span className="text-xs font-bold text-slate-500">{payLink.currency}</span>
+                    <span className="text-xs font-bold text-fg-muted">{payLink.currency}</span>
                   </span>
                 </div>
-                <div className="text-right text-[11px] text-slate-500">
+                <div className="text-right text-[11px] text-fg-muted">
                   <div>Apple Pay &middot; Google Pay</div>
                   <div>Visa &middot; Mastercard &middot; Amex</div>
                 </div>
@@ -848,7 +848,7 @@ export default function PublicPayLinkCheckoutPage() {
                 <form onSubmit={handleSubmitStripeCheckout} className="space-y-4">
                   <div className="min-h-[120px] relative">
                     {isPreparingIntent && !clientSecret && (
-                      <div className="py-8 flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
+                      <div className="py-8 flex items-center justify-center gap-2 text-xs font-semibold text-fg-muted">
                         <SpinnerIcon className="w-4 h-4 animate-spin text-blue-600" />
                         <span>Initializing encrypted payment session...</span>
                       </div>
@@ -857,7 +857,7 @@ export default function PublicPayLinkCheckoutPage() {
                   </div>
 
                   {checkoutError && (
-                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-start gap-2">
+                    <div className="p-3 rounded-xl bg-status-danger-bg border border-status-danger-border text-status-danger-fg text-xs font-semibold flex items-start gap-2">
                       <AlertCircleIcon className="w-4 h-4 shrink-0 mt-0.5" />
                       <span>{checkoutError}</span>
                     </div>
@@ -885,7 +885,7 @@ export default function PublicPayLinkCheckoutPage() {
                     )}
                   </button>
 
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <div className="flex items-center justify-between text-[11px] text-fg-subtle pt-1">
                     <span className="inline-flex items-center gap-1">
                       <ShieldCheckIcon className="w-3.5 h-3.5 text-emerald-600" />
                       PCI-DSS Level 1 Encrypted via Stripe
@@ -895,18 +895,18 @@ export default function PublicPayLinkCheckoutPage() {
                 </form>
               ) : (
                 /* Graceful Unconfigured Fallback Card */
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="p-4 rounded-xl bg-surface-subtle border border-border-subtle space-y-3">
                   <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-status-info-bg border border-status-info-border text-status-info-fg flex items-center justify-center shrink-0">
                       <CreditCardIcon className="w-4 h-4" />
                     </div>
                     <div className="space-y-1 text-xs">
-                      <div className="font-extrabold text-slate-900">
+                      <div className="font-extrabold text-fg-primary">
                         {isInvoice
                           ? 'Direct Dispatch / Billing Settlement'
                           : 'Pay Driver in Car or Contact Dispatch'}
                       </div>
-                      <p className="text-slate-600 leading-relaxed">
+                      <p className="text-fg-secondary leading-relaxed">
                         {fallbackNotice ||
                           'Online card checkout is not currently active on this terminal. You may pay your driver directly in the car (Tap / Apple Pay / Google Pay / Card / Cash) or call Chesterfield Taxi Dispatch at (314) 738-0100.'}
                       </p>
@@ -924,7 +924,7 @@ export default function PublicPayLinkCheckoutPage() {
                     <button
                       type="button"
                       onClick={handleRefreshStatus}
-                      className="py-2.5 px-4 rounded-xl border border-slate-300 hover:bg-white text-slate-700 font-bold text-xs cursor-pointer"
+                      className="py-2.5 px-4 rounded-xl border border-border-strong hover:bg-surface-card text-fg-secondary font-bold text-xs cursor-pointer"
                     >
                       Refresh Status
                     </button>
@@ -936,7 +936,7 @@ export default function PublicPayLinkCheckoutPage() {
         )}
       </main>
 
-      <footer className="py-6 text-center text-[11px] text-slate-400 print:text-slate-500">
+      <footer className="py-6 text-center text-[11px] text-fg-subtle print:text-fg-muted">
         &copy; {new Date().getFullYear()} {COMPANY_CONFIG.legalName} &middot; {COMPANY_CONFIG.address.formatted}
       </footer>
     </div>

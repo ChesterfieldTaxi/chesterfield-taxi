@@ -59,40 +59,40 @@ const PILLARS = [
 
 export default function AboutRoute() {
   return (
-    <div className="py-12 bg-slate-50 flex-1">
+    <div className="py-12 bg-surface-subtle flex-1">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
         
         {/* Page Header & Mission */}
         <div className="text-center max-w-3xl mx-auto space-y-4">
-          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-blue-200">
+          <div className="inline-flex items-center gap-2 bg-status-info-bg text-status-info-fg text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-status-info-border">
             About {COMPANY_CONFIG.name}
           </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-fg-primary tracking-tight">
             West County&apos;s Trusted Taxi &amp; Car Service
           </h1>
-          <p className="text-base sm:text-lg text-slate-600 leading-relaxed">
+          <p className="text-base sm:text-lg text-fg-secondary leading-relaxed">
             Built on a simple idea: every ride should be on time, fairly priced, and driven by
             courteous local professionals.
           </p>
         </div>
 
         {/* Heritage Story Block */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-8 sm:p-12 shadow-xs">
+        <div className="bg-surface-card rounded-3xl border border-border-subtle/80 p-8 sm:p-12 shadow-xs">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             <div className="lg:col-span-7 space-y-4">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
                 Our Heritage &amp; Mission
               </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-fg-primary tracking-tight">
                 Locally Owned, Community Focused
               </h2>
-              <p className="text-slate-600 leading-relaxed text-sm sm:text-base">
+              <p className="text-fg-secondary leading-relaxed text-sm sm:text-base">
                 {COMPANY_CONFIG.name} was established to bridge the gap between impersonal rideshare apps
                 and outdated taxi companies. Based right in Chesterfield, Missouri, we serve corporate
                 campuses, residential subdivisions, and airport commuters throughout West St. Louis
                 County.
               </p>
-              <p className="text-slate-600 leading-relaxed text-sm sm:text-base">
+              <p className="text-fg-secondary leading-relaxed text-sm sm:text-base">
                 Whether transporting an executive to a critical meeting in Clayton, ensuring an
                 elderly passenger reaches an appointment at St. Luke&apos;s Hospital safely, or meeting an
                 early flight at Lambert-St. Louis International, we treat every passenger with respect
@@ -100,7 +100,7 @@ export default function AboutRoute() {
               </p>
             </div>
 
-            <div className="lg:col-span-5 bg-slate-950 text-white p-8 rounded-2xl space-y-6">
+            <div className="lg:col-span-5 bg-surface-header text-white p-8 rounded-2xl space-y-6">
               <h3 className="text-lg font-bold text-blue-400">Our Operational Promise</h3>
               <ul className="space-y-3 text-sm text-slate-300">
                 <li className="flex items-start gap-2.5">
@@ -129,13 +129,13 @@ export default function AboutRoute() {
           {STATS.map((stat) => (
             <div
               key={stat.label}
-              className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs text-center space-y-1 hover:border-blue-400 transition-colors"
+              className="bg-surface-card p-6 rounded-2xl border border-border-subtle/80 shadow-xs text-center space-y-1 hover:border-blue-400 transition-colors"
             >
               <span className="text-3xl sm:text-4xl font-black text-blue-600 block tracking-tight">
                 {stat.value}
               </span>
-              <span className="text-sm font-extrabold text-slate-900 block">{stat.label}</span>
-              <span className="text-xs text-slate-500 block">{stat.detail}</span>
+              <span className="text-sm font-extrabold text-fg-primary block">{stat.label}</span>
+              <span className="text-xs text-fg-muted block">{stat.detail}</span>
             </div>
           ))}
         </div>
@@ -146,10 +146,10 @@ export default function AboutRoute() {
             <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
               Safety &amp; Compliance
             </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-fg-primary tracking-tight">
               Safety Is Our Non-Negotiable Standard
             </h2>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-fg-secondary">
               How we ensure peace of mind on every trip throughout the St. Louis metropolitan area.
             </p>
           </div>
@@ -159,25 +159,25 @@ export default function AboutRoute() {
               <Card
                 key={pillar.title}
                 variant="default"
-                className="p-8 rounded-3xl bg-white border-slate-200/80 space-y-3"
+                className="p-8 rounded-3xl bg-surface-card border-border-subtle/80 space-y-3"
               >
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+                <div className="w-12 h-12 rounded-2xl bg-status-info-bg border border-status-info-border flex items-center justify-center text-blue-600">
                   {pillar.icon}
                 </div>
-                <h3 className="text-lg font-extrabold text-slate-900">{pillar.title}</h3>
-                <p className="text-sm text-slate-600 leading-relaxed">{pillar.description}</p>
+                <h3 className="text-lg font-extrabold text-fg-primary">{pillar.title}</h3>
+                <p className="text-sm text-fg-secondary leading-relaxed">{pillar.description}</p>
               </Card>
             ))}
           </div>
         </div>
 
         {/* Ready to Ride Banner */}
-        <div className="bg-slate-900 text-white rounded-3xl p-8 sm:p-12 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="bg-surface-header text-white rounded-3xl p-8 sm:p-12 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-2 text-center md:text-left">
             <h3 className="text-2xl font-extrabold tracking-tight">
               Ready to book your next ride?
             </h3>
-            <p className="text-slate-400 text-sm">
+            <p className="text-fg-subtle text-sm">
               Book your airport ride or local pickup online in seconds, or call our 24/7 dispatch team.
             </p>
           </div>
@@ -197,7 +197,7 @@ export default function AboutRoute() {
 
             <Link
               to="/contact"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm px-6 py-3.5 rounded-xl border border-slate-700 transition-colors"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-surface-header-elevated hover:bg-surface-header-muted text-fg-on-header font-bold text-sm px-6 py-3.5 rounded-xl border border-border-header transition-colors"
             >
               <span>Contact Dispatch</span>
             </Link>

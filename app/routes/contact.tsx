@@ -158,18 +158,18 @@ export default function ContactRoute() {
   };
 
   return (
-    <div className="py-12 bg-slate-50 flex-1">
+    <div className="py-12 bg-surface-subtle flex-1">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
         
         {/* Page Header */}
         <div className="text-center max-w-3xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-blue-200">
+          <div className="inline-flex items-center gap-2 bg-status-info-bg text-status-info-fg text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-status-info-border">
             24/7 Dispatch &amp; Support
           </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-fg-primary tracking-tight">
             Contact Us
           </h1>
-          <p className="text-base sm:text-lg text-slate-600 leading-relaxed">
+          <p className="text-base sm:text-lg text-fg-secondary leading-relaxed">
             Need a pickup right away, have a question about an upcoming ride, or want to set up a
             corporate account? Our local team is here 24/7.
           </p>
@@ -178,22 +178,22 @@ export default function ContactRoute() {
         {/* Primary Contact Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card 1: Telephone */}
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-6 hover:border-blue-400 transition-colors">
+          <div className="bg-surface-card p-6 sm:p-8 rounded-3xl border border-border-subtle/80 shadow-xs flex flex-col justify-between space-y-6 hover:border-blue-400 transition-colors">
             <div className="space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+              <div className="w-12 h-12 rounded-2xl bg-status-info-bg border border-status-info-border flex items-center justify-center text-blue-600">
                 <PhoneIcon className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-lg font-extrabold text-slate-900">Phone Dispatch</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Direct line to our 24/7 operators</p>
+                <h2 className="text-lg font-extrabold text-fg-primary">Phone Dispatch</h2>
+                <p className="text-xs text-fg-muted mt-0.5">Direct line to our 24/7 operators</p>
               </div>
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-fg-secondary">
                 For immediate pickup, ASAP bookings, or urgent schedule changes, call us anytime.
               </p>
             </div>
             <a
               href={`tel:${phoneRaw}`}
-              className="inline-flex items-center justify-center gap-2 bg-slate-950 hover:bg-slate-900 text-blue-400 font-extrabold text-sm py-3 px-4 rounded-xl transition-colors shadow-xs"
+              className="inline-flex items-center justify-center gap-2 bg-surface-header hover:bg-surface-header text-blue-400 font-extrabold text-sm py-3 px-4 rounded-xl transition-colors shadow-xs"
             >
               <PhoneIcon className="w-4 h-4" />
               <span>{phoneDisplay}</span>
@@ -201,22 +201,22 @@ export default function ContactRoute() {
           </div>
 
           {/* Card 2: Email */}
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-6 hover:border-blue-400 transition-colors">
+          <div className="bg-surface-card p-6 sm:p-8 rounded-3xl border border-border-subtle/80 shadow-xs flex flex-col justify-between space-y-6 hover:border-blue-400 transition-colors">
             <div className="space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+              <div className="w-12 h-12 rounded-2xl bg-status-info-bg border border-status-info-border flex items-center justify-center text-blue-600">
                 <MailIcon className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-lg font-extrabold text-slate-900">Email &amp; Invoicing</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Corporate billing and receipts</p>
+                <h2 className="text-lg font-extrabold text-fg-primary">Email &amp; Invoicing</h2>
+                <p className="text-xs text-fg-muted mt-0.5">Corporate billing and receipts</p>
               </div>
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-fg-secondary">
                 For expense receipts, corporate contract setup, and general inquiries.
               </p>
             </div>
             <a
               href={`mailto:${emailDisplay}`}
-              className="inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-3 px-4 rounded-xl transition-colors truncate"
+              className="inline-flex items-center justify-center gap-2 bg-surface-muted hover:bg-surface-emphasis text-fg-strong font-bold text-xs py-3 px-4 rounded-xl transition-colors truncate"
             >
               <MailIcon className="w-4 h-4 text-blue-600 shrink-0" />
               <span className="truncate">{emailDisplay}</span>
@@ -224,19 +224,19 @@ export default function ContactRoute() {
           </div>
 
           {/* Card 3: Address & Hours */}
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-6 hover:border-blue-400 transition-colors">
+          <div className="bg-surface-card p-6 sm:p-8 rounded-3xl border border-border-subtle/80 shadow-xs flex flex-col justify-between space-y-6 hover:border-blue-400 transition-colors">
             <div className="space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+              <div className="w-12 h-12 rounded-2xl bg-status-info-bg border border-status-info-border flex items-center justify-center text-blue-600">
                 <MapPinIcon className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-lg font-extrabold text-slate-900">Dispatch Headquarters</h2>
-                <p className="text-xs text-slate-500 mt-0.5">West County Operations Hub</p>
+                <h2 className="text-lg font-extrabold text-fg-primary">Dispatch Headquarters</h2>
+                <p className="text-xs text-fg-muted mt-0.5">West County Operations Hub</p>
               </div>
-              <div className="text-xs text-slate-600 space-y-1">
-                <p className="font-semibold text-slate-800">{streetLine}</p>
+              <div className="text-xs text-fg-secondary space-y-1">
+                <p className="font-semibold text-fg-strong">{streetLine}</p>
                 {cityStateZipLine ? <p>{cityStateZipLine}</p> : null}
-                <div className="flex items-center gap-1.5 pt-2 text-blue-700 font-bold">
+                <div className="flex items-center gap-1.5 pt-2 text-status-info-fg font-bold">
                   <ClockIcon className="w-3.5 h-3.5" />
                   <span>{COMPANY_CONFIG.operatingHours}</span>
                 </div>
@@ -262,23 +262,23 @@ export default function ContactRoute() {
           
           {/* Inquiry Form */}
           <div className="lg:col-span-7">
-            <Card variant="elevated" className="border-slate-200/80 rounded-3xl p-6 sm:p-8 bg-white shadow-xs">
-              <CardHeader className="p-0 pb-6 border-b border-slate-100">
-                <CardTitle className="text-xl font-extrabold text-slate-950">
+            <Card variant="elevated" className="border-border-subtle/80 rounded-3xl p-6 sm:p-8 bg-surface-card shadow-xs">
+              <CardHeader className="p-0 pb-6 border-b border-border-faint">
+                <CardTitle className="text-xl font-extrabold text-fg-primary">
                   Send Us a Message
                 </CardTitle>
-                <CardDescription className="text-xs text-slate-500">
+                <CardDescription className="text-xs text-fg-muted">
                   Fill out the form below and our local team will get back to you shortly.
                 </CardDescription>
               </CardHeader>
 
               {submitted ? (
                 <div className="py-10 text-center space-y-4">
-                  <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                  <div className="w-14 h-14 bg-status-success-bg-strong text-emerald-600 rounded-full flex items-center justify-center mx-auto">
                     <CheckIcon className="w-7 h-7 stroke-[3]" />
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900">Message Sent!</h3>
-                  <p className="text-sm text-slate-600 max-w-md mx-auto">
+                  <h3 className="text-xl font-bold text-fg-primary">Message Sent!</h3>
+                  <p className="text-sm text-fg-secondary max-w-md mx-auto">
                     Thanks for reaching out. Our {companyName} team has received your message and
                     will reply shortly.
                   </p>
@@ -301,7 +301,7 @@ export default function ContactRoute() {
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-fg-secondary mb-1">
                         Full Name *
                       </label>
                       <input
@@ -310,12 +310,12 @@ export default function ContactRoute() {
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="Jane Doe"
-                        className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3.5 py-2.5 text-sm bg-surface-subtle border border-border-strong rounded-xl text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-fg-secondary mb-1">
                         Phone Number *
                       </label>
                       <input
@@ -324,14 +324,14 @@ export default function ContactRoute() {
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         placeholder="(636) 555-0199"
-                        className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3.5 py-2.5 text-sm bg-surface-subtle border border-border-strong rounded-xl text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-fg-secondary mb-1">
                         Email Address *
                       </label>
                       <input
@@ -340,12 +340,12 @@ export default function ContactRoute() {
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         placeholder="jane@example.com"
-                        className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3.5 py-2.5 text-sm bg-surface-subtle border border-border-strong rounded-xl text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-fg-secondary mb-1">
                         How Can We Help?
                       </label>
                       <Select
@@ -362,7 +362,7 @@ export default function ContactRoute() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-fg-secondary mb-1">
                       Message &amp; Details *
                     </label>
                     <textarea
@@ -371,7 +371,7 @@ export default function ContactRoute() {
                       value={formData.message}
                       onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                       placeholder="Include trip dates, pickup times, passenger counts, or any questions..."
-                      className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3.5 py-2.5 text-sm bg-surface-subtle border border-border-strong rounded-xl text-fg-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
@@ -404,24 +404,24 @@ export default function ContactRoute() {
 
           {/* Careers & Applications */}
           <div className="lg:col-span-5 space-y-6">
-            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs space-y-6">
+            <div className="bg-surface-card rounded-3xl border border-border-subtle/80 p-6 sm:p-8 shadow-xs space-y-6">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
                   Work With {companyName}
                 </span>
-                <h3 className="text-xl font-extrabold text-slate-950 tracking-tight mt-1">
+                <h3 className="text-xl font-extrabold text-fg-primary tracking-tight mt-1">
                   Join Our Local Team
                 </h3>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-fg-muted mt-1">
                   We are always looking for reliable drivers, dispatchers, and office staff to join our growing team.
                 </p>
               </div>
 
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-start gap-3">
+              <div className="p-4 bg-surface-subtle border border-border-subtle rounded-2xl flex items-start gap-3">
                 <CarIcon className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                <div className="text-xs text-slate-700 space-y-2">
+                <div className="text-xs text-fg-secondary space-y-2">
                   <span className="font-bold block">Open Positions</span>
-                  <ul className="space-y-1 ml-4 list-disc text-slate-600">
+                  <ul className="space-y-1 ml-4 list-disc text-fg-secondary">
                     <li>Drivers (Company Cars)</li>
                     <li>Drivers (Own Vehicle)</li>
                     <li>24/7 Dispatchers</li>
@@ -432,7 +432,7 @@ export default function ContactRoute() {
 
               <Link
                 to="/apply"
-                className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm py-3 px-4 rounded-xl transition-colors shadow-sm"
+                className="w-full flex items-center justify-center gap-2 bg-surface-header hover:bg-surface-header-elevated text-white font-bold text-sm py-3 px-4 rounded-xl transition-colors shadow-sm"
               >
                 <span>View Job Openings & Apply</span>
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>

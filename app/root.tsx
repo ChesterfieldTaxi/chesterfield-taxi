@@ -10,8 +10,8 @@ import {
   useRouteLoaderData,
 } from "react-router";
 import { COMPANY_CONFIG, DEFAULT_GOOGLE_MAPS_KEY } from "./config/companyConfig";
-import { buildPreHydrationThemeScript, isDarkModeRoutePath } from "./config/theme-tokens";
-import { applyResolvedTheme, initTheme } from "./services/theme.service";
+import { buildPreHydrationThemeScript, isDarkModeRoutePath, THEME_CHANGE_EVENT, THEME_STORAGE_KEY } from "./config/theme-tokens";
+import { applyResolvedTheme, getThemeSnapshot, initTheme, resolveEffectiveBranding, subscribeToTheme } from "./services/theme.service";
 import { getAdminConfigService } from "./core/services/config/admin-config.service";
 import { useRootPwaServiceWorker } from "./core/hooks/usePushNotifications";
 import type { BrandingConfig } from "./core/types/config";
@@ -130,10 +130,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-function useDynamicBrandingSync() {
+function useDynamicBrandingSync(pathname: string) {
   useEffect(() => {
-    const applyTokens = (branding?: Partial<BrandingConfig>) => {
-      if (!branding || typeof document === 'undefined') return;
+    let latestBranding: BrandingConfig = {
+      primaryColor: COMPANY_CONFIG.primaryColor || '#2563eb',
+      secondaryColor: COMPANY_CONFIG.secondaryColor || '#0f172a',
+      headingFont: COMPANY_CONFIG.headingFont || 'Lexend',
+      bodyFont: COMPANY_CONFIG.bodyFont || 'Inter',
+      headingColor: COMPANY_CONFIG.headingColor || '#0f172a',
+      bodyTextColor: COMPANY_CONFIG.bodyTextColor || '#334155',
+      mutedTextColor: COMPANY_CONFIG.mutedTextColor || '#64748b',
+      btnPrimaryBg: COMPANY_CONFIG.btnPrimaryBg || '#2563eb',
+      btnPrimaryText: COMPANY_CONFIG.btnPrimaryText || '#ffffff',
+      btnSecondaryBg: COMPANY_CONFIG.btnSecondaryBg || '#0f172a',
+      btnSecondaryText: COMPANY_CONFIG.btnSecondaryText || '#ffffff',
+      btnBorderRadius: COMPANY_CONFIG.btnBorderRadius || '12px',
+      navbarBg: COMPANY_CONFIG.navbarBg || '#0f172a',
+      cardBg: COMPANY_CONFIG.cardBg || '#ffffff',
+    };
+
+    const applyTokens = (rawBranding?: Partial<BrandingConfig>) => {
+      if (typeof document === 'undefined') return;
+      if (rawBranding) {
+        latestBranding = { ...latestBranding, ...rawBranding };
+      }
+      const effectiveTheme = isDarkModeRoutePath(pathname)
+        ? getThemeSnapshot().resolvedTheme
+        : 'light';
+      const branding = resolveEffectiveBranding(latestBranding, effectiveTheme);
       const root = document.documentElement;
       if (branding.primaryColor) {
         root.style.setProperty('--color-primary', branding.primaryColor);
@@ -184,12 +208,10 @@ function useDynamicBrandingSync() {
 
     try {
       const cached = getAdminConfigService().getCachedSettings();
-      if (cached?.branding) {
-        applyTokens(cached.branding);
-      }
+      applyTokens(cached?.branding);
     } catch {}
 
-    const unsub = getAdminConfigService().subscribeToSettings(
+    const unsubSettings = getAdminConfigService().subscribeToSettings(
       (settings) => {
         if (settings?.branding) {
           applyTokens(settings.branding);
@@ -198,14 +220,29 @@ function useDynamicBrandingSync() {
       () => {}
     );
 
-    return unsub;
-  }, []);
+    const unsubTheme = subscribeToTheme(() => applyTokens());
+    const handleThemeEvent = () => applyTokens();
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === THEME_STORAGE_KEY) {
+        applyTokens();
+      }
+    };
+    window.addEventListener(THEME_CHANGE_EVENT, handleThemeEvent);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      unsubSettings();
+      unsubTheme();
+      window.removeEventListener(THEME_CHANGE_EVENT, handleThemeEvent);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [pathname]);
 }
 
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  useDynamicBrandingSync();
+  useDynamicBrandingSync(location.pathname);
   useRootPwaServiceWorker(navigate);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { Suspense, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router';
 import { useBottomSheetDragToClose } from '../core/hooks/useBottomSheetDragToClose';
 import UnderConstruction from '../components/UnderConstruction';
@@ -50,9 +50,16 @@ import { BookingEngineV2, type BookingEngineV2InitialValues } from '../component
 import { PriceBreakdownPanel } from '../components/domain/booking/PriceBreakdownPanel';
 import { DispatchLocationInput } from '../components/domain/dispatch/DispatchLocationInput';
 import { UserDropdown } from '../components/domain/common/UserDropdown';
+import { HelpTriggerButton } from '../components/domain/common/HelpTriggerButton';
 import { AppearanceToggle } from '../components/ui/AppearanceToggle';
 import { useTheme } from '../hooks/useTheme';
 import { formatVehicleTierDisplay } from '../core/utils/vehicle-tier-format.util';
+
+const HelpDrawer = React.lazy(() =>
+  import('../components/domain/common/HelpDrawer').then((m) => ({
+    default: m.HelpDrawer,
+  }))
+);
 
 export function meta() {
   return [
@@ -128,6 +135,12 @@ export default function PassengerAppRoute() {
   const [isLoadingTrips, setIsLoadingTrips] = useState(true);
   const [editingTripId, setEditingTripId] = useState<string | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>(['customer']);
+  const [isHelpDrawerOpen, setIsHelpDrawerOpen] = useState(false);
+  const [hasOpenedHelpDrawer, setHasOpenedHelpDrawer] = useState(false);
+  const handleOpenHelpDrawer = useCallback(() => {
+    setHasOpenedHelpDrawer(true);
+    setIsHelpDrawerOpen(true);
+  }, []);
 
   const { preference: themePreference, setPreference: setThemePreference } = useTheme({
     uid: authUserUid,
@@ -756,12 +769,17 @@ export default function PassengerAppRoute() {
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            <HelpTriggerButton
+              onClick={handleOpenHelpDrawer}
+              isOpen={isHelpDrawerOpen}
+              variant="subtle"
+            />
             <button
               type="button"
               onClick={() => setIsHelpMenuOpen(true)}
               className="w-9 h-9 rounded-xl bg-surface-muted hover:bg-surface-emphasis/80 active:scale-95 text-fg-secondary flex items-center justify-center transition-all cursor-pointer"
-              aria-label="Help and 24/7 Dispatch"
-              title="Help & 24/7 Dispatch"
+              aria-label="24/7 Dispatch Assistance"
+              title="24/7 Dispatch Assistance"
             >
               <InfoIcon className="w-4 h-4" />
             </button>
@@ -2398,6 +2416,21 @@ export default function PassengerAppRoute() {
             </div>
           </div>
         </div>
+      )}
+
+      {hasOpenedHelpDrawer && (
+        <Suspense fallback={null}>
+          <HelpDrawer
+            isOpen={isHelpDrawerOpen}
+            onClose={() => setIsHelpDrawerOpen(false)}
+            role="passenger"
+            userRoles={userRoles}
+            context={{
+              portal: 'passenger',
+              tab: activeTab,
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

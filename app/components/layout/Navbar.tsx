@@ -5,6 +5,8 @@ import { getAdminConfigService } from '../../core/services/config/admin-config.s
 import type { AppSettings } from '../../core/types/config';
 import { COMPANY_CONFIG } from '../../config/companyConfig';
 import { UserDropdown } from '../domain/common/UserDropdown';
+import { AppearanceToggle } from '../ui/AppearanceToggle';
+import { useTheme } from '../../hooks/useTheme';
 
 interface NavItem {
   label: string;
@@ -85,6 +87,10 @@ export function Navbar() {
   }, []);
 
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const { preference, isDark, setPreference } = useTheme({
+    uid: currentUser?.uid,
+    profilePreference: currentUser?.themePreference,
+  });
 
   useEffect(() => {
     import('../../core/services/auth/admin-auth.service')
@@ -126,7 +132,7 @@ export function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs transition-colors">
+      <header className="sticky top-0 z-50 bg-surface-card/95 backdrop-blur-md border-b border-border-subtle/80 shadow-xs transition-colors">
         {/* Optional Site-Wide Announcement Ribbon */}
         {announcement?.enabled && announcement?.text && (
           <div
@@ -159,7 +165,7 @@ export function Navbar() {
                 <CarIcon className="w-6 h-6 text-white" />
               </div>
               <div>
-                <span className="text-lg font-extrabold tracking-tight text-slate-950 block leading-none">
+                <span className="text-lg font-extrabold tracking-tight text-fg-primary block leading-none">
                   {companySettings.name || COMPANY_CONFIG.name}
                 </span>
                 <span
@@ -183,8 +189,8 @@ export function Navbar() {
                     className={({ isActive }) =>
                       `px-3.5 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
                         isActive
-                          ? 'bg-blue-50 text-blue-700 font-bold border border-blue-200 shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100'
+                          ? 'bg-status-info-bg text-status-info-fg font-bold border border-status-info-border shadow-2xs'
+                          : 'text-fg-secondary hover:text-fg-primary hover:bg-surface-muted'
                       }`
                     }
                   >
@@ -193,7 +199,7 @@ export function Navbar() {
                 ))}
               </nav>
 
-              <div className="h-5 w-px bg-slate-200 mx-1" aria-hidden="true" />
+              <div className="h-5 w-px bg-surface-emphasis mx-1" aria-hidden="true" />
 
               {/* Action Controls */}
               <div className="flex items-center gap-2.5">
@@ -201,7 +207,7 @@ export function Navbar() {
                 {showPhoneBadge && (
                   <a
                     href={`tel:${phoneRaw}`}
-                    className="inline-flex items-center gap-1.5 text-slate-700 hover:text-blue-700 bg-slate-50 hover:bg-blue-50/70 border border-slate-200/80 hover:border-blue-200 text-xs lg:text-sm font-bold px-3 py-2 rounded-xl transition-all whitespace-nowrap"
+                    className="inline-flex items-center gap-1.5 text-fg-secondary hover:text-status-info-fg bg-surface-subtle hover:bg-status-info-bg/70 border border-border-subtle/80 hover:border-status-info-border text-xs lg:text-sm font-bold px-3 py-2 rounded-xl transition-all whitespace-nowrap"
                   >
                     <PhoneIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                     <span>{phoneDisplay}</span>
@@ -213,10 +219,10 @@ export function Navbar() {
                   <button
                     type="button"
                     onClick={() => setIsAppModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 text-xs lg:text-sm font-bold px-3 py-2 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/80 transition-all whitespace-nowrap cursor-pointer"
+                    className="inline-flex items-center gap-1.5 text-xs lg:text-sm font-bold px-3 py-2 rounded-xl text-fg-secondary hover:text-fg-primary hover:bg-surface-muted border border-border-subtle/80 transition-all whitespace-nowrap cursor-pointer"
                   >
                     <svg
-                      className="w-4 h-4 text-slate-500 shrink-0"
+                      className="w-4 h-4 text-fg-muted shrink-0"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -248,6 +254,13 @@ export function Navbar() {
                   <span>{headerCtaLabel}</span>
                 </Link>
 
+                {/* Visitor Appearance Switcher */}
+                <AppearanceToggle
+                  preference={preference}
+                  onChange={setPreference}
+                  variant="cycle"
+                />
+
                 {/* User Account Dropdown / Sign In (Far-Right Corner) */}
                 {currentUser ? (
                   <UserDropdown
@@ -259,15 +272,15 @@ export function Navbar() {
                         }
                       );
                     }}
-                    variant="light"
+                    variant={isDark ? 'dark' : 'light'}
                   />
                 ) : (
                   <Link
                     to="/app/login"
-                    className="inline-flex items-center gap-1.5 text-xs lg:text-sm font-bold px-3.5 py-2.5 rounded-xl text-slate-700 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition-all shadow-2xs whitespace-nowrap"
+                    className="inline-flex items-center gap-1.5 text-xs lg:text-sm font-bold px-3.5 py-2.5 rounded-xl text-fg-secondary hover:text-status-info-fg hover:bg-status-info-bg border border-border-subtle hover:border-status-info-border transition-all shadow-2xs whitespace-nowrap"
                     title="Sign in to your account"
                   >
-                    <UserIcon className="w-4 h-4 text-slate-500 shrink-0" />
+                    <UserIcon className="w-4 h-4 text-fg-muted shrink-0" />
                     <span>Sign In</span>
                   </Link>
                 )}
@@ -291,7 +304,7 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen((prev) => !prev)}
-                className="p-2 rounded-xl text-slate-700 hover:text-slate-950 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="p-2 rounded-xl text-fg-secondary hover:text-fg-primary hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-blue-500"
                 aria-label={mobileMenuOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
                 aria-expanded={mobileMenuOpen}
               >
@@ -307,7 +320,7 @@ export function Navbar() {
 
         {/* Mobile Drawer / Dropdown Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-200 bg-white/98 px-4 pt-3 pb-6 space-y-3 shadow-lg animate-in slide-in-from-top-2 duration-200">
+          <div className="md:hidden border-t border-border-subtle bg-surface-card/98 px-4 pt-3 pb-6 space-y-3 shadow-lg animate-in slide-in-from-top-2 duration-200">
             <nav className="flex flex-col space-y-1">
               {navItems.map((item) => (
                 <NavLink
@@ -317,8 +330,8 @@ export function Navbar() {
                   className={({ isActive }) =>
                     `px-4 py-3 rounded-xl text-base font-semibold transition-all ${
                       isActive
-                        ? 'bg-blue-50 text-blue-900 font-bold border-l-4 border-blue-600 pl-3'
-                        : 'text-slate-700 hover:bg-slate-50'
+                        ? 'bg-status-info-bg text-status-info-fg font-bold border-l-4 border-blue-600 pl-3'
+                        : 'text-fg-secondary hover:bg-surface-subtle'
                     }`
                   }
                 >
@@ -327,7 +340,18 @@ export function Navbar() {
               ))}
             </nav>
 
-            <div className="pt-3 border-t border-slate-100 space-y-2.5">
+            <div className="pt-3 border-t border-border-faint space-y-2.5">
+              <div className="space-y-1.5 pb-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-fg-muted px-1 block">
+                  Appearance
+                </span>
+                <AppearanceToggle
+                  preference={preference}
+                  onChange={setPreference}
+                  variant="selector"
+                />
+              </div>
+
               {currentUser ? (
                 <div className="w-full">
                   <UserDropdown
@@ -347,7 +371,7 @@ export function Navbar() {
                 <Link
                   to="/app/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-sm py-2.5 px-4 rounded-xl transition-colors"
+                  className="w-full flex items-center justify-center gap-2 bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg border border-status-info-border font-bold text-sm py-2.5 px-4 rounded-xl transition-colors"
                 >
                   <UserIcon className="w-4 h-4" />
                   <span>Sign In</span>
@@ -361,7 +385,7 @@ export function Navbar() {
                     setMobileMenuOpen(false);
                     setIsAppModalOpen(true);
                   }}
-                  className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-sm py-2.5 px-4 rounded-xl transition-colors"
+                  className="w-full flex items-center justify-center gap-2 bg-surface-muted hover:bg-surface-emphasis text-fg-secondary border border-border-subtle font-bold text-sm py-2.5 px-4 rounded-xl transition-colors"
                 >
                   <svg
                     className="w-4 h-4"
@@ -399,7 +423,7 @@ export function Navbar() {
               {showPhoneBadge && (
                 <a
                   href={`tel:${phoneRaw}`}
-                  className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm py-2.5 px-4 rounded-xl transition-colors"
+                  className="w-full flex items-center justify-center gap-2 bg-surface-muted hover:bg-surface-emphasis text-fg-strong font-bold text-sm py-2.5 px-4 rounded-xl transition-colors"
                 >
                   <PhoneIcon className="w-4 h-4 text-blue-600" />
                   <span>Call Dispatch: {phoneDisplay}</span>
@@ -412,10 +436,10 @@ export function Navbar() {
 
       {/* App Download Modal */}
       {enableGetAppButtons && isAppModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-surface-overlay/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-surface-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-border-faint flex justify-between items-center bg-surface-subtle/50">
+              <h3 className="text-lg font-black text-fg-primary flex items-center gap-2">
                 <svg
                   className="w-5 h-5 text-blue-600"
                   viewBox="0 0 24 24"
@@ -430,7 +454,7 @@ export function Navbar() {
               </h3>
               <button
                 onClick={() => setIsAppModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                className="text-fg-subtle hover:text-fg-secondary p-1 bg-surface-muted hover:bg-surface-emphasis rounded-lg transition-colors"
               >
                 <XIcon className="w-5 h-5" />
               </button>
@@ -440,13 +464,13 @@ export function Navbar() {
                 <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-600/20">
                   <CarIcon className="w-7 h-7" />
                 </div>
-                <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                <p className="text-sm text-fg-secondary font-medium leading-relaxed">
                   Add the {companySettings.name || COMPANY_CONFIG.name} Client Portal to your phone&apos;s home screen for faster bookings, live driver tracking, and trip receipts.
                 </p>
               </div>
 
-              <div className="rounded-xl bg-slate-50 border border-slate-200/90 p-4 space-y-2 text-xs text-slate-600">
-                <div className="font-bold text-slate-900">Quick Home Screen Install</div>
+              <div className="rounded-xl bg-surface-subtle border border-border-subtle/90 p-4 space-y-2 text-xs text-fg-secondary">
+                <div className="font-bold text-fg-primary">Quick Home Screen Install</div>
                 <p>
                   <strong>iPhone / iPad (Safari):</strong> Tap the <strong>Share</strong> icon, then select <strong>Add to Home Screen</strong>.
                 </p>
@@ -455,7 +479,7 @@ export function Navbar() {
                 </p>
               </div>
 
-              <div className="space-y-3 pt-2 border-t border-slate-100">
+              <div className="space-y-3 pt-2 border-t border-border-faint">
                 <Link
                   to="/app"
                   onClick={() => setIsAppModalOpen(false)}

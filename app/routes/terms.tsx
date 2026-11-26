@@ -16,28 +16,28 @@ export function meta() {
 
 export default function TermsPage() {
   return (
-    <div className="py-12 bg-slate-50 flex-1 px-4 sm:px-6 lg:px-8">
+    <div className="py-12 bg-surface-subtle flex-1 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
       {/* Header */}
       <div className="text-center space-y-3">
-        <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-50 text-blue-900 text-xs font-bold uppercase tracking-wider border border-blue-200">
+        <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-status-info-bg text-status-info-fg text-xs font-bold uppercase tracking-wider border border-status-info-border">
           <ShieldCheckIcon className="w-3.5 h-3.5" />
           Legal &amp; Passenger Agreements
         </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-fg-primary tracking-tight">
           Terms and Conditions
         </h1>
-        <p className="text-sm text-slate-500 max-w-2xl mx-auto">
+        <p className="text-sm text-fg-muted max-w-2xl mx-auto">
           Last updated: March 2026. Please review the service terms governing your reservations, rides, and accounts with {COMPANY_CONFIG.name}.
         </p>
       </div>
 
       {/* Main Content */}
-      <Card className="p-6 sm:p-10 bg-white border border-slate-200/90 rounded-2xl shadow-xs space-y-8 text-sm text-slate-600 leading-relaxed">
+      <Card className="p-6 sm:p-10 bg-surface-card border border-border-subtle/90 rounded-2xl shadow-xs space-y-8 text-sm text-fg-secondary leading-relaxed">
         {/* Section 1 */}
         <section className="space-y-2">
-          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-800 text-xs font-black flex items-center justify-center">1</span>
+          <h2 className="text-base font-bold text-fg-primary flex items-center gap-2">
+            <span className="w-6 h-6 rounded-lg bg-status-info-bg-strong text-status-info-fg text-xs font-black flex items-center justify-center">1</span>
             Booking Reservations & Confirmation
           </h2>
           <p>
@@ -50,8 +50,8 @@ export default function TermsPage() {
 
         {/* Section 2 */}
         <section className="space-y-2">
-          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-800 text-xs font-black flex items-center justify-center">2</span>
+          <h2 className="text-base font-bold text-fg-primary flex items-center gap-2">
+            <span className="w-6 h-6 rounded-lg bg-status-info-bg-strong text-status-info-fg text-xs font-black flex items-center justify-center">2</span>
             Upfront Pricing & Zero Surge Guarantee
           </h2>
           <p>
@@ -60,7 +60,7 @@ export default function TermsPage() {
           <p>
             Additional charges may apply only in the event of:
           </p>
-          <ul className="list-disc pl-5 space-y-1 text-slate-600">
+          <ul className="list-disc pl-5 space-y-1 text-fg-secondary">
             <li>Unscheduled intermediate stops requested during the trip.</li>
             <li>Excessive passenger wait times at standard residential or commercial pickups beyond the complimentary 10-minute grace period (for flight-monitored airport arrivals, we track your flight in real time and wait as long as it takes as a general policy, handling exceptional cases individually).</li>
             <li>Special cleaning or sanitization fees necessitated by severe vehicle interior damage or contamination.</li>
@@ -69,8 +69,8 @@ export default function TermsPage() {
 
         {/* Section 3 */}
         <section className="space-y-2">
-          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-800 text-xs font-black flex items-center justify-center">3</span>
+          <h2 className="text-base font-bold text-fg-primary flex items-center gap-2">
+            <span className="w-6 h-6 rounded-lg bg-status-info-bg-strong text-status-info-fg text-xs font-black flex items-center justify-center">3</span>
             Cancellation & Modification Policy
           </h2>
           <p>
@@ -83,8 +83,8 @@ export default function TermsPage() {
 
         {/* Section 4 */}
         <section className="space-y-2">
-          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-800 text-xs font-black flex items-center justify-center">4</span>
+          <h2 className="text-base font-bold text-fg-primary flex items-center gap-2">
+            <span className="w-6 h-6 rounded-lg bg-status-info-bg-strong text-status-info-fg text-xs font-black flex items-center justify-center">4</span>
             Passenger Conduct & Vehicle Safety
           </h2>
           <p>
@@ -97,8 +97,8 @@ export default function TermsPage() {
 
         {/* Section 5 */}
         <section className="space-y-2">
-          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-800 text-xs font-black flex items-center justify-center">5</span>
+          <h2 className="text-base font-bold text-fg-primary flex items-center gap-2">
+            <span className="w-6 h-6 rounded-lg bg-status-info-bg-strong text-status-info-fg text-xs font-black flex items-center justify-center">5</span>
             Luggage & Personal Belongings
           </h2>
           <p>
@@ -108,8 +108,8 @@ export default function TermsPage() {
 
         {/* Section 6 */}
         <section className="space-y-2">
-          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-800 text-xs font-black flex items-center justify-center">6</span>
+          <h2 className="text-base font-bold text-fg-primary flex items-center gap-2">
+            <span className="w-6 h-6 rounded-lg bg-status-info-bg-strong text-status-info-fg text-xs font-black flex items-center justify-center">6</span>
             Contacting Dispatch
           </h2>
           <p>
@@ -118,14 +118,14 @@ export default function TermsPage() {
           <div className="pt-2 flex flex-col sm:flex-row gap-3">
             <a
               href={`tel:${COMPANY_CONFIG.phone.primaryRaw}`}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-surface-muted hover:bg-surface-emphasis text-fg-strong rounded-xl font-bold text-xs transition-colors"
             >
               <PhoneIcon className="w-3.5 h-3.5 text-blue-600" />
               <span>{COMPANY_CONFIG.phone.dispatch}</span>
             </a>
             <Link
               to="/contact"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold text-xs transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg rounded-xl font-bold text-xs transition-colors"
             >
               Contact Dispatch Office
             </Link>

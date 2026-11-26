@@ -213,6 +213,7 @@ export interface BrandingConfig {
   btnBorderRadius?: string; // e.g. '0px', '4px', '8px', '12px', '16px', '9999px'
   navbarBg?: string;
   cardBg?: string;
+  darkTokens?: Partial<BrandingConfig>;
 }
 
 export interface StepIncrementTier {

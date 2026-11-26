@@ -97,25 +97,25 @@ function getCategoryBadgeMeta(category: LocalSeoCorridorCategory) {
     case 'airport':
       return {
         label: 'STL Airport Corridor',
-        className: 'bg-blue-50 text-blue-800 border-blue-200',
+        className: 'bg-status-info-bg text-status-info-fg border-status-info-border',
         icon: <PlaneIcon className="w-4 h-4 text-blue-600" />,
       };
     case 'fbo':
       return {
         label: 'Private FBO Aviation',
-        className: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+        className: 'bg-status-staged-bg text-status-staged-fg border-status-staged-border',
         icon: <SparklesIcon className="w-4 h-4 text-indigo-600" />,
       };
     case 'corporate':
       return {
         label: 'Corporate & Business',
-        className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+        className: 'bg-status-success-bg text-status-success-fg border-status-success-border',
         icon: <BuildingIcon className="w-4 h-4 text-emerald-600" />,
       };
     case 'suburban':
       return {
         label: 'West County Direct',
-        className: 'bg-amber-50 text-amber-800 border-amber-200',
+        className: 'bg-status-warning-bg text-status-warning-fg border-status-warning-border',
         icon: <CarIcon className="w-4 h-4 text-amber-600" />,
       };
   }
@@ -170,7 +170,7 @@ export default function ServiceAreasHubRoute() {
   ];
 
   return (
-    <div className="py-10 sm:py-14 bg-gradient-to-b from-slate-50 via-white to-blue-50/30 flex-1">
+    <div className="py-10 sm:py-14 bg-gradient-to-b from-surface-subtle via-surface-card to-status-info-bg/30 flex-1">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLdScriptPayload(breadcrumbJsonLd) }}
@@ -182,39 +182,39 @@ export default function ServiceAreasHubRoute() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-slate-500">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-fg-muted">
           <Link to="/" className="hover:text-blue-600 font-medium transition-colors">
             Home
           </Link>
-          <ChevronRightIcon className="w-3.5 h-3.5 text-slate-400" />
-          <span className="font-bold text-slate-900">Service Areas &amp; Airport Corridors</span>
+          <ChevronRightIcon className="w-3.5 h-3.5 text-fg-subtle" />
+          <span className="font-bold text-fg-primary">Service Areas &amp; Airport Corridors</span>
         </nav>
 
         {/* Hero Header */}
         <div className="text-center max-w-4xl mx-auto space-y-4">
-          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-900 text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-blue-200">
+          <div className="inline-flex items-center gap-2 bg-status-info-bg text-status-info-fg text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider border border-status-info-border">
             <PlaneIcon className="w-3.5 h-3.5 text-blue-600" />
             <span>24/7 STL Airport, Spirit FBO &amp; West County Coverage</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-fg-primary tracking-tight">
             Pre-Quoted St. Louis Airport &amp; West County Corridors
           </h1>
-          <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-3xl mx-auto">
+          <p className="text-base sm:text-lg text-fg-secondary leading-relaxed max-w-3xl mx-auto">
             Transparent upfront taxi, executive sedan, and 6-passenger SUV rates with live STL
             flight tracking, private FBO ramp coordination, and zero rideshare surge multipliers.
           </p>
 
           {/* Trust Bar */}
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-2 text-xs font-semibold text-slate-700">
-            <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-2xs">
+          <div className="flex flex-wrap items-center justify-center gap-4 pt-2 text-xs font-semibold text-fg-secondary">
+            <span className="inline-flex items-center gap-1.5 bg-surface-card border border-border-subtle px-3 py-1.5 rounded-full shadow-2xs">
               <CheckIcon className="w-3.5 h-3.5 text-emerald-600" />
               Upfront Locked Quotes
             </span>
-            <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-2xs">
+            <span className="inline-flex items-center gap-1.5 bg-surface-card border border-border-subtle px-3 py-1.5 rounded-full shadow-2xs">
               <PlaneIcon className="w-3.5 h-3.5 text-blue-600" />
               STL Terminal 1 &amp; 2 + Spirit (SUS) FBOs
             </span>
-            <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-2xs">
+            <span className="inline-flex items-center gap-1.5 bg-surface-card border border-border-subtle px-3 py-1.5 rounded-full shadow-2xs">
               <ShieldCheckIcon className="w-3.5 h-3.5 text-blue-600" />
               Licensed &amp; Insured Local Fleet
             </span>
@@ -238,8 +238,8 @@ export default function ServiceAreasHubRoute() {
                 onClick={() => setActiveFilter(pill.key)}
                 className={`px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer border ${
                   isSelected
-                    ? 'bg-slate-950 text-white border-slate-950 shadow-sm'
-                    : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:text-blue-700'
+                    ? 'bg-surface-header text-white border-slate-950 shadow-sm'
+                    : 'bg-surface-card text-fg-secondary border-border-subtle hover:border-blue-400 hover:text-status-info-fg'
                 }`}
               >
                 {pill.label}
@@ -256,7 +256,7 @@ export default function ServiceAreasHubRoute() {
               <Card
                 key={corridor.slug}
                 variant="elevated"
-                className="bg-white border border-slate-200/90 hover:border-blue-400/90 rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all shadow-xs"
+                className="bg-surface-card border border-border-subtle/90 hover:border-blue-400/90 rounded-3xl p-6 sm:p-7 flex flex-col justify-between transition-all shadow-xs"
               >
                 <div className="space-y-4">
                   {/* Top Badge + Live Starting Fare */}
@@ -269,17 +269,17 @@ export default function ServiceAreasHubRoute() {
                         <span>{badge.label}</span>
                       </span>
                       {corridor.featured && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border">
                           <SparklesIcon className="w-3 h-3 text-amber-600" />
                           <span>Featured</span>
                         </span>
                       )}
                     </div>
                     <div className="text-right shrink-0">
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
                         Upfront From
                       </span>
-                      <span className="text-2xl font-extrabold text-slate-950 tracking-tight">
+                      <span className="text-2xl font-extrabold text-fg-primary tracking-tight">
                         ${startingFareWholeDollars}
                       </span>
                     </div>
@@ -287,7 +287,7 @@ export default function ServiceAreasHubRoute() {
 
                   {/* Title & Subheadline */}
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-extrabold text-slate-950 tracking-tight">
+                    <h2 className="text-xl sm:text-2xl font-extrabold text-fg-primary tracking-tight">
                       <Link
                         to={`/service-areas/${corridor.slug}`}
                         className="hover:text-blue-600 transition-colors"
@@ -295,31 +295,31 @@ export default function ServiceAreasHubRoute() {
                         {corridor.shortTitle}
                       </Link>
                     </h2>
-                    <p className="text-xs sm:text-sm text-slate-600 mt-1.5 leading-relaxed">
+                    <p className="text-xs sm:text-sm text-fg-secondary mt-1.5 leading-relaxed">
                       {corridor.heroSubheadline}
                     </p>
                   </div>
 
                   {/* Distance / Travel Time / ZIPs */}
-                  <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs">
-                    <div className="flex items-center gap-2 text-slate-700">
+                  <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-surface-subtle border border-border-subtle/70 text-xs">
+                    <div className="flex items-center gap-2 text-fg-secondary">
                       <MapPinIcon className="w-4 h-4 text-blue-600 shrink-0" />
                       <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        <span className="text-[10px] uppercase font-bold text-fg-subtle block">
                           Corridor Distance
                         </span>
-                        <span className="font-bold text-slate-900">
+                        <span className="font-bold text-fg-primary">
                           {corridor.distanceMiles} miles
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 text-slate-700">
+                    <div className="flex items-center gap-2 text-fg-secondary">
                       <ClockIcon className="w-4 h-4 text-blue-600 shrink-0" />
                       <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        <span className="text-[10px] uppercase font-bold text-fg-subtle block">
                           Typical Travel Time
                         </span>
-                        <span className="font-bold text-slate-900">
+                        <span className="font-bold text-fg-primary">
                           ~{corridor.typicalDurationMinutes} mins
                         </span>
                       </div>
@@ -331,7 +331,7 @@ export default function ServiceAreasHubRoute() {
                     {corridor.zipCodes.slice(0, 4).map((zip) => (
                       <span
                         key={zip}
-                        className="font-mono text-[11px] font-semibold bg-blue-50/80 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-md"
+                        className="font-mono text-[11px] font-semibold bg-status-info-bg/80 text-status-info-fg border border-blue-100 px-2 py-0.5 rounded-md"
                       >
                         ZIP {zip}
                       </span>
@@ -339,7 +339,7 @@ export default function ServiceAreasHubRoute() {
                     {corridor.landmarks.slice(0, 2).map((lm) => (
                       <span
                         key={lm}
-                        className="text-[11px] font-medium bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-md truncate max-w-[220px]"
+                        className="text-[11px] font-medium bg-surface-muted text-fg-secondary px-2.5 py-0.5 rounded-md truncate max-w-[220px]"
                       >
                         {lm}
                       </span>
@@ -348,10 +348,10 @@ export default function ServiceAreasHubRoute() {
                 </div>
 
                 {/* Dual CTAs */}
-                <div className="pt-5 mt-6 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="pt-5 mt-6 border-t border-border-faint flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                   <Link
                     to={`/service-areas/${corridor.slug}`}
-                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-300 hover:border-slate-900 bg-white text-slate-800 hover:text-slate-950 text-xs font-bold transition-colors"
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-border-strong hover:border-border-emphasis bg-surface-card text-fg-strong hover:text-fg-primary text-xs font-bold transition-colors"
                   >
                     <span>View Corridor &amp; Terminal Guide</span>
                   </Link>
@@ -368,7 +368,7 @@ export default function ServiceAreasHubRoute() {
         </div>
 
         {/* Bottom 24/7 Dispatch Callout */}
-        <div className="rounded-3xl bg-slate-950 text-white p-7 sm:p-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-md">
+        <div className="rounded-3xl bg-surface-header text-white p-7 sm:p-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-md">
           <div className="space-y-1.5 text-center md:text-left max-w-2xl">
             <h2 className="text-2xl font-extrabold tracking-tight">
               Need an immediate pickup, multi-stop itinerary, or corporate account?
@@ -381,7 +381,7 @@ export default function ServiceAreasHubRoute() {
           <div className="flex flex-wrap items-center justify-center gap-3 shrink-0">
             <a
               href={`tel:${phoneRaw}`}
-              className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-sm px-5 py-3 rounded-xl transition-colors"
+              className="inline-flex items-center gap-2 bg-surface-header-elevated hover:bg-surface-header-muted border border-border-header text-white font-bold text-sm px-5 py-3 rounded-xl transition-colors"
             >
               <PhoneIcon className="w-4 h-4 text-blue-400" />
               <span>{phoneDisplay}</span>

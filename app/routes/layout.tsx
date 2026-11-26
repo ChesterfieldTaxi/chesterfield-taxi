@@ -6,6 +6,8 @@ import { getAdminConfigService } from '../core/services/config/admin-config.serv
 import { getAdminAuthService } from '../core/services/auth/admin-auth.service';
 import { COMPANY_CONFIG } from '../config/companyConfig';
 import { isLocalhostDevHost } from '../core/utils/security-sanitizer.util';
+import { useTheme } from '../hooks/useTheme';
+import { resolveEffectiveBranding } from '../services/theme.service';
 import type { BrandingConfig } from '../core/types/config';
 
 export { isLocalhostDevHost };
@@ -16,6 +18,7 @@ export default function PublicLayout() {
   const previewParam = searchParams.get('preview') === 'true';
   const [isStaffUser, setIsStaffUser] = useState(false);
   const [isLocalhost, setIsLocalhost] = useState(false);
+  const { resolvedTheme } = useTheme({ applyToDom: false });
 
   useEffect(() => {
     const unsub = getAdminAuthService().onAuthStateChanged((user) => {
@@ -79,26 +82,28 @@ export default function PublicLayout() {
     return <UnderConstruction />;
   }
 
+  const effectiveBranding = resolveEffectiveBranding(branding, resolvedTheme);
+
   return (
     <div 
-      className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-blue-600 selection:text-white"
+      className="min-h-screen flex flex-col bg-surface-page text-fg-primary selection:bg-blue-600 selection:text-white"
       style={{
-        '--color-primary': branding.primaryColor,
-        '--color-secondary': branding.secondaryColor,
-        '--brand-primary': branding.primaryColor,
-        '--brand-secondary': branding.secondaryColor,
-        '--color-heading': branding.headingColor || '#0f172a',
-        '--color-text-main': branding.bodyTextColor || '#334155',
-        '--color-text-muted': branding.mutedTextColor || '#64748b',
-        '--btn-primary-bg': branding.btnPrimaryBg || '#2563eb',
-        '--btn-primary-text': branding.btnPrimaryText || '#ffffff',
-        '--btn-secondary-bg': branding.btnSecondaryBg || '#0f172a',
-        '--btn-secondary-text': branding.btnSecondaryText || '#ffffff',
-        '--btn-radius': branding.btnBorderRadius || '8px',
-        '--navbar-bg': branding.navbarBg || '#0f172a',
-        '--card-bg': branding.cardBg || '#ffffff',
-        '--font-heading': `'${branding.headingFont || 'Inter'}', sans-serif`,
-        '--font-body': `'${branding.bodyFont || 'Inter'}', sans-serif`,
+        '--color-primary': effectiveBranding.primaryColor,
+        '--color-secondary': effectiveBranding.secondaryColor,
+        '--brand-primary': effectiveBranding.primaryColor,
+        '--brand-secondary': effectiveBranding.secondaryColor,
+        '--color-heading': effectiveBranding.headingColor || '#0f172a',
+        '--color-text-main': effectiveBranding.bodyTextColor || '#334155',
+        '--color-text-muted': effectiveBranding.mutedTextColor || '#64748b',
+        '--btn-primary-bg': effectiveBranding.btnPrimaryBg || '#2563eb',
+        '--btn-primary-text': effectiveBranding.btnPrimaryText || '#ffffff',
+        '--btn-secondary-bg': effectiveBranding.btnSecondaryBg || '#0f172a',
+        '--btn-secondary-text': effectiveBranding.btnSecondaryText || '#ffffff',
+        '--btn-radius': effectiveBranding.btnBorderRadius || '8px',
+        '--navbar-bg': effectiveBranding.navbarBg || '#0f172a',
+        '--card-bg': effectiveBranding.cardBg || '#ffffff',
+        '--font-heading': `'${effectiveBranding.headingFont || 'Inter'}', sans-serif`,
+        '--font-body': `'${effectiveBranding.bodyFont || 'Inter'}', sans-serif`,
       } as React.CSSProperties}
     >
       <Navbar />
