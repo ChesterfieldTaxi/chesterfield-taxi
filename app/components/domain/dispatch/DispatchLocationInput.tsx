@@ -1,6 +1,6 @@
 /// <reference types="google.maps" />
 
-import React, { useState, useRef, useEffect, useId } from 'react';
+import React, { useState, useRef, useEffect, useId, useMemo } from 'react';
 import type { GeoPoint } from '../../../core/types';
 import {
   loadGoogleMaps,
@@ -12,6 +12,10 @@ import {
   useDebouncedPlacesAutocomplete,
   type AutocompletePredictionItem,
 } from '../../../core/hooks/useDebouncedPlacesAutocomplete';
+import {
+  getSpecialPlacesService,
+  type SpecialPlace,
+} from '../../../core/services/places/special-places.service';
 
 export interface PlaceSelectedDetails {
   address: string;
@@ -34,48 +38,9 @@ export interface DispatchLocationInputProps {
   hasError?: boolean;
   disabled?: boolean;
   required?: boolean;
+  includeDispatchOnly?: boolean;
   className?: string;
 }
-
-interface RegionalPresetLocation {
-  address: string;
-  coordinates: GeoPoint;
-}
-
-const REGIONAL_DISPATCH_LOCATIONS: RegionalPresetLocation[] = [
-  {
-    address: 'St. Louis Lambert International Airport (STL), St. Louis, MO',
-    coordinates: { lat: 38.7487, lng: -90.37 },
-  },
-  {
-    address: 'Spirit of St. Louis Airport (SUS), Chesterfield, MO',
-    coordinates: { lat: 38.6621, lng: -90.652 },
-  },
-  {
-    address: 'Chesterfield Valley Shopping Center, Chesterfield, MO',
-    coordinates: { lat: 38.6685, lng: -90.5797 },
-  },
-  {
-    address: 'Chesterfield Mall / Downtown Chesterfield, MO',
-    coordinates: { lat: 38.6531, lng: -90.5625 },
-  },
-  {
-    address: "St. Luke's Hospital, Chesterfield, MO",
-    coordinates: { lat: 38.6458, lng: -90.5091 },
-  },
-  {
-    address: 'Downtown St. Louis / Gateway Arch, St. Louis, MO',
-    coordinates: { lat: 38.6247, lng: -90.1848 },
-  },
-  {
-    address: 'Centene Community Ice Center, Maryland Heights, MO',
-    coordinates: { lat: 38.7248, lng: -90.4648 },
-  },
-  {
-    address: 'Town and Country Crossing, Town and Country, MO',
-    coordinates: { lat: 38.6295, lng: -90.4712 },
-  },
-];
 
 export function DispatchLocationInput({
   name,
@@ -91,6 +56,7 @@ export function DispatchLocationInput({
   hasError = false,
   disabled = false,
   required = false,
+  includeDispatchOnly = false,
   className = '',
 }: DispatchLocationInputProps) {
   const autoId = useId();
@@ -103,6 +69,7 @@ export function DispatchLocationInput({
   const [mapsStatus, setMapsStatus] = useState<GoogleMapsStatus>(() =>
     typeof window !== 'undefined' && isGoogleMapsReady() ? 'ready' : 'loading'
   );
+  const [specialPlacesVersion, setSpecialPlacesVersion] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -121,6 +88,18 @@ export function DispatchLocationInput({
     const unsub = subscribeToGoogleMapsStatus((status) => setMapsStatus(status));
     return unsub;
   }, []);
+
+  const specialPlacesService = getSpecialPlacesService();
+  useEffect(() => {
+    return specialPlacesService.subscribe(() => {
+      setSpecialPlacesVersion((v) => v + 1);
+    });
+  }, [specialPlacesService]);
+
+  const matchingSpecialPlaces = useMemo(
+    () => specialPlacesService.searchPlaces(inputValue, { includeDispatchOnly }),
+    [inputValue, includeDispatchOnly, specialPlacesVersion, specialPlacesService]
+  );
 
   // Strict 300ms Debounced Places Query Engine
   const { predictions, isLoading, hasQuotaError, getPlaceDetails } =
@@ -174,14 +153,16 @@ export function DispatchLocationInput({
     }
   };
 
-  const handleSelectRegional = (loc: RegionalPresetLocation) => {
+  const handleSelectSpecialPlace = (place: SpecialPlace) => {
+    const displayLabel = place.shortName || place.name;
     setLocateError(null);
-    setInputValue(loc.address);
-    onChangeRef.current?.(loc.address);
+    setInputValue(displayLabel);
+    onChangeRef.current?.(displayLabel);
     onPlaceSelectedRef.current?.({
-      address: loc.address,
-      formattedAddress: loc.address,
-      coordinates: loc.coordinates,
+      address: displayLabel,
+      formattedAddress: place.address,
+      placeId: place.id,
+      coordinates: place.coordinates,
     });
     setIsOpen(false);
   };
@@ -281,14 +262,16 @@ export function DispatchLocationInput({
     );
   };
 
-  const filteredRegional = REGIONAL_DISPATCH_LOCATIONS.filter((loc) =>
-    inputValue.trim().length === 0
-      ? true
-      : loc.address.toLowerCase().includes(inputValue.toLowerCase())
+  const hasSpecialLambert = matchingSpecialPlaces.some(
+    (p) => p.id === 'place-lambert-airport-stl' || p.name.includes('Lambert')
   );
+  const displayPredictions = useMemo(() => {
+    if (!hasSpecialLambert) return predictions;
+    return predictions.filter((p) => p.placeId !== 'canonical-lambert-stl');
+  }, [predictions, hasSpecialLambert]);
 
   const hasLivePredictions =
-    mapsStatus === 'ready' && !hasQuotaError && predictions.length > 0;
+    mapsStatus === 'ready' && !hasQuotaError && displayPredictions.length > 0;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen) {
@@ -299,21 +282,29 @@ export function DispatchLocationInput({
       return;
     }
 
-    const currentCount = hasLivePredictions ? predictions.length : filteredRegional.length;
+    const currentCount =
+      matchingSpecialPlaces.length + (hasLivePredictions ? displayPredictions.length : 0);
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setHighlightedIndex((prev) => (prev < currentCount - 1 ? prev + 1 : 0));
+      if (currentCount > 0) {
+        setHighlightedIndex((prev) => (prev < currentCount - 1 ? prev + 1 : 0));
+      }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : currentCount - 1));
+      if (currentCount > 0) {
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : currentCount - 1));
+      }
     } else if (e.key === 'Enter') {
       if (highlightedIndex >= 0) {
         e.preventDefault();
-        if (hasLivePredictions && predictions[highlightedIndex]) {
-          handleSelectPrediction(predictions[highlightedIndex]);
-        } else if (filteredRegional[highlightedIndex]) {
-          handleSelectRegional(filteredRegional[highlightedIndex]);
+        if (highlightedIndex < matchingSpecialPlaces.length) {
+          handleSelectSpecialPlace(matchingSpecialPlaces[highlightedIndex]);
+        } else if (hasLivePredictions) {
+          const predIdx = highlightedIndex - matchingSpecialPlaces.length;
+          if (displayPredictions[predIdx]) {
+            handleSelectPrediction(displayPredictions[predIdx]);
+          }
         }
       } else if (inputValue.trim()) {
         e.preventDefault();
@@ -418,7 +409,7 @@ export function DispatchLocationInput({
         <p className="text-[11px] text-status-warning-fg font-medium mt-1 ml-1">{locateError}</p>
       )}
 
-      {/* Debounced Predictions / Regional Quick-Pick Dropdown */}
+      {/* Special Places & Debounced Google Places Predictions Dropdown */}
       {isOpen && !disabled && (
         <div
           id={listboxId}
@@ -427,69 +418,82 @@ export function DispatchLocationInput({
             isComfortable ? 'text-sm sm:text-xs' : 'text-xs'
           }`}
         >
-          {hasLivePredictions ? (
-            predictions.map((pred, idx) => (
-              <button
-                key={pred.placeId}
-                type="button"
-                role="option"
-                aria-selected={idx === highlightedIndex}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  handleSelectPrediction(pred);
-                }}
-                onMouseEnter={() => setHighlightedIndex(idx)}
-                className={`w-full flex flex-col text-left px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                  idx === highlightedIndex
-                    ? 'bg-status-info-bg text-status-info-fg font-semibold'
-                    : 'hover:bg-surface-subtle text-fg-secondary'
-                }`}
-              >
-                <span className="truncate font-semibold">{pred.mainText}</span>
-                {pred.secondaryText && (
-                  <span className="truncate text-[11px] text-fg-muted">{pred.secondaryText}</span>
-                )}
-              </button>
-            ))
-          ) : filteredRegional.length > 0 ? (
-            <>
-              <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
-                {inputValue.trim().length === 0 ? 'Popular St. Louis & Chesterfield Locations' : 'Matching Locations'}
+          {matchingSpecialPlaces.length > 0 && (
+            <div className="mb-1">
+              <div className="flex items-center justify-between px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300 bg-amber-500/10 rounded-md mb-0.5">
+                <span>Special Places &amp; Landmarks</span>
+                <span className="text-[9px] font-mono opacity-80">
+                  {matchingSpecialPlaces.length}
+                </span>
               </div>
-              {filteredRegional.map((loc, idx) => (
+              {matchingSpecialPlaces.map((place, idx) => (
                 <button
-                  key={loc.address}
+                  key={place.id}
                   type="button"
                   role="option"
                   aria-selected={idx === highlightedIndex}
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    handleSelectRegional(loc);
+                    handleSelectSpecialPlace(place);
                   }}
                   onMouseEnter={() => setHighlightedIndex(idx)}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors cursor-pointer truncate ${
+                  className={`w-full flex flex-col text-left px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                     idx === highlightedIndex
-                      ? 'bg-status-info-bg text-status-info-fg font-semibold'
+                      ? 'bg-amber-500/15 text-amber-800 dark:text-amber-200 font-semibold'
                       : 'hover:bg-surface-subtle text-fg-secondary'
                   }`}
                 >
-                  {loc.address}
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="truncate font-semibold text-fg-primary">
+                      {place.shortName || place.name}
+                    </span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-semibold uppercase shrink-0">
+                      {place.category}
+                    </span>
+                  </div>
+                  <span className="truncate text-[10.5px] text-fg-muted">{place.address}</span>
                 </button>
               ))}
-              {inputValue.trim().length >= 3 && (
-                <button
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    handleConfirmFreeformAddress(inputValue);
-                  }}
-                  className="w-full text-left px-3 py-2 mt-0.5 border-t border-border-faint text-blue-600 hover:bg-status-info-bg font-semibold rounded-lg transition-colors cursor-pointer"
-                >
-                  Use &ldquo;{inputValue.trim()}&rdquo; as address
-                </button>
+            </div>
+          )}
+
+          {hasLivePredictions && (
+            <div>
+              {matchingSpecialPlaces.length > 0 && (
+                <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-fg-subtle border-t border-border-faint mt-0.5 pt-1">
+                  Google Places Predictions
+                </div>
               )}
-            </>
-          ) : inputValue.trim().length > 0 ? (
+              {displayPredictions.map((pred, predIdx) => {
+                const globalIdx = matchingSpecialPlaces.length + predIdx;
+                return (
+                  <button
+                    key={pred.placeId}
+                    type="button"
+                    role="option"
+                    aria-selected={globalIdx === highlightedIndex}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectPrediction(pred);
+                    }}
+                    onMouseEnter={() => setHighlightedIndex(globalIdx)}
+                    className={`w-full flex flex-col text-left px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                      globalIdx === highlightedIndex
+                        ? 'bg-status-info-bg text-status-info-fg font-semibold'
+                        : 'hover:bg-surface-subtle text-fg-secondary'
+                    }`}
+                  >
+                    <span className="truncate font-semibold">{pred.mainText}</span>
+                    {pred.secondaryText && (
+                      <span className="truncate text-[11px] text-fg-muted">{pred.secondaryText}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {!hasLivePredictions && matchingSpecialPlaces.length === 0 && inputValue.trim().length > 0 ? (
             <button
               type="button"
               onMouseDown={(e) => {
@@ -500,11 +504,22 @@ export function DispatchLocationInput({
             >
               Use &ldquo;{inputValue.trim()}&rdquo; as address
             </button>
+          ) : !hasLivePredictions && inputValue.trim().length >= 3 && matchingSpecialPlaces.length > 0 ? (
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleConfirmFreeformAddress(inputValue);
+              }}
+              className="w-full text-left px-3 py-2 mt-0.5 border-t border-border-faint text-blue-600 hover:bg-status-info-bg font-semibold rounded-lg transition-colors cursor-pointer"
+            >
+              Use &ldquo;{inputValue.trim()}&rdquo; as address
+            </button>
           ) : null}
 
           {(mapsStatus === 'error' || hasQuotaError) && (
             <div className="mt-1 px-2.5 py-1.5 bg-surface-subtle border-t border-border-subtle rounded-b-lg text-[11px] text-fg-secondary flex items-center justify-between">
-              <span>Type your full street address or choose a popular hub above.</span>
+              <span>Type your full street address or choose a special place above.</span>
             </div>
           )}
         </div>

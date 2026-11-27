@@ -231,6 +231,11 @@ export function DispatchTripDetailsDrawer({
                   >
                     {reviewTrip.status}
                   </span>
+                  {reviewTrip.bookingCategory === 'package' && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-400/50 uppercase tracking-wider">
+                      PACKAGE
+                    </span>
+                  )}
                   {isReturnRide ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-500 text-white uppercase tracking-wider">
                       <RepeatIcon className="w-3 h-3" />

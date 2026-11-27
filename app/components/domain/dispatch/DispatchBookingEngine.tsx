@@ -204,6 +204,8 @@ function DispatchBookingEngineComponent({
     useState<FlightTelemetrySnapshot | null>(null);
 
   // Passenger & Contact Person
+  const [bookingCategory, setBookingCategory] = useState<'passenger' | 'package'>('passenger');
+  const [packageDescription, setPackageDescription] = useState('');
   const [passengerName, setPassengerName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -658,6 +660,8 @@ function DispatchBookingEngineComponent({
     dropoffCoordinates,
     dropoffPlaceId,
     intermediateStops,
+    bookingCategory,
+    packageDescription,
     passengerName,
     phone,
     email,
@@ -818,6 +822,8 @@ function DispatchBookingEngineComponent({
       setDropoffCoordinates,
       setDropoffPlaceId,
       setIntermediateStops,
+      setBookingCategory,
+      setPackageDescription,
       setPassengerName,
       setPhone,
       setEmail,
@@ -940,6 +946,8 @@ function DispatchBookingEngineComponent({
       dropoffCoordinates,
       dropoffPlaceId,
       intermediateStops,
+      bookingCategory,
+      packageDescription,
       passengerName,
       phone,
       email,
@@ -1345,6 +1353,10 @@ function DispatchBookingEngineComponent({
         />
 
         <DispatchPassengerCrmSection
+          bookingCategory={bookingCategory}
+          setBookingCategory={setBookingCategory}
+          packageDescription={packageDescription}
+          setPackageDescription={setPackageDescription}
           passengerName={passengerName}
           setPassengerName={setPassengerName}
           phone={phone}
@@ -1379,6 +1391,7 @@ function DispatchBookingEngineComponent({
         />
 
         <DispatchExtrasVehicleSection
+          bookingCategory={bookingCategory}
           isCompleted={isCompleted}
           isCancelled={isCancelled}
           passengers={passengers}

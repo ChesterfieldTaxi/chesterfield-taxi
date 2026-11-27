@@ -28,6 +28,10 @@ export function publishPassengerCandidateTripsProfile(cand: {
 }
 
 export interface DispatchPassengerCrmSectionProps {
+  bookingCategory?: 'passenger' | 'package';
+  setBookingCategory?: (val: 'passenger' | 'package') => void;
+  packageDescription?: string;
+  setPackageDescription?: (val: string) => void;
   passengerName: string;
   setPassengerName: (val: string) => void;
   phone: string;
@@ -62,6 +66,10 @@ export interface DispatchPassengerCrmSectionProps {
 }
 
 export function DispatchPassengerCrmSection({
+  bookingCategory = 'passenger',
+  setBookingCategory,
+  packageDescription = '',
+  setPackageDescription,
   passengerName,
   setPassengerName,
   phone,
@@ -96,6 +104,7 @@ export function DispatchPassengerCrmSection({
 }: DispatchPassengerCrmSectionProps) {
   const [showCallerSuggestions, setShowCallerSuggestions] = useState(false);
   const [callerQuickAddresses, setCallerQuickAddresses] = useState<string[]>([]);
+  const isPackageMode = bookingCategory === 'package';
 
   // Instant zero-latency inline caller lookup (ContactService + loaded dispatch trips)
   const callerSuggestions = useMemo(() => {
@@ -216,9 +225,36 @@ export function DispatchPassengerCrmSection({
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5 gap-1.5">
-        <label className="block text-[11px] font-bold text-fg-secondary uppercase tracking-wide">
-          Passengers
-        </label>
+        <div className="flex items-center gap-2">
+          <div
+            role="group"
+            aria-label="Booking Category"
+            className="inline-flex rounded-lg bg-surface-muted p-0.5 border border-border-subtle"
+          >
+            <button
+              type="button"
+              onClick={() => setBookingCategory?.('passenger')}
+              className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
+                !isPackageMode
+                  ? 'bg-surface-card text-fg-primary shadow-2xs'
+                  : 'text-fg-muted hover:text-fg-secondary'
+              }`}
+            >
+              Passenger
+            </button>
+            <button
+              type="button"
+              onClick={() => setBookingCategory?.('package')}
+              className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
+                isPackageMode
+                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 shadow-2xs'
+                  : 'text-fg-muted hover:text-fg-secondary'
+              }`}
+            >
+              Package
+            </button>
+          </div>
+        </div>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -237,26 +273,32 @@ export function DispatchPassengerCrmSection({
             <UserIcon className="w-3.5 h-3.5" />
             <span>Profile</span>
           </button>
-          <button
-            type="button"
-            onClick={onAddPassenger}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg font-bold text-xs border border-status-info-border transition-all shadow-2xs active:scale-95"
-          >
-            <PlusIcon className="w-3.5 h-3.5 text-blue-600" />
-            <span>Add passenger</span>
-          </button>
+          {!isPackageMode && (
+            <button
+              type="button"
+              onClick={onAddPassenger}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-status-info-bg hover:bg-status-info-bg-strong text-status-info-fg font-bold text-xs border border-status-info-border transition-all shadow-2xs active:scale-95"
+            >
+              <PlusIcon className="w-3.5 h-3.5 text-blue-600" />
+              <span>Add passenger</span>
+            </button>
+          )}
         </div>
       </div>
 
       <div className="p-2 bg-surface-card border border-border-subtle rounded-lg shadow-sm space-y-2 relative">
-        {/* Primary Passenger with Instant Inline Caller Lookup */}
+        {/* Primary Passenger / Optional Package Contact with Instant Inline Caller Lookup */}
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-fg-subtle">
             <UserIcon className="w-3.5 h-3.5" />
           </div>
           <input
             type="text"
-            placeholder="Primary Passenger Name (type to search callers...)"
+            placeholder={
+              isPackageMode
+                ? 'Contact Name (optional — type to search callers...)'
+                : 'Primary Passenger Name (type to search callers...)'
+            }
             value={passengerName}
             onFocus={() => setShowCallerSuggestions(true)}
             onBlur={() => setTimeout(() => setShowCallerSuggestions(false), 180)}
@@ -264,7 +306,7 @@ export function DispatchPassengerCrmSection({
               setPassengerName(e.target.value);
               setShowCallerSuggestions(true);
             }}
-            required
+            required={!isPackageMode}
             className="w-full pl-8 pr-2.5 py-1.5 bg-surface-card border border-border-strong rounded text-fg-strong text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
           />
         </div>
@@ -276,7 +318,7 @@ export function DispatchPassengerCrmSection({
             </div>
             <input
               type="tel"
-              placeholder="Phone Number"
+              placeholder={isPackageMode ? 'Contact Phone (optional)' : 'Phone Number'}
               value={phone}
               onFocus={() => setShowCallerSuggestions(true)}
               onBlur={() => setTimeout(() => setShowCallerSuggestions(false), 180)}
@@ -284,7 +326,7 @@ export function DispatchPassengerCrmSection({
                 setPhone(e.target.value);
                 setShowCallerSuggestions(true);
               }}
-              required
+              required={!isPackageMode}
               className="w-full pl-8 pr-2 py-1.5 bg-surface-card border border-border-strong rounded text-fg-strong text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
             />
           </div>
@@ -388,8 +430,21 @@ export function DispatchPassengerCrmSection({
           </div>
         )}
 
+        {/* Package Description / Delivery Notes (Package mode only) */}
+        {isPackageMode && (
+          <div>
+            <input
+              type="text"
+              placeholder="Package Description / Delivery Notes (optional — e.g., Sealed envelope, Lab sample)"
+              value={packageDescription}
+              onChange={(e) => setPackageDescription?.(e.target.value)}
+              className="w-full px-2.5 py-1.5 bg-surface-card border border-border-strong rounded text-fg-strong text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+        )}
+
         {/* Additional Passengers List */}
-        {additionalPassengers.map((ap, idx) => (
+        {!isPackageMode && additionalPassengers.map((ap, idx) => (
           <div key={idx} className="flex items-center gap-1.5 pt-1 border-t border-border-faint">
             <span className="text-fg-subtle text-xs">#{idx + 2}</span>
             <input
@@ -426,6 +481,7 @@ export function DispatchPassengerCrmSection({
         ))}
 
         {/* Contact Person / Booker Checkbox & Expansion */}
+        {!isPackageMode && (
         <div className="pt-2 border-t border-border-faint">
           <label className="flex items-center gap-2 cursor-pointer select-none text-fg-secondary">
             <input
@@ -484,6 +540,7 @@ export function DispatchPassengerCrmSection({
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

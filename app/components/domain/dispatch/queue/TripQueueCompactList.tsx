@@ -135,6 +135,14 @@ export function TripQueueCompactList({
               <span className="font-bold text-fg-primary shrink-0 max-w-[120px] truncate">
                 {trip.passenger.firstName} {trip.passenger.lastName}
               </span>
+              {trip.bookingCategory === 'package' && (
+                <span
+                  className="px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40 text-[9.5px] font-black uppercase tracking-wider shrink-0"
+                  title={trip.packageDetails?.description || 'Package Delivery'}
+                >
+                  PACKAGE
+                </span>
+              )}
               <DispatchSlaBadge sla={slaSummary.byTripId[trip.id]} />
               <DispatchFlightTelemetryPill trip={trip} compact />
               <DispatchCascadePill

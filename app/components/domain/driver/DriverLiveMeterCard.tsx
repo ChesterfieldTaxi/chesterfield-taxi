@@ -294,6 +294,11 @@ export const DriverLiveMeterCard = React.memo(function DriverLiveMeterCard({
               <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded bg-blue-600/20 text-blue-300 border border-blue-600/30">
                 {activeTrip.bookingType === 'asap' ? 'ASAP' : 'PRE-BOOKED'}
               </span>
+              {activeTrip.bookingCategory === 'package' && (
+                <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                  PACKAGE
+                </span>
+              )}
               {(() => {
                 const meta = (activeTrip.metadata || {}) as Record<string, any>;
                 const groupId = activeTrip.multiCarGroupId || meta.multiCarGroupId;

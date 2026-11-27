@@ -101,9 +101,16 @@ export const DriverOfferSheet = React.memo(function DriverOfferSheet({
 
                   <div className="bg-slate-950/70 p-3 rounded-2xl border border-slate-800 flex items-center justify-between">
                     <div>
-                      <span className="text-xs font-bold text-white block">
-                        {offer.passenger?.firstName} {offer.passenger?.lastName}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-bold text-white">
+                          {offer.passenger?.firstName} {offer.passenger?.lastName}
+                        </span>
+                        {offer.bookingCategory === 'package' && (
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9.5px] font-black uppercase tracking-wider">
+                            PACKAGE
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[11px] text-slate-400">
                         {offer.passenger?.passengerCount || 1}{' '}
                         {(offer.passenger?.passengerCount || 1) === 1 ? 'Passenger' : 'Passengers'} ·{' '}
@@ -221,9 +228,16 @@ export const DriverOfferSheet = React.memo(function DriverOfferSheet({
 
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-sm font-bold text-white">
-                      {trip.passenger?.firstName} {trip.passenger?.lastName}
-                    </h4>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h4 className="text-sm font-bold text-white">
+                        {trip.passenger?.firstName} {trip.passenger?.lastName}
+                      </h4>
+                      {trip.bookingCategory === 'package' && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9.5px] font-black uppercase tracking-wider">
+                          PACKAGE
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
                       <span>
                         {trip.passenger?.passengerCount || 1}{' '}

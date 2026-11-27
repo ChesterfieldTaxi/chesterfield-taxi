@@ -47,6 +47,8 @@ export interface SpecialPlace {
   isPopular: boolean; // Shown prominently in initial suggestions
   isActive: boolean;
   isArchived?: boolean;
+  /** When true (or category is 'corporate'/'custom'), hidden from public booking autocomplete and shown only in Dispatch */
+  dispatchOnly?: boolean;
   notes?: string;
   aliases?: string[]; // e.g. ["STL", "Lambert", "Terminal 1", "T1", "Terminal 2", "T2"]
   createdAt?: string;
@@ -923,11 +925,20 @@ export class SpecialPlacesService {
     return this.getActivePlaces().filter((p) => p.isPopular);
   }
 
-  public searchPlaces(query: string): SpecialPlace[] {
+  public searchPlaces(
+    query: string,
+    options?: { includeDispatchOnly?: boolean }
+  ): SpecialPlace[] {
+    const includeDispatchOnly = options?.includeDispatchOnly === true;
+    const isPubliclyVisible = (place: SpecialPlace) =>
+      includeDispatchOnly ||
+      (!place.dispatchOnly && place.category !== 'corporate' && place.category !== 'custom');
+
     const q = query.toLowerCase().trim();
-    if (!q) return this.getPopularPlaces();
+    if (!q) return this.getPopularPlaces().filter(isPubliclyVisible);
 
     return this.getActivePlaces().filter((place) => {
+      if (!isPubliclyVisible(place)) return false;
       const matchName = place.name.toLowerCase().includes(q);
       const matchShort = place.shortName?.toLowerCase().includes(q);
       const matchAddress = place.address.toLowerCase().includes(q);

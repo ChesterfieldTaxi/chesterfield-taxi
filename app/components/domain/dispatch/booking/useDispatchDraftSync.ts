@@ -57,6 +57,8 @@ export interface UseDispatchDraftSyncParams {
     dropoffCoordinates?: GeoPoint;
     dropoffPlaceId?: string;
     intermediateStops: Array<{ address: string; coordinates?: GeoPoint; placeId?: string }>;
+    bookingCategory: 'passenger' | 'package';
+    packageDescription: string;
     passengerName: string;
     phone: string;
     email: string;
@@ -418,6 +420,8 @@ export function useDispatchDraftSync({
       dropoffCoordinates: v.dropoffCoordinates,
       dropoffPlaceId: v.dropoffPlaceId,
       intermediateStops: v.intermediateStops,
+      bookingCategory: v.bookingCategory,
+      packageDescription: v.packageDescription,
       passengerName: v.passengerName,
       phone: v.phone,
       email: v.email,
@@ -608,6 +612,8 @@ export function useDispatchDraftSync({
     try {
       const hasMeaningfulData = Boolean(
         isEditMode ||
+          v.bookingCategory === 'package' ||
+          v.packageDescription.trim() ||
           v.pickupAddress.trim() ||
           v.dropoffAddress.trim() ||
           v.passengerName.trim() ||
@@ -646,6 +652,8 @@ export function useDispatchDraftSync({
     s.setDropoffCoordinates(undefined);
     s.setDropoffPlaceId(undefined);
     s.setIntermediateStops([]);
+    s.setBookingCategory?.('passenger');
+    s.setPackageDescription?.('');
     s.setPassengerName('');
     s.setPhone('');
     s.setEmail('');

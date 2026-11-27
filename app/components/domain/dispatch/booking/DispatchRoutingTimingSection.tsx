@@ -197,6 +197,7 @@ export function DispatchRoutingTimingSection({
                 placeholder="Pickup Location"
                 value={pickupAddress}
                 variant="pickup"
+                includeDispatchOnly
                 disabled={isCancelled}
                 onChange={(val) => {
                   setPickupAddress(val);
@@ -216,6 +217,7 @@ export function DispatchRoutingTimingSection({
                     placeholder={`Stop #${idx + 1}`}
                     value={stop.address}
                     variant="stop"
+                    includeDispatchOnly
                     disabled={isCancelled}
                     onChange={(val) =>
                       outboundWaypoints.updateStopAt(idx, { address: val, placeId: undefined })
@@ -243,6 +245,7 @@ export function DispatchRoutingTimingSection({
                 placeholder="Dropoff Location"
                 value={dropoffAddress}
                 variant="dropoff"
+                includeDispatchOnly
                 disabled={isCancelled}
                 onChange={(val) => {
                   setDropoffAddress(val);

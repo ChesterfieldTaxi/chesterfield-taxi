@@ -355,6 +355,7 @@ export function DispatchReturnRepeatSection({
                         placeholder="Return Pickup Location"
                         value={returnPickupAddress}
                         variant="pickup"
+                        includeDispatchOnly
                         onChange={setReturnPickupAddress}
                         onPlaceSelected={(p) => {
                           setReturnPickupAddress(p.address);
@@ -369,6 +370,7 @@ export function DispatchReturnRepeatSection({
                             placeholder={`Return Stop #${idx + 1}`}
                             value={stop.address}
                             variant="stop"
+                            includeDispatchOnly
                             onChange={(val) =>
                               returnWaypoints.updateStopAt(idx, { address: val })
                             }
@@ -393,6 +395,7 @@ export function DispatchReturnRepeatSection({
                         placeholder="Return Dropoff Location"
                         value={returnDropoffAddress}
                         variant="dropoff"
+                        includeDispatchOnly
                         onChange={setReturnDropoffAddress}
                         onPlaceSelected={(p) => {
                           setReturnDropoffAddress(p.address);

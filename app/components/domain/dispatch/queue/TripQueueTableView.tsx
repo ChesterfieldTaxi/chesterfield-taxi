@@ -352,6 +352,14 @@ export function TripQueueTableView({
                       >
                         {trip.passenger.firstName} {trip.passenger.lastName}
                       </span>
+                      {trip.bookingCategory === 'package' && (
+                        <span
+                          className="px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40 text-[9.5px] font-black uppercase tracking-wider shrink-0"
+                          title={trip.packageDetails?.description || 'Package Delivery'}
+                        >
+                          PACKAGE
+                        </span>
+                      )}
                       {trip.multiCarGroupId && (trip.multiCarTotal || 1) > 1 && (
                         <button
                           type="button"

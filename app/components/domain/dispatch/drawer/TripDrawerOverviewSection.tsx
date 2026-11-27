@@ -585,9 +585,20 @@ export function TripDrawerOverviewSection({
           <div className="font-bold text-fg-secondary uppercase tracking-wider text-[10px]">
             Customer Details
           </div>
-          <div className="text-sm font-extrabold text-fg-primary">
-            {reviewTrip.passenger.firstName} {reviewTrip.passenger.lastName}
+          <div className="text-sm font-extrabold text-fg-primary flex items-center gap-2 flex-wrap">
+            <span>{reviewTrip.passenger.firstName} {reviewTrip.passenger.lastName}</span>
+            {reviewTrip.bookingCategory === 'package' && (
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-wider">
+                PACKAGE
+              </span>
+            )}
           </div>
+          {reviewTrip.bookingCategory === 'package' && reviewTrip.packageDetails?.description && (
+            <div className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] font-semibold text-amber-800 dark:text-amber-200">
+              <span className="font-bold uppercase tracking-wider text-[10px] mr-1">Package:</span>
+              {reviewTrip.packageDetails.description}
+            </div>
+          )}
           <div className="space-y-1 text-fg-secondary">
             <div className="flex items-center gap-1.5">
               <PhoneIcon className="w-3.5 h-3.5 text-fg-subtle shrink-0" />

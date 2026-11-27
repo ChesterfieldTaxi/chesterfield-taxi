@@ -22,6 +22,7 @@ import {
 } from '../../../ui/Icons';
 
 export interface DispatchExtrasVehicleSectionProps {
+  bookingCategory?: 'passenger' | 'package';
   isCompleted: boolean;
   isCancelled: boolean;
   passengers: number;
@@ -87,6 +88,7 @@ export interface DispatchExtrasVehicleSectionProps {
 }
 
 export function DispatchExtrasVehicleSection({
+  bookingCategory = 'passenger',
   isCompleted,
   isCancelled,
   passengers,
@@ -135,6 +137,7 @@ export function DispatchExtrasVehicleSection({
   onRemoveVehicle,
   onUpdateVehicleChoice,
 }: DispatchExtrasVehicleSectionProps) {
+  const isPackageMode = bookingCategory === 'package';
   return (
     <>
       {/* Trip Details (Pax, Bags, Car Seats with 3-tier counters) */}
@@ -144,16 +147,23 @@ export function DispatchExtrasVehicleSection({
             Trip Details
           </label>
           <span className="text-[10px] text-fg-muted font-medium">
-            Capacity: Max {totalMaxPassengers}{' '}
-            {totalMaxPassengers === 1 ? 'Passenger' : 'Passengers'} • {totalMaxBags}{' '}
-            {totalMaxBags === 1 ? 'Bag' : 'Bags'}
+            Capacity:{' '}
+            {!isPackageMode && (
+              <>
+                Max {totalMaxPassengers} {totalMaxPassengers === 1 ? 'Passenger' : 'Passengers'} •{' '}
+              </>
+            )}
+            {isPackageMode
+              ? `Max ${totalMaxBags} ${totalMaxBags === 1 ? 'Package' : 'Packages'}`
+              : `${totalMaxBags} ${totalMaxBags === 1 ? 'Bag' : 'Bags'}`}
           </span>
         </div>
 
         <div className="p-2.5 bg-surface-card border border-border-subtle rounded-xl shadow-xs space-y-2.5">
-          {/* Compact 3-Column Steppers: Passengers, Carry-on & Checked */}
-          <div className="grid grid-cols-3 gap-1.5">
+          {/* Compact Steppers: Passengers (hidden in package mode), Carry-on & Checked */}
+          <div className={`grid gap-1.5 ${isPackageMode ? 'grid-cols-2' : 'grid-cols-3'}`}>
             {/* Passengers */}
+            {!isPackageMode && (
             <div className="p-2 bg-surface-subtle border border-border-subtle rounded-xl flex flex-col justify-between gap-1.5 min-w-0">
               <div className="flex items-center justify-center gap-1 text-fg-secondary text-[11px] min-w-0">
                 <UserIcon className="w-3 h-3 text-fg-muted shrink-0" />
@@ -183,12 +193,15 @@ export function DispatchExtrasVehicleSection({
                 </button>
               </div>
             </div>
+            )}
 
-            {/* Carry-on Bags */}
+            {/* Carry-on Bags / Small Packages */}
             <div className="p-2 bg-surface-subtle border border-border-subtle rounded-xl flex flex-col justify-between gap-1.5 min-w-0">
               <div className="flex items-center justify-center gap-1 text-fg-secondary text-[11px] min-w-0">
                 <LuggageIcon className="w-3 h-3 text-fg-muted shrink-0" />
-                <span className="font-bold text-fg-strong truncate">Carry-on</span>
+                <span className="font-bold text-fg-strong truncate">
+                  {isPackageMode ? 'Envelopes / Small' : 'Carry-on'}
+                </span>
               </div>
               <div className="flex items-center justify-between gap-1">
                 <button
@@ -235,11 +248,13 @@ export function DispatchExtrasVehicleSection({
               </div>
             </div>
 
-            {/* Checked Bags */}
+            {/* Checked Bags / Boxes & Parcels */}
             <div className="p-2 bg-surface-subtle border border-border-subtle rounded-xl flex flex-col justify-between gap-1.5 min-w-0">
               <div className="flex items-center justify-center gap-1 text-fg-secondary text-[11px] min-w-0">
                 <LuggageIcon className="w-3 h-3 text-fg-muted shrink-0" />
-                <span className="font-bold text-fg-strong truncate">Checked</span>
+                <span className="font-bold text-fg-strong truncate">
+                  {isPackageMode ? 'Boxes / Parcels' : 'Checked'}
+                </span>
               </div>
               <div className="flex items-center justify-between gap-1">
                 <button
@@ -311,7 +326,7 @@ export function DispatchExtrasVehicleSection({
                     }}
                     className="rounded border-border-strong text-blue-600 focus:ring-blue-500"
                   />
-                  <span>Oversized Cargo (Golf / Skis)</span>
+                  <span>{isPackageMode ? 'Oversized Freight / Heavy Parcel' : 'Oversized Cargo (Golf / Skis)'}</span>
                 </span>
                 {hasOversizedLuggage && totalOversizedCount > 0 && (
                   <span className="text-[10px] font-bold text-status-info-fg bg-surface-card px-1.5 py-0.5 rounded border border-status-info-border">
@@ -392,31 +407,34 @@ export function DispatchExtrasVehicleSection({
                 </div>
               </CollapsibleSection>
 
-              <label
-                className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border cursor-pointer select-none transition-colors ${
-                  carSeats
-                    ? 'bg-status-warning-bg/80 border-status-warning-border'
-                    : 'bg-surface-subtle border-border-subtle hover:bg-surface-muted/70'
-                }`}
-              >
-                <span className="flex items-center gap-2 text-[11px] font-semibold text-fg-strong">
-                  <input
-                    type="checkbox"
-                    checked={carSeats}
-                    onChange={(e) => onToggleCarSeats(e.target.checked)}
-                    className="rounded border-border-strong text-blue-600 focus:ring-blue-500"
-                  />
-                  <span>Child Safety Seats</span>
-                </span>
-                {carSeats && (
-                  <span className="text-[10px] font-bold text-status-warning-fg bg-surface-card px-1.5 py-0.5 rounded border border-status-warning-border">
-                    {totalCarSeats} / {carSeatLimits.maxTotalCarSeats} max
+              {!isPackageMode && (
+                <label
+                  className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border cursor-pointer select-none transition-colors ${
+                    carSeats
+                      ? 'bg-status-warning-bg/80 border-status-warning-border'
+                      : 'bg-surface-subtle border-border-subtle hover:bg-surface-muted/70'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-[11px] font-semibold text-fg-strong">
+                    <input
+                      type="checkbox"
+                      checked={carSeats}
+                      onChange={(e) => onToggleCarSeats(e.target.checked)}
+                      className="rounded border-border-strong text-blue-600 focus:ring-blue-500"
+                    />
+                    <span>Child Safety Seats</span>
                   </span>
-                )}
-              </label>
+                  {carSeats && (
+                    <span className="text-[10px] font-bold text-status-warning-fg bg-surface-card px-1.5 py-0.5 rounded border border-status-warning-border">
+                      {totalCarSeats} / {carSeatLimits.maxTotalCarSeats} max
+                    </span>
+                  )}
+                </label>
+              )}
             </div>
 
             {/* 3 Car Seat Counters: Rear-Facing, Front-Facing, Booster */}
+            {!isPackageMode && (
             <CollapsibleSection isOpen={carSeats}>
               <div className="p-2 bg-status-warning-bg/60 border border-status-warning-border rounded-lg space-y-1.5">
                 <div className="flex items-center justify-between text-[11px]">
@@ -520,6 +538,7 @@ export function DispatchExtrasVehicleSection({
                 </div>
               </div>
             </CollapsibleSection>
+            )}
 
             {/* Admin Custom Bookable Extras */}
             {universalExtrasConfig?.customExtras &&
@@ -586,12 +605,12 @@ export function DispatchExtrasVehicleSection({
                 className="w-full flex items-center justify-between text-[11px] font-bold text-fg-secondary hover:text-status-info-fg cursor-pointer"
               >
                 <span className="flex items-center gap-1.5">
-                  <span>Special Requests &amp; Gate Code</span>
+                  <span>{isPackageMode ? 'Gate Code' : 'Special Requests & Gate Code'}</span>
                   <span className="font-normal text-fg-subtle">(Optional)</span>
-                  {(Object.values(specialRequestFlags).some(Boolean) ||
+                  {((!isPackageMode && Object.values(specialRequestFlags).some(Boolean)) ||
                     Boolean(gateCode.trim())) && (
                     <span className="text-[9px] font-bold text-status-info-fg bg-status-info-bg px-1.5 py-0.5 rounded border border-status-info-border">
-                      {Object.values(specialRequestFlags).filter(Boolean).length +
+                      {(isPackageMode ? 0 : Object.values(specialRequestFlags).filter(Boolean).length) +
                         (gateCode.trim() ? 1 : 0)}{' '}
                       active
                     </span>
@@ -604,6 +623,7 @@ export function DispatchExtrasVehicleSection({
 
               {showSpecialRequests && (
                 <div className="space-y-2 p-2 bg-surface-subtle border border-border-subtle rounded-lg animate-in fade-in duration-150">
+                  {!isPackageMode && (
                   <div className="grid grid-cols-3 gap-1.5">
                     {(
                       [
@@ -635,6 +655,7 @@ export function DispatchExtrasVehicleSection({
                       );
                     })}
                   </div>
+                  )}
 
                   <div>
                     <label className="block text-[10px] text-fg-secondary font-semibold mb-0.5">

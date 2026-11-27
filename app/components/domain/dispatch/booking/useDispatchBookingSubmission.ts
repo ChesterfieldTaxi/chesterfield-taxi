@@ -241,6 +241,8 @@ export interface DispatchFormValues {
   dropoffCoordinates?: GeoPoint;
   dropoffPlaceId?: string;
   intermediateStops: Array<{ address: string; coordinates?: GeoPoint; placeId?: string }>;
+  bookingCategory?: 'passenger' | 'package';
+  packageDescription?: string;
   passengerName: string;
   phone: string;
   email: string;
@@ -313,6 +315,8 @@ export interface DispatchHydrationSetters {
   setIntermediateStops: (
     v: Array<{ address: string; coordinates?: GeoPoint; placeId?: string }>
   ) => void;
+  setBookingCategory?: (v: 'passenger' | 'package') => void;
+  setPackageDescription?: (v: string) => void;
   setPassengerName: (v: string) => void;
   setPhone: (v: string) => void;
   setEmail: (v: string) => void;
@@ -443,6 +447,12 @@ export function applySavedDraftOverlayToDispatchState(
   if (parsed.dropoffCoordinates) s.setDropoffCoordinates(parsed.dropoffCoordinates);
   if (parsed.dropoffPlaceId !== undefined) s.setDropoffPlaceId(parsed.dropoffPlaceId);
   if (parsed.intermediateStops) s.setIntermediateStops(parsed.intermediateStops);
+  if (parsed.bookingCategory === 'package' || parsed.bookingCategory === 'passenger') {
+    s.setBookingCategory?.(parsed.bookingCategory);
+  }
+  if (parsed.packageDescription !== undefined) {
+    s.setPackageDescription?.(parsed.packageDescription);
+  }
   if (parsed.passengerName !== undefined) s.setPassengerName(parsed.passengerName);
   if (parsed.phone !== undefined) s.setPhone(parsed.phone);
   if (parsed.email !== undefined) s.setEmail(parsed.email);
@@ -768,8 +778,12 @@ export function hydrateInitialTripIntoDispatchState(
     );
   }
 
+  const resolvedCategory = initialTrip.bookingCategory === 'package' ? 'package' : 'passenger';
+  s.setBookingCategory?.(resolvedCategory);
+  s.setPackageDescription?.(initialTrip.packageDetails?.description || '');
+  const rawFullName = `${initialTrip.passenger?.firstName || ''} ${initialTrip.passenger?.lastName || ''}`.trim();
   s.setPassengerName(
-    `${initialTrip.passenger?.firstName || ''} ${initialTrip.passenger?.lastName || ''}`.trim()
+    resolvedCategory === 'package' && rawFullName === 'Package Delivery' ? '' : rawFullName
   );
   s.setPhone(initialTrip.passenger?.phone || '');
   s.setEmail(initialTrip.passenger?.email || '');
@@ -1077,6 +1091,8 @@ export interface UseDispatchBookingSubmissionParams {
   dropoffCoordinates?: GeoPoint;
   dropoffPlaceId?: string;
   intermediateStops: Array<{ address: string; coordinates?: GeoPoint; placeId?: string }>;
+  bookingCategory?: 'passenger' | 'package';
+  packageDescription?: string;
   passengerName: string;
   phone: string;
   email: string;
@@ -1219,6 +1235,8 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     dropoffCoordinates,
     dropoffPlaceId,
     intermediateStops,
+    bookingCategory,
+    packageDescription,
     passengerName,
     phone,
     email,
@@ -1804,13 +1822,15 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
       setSubmitError('Please enter a dropoff address.');
       return;
     }
-    if (!passengerName.trim()) {
-      setSubmitError('Please enter passenger name.');
-      return;
-    }
-    if (!phone.trim()) {
-      setSubmitError('Please enter passenger phone number.');
-      return;
+    if (bookingCategory !== 'package') {
+      if (!passengerName.trim()) {
+        setSubmitError('Please enter passenger name.');
+        return;
+      }
+      if (!phone.trim()) {
+        setSubmitError('Please enter passenger phone number.');
+        return;
+      }
     }
 
     if (paymentMethod === 'account') {
@@ -1881,9 +1901,23 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
       { alwaysPrefixQty: true, emptyAsUndefined: true }
     );
 
-    const names = passengerName.trim().split(/\s+/);
-    const firstName = names[0] || 'Guest';
-    const lastName = names.slice(1).join(' ') || 'Passenger';
+    const isPackageMode = bookingCategory === 'package';
+    const trimmedName = passengerName.trim();
+    const names = trimmedName ? trimmedName.split(/\s+/) : [];
+    const firstName = isPackageMode && !trimmedName ? 'Package' : names[0] || 'Guest';
+    const lastName =
+      isPackageMode && !trimmedName
+        ? 'Delivery'
+        : names.slice(1).join(' ') || (isPackageMode ? '' : 'Passenger');
+    const trimmedPkgDesc = (packageDescription || '').trim();
+    const packagePayloadFields: Pick<Trip, 'bookingCategory' | 'packageDetails'> = isPackageMode
+      ? {
+          bookingCategory: 'package',
+          ...(trimmedPkgDesc ? { packageDetails: { description: trimmedPkgDesc } } : {}),
+        }
+      : {
+          bookingCategory: 'passenger',
+        };
 
     let scheduledPickupTime: string | undefined = undefined;
     if (timingType === 'later' && scheduledDate && scheduledTime) {
@@ -2273,6 +2307,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
               luggageCount: bagAlloc[0],
               specialRequests,
             },
+            ...packagePayloadFields,
             vehicleTier: car1Spec.vehicleTier as VehicleTier,
             bookingType: timingType === 'later' ? 'scheduled' : 'asap',
             scheduledPickupTime,
@@ -2404,6 +2439,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                 passengerCount: paxAlloc[i],
                 luggageCount: bagAlloc[i],
               },
+              ...packagePayloadFields,
               vehicleTier: spec.vehicleTier as VehicleTier,
               driverNotes: notesForAll,
               flightNotes: outboundFlightNotes || undefined,
@@ -2544,6 +2580,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
             luggageCount: bags,
             specialRequests,
           },
+          ...packagePayloadFields,
           vehicleTier: isCompleted || isCancelled ? initialTrip.vehicleTier : tier,
           bookingType:
             isCompleted || isCancelled
@@ -2735,6 +2772,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
               luggageCount: bagAlloc[i],
               specialRequests: isCar1 ? specialRequests : undefined,
             },
+            ...packagePayloadFields,
             vehicleTier: spec.vehicleTier as VehicleTier,
             driverNotes: notesForAll,
             flightNotes: outboundFlightNotes || undefined,
@@ -2993,6 +3031,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                   luggageCount: retBagAlloc[rIdx],
                   specialRequests: rIdx === 0 ? returnSpecialRequests : undefined,
                 },
+                ...packagePayloadFields,
                 vehicleTier: rSpec.vehicleTier as VehicleTier,
                 driverNotes: notesForAll,
                 flightNotes: returnLegFlightNotes || undefined,
@@ -3181,6 +3220,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                     luggageCount: bagAlloc[cIdx],
                     specialRequests: cIdx === 0 ? specialRequests : undefined,
                   },
+                  ...packagePayloadFields,
                   vehicleTier: spec.vehicleTier as VehicleTier,
                   driverNotes: notesForAll,
                   flightNotes: outboundFlightNotes || undefined,

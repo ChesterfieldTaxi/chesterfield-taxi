@@ -413,6 +413,8 @@ export interface Trip {
   multiCarAssociates?: MultiCarAssociate[];
 
   /** Passenger & Vehicle */
+  bookingCategory?: 'passenger' | 'package';
+  packageDetails?: { description?: string };
   passenger: TripPassenger;
   vehicleTier: VehicleTier;
 

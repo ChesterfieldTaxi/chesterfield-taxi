@@ -137,6 +137,10 @@ export function detectAirportInAddresses(
   // so regular street/city names like "Castle", "Westlake", or "Sussex" never false-positive.
   const matchesKeyword = (text: string, kw: string): boolean => {
     if (!text) return false;
+    if (kw === 'chesterfield airport') {
+      // Exclude street addresses on Chesterfield Airport Rd / Road (e.g., businesses along that corridor)
+      return /\bchesterfield airport\b(?!\s+(?:rd|road)\b)/i.test(text);
+    }
     if (kw.length <= 4) {
       const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       return new RegExp(`\\b${escaped}\\b`, 'i').test(text);

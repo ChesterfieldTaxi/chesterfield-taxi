@@ -363,6 +363,14 @@ export function TripQueueCardsGrid({
                     <span className="font-bold text-xs text-fg-primary">
                       {trip.passenger.firstName} {trip.passenger.lastName}
                     </span>
+                    {trip.bookingCategory === 'package' && (
+                      <span
+                        className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40 text-[10px] font-black uppercase tracking-wider shrink-0"
+                        title={trip.packageDetails?.description || 'Package Delivery'}
+                      >
+                        PACKAGE
+                      </span>
+                    )}
                     <DispatchSlaBadge sla={slaSummary.byTripId[trip.id]} />
                     <DispatchFlightTelemetryPill trip={trip} compact />
                     <DispatchCascadePill

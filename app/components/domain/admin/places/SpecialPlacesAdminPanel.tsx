@@ -9,6 +9,7 @@ import { Button } from '~/components/ui/Button';
 import { Input } from '~/components/ui/Input';
 import { Select } from '~/components/ui/Select';
 import { Badge } from '~/components/ui/Badge';
+import { AdminSlideOverDrawer } from '~/components/domain/admin/AdminSlideOverDrawer';
 import {
   MapPinIcon,
   SearchIcon,
@@ -140,6 +141,7 @@ export function SpecialPlacesAdminPanel() {
     category: 'custom',
     isPopular: true,
     isActive: true,
+    dispatchOnly: false,
     aliases: [],
     notes: '',
   });
@@ -202,6 +204,7 @@ export function SpecialPlacesAdminPanel() {
       category: 'landmark',
       isPopular: true,
       isActive: true,
+      dispatchOnly: false,
       aliases: [],
       notes: '',
     });
@@ -354,19 +357,39 @@ export function SpecialPlacesAdminPanel() {
         </div>
       )}
 
-      {/* Editing / Creation Drawer Modal */}
-      {isEditing && (
-        <form onSubmit={handleSave} className="p-5 rounded-xl bg-surface-card border border-border-strong shadow-md space-y-4">
-          <div className="flex items-center justify-between border-b border-border-faint pb-3">
-            <h3 className="text-sm font-bold text-fg-primary flex items-center gap-2">
-              <SparklesIcon className="w-4 h-4 text-emerald-600" />
-              {editingId ? 'Edit Special Place' : 'Create New Special Place'}
-            </h3>
-            <span className="text-xs text-fg-subtle font-mono">ID: {formData.id || 'auto'}</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="md:col-span-2">
+      {/* Editing / Creation Sidebar Drawer */}
+      <AdminSlideOverDrawer
+        isOpen={isEditing}
+        onClose={() => setIsEditing(false)}
+        title={editingId ? 'Edit Special Place' : 'Create New Special Place'}
+        subtitle={formData.id ? `ID: ${formData.id}` : undefined}
+        size="lg"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditing(false)}
+              className="text-xs border-border-strong bg-surface-card text-fg-secondary hover:bg-surface-subtle"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="special-place-editor-form"
+              size="sm"
+              className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-2xs"
+            >
+              <CheckIcon className="w-3.5 h-3.5 mr-1" />
+              Save Special Place
+            </Button>
+          </>
+        }
+      >
+        <form id="special-place-editor-form" onSubmit={handleSave} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-2">
               <label className="text-xs font-medium text-fg-secondary block mb-1">
                 Full Place Name <span className="text-rose-500">*</span>
               </label>
@@ -588,29 +611,26 @@ export function SpecialPlacesAdminPanel() {
               />
               <span>Active in Autocomplete</span>
             </label>
-          </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-border-faint">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsEditing(false)}
-              className="text-xs border-border-strong bg-surface-card text-fg-secondary hover:bg-surface-subtle"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-2xs"
-            >
-              <CheckIcon className="w-3.5 h-3.5 mr-1" />
-              Save Special Place
-            </Button>
+            <label className="flex items-center gap-2 cursor-pointer font-medium text-fg-strong">
+              <input
+                type="checkbox"
+                checked={Boolean(
+                  formData.dispatchOnly ||
+                    formData.category === 'corporate' ||
+                    formData.category === 'custom'
+                )}
+                disabled={formData.category === 'corporate' || formData.category === 'custom'}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setFormData({ ...formData, dispatchOnly: e.target.checked })
+                }
+                className="rounded border-border-strong text-amber-600 focus:ring-0"
+              />
+              <span>Dispatch Only (hide from public booking)</span>
+            </label>
           </div>
         </form>
-      )}
+      </AdminSlideOverDrawer>
 
       {/* Filter and Search Bar */}
       <div className="p-3.5 rounded-xl bg-surface-card border border-border-subtle flex flex-col md:flex-row items-center justify-between gap-3 shadow-2xs">
@@ -718,6 +738,17 @@ export function SpecialPlacesAdminPanel() {
                           <PlaneIcon className="w-3 h-3 shrink-0" />
                           <span>{place.airportType === 'private' ? 'Private / FBO' : 'Commercial'}</span>
                         </span>
+                      )}
+
+                      {(place.dispatchOnly ||
+                        place.category === 'corporate' ||
+                        place.category === 'custom') && (
+                        <Badge
+                          variant="outline"
+                          className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40 text-[10px]"
+                        >
+                          Dispatch Only
+                        </Badge>
                       )}
 
                       {!place.isActive && (

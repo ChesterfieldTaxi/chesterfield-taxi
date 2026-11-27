@@ -206,6 +206,16 @@ export function DriverTripManifest({ trip, adminVehicles, compact = false }: Dri
     <div className="space-y-2.5">
       {/* Primary Manifest Chips Row: Multi-Car Convoy, Vehicle, Payment Method, Return Leg */}
       <div className="flex flex-wrap items-center gap-1.5">
+        {trip.bookingCategory === 'package' && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase tracking-wider">
+            <span>PACKAGE</span>
+            {trip.packageDetails?.description && (
+              <span className="font-semibold normal-case text-amber-200/90">
+                · {trip.packageDetails.description}
+              </span>
+            )}
+          </span>
+        )}
         {isMultiCar && (
           <button
             type="button"
