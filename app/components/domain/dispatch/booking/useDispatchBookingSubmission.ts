@@ -54,7 +54,6 @@ import {
 } from '../../../../core/services/operator.service';
 import { formatLocalDateStr } from '../../../../core/services/pricing/vehicle-matching';
 import {
-  DEFAULT_CORPORATE_ACCOUNTS,
   resolveVehicleEngineId,
   generateRecurringDates,
   formatCustomExtrasSummary,
@@ -941,7 +940,7 @@ export function hydrateInitialTripIntoDispatchState(
 
   if (meta.corporateDetails) {
     s.setCorporateAccount(
-      meta.corporateDetails.corporateAccount || DEFAULT_CORPORATE_ACCOUNTS[0]
+      meta.corporateDetails.corporateAccount || ''
     );
     s.setBillingPo(meta.corporateDetails.billingPo || '');
     s.setAuthorizedBy(meta.corporateDetails.authorizedBy || '');

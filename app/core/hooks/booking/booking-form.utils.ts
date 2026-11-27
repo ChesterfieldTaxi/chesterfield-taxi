@@ -41,17 +41,6 @@ export const DEFAULT_DISPATCH_COMPANIES = [
   'West County Express',
 ];
 
-export const DEFAULT_CORPORATE_ACCOUNTS = [
-  'Bayer Crop Science (St. Louis HQ)',
-  'Pfizer Chesterfield',
-  'Marriott St. Louis West',
-  'Mercy Hospital St. Louis',
-  "St. Luke's Hospital",
-  'Delmar Gardens Chesterfield',
-  'West County Orthopedics',
-  'Custom Direct Bill Account',
-];
-
 export const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export type BookingVehicleChoice = 'any' | 'sedan' | 'suv' | 'van' | (string & {});

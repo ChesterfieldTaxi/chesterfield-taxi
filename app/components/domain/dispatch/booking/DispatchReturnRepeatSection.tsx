@@ -12,14 +12,13 @@ import { getAdminConfigService } from '../../../../core/services/config/admin-co
 import {
   DAYS_OF_WEEK,
   DISPATCH_FBO_FACILITIES as COMMON_FBO_FACILITIES,
-  isVehicleChoiceSelected,
-  resolveVehicleEngineId,
   stepLuggageCount,
   type BookingVehicleChoice as VehicleChoice,
   type DispatchVehicleOption,
   type UseBookingWaypointsResult,
   type VehicleCapacityInfo,
 } from '../../../../core/hooks/booking';
+import { DispatchVehicleSelectorList } from './DispatchVehicleSelectorList';
 import { DispatchLocationInput } from '../DispatchLocationInput';
 import { AirportCityCombobox } from '../../booking/AirportCityCombobox';
 import { FlightTelemetryCheckPanel } from '../../booking/FlightAssistanceCard';
@@ -1105,85 +1104,20 @@ export function DispatchReturnRepeatSection({
                 </div>
 
                 {/* Return Vehicles Section */}
-                <div className="p-2 bg-surface-card border border-status-staged-border rounded space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-status-staged-fg">
-                    <span>Return Vehicles ({returnVehicles.length})</span>
-                    <button
-                      type="button"
-                      onClick={onAddReturnVehicle}
-                      className="text-[10px] text-indigo-600 hover:text-status-staged-fg"
-                    >
-                      + Add Vehicle
-                    </button>
-                  </div>
-                  {returnVehicles.map((rv, rIdx) => (
-                    <div key={rIdx} className="flex items-center gap-1 text-[11px]">
-                      <span className="text-fg-subtle font-bold text-[9px]">#{rIdx + 1}</span>
-                      <div className="flex-1 flex flex-wrap gap-1 p-0.5 bg-surface-muted rounded">
-                        {dispatchVehicleOptions.map((opt) => {
-                          const isSelected = isVehicleChoiceSelected(rv, opt.key, 'wheelchair');
-                          const simulatedReturnVehicles = [...returnVehicles];
-                          simulatedReturnVehicles[rIdx] = opt.key;
-                          const simulatedReturnCapacity = simulatedReturnVehicles.reduce(
-                            (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
-                            0
-                          );
-                          const isReturnCapacityInsufficient =
-                            simulatedReturnCapacity < returnPassengers;
-
-                          const retEngineId = resolveVehicleEngineId(
-                            opt.key,
-                            activeAdminVehicleIds
-                          );
-                          const retLivePrice = returnVehicleQuotes[retEngineId]?.totalFare;
-
-                          return (
-                            <button
-                              type="button"
-                              key={opt.key}
-                              disabled={isReturnCapacityInsufficient}
-                              onClick={() => onUpdateReturnVehicle(rIdx, opt.key)}
-                              title={
-                                isReturnCapacityInsufficient
-                                  ? `${opt.label} fleet capacity (${simulatedReturnCapacity}p) is insufficient for ${returnPassengers} passengers.`
-                                  : `${opt.label} (${opt.maxPassengers}p / ${opt.maxBags}b)${
-                                      retLivePrice ? ` • $${Math.ceil(retLivePrice)}` : ''
-                                    }`
-                              }
-                              className={`flex-1 min-w-[54px] py-0.5 px-1 text-center rounded text-[10px] font-bold transition-all truncate ${
-                                isReturnCapacityInsufficient
-                                  ? 'opacity-35 cursor-not-allowed bg-surface-muted text-fg-subtle'
-                                  : isSelected
-                                  ? 'bg-indigo-600 text-white'
-                                  : 'text-fg-secondary hover:text-fg-primary hover:bg-surface-emphasis'
-                              }`}
-                            >
-                              <span>{opt.label}</span>
-                              {typeof retLivePrice === 'number' && retLivePrice > 0 && (
-                                <span
-                                  className={`block text-[9.5px] font-mono font-extrabold ${
-                                    isSelected ? 'text-indigo-100' : 'text-status-success-fg'
-                                  }`}
-                                >
-                                  ${Math.ceil(retLivePrice)}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {returnVehicles.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => onRemoveReturnVehicle(rIdx)}
-                          className="text-fg-subtle hover:text-red-500 px-1"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <DispatchVehicleSelectorList
+                  vehicles={returnVehicles}
+                  dispatchVehicleOptions={dispatchVehicleOptions}
+                  vehicleCapacities={vehicleCapacities}
+                  activeAdminVehicleIds={activeAdminVehicleIds}
+                  vehicleQuotes={returnVehicleQuotes}
+                  passengers={returnPassengers}
+                  disabled={isCompleted || isCancelled}
+                  title="Return Vehicles"
+                  accent="indigo"
+                  onAddVehicle={onAddReturnVehicle}
+                  onRemoveVehicle={onRemoveReturnVehicle}
+                  onUpdateVehicleChoice={onUpdateReturnVehicle}
+                />
 
                 <label className="flex items-center gap-2 cursor-pointer text-status-staged-fg text-[11px] select-none pt-0.5">
                   <input

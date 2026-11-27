@@ -12,7 +12,6 @@ import { getUniversalExtrasConfig } from '../../../../core/services/pricing/extr
 import { getWorkspaceBus } from '../../../../core/services/workspace-bus.service';
 import { resolvePopulatePassengerMode } from '../../../../core/hooks/dispatch/dispatch-workspace.util';
 import {
-  DEFAULT_CORPORATE_ACCOUNTS,
   buildDispatchVehicleCapacities,
   buildDispatchVehicleOptions,
   findMatchingCorporateAccount,
@@ -684,7 +683,7 @@ export function useDispatchDraftSync({
     s.setCardNumber('');
     s.setCardExp('');
     s.setCardCvc('');
-    s.setCorporateAccount(DEFAULT_CORPORATE_ACCOUNTS[0]);
+    s.setCorporateAccount('');
     s.setBillingPo('');
     s.setAuthorizedBy('');
     s.setTariff('Standard');

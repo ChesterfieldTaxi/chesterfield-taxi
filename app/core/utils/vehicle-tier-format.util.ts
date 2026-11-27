@@ -221,16 +221,11 @@ export function formatTripVehicleColumnDisplay(
       : '';
 
   const resolvedToken = explicitDriverTier || inferredFromDesc || fallbackNonDefaultTier;
-  if (!resolvedToken && !metaAssignedDisplay) {
-    return 'Any';
-  }
-
-  const assignedLabel = formatVehicleTierDisplay(
-    resolvedToken || undefined,
-    vehicles || undefined,
-    metaAssignedDisplay
-  );
-  if (!assignedLabel || assignedLabel === 'Any') {
+  const matchedAdminTier =
+    findLiveVehicleTier(resolvedToken, vehicles) ||
+    findLiveVehicleTier(metaAssignedDisplay, vehicles);
+  const assignedLabel = matchedAdminTier?.name?.trim();
+  if (!assignedLabel || assignedLabel.toLowerCase() === 'any') {
     return 'Any';
   }
   return `Any → ${assignedLabel}`;

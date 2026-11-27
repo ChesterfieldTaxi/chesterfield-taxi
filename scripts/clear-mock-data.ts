@@ -39,12 +39,27 @@ const firebaseConfig = {
 };
 
 async function clearMockData() {
+  console.warn(
+    '⚠️  DEPRECATION NOTICE: `scripts/clear-mock-data.ts` is deprecated.\n' +
+    '   Prefer `npx tsx scripts/cleanup-prelaunch-test-data.ts` (dry-run by default, Admin SDK).'
+  );
+
+  const setupEmail = process.env.ADMIN_SETUP_EMAIL;
+  const setupPassword = process.env.ADMIN_SETUP_PASSWORD;
+  if (!setupEmail || !setupPassword) {
+    console.error(
+      'Missing ADMIN_SETUP_EMAIL or ADMIN_SETUP_PASSWORD environment variables.\n' +
+      'Set both in your environment, or use `npx tsx scripts/cleanup-prelaunch-test-data.ts` instead.'
+    );
+    process.exit(1);
+  }
+
   const app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
   const { getAuth, signInWithEmailAndPassword } = await import('firebase/auth');
   const auth = getAuth(app);
-  await signInWithEmailAndPassword(auth, 'admin_setup@chesterfieldtaxi.com', 'AdminSecret2026!');
+  await signInWithEmailAndPassword(auth, setupEmail, setupPassword);
   console.log('🔑 Authenticated with Firestore.');
 
   // 1. Process Trips

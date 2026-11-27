@@ -5,13 +5,12 @@ import type {
   UniversalExtrasConfig,
 } from '../../../../core/types/config';
 import {
-  isVehicleChoiceSelected,
-  resolveVehicleEngineId,
   stepLuggageCount,
   type BookingVehicleChoice as VehicleChoice,
   type DispatchVehicleOption,
   type VehicleCapacityInfo,
 } from '../../../../core/hooks/booking';
+import { DispatchVehicleSelectorList } from './DispatchVehicleSelectorList';
 import { CollapsibleSection } from '../../../ui/CollapsibleSection';
 import {
   LuggageIcon,
@@ -676,92 +675,21 @@ export function DispatchExtrasVehicleSection({
         </div>
       </div>
 
-      {/* Vehicles (Multi-Vehicle Selector with Inline Choices & Add/Remove) */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="block text-[11px] font-bold text-fg-secondary uppercase tracking-wide">
-            Vehicles ({selectedVehicles.length})
-          </label>
-          <button
-            type="button"
-            onClick={onAddVehicle}
-            className="text-[11px] text-blue-600 hover:text-status-info-fg font-bold"
-          >
-            + Add Vehicle
-          </button>
-        </div>
-
-        <div className="space-y-1.5">
-          {selectedVehicles.map((vChoice, idx) => (
-            <div
-              key={idx}
-              className="p-1.5 bg-surface-card border border-border-strong rounded-lg shadow-2xs flex items-center gap-2"
-            >
-              <span className="text-[10px] font-bold text-fg-subtle w-5">#{idx + 1}</span>
-              <div className="flex-1 flex flex-wrap gap-1 p-0.5 bg-surface-muted rounded">
-                {dispatchVehicleOptions.map((opt) => {
-                  const isSelected = isVehicleChoiceSelected(vChoice, opt.key, 'wheelchair');
-                  const simulatedVehicles = [...selectedVehicles];
-                  simulatedVehicles[idx] = opt.key;
-                  const simulatedCapacity = simulatedVehicles.reduce(
-                    (acc, v) => acc + (vehicleCapacities[v]?.maxPassengers || 4),
-                    0
-                  );
-                  const isCapacityInsufficient = simulatedCapacity < passengers;
-
-                  const engineId = resolveVehicleEngineId(opt.key, activeAdminVehicleIds);
-                  const livePrice = vehicleQuotes[engineId]?.totalFare;
-
-                  return (
-                    <button
-                      type="button"
-                      key={opt.key}
-                      disabled={isCapacityInsufficient || isCompleted || isCancelled}
-                      onClick={() => onUpdateVehicleChoice(idx, opt.key)}
-                      title={
-                        isCapacityInsufficient
-                          ? `${opt.label} fleet capacity (${simulatedCapacity}p) is insufficient for ${passengers} passengers. Requires larger vehicle or additional vehicles.`
-                          : `${opt.label} (${opt.maxPassengers}p / ${opt.maxBags}b)${
-                              livePrice ? ` • $${Math.ceil(livePrice)}` : ''
-                            }`
-                      }
-                      className={`flex-1 min-w-[64px] py-1 text-center rounded text-[11px] font-bold transition-all truncate px-1.5 ${
-                        isCapacityInsufficient
-                          ? 'opacity-35 cursor-not-allowed bg-surface-muted text-fg-subtle'
-                          : isSelected
-                          ? 'bg-blue-600 text-white shadow-xs'
-                          : 'text-fg-secondary hover:text-fg-primary hover:bg-surface-emphasis'
-                      }`}
-                    >
-                      <span>{opt.label}</span>{' '}
-                      <span className="text-[9px] opacity-80">({opt.maxPassengers}p)</span>
-                      {typeof livePrice === 'number' && livePrice > 0 && (
-                        <span
-                          className={`block text-[10px] font-mono font-extrabold leading-tight ${
-                            isSelected ? 'text-blue-100' : 'text-status-success-fg'
-                          }`}
-                        >
-                          ${Math.ceil(livePrice)}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              {selectedVehicles.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => onRemoveVehicle(idx)}
-                  className="p-1 text-fg-subtle hover:text-red-500 rounded"
-                  title="Remove vehicle"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Vehicles (Multi-Vehicle Selector with Compact Trigger & Popover) */}
+      <DispatchVehicleSelectorList
+        vehicles={selectedVehicles}
+        dispatchVehicleOptions={dispatchVehicleOptions}
+        vehicleCapacities={vehicleCapacities}
+        activeAdminVehicleIds={activeAdminVehicleIds}
+        vehicleQuotes={vehicleQuotes}
+        passengers={passengers}
+        disabled={isCompleted || isCancelled}
+        title="Vehicles"
+        accent="blue"
+        onAddVehicle={onAddVehicle}
+        onRemoveVehicle={onRemoveVehicle}
+        onUpdateVehicleChoice={onUpdateVehicleChoice}
+      />
     </>
   );
 }

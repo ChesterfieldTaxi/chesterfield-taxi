@@ -24,10 +24,10 @@ Provide a safe, dry-run-by-default Firebase Admin SDK CLI script to purge mock, 
 - `scripts/test-prelaunch-cleanup.ts` — Unit test verifying classifier helpers accurately flag mock/demo records and never flag real production records.
 
 ## Tasks
-- [ ] Create `scripts/cleanup-prelaunch-test-data.ts` with exported pure test-record classifiers (`isMockTripRecord`, `isMockDriverRecord`, `isMockCorporateRecord`, `isMockContactOrCommsRecord`), dry-run summary output, `--execute`, `--verbose`, `--key=<path>`, `--include-all-trips`, and `--remove-setup-auth` flags.
-- [ ] Update `scripts/clear-mock-data.ts` to remove hardcoded setup credentials and read from `process.env.ADMIN_SETUP_EMAIL` / `process.env.ADMIN_SETUP_PASSWORD`.
-- [ ] Create `scripts/test-prelaunch-cleanup.ts` to test positive and negative cases for every classifier helper.
-- [ ] Run `npm run typecheck` and `npx tsx scripts/test-prelaunch-cleanup.ts`.
+- [x] Create `scripts/cleanup-prelaunch-test-data.ts` with exported pure test-record classifiers (`isMockTripRecord`, `isMockDriverRecord`, `isMockCorporateRecord`, `isMockContactOrCommsRecord`), dry-run summary output, `--execute`, `--verbose`, `--key=<path>`, `--include-all-trips`, and `--remove-setup-auth` flags.
+- [x] Update `scripts/clear-mock-data.ts` to remove hardcoded setup credentials and read from `process.env.ADMIN_SETUP_EMAIL` / `process.env.ADMIN_SETUP_PASSWORD`.
+- [x] Create `scripts/test-prelaunch-cleanup.ts` to test positive and negative cases for every classifier helper.
+- [x] Run `npm run typecheck` and `npx tsx scripts/test-prelaunch-cleanup.ts`.
 
 ## Verification
 - `npm run typecheck`

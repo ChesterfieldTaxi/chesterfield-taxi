@@ -26,7 +26,6 @@ import { getOperatorService, type DriverRosterItem } from '../../../core/service
 import {
   DISPATCH_FBO_FACILITIES as COMMON_FBO_FACILITIES,
   DEFAULT_DISPATCH_COMPANIES as DEFAULT_COMPANIES,
-  DEFAULT_CORPORATE_ACCOUNTS,
   buildDispatchVehicleOptions,
   buildDispatchVehicleCapacities,
   sumSelectedVehicleCapacities,
@@ -250,7 +249,7 @@ function DispatchBookingEngineComponent({
   const [savedPaymentMethodId, setSavedPaymentMethodId] = useState('');
   const [, setCardCvc] = useState('');
   const [saveCardOnFile, setSaveCardOnFile] = useState(false);
-  const [corporateAccount, setCorporateAccount] = useState(DEFAULT_CORPORATE_ACCOUNTS[0]);
+  const [corporateAccount, setCorporateAccount] = useState('');
   const [billingPo, setBillingPo] = useState('');
   const [enteredBookingPin, setEnteredBookingPin] = useState('');
   const [callerPhoneFromBus, setCallerPhoneFromBus] = useState('');

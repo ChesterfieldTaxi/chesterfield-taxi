@@ -6,7 +6,6 @@ import {
   normalizeCorporateBookingPin,
   searchCorporateAccounts,
 } from '../../../../core/services/corporate-caller-auth.util';
-import { DEFAULT_CORPORATE_ACCOUNTS } from '../../../../core/hooks/booking';
 import { AlertTriangleIcon, CheckIcon, LockIcon, ShieldCheckIcon, UserCheckIcon } from '../../../ui/Icons';
 import { Select, type SelectOption } from '../../../ui/Select';
 
@@ -60,7 +59,7 @@ export function DispatchCorporateAccountCard({
   const orderedAccounts = useMemo(() => searchCorporateAccounts(corporateAccountList, ''), [corporateAccountList]);
   const accountSelectOptions = useMemo<SelectOption[]>(() => {
     if (orderedAccounts.length === 0) {
-      return DEFAULT_CORPORATE_ACCOUNTS.map((acc) => ({ value: acc, label: acc }));
+      return [];
     }
     return orderedAccounts.map((acc) => ({
       value: acc.companyName,
@@ -232,9 +231,6 @@ export function DispatchCorporateAccountCard({
         <div>
           <div className="flex items-center justify-between mb-0.5">
             <span className="text-[10px] text-fg-secondary font-semibold">Billing PO / Code</span>
-            {selectedCorp?.currentPoNumber && (
-              <span className="text-[9px] font-mono text-fg-muted">Active: {selectedCorp.currentPoNumber}</span>
-            )}
           </div>
           <input
             type="text"
