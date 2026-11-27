@@ -18,6 +18,7 @@ import {
   evaluateFlightPickupAlignment,
   parseFlightIdent,
   resolveStlTerminalInfo,
+  stripTerminalPrefix,
   type FlightCheckBlockReason,
   type FlightCheckEligibilityInput,
   type FlightCheckEligibilityResult,
@@ -427,19 +428,6 @@ function stripRedundantFlightNotes(
     .trim();
 
   return withoutBracketed || undefined;
-}
-
-function stripTerminalPrefix(guidance: string | undefined, terminal: string | undefined): string | undefined {
-  const trimmed = (guidance || '').trim();
-  if (!trimmed) return undefined;
-  if (!terminal) return trimmed;
-
-  const escaped = terminal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const stripped = trimmed
-    .replace(new RegExp(`^${escaped}\\s*(?:·|-|–|:|\\|)?\\s*`, 'i'), '')
-    .trim();
-
-  return stripped || trimmed;
 }
 
 /**

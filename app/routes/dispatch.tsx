@@ -22,6 +22,7 @@ import { soundNotificationService } from '../core/services/sound-notification.se
 import type { DriverRosterItem } from '../core/services/operator.service';
 import { DriverQueueWindow } from '../components/domain/dispatch/DriverQueueWindow';
 import { ClientProfileWindow } from '../components/domain/dispatch/ClientProfileWindow';
+import { buildReturnTabValuesFromClientTrip } from '../components/domain/dispatch/client-profile-workflows.util';
 import type { DispatchUniversalTripActions } from '../components/domain/dispatch/TripActionDropdown';
 import { DispatchStagedPlannerModals } from '../components/domain/dispatch/StagedDriverConflictModal';
 import { useDispatchFleet, type LiveFleetDriver } from '../core/hooks/useDispatchFleet';
@@ -887,6 +888,15 @@ export default function DispatchRoute() {
     },
     [handleCloneBooking]
   );
+  const stableCreateReturnBookingFromWorkspace = useCallback(
+    (trip: Trip) => {
+      handleCloneBookingToNewDraft(
+        buildReturnTabValuesFromClientTrip(trip, Date.now(), { linkToSourceTrip: true })
+      );
+      setActiveMobileTab('booking');
+    },
+    [handleCloneBookingToNewDraft]
+  );
   const stableOpenDriverPickerFromWorkspace = useCallback((trip: Trip) => {
     setDriverPickerSearch('');
     setDriverPickerFilter('all');
@@ -899,6 +909,7 @@ export default function DispatchRoute() {
       onEdit: stableEditTripFromWorkspace,
       onFare: handleOpenDriverModal,
       onClone: stableCloneTripFromWorkspace,
+      onCreateReturnBooking: stableCreateReturnBookingFromWorkspace,
       onFocusMap: stableFocusTripOnMapFromWorkspace,
       onStartAutoOffer: stagedPlanner.requestAutoOfferWithStagedCheck,
       onCancelAutoOffer: handleCancelAutoOffer,
@@ -910,8 +921,8 @@ export default function DispatchRoute() {
     }),
     [
       handleOpenReviewModal, stableEditTripFromWorkspace, handleOpenDriverModal, stableCloneTripFromWorkspace,
-      stableFocusTripOnMapFromWorkspace, stagedPlanner, handleCancelAutoOffer, stableOpenDriverPickerFromWorkspace,
-      handleOpenCompleteTripModal, handlePromptCancelTrip, handleReactivateTrip,
+      stableCreateReturnBookingFromWorkspace, stableFocusTripOnMapFromWorkspace, stagedPlanner, handleCancelAutoOffer,
+      stableOpenDriverPickerFromWorkspace, handleOpenCompleteTripModal, handlePromptCancelTrip, handleReactivateTrip,
     ]
   );
 
@@ -1191,6 +1202,7 @@ export default function DispatchRoute() {
             onOpenReviewModal={handleOpenReviewModal}
             onOpenDriverModal={handleOpenDriverModal}
             onCloneBookingFromQueue={stableCloneTripFromWorkspace}
+            onCreateReturnBookingFromQueue={stableCreateReturnBookingFromWorkspace}
             onOpenCompleteTripModal={handleOpenCompleteTripModal}
             onPromptCancelTrip={handlePromptCancelTrip}
             onReactivateTrip={handleReactivateTrip}

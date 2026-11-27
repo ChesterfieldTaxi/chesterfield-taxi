@@ -29,6 +29,7 @@ import {
 } from '../../../../core/utils/route-markers.util';
 import { formatVehicleTierDisplay } from '../../../../core/utils/vehicle-tier-format.util';
 import { TripActionDropdown } from '../TripActionDropdown';
+import { hasTripLinkedCounterpart } from '../client-profile-workflows.util';
 import {
   DispatchCascadePill,
   DispatchFlightTelemetryPill,
@@ -54,6 +55,7 @@ export interface TripQueueCardsGridProps {
   queueWidthPx: number;
   settings: AppSettings;
   drivers: LiveFleetDriver[];
+  allTrips?: ReadonlyArray<Trip>;
   filteredTrips: Trip[];
   selectedTripIds: string[];
   selectedQueueTripId: string | null;
@@ -71,6 +73,7 @@ export interface TripQueueCardsGridProps {
   onOpenReviewModal: (trip: Trip, initialTab?: 'details' | 'audit') => void;
   onOpenDriverModal: (trip: Trip) => void;
   onCloneBookingFromQueue: (trip: Trip) => void;
+  onCreateReturnBookingFromQueue?: (trip: Trip) => void;
   onOpenCompleteTripModal: (trip: Trip) => void;
   onPromptCancelTrip: (trip: Trip) => void;
   onReactivateTrip: (trip: Trip) => void;
@@ -87,6 +90,7 @@ export function TripQueueCardsGrid({
   queueWidthPx,
   settings,
   drivers,
+  allTrips,
   filteredTrips,
   selectedTripIds,
   selectedQueueTripId,
@@ -104,6 +108,7 @@ export function TripQueueCardsGrid({
   onOpenReviewModal,
   onOpenDriverModal,
   onCloneBookingFromQueue,
+  onCreateReturnBookingFromQueue,
   onOpenCompleteTripModal,
   onPromptCancelTrip,
   onReactivateTrip,
@@ -641,6 +646,12 @@ export function TripQueueCardsGrid({
                         onFare={() => onOpenDriverModal(trip)}
                         onAudit={() => onOpenReviewModal(trip, 'audit')}
                         onClone={() => onCloneBookingFromQueue(trip)}
+                        isLinkedTrip={hasTripLinkedCounterpart(trip, allTrips || filteredTrips)}
+                        onCreateReturnBooking={
+                          onCreateReturnBookingFromQueue
+                            ? () => onCreateReturnBookingFromQueue(trip)
+                            : undefined
+                        }
                         onFocusMap={() => onFocusTripOnMapFromQueue(trip)}
                         onStartAutoOffer={() => onStartAutoOffer(trip)}
                         onCancelAutoOffer={() => onCancelAutoOffer(trip)}

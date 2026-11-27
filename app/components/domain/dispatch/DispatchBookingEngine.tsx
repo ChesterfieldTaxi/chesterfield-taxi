@@ -72,6 +72,7 @@ import {
   type DispatchFormValues,
   type DispatchBookingEngineProps,
 } from './booking';
+import { hasTripLinkedCounterpart } from './client-profile-workflows.util';
 
 export {
   COMMON_FBO_FACILITIES,
@@ -172,7 +173,7 @@ function DispatchBookingEngineComponent({
           (initialTrip?.metadata as any)?.returnTime
         }:00`
       : undefined);
-  const hasLinkedTrip = Boolean(linkedTripId);
+  const hasLinkedTrip = hasTripLinkedCounterpart(initialTrip, allTrips);
   const draftStorageKey = `chesterfield_dispatch_draft_${draftId}`;
 
   // Timing & Outbound Route
@@ -316,6 +317,7 @@ function DispatchBookingEngineComponent({
   const [returnTailNumber, setReturnTailNumber] = useState('');
   const [returnFboFacility, setReturnFboFacility] = useState('');
   const [returnHasCheckedLuggage, setReturnHasCheckedLuggage] = useState(false);
+  const [linkedOutboundTripId, setLinkedOutboundTripId] = useState<string | undefined>();
 
   const [repeat, setRepeat] = useState(false);
   const [repeatFrequency, setRepeatFrequency] = useState<
@@ -781,6 +783,7 @@ function DispatchBookingEngineComponent({
     vehicleCapacities,
     validateDispatchAccount,
     allTrips: lookupTrips,
+    linkedOutboundTripId,
     onResetAfterCreate: () => resetAfterCreateRef.current?.(),
     onBookingSuccess,
   });
@@ -932,6 +935,7 @@ function DispatchBookingEngineComponent({
       setReturnFboFacility,
       setReturnHasCheckedLuggage,
       setReturnFlightTelemetry,
+      setLinkedOutboundTripId,
       setSubmitError,
     },
     values: {
@@ -1046,6 +1050,7 @@ function DispatchBookingEngineComponent({
       tailNumber,
       fboFacility,
       hasCheckedLuggage,
+      linkedOutboundTripId,
     },
     onValuesChange,
     onClearDraft,

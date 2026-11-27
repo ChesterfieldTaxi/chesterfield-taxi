@@ -10,6 +10,7 @@ import {
   TripActionDropdown,
   type DispatchUniversalTripActions,
 } from '../TripActionDropdown';
+import { hasTripLinkedCounterpart } from '../client-profile-workflows.util';
 import { DriverAssignDropdown } from '../queue/DriverAssignDropdown';
 import { getDispatchStatusBadge } from '../queue/TripQueueToolbar';
 import {
@@ -482,6 +483,12 @@ export function DispatchLeftBookingSidebar({
                 onFare={() => tripActions.onFare(activeEditTrip)}
                 onAudit={() => tripActions.onReview(activeEditTrip, 'audit')}
                 onClone={() => tripActions.onClone(activeEditTrip)}
+                isLinkedTrip={hasTripLinkedCounterpart(activeEditTrip, trips)}
+                onCreateReturnBooking={
+                  tripActions.onCreateReturnBooking
+                    ? () => tripActions.onCreateReturnBooking?.(activeEditTrip)
+                    : undefined
+                }
                 onFocusMap={() => tripActions.onFocusMap(activeEditTrip)}
                 onStartAutoOffer={
                   tripActions.onStartAutoOffer

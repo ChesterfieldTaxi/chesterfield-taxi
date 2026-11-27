@@ -73,10 +73,45 @@ export function normalizeClonedDraftTiming(
   return seedAsapTiming(values, nowMs);
 }
 
+/**
+ * Pure linked-trip detection shared by the dispatch editor, Client Profile, and Trip Actions dropdown.
+ */
+export function hasTripLinkedCounterpart(
+  trip: Trip | null | undefined,
+  allTrips?: ReadonlyArray<Trip>
+): boolean {
+  if (!trip) return false;
+  const meta = (trip.metadata ?? {}) as Record<string, unknown>;
+  if (
+    trip.linkedTripId ||
+    trip.linkedReturnTripId ||
+    meta.linkedTripId ||
+    meta.linkedReturnTripId ||
+    meta.returnTripId
+  ) {
+    return true;
+  }
+  if (trip.id && allTrips && allTrips.length > 0) {
+    return allTrips.some((other) => {
+      if (!other || other.id === trip.id) return false;
+      const otherMeta = (other.metadata ?? {}) as Record<string, unknown>;
+      return (
+        other.linkedTripId === trip.id ||
+        other.linkedReturnTripId === trip.id ||
+        otherMeta.linkedTripId === trip.id ||
+        otherMeta.linkedReturnTripId === trip.id ||
+        otherMeta.returnTripId === trip.id
+      );
+    });
+  }
+  return false;
+}
+
 /** 1-click `⇄ Book Return`: reverses the route and resets timing / stale outbound flight info. */
 export function buildReturnTabValuesFromClientTrip(
   trip: Trip,
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
+  options?: { linkToSourceTrip?: boolean }
 ): DispatchFormValues {
   const base = cloneTripToDispatchFormValues(trip);
   const swapped: DispatchFormValues = {
@@ -92,8 +127,13 @@ export function buildReturnTabValuesFromClientTrip(
       .map((s) => ({ address: s.address, coordinates: s.coordinates, ...(s.placeId ? { placeId: s.placeId } : {}) })),
   };
   const timed = seedAsapTiming(swapped, nowMs);
-  if (detectAirportEndpoint(timed.pickupAddress).isAirport) return timed;
-  return { ...timed, provideFlightInfo: false, airline: '', flightNumber: '', flightOrigin: '' };
+  const result = detectAirportEndpoint(timed.pickupAddress).isAirport
+    ? timed
+    : { ...timed, provideFlightInfo: false, airline: '', flightNumber: '', flightOrigin: '' };
+  if (options?.linkToSourceTrip && trip.id) {
+    return { ...result, linkedOutboundTripId: trip.id };
+  }
+  return result;
 }
 
 export function partitionClientActiveUpcomingAndPastTrips(

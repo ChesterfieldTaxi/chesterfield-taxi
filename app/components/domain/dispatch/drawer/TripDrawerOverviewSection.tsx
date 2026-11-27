@@ -763,7 +763,7 @@ export function TripDrawerOverviewSection({
                           </div>
                         )}
                         <div className="text-status-info-fg font-semibold">
-                          Ramp / Lobby Guidance: {termInfo.pickupDoorGuidance}
+                          Ramp / Lobby: {termInfo.doorLocation}
                         </div>
                       </>
                     ) : (
@@ -838,16 +838,11 @@ export function TripDrawerOverviewSection({
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-status-info-fg">
                           {(snap?.originIata || flightOrigin) && (
                             <span>
-                              Departing From:{' '}
+                              Departing:{' '}
                               <strong>
                                 {snap?.originIata || flightOrigin}
                                 {snap?.originCity ? ` (${snap.originCity})` : ''}
                               </strong>
-                            </span>
-                          )}
-                          {(snap?.terminal || termInfo.terminal) && (
-                            <span>
-                              Terminal: <strong>{snap?.terminal || termInfo.terminal}</strong>
                             </span>
                           )}
                           {snap?.gate && (
@@ -883,7 +878,9 @@ export function TripDrawerOverviewSection({
                         )}
 
                         <div className="text-status-info-fg font-semibold bg-surface-card/80 px-2 py-1 rounded border border-status-info-border/80">
-                          Curbside Pickup: {termInfo.pickupDoorGuidance || snap?.pickupDoorGuidance}
+                          Curbside Pickup:{' '}
+                          <strong>{snap?.terminal || termInfo.shortTerminal}</strong>
+                          {termInfo.doorLocation ? ` · ${termInfo.doorLocation}` : ''}
                         </div>
 
                         {alignment?.conflict === 'flight_cancelled' && (

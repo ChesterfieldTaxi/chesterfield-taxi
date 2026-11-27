@@ -354,8 +354,30 @@ export interface StlTerminalInfo {
   airlineName?: string;
   terminal?: string;
   shortTerminal: string;
+  /** Admin-configured door/ramp location without redundant terminal prefix */
+  doorLocation: string;
   pickupDoorGuidance: string;
   isPrivateFbo: boolean;
+}
+
+/**
+ * Strips a leading terminal label (e.g. "Terminal 1 · ") from pickup guidance
+ * when the terminal is already displayed in a badge or header.
+ */
+export function stripTerminalPrefix(
+  guidance: string | undefined,
+  terminal: string | undefined
+): string | undefined {
+  const trimmed = (guidance || '').trim();
+  if (!trimmed) return undefined;
+  if (!terminal) return trimmed;
+
+  const escaped = terminal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const stripped = trimmed
+    .replace(new RegExp(`^${escaped}\\s*(?:·|-|–|:|\\|)?\\s*`, 'i'), '')
+    .trim();
+
+  return stripped || trimmed;
 }
 
 /**
@@ -523,11 +545,13 @@ export function resolveStlTerminalInfo(
     rawLower.includes('tac air') ||
     rawLower.includes('premier jet')
   ) {
+    const cleanFbo = stripTerminalPrefix(fboLoc, 'Spirit of St. Louis (SUS)') || fboLoc;
     return {
       airportCode: 'SUS',
       terminal: 'Private FBO',
       shortTerminal: 'SUS FBO',
-      pickupDoorGuidance: `Spirit of St. Louis (SUS) · ${fboLoc}`,
+      doorLocation: cleanFbo,
+      pickupDoorGuidance: `Spirit of St. Louis (SUS) · ${cleanFbo}`,
       isPrivateFbo: true,
     };
   }
@@ -539,11 +563,13 @@ export function resolveStlTerminalInfo(
     rawLower.includes('jet aviation') ||
     rawLower.includes('ideal aviation')
   ) {
+    const cleanFbo = stripTerminalPrefix(fboLoc, 'St. Louis Downtown (CPS)') || fboLoc;
     return {
       airportCode: 'CPS',
       terminal: 'Private FBO',
       shortTerminal: 'CPS FBO',
-      pickupDoorGuidance: `St. Louis Downtown (CPS) · ${fboLoc}`,
+      doorLocation: cleanFbo,
+      pickupDoorGuidance: `St. Louis Downtown (CPS) · ${cleanFbo}`,
       isPrivateFbo: true,
     };
   }
@@ -557,15 +583,15 @@ export function resolveStlTerminalInfo(
     rawLower.includes('terminal 2') ||
     rawLower === 't2'
   ) {
+    const cleanT2 = stripTerminalPrefix(t2Loc, 'Terminal 2') || t2Loc;
     return {
       airportCode: 'STL',
       airlineCode: airlineCode || undefined,
       airlineName,
       terminal: 'Terminal 2',
       shortTerminal: 'STL T2',
-      pickupDoorGuidance: t2Loc.toLowerCase().startsWith('terminal 2')
-        ? t2Loc
-        : `Terminal 2 · ${t2Loc}`,
+      doorLocation: cleanT2,
+      pickupDoorGuidance: `Terminal 2 · ${cleanT2}`,
       isPrivateFbo: false,
     };
   }
@@ -576,24 +602,26 @@ export function resolveStlTerminalInfo(
     rawLower.includes('terminal 1') ||
     rawLower === 't1'
   ) {
+    const cleanT1 = stripTerminalPrefix(t1Loc, 'Terminal 1') || t1Loc;
     return {
       airportCode: 'STL',
       airlineCode: airlineCode || undefined,
       airlineName,
       terminal: 'Terminal 1',
       shortTerminal: 'STL T1',
-      pickupDoorGuidance: t1Loc.toLowerCase().startsWith('terminal 1')
-        ? t1Loc
-        : `Terminal 1 · ${t1Loc}`,
+      doorLocation: cleanT1,
+      pickupDoorGuidance: `Terminal 1 · ${cleanT1}`,
       isPrivateFbo: false,
     };
   }
 
+  const combined = `Terminal 1: ${t1Loc} • Terminal 2 (Southwest / Lufthansa): ${t2Loc}`;
   return {
     airportCode: 'STL',
     terminal: undefined,
     shortTerminal: 'STL',
-    pickupDoorGuidance: `Terminal 1: ${t1Loc} • Terminal 2 (Southwest / Lufthansa): ${t2Loc}`,
+    doorLocation: combined,
+    pickupDoorGuidance: combined,
     isPrivateFbo: false,
   };
 }

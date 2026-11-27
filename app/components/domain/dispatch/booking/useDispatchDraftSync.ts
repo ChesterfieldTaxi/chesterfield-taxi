@@ -157,6 +157,7 @@ export interface UseDispatchDraftSyncParams {
     tailNumber: string;
     fboFacility: string;
     hasCheckedLuggage: boolean;
+    linkedOutboundTripId?: string;
   };
   onValuesChange?: (values: DispatchFormValues) => void;
   onClearDraft?: () => void;
@@ -527,6 +528,7 @@ export function useDispatchDraftSync({
       tailNumber: v.tailNumber,
       fboFacility: v.fboFacility,
       hasCheckedLuggage: v.hasCheckedLuggage,
+      ...(v.linkedOutboundTripId ? { linkedOutboundTripId: v.linkedOutboundTripId } : {}),
     };
   }, [v, availableNamedRules]);
 
@@ -742,6 +744,7 @@ export function useDispatchDraftSync({
     s.setReturnTailNumber('');
     s.setReturnFboFacility('');
     s.setReturnHasCheckedLuggage(false);
+    s.setLinkedOutboundTripId?.(undefined);
     s.setOutboundFlightTelemetry(null);
     s.setReturnFlightTelemetry(null);
     s.setSubmitError(null);

@@ -194,11 +194,18 @@ export function ClientProfileWindow({
           <div className="space-y-2.5">
             <ClientUpcomingRidesStrip
               trips={activeUpcomingTrips}
+              allTrips={trips}
               nowMs={nowMs}
               drivers={drivers}
               onOpenTripDetails={openTripDetails}
               onEditTrip={onEditTrip}
               onFocusTripOnMap={onFocusTripOnMap}
+              onBookReturn={(trip) =>
+                onLoadTripIntoNewTab(
+                  buildReturnTabValuesFromClientTrip(trip, nowMs, { linkToSourceTrip: true }),
+                  trip
+                )
+              }
             />
 
             <div className="space-y-1.5">

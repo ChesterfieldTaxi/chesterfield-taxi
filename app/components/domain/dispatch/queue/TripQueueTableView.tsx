@@ -17,6 +17,7 @@ import {
 } from '../../../../core/utils/route-markers.util';
 import { formatTripVehicleColumnDisplay } from '../../../../core/utils/vehicle-tier-format.util';
 import { TripActionDropdown } from '../TripActionDropdown';
+import { hasTripLinkedCounterpart } from '../client-profile-workflows.util';
 import {
   DispatchCascadePill, DispatchFlightTelemetryPill, DispatchSlaBadge, getTripCascadeExhaustedTooltip,
 } from '../DispatchCascadeSlaBadges';
@@ -35,6 +36,7 @@ export interface TripQueueTableViewProps {
   isDesktop: boolean;
   settings: AppSettings;
   drivers: LiveFleetDriver[];
+  allTrips?: ReadonlyArray<Trip>;
   filteredTrips: Trip[];
   selectedTripIds: string[];
   allFilteredSelected: boolean;
@@ -52,6 +54,7 @@ export interface TripQueueTableViewProps {
   onOpenReviewModal: (trip: Trip, initialTab?: 'details' | 'audit') => void;
   onOpenDriverModal: (trip: Trip) => void;
   onCloneBookingFromQueue: (trip: Trip) => void;
+  onCreateReturnBookingFromQueue?: (trip: Trip) => void;
   onOpenCompleteTripModal: (trip: Trip) => void;
   onPromptCancelTrip: (trip: Trip) => void;
   onReactivateTrip: (trip: Trip) => void;
@@ -71,11 +74,11 @@ const useIsomorphicLayoutEffect =
   typeof window !== 'undefined' ? React.useLayoutEffect : useEffect;
 
 export function TripQueueTableView({
-  isDesktop, settings, drivers, filteredTrips, selectedTripIds, allFilteredSelected,
+  isDesktop, settings, drivers, allTrips, filteredTrips, selectedTripIds, allFilteredSelected,
   someFilteredSelected, selectedQueueTripId, openTripActionId, onOpenTripActionIdChange,
   onToggleSelectAll, onToggleSelectTrip, onSearchTermChange, onSearchExpandedChange,
   onSelectTripOnQueue, onEditTripFromQueue, onFocusTripOnMapFromQueue, onOpenReviewModal,
-  onOpenDriverModal, onCloneBookingFromQueue, onOpenCompleteTripModal, onPromptCancelTrip,
+  onOpenDriverModal, onCloneBookingFromQueue, onCreateReturnBookingFromQueue, onOpenCompleteTripModal, onPromptCancelTrip,
   onReactivateTrip, onQuickAssignDriver, onCallPassengerFromQueue, slaSummary,
   onStartAutoOffer, onCancelAutoOffer, onOpenDriverPickerForTrip, stagedPlanner,
   onTableOverflowDetected, visibleColumns: externalColumns, tableMinWidthPx: externalMinWidthPx,
@@ -587,6 +590,12 @@ export function TripQueueTableView({
                         onFare={() => onOpenDriverModal(trip)}
                         onAudit={() => onOpenReviewModal(trip, 'audit')}
                         onClone={() => onCloneBookingFromQueue(trip)}
+                        isLinkedTrip={hasTripLinkedCounterpart(trip, allTrips || filteredTrips)}
+                        onCreateReturnBooking={
+                          onCreateReturnBookingFromQueue
+                            ? () => onCreateReturnBookingFromQueue(trip)
+                            : undefined
+                        }
                         onFocusMap={() => onFocusTripOnMapFromQueue(trip)}
                         onStartAutoOffer={() => onStartAutoOffer(trip)}
                         onCancelAutoOffer={() => onCancelAutoOffer(trip)}

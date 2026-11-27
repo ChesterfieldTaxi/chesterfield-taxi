@@ -68,6 +68,7 @@ import {
   type VehicleCapacityInfo,
   type validateDispatchCorporateSubmission,
 } from '../../../../core/hooks/booking';
+import { hasTripLinkedCounterpart } from '../client-profile-workflows.util';
 
 export function resolveTripClientDriverPreferencesMetadata(
   phone?: string,
@@ -283,6 +284,7 @@ export interface DispatchFormValues {
   tailNumber?: string;
   fboFacility?: string;
   hasCheckedLuggage?: boolean;
+  linkedOutboundTripId?: string;
 }
 
 export interface DispatchBookingEngineProps {
@@ -425,6 +427,7 @@ export interface DispatchHydrationSetters {
   setReturnTailNumber: (v: string) => void;
   setReturnFboFacility: (v: string) => void;
   setReturnHasCheckedLuggage: (v: boolean) => void;
+  setLinkedOutboundTripId?: (v: string | undefined) => void;
 }
 
 export function applySavedDraftOverlayToDispatchState(
@@ -733,6 +736,9 @@ export function applySavedDraftOverlayToDispatchState(
   if (parsed.returnFboFacility !== undefined) s.setReturnFboFacility(parsed.returnFboFacility);
   if (parsed.returnHasCheckedLuggage !== undefined) {
     s.setReturnHasCheckedLuggage(parsed.returnHasCheckedLuggage);
+  }
+  if (parsed.linkedOutboundTripId !== undefined) {
+    s.setLinkedOutboundTripId?.(parsed.linkedOutboundTripId || undefined);
   }
 }
 
@@ -1213,6 +1219,7 @@ export interface UseDispatchBookingSubmissionParams {
   vehicleCapacities: Record<string, VehicleCapacityInfo>;
   validateDispatchAccount: typeof validateDispatchCorporateSubmission;
   allTrips?: ReadonlyArray<Trip>;
+  linkedOutboundTripId?: string;
   onResetAfterCreate?: () => void;
   onBookingSuccess?: (trip: Trip, isEdit: boolean, feedback?: DispatchBookingFeedback) => void;
 }
@@ -1342,6 +1349,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
     fboFacility,
     hasCheckedLuggage,
     outboundFlightTelemetry,
+    linkedOutboundTripId,
     returnProvideFlightInfo,
     returnAirline,
     returnFlightNumber,
@@ -2068,7 +2076,13 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
       customExtrasSummary,
       corporateAccountId: matchedCorporateAccount?.id,
       corporateOrgName: paymentMethod === 'account' ? corporateAccount : undefined,
-      hasReturnTrip: Boolean(returnTrip && autoCreateReturnTrip),
+      hasReturnTrip: isEditMode
+        ? Boolean(
+            initialTrip?.linkedReturnTripId ||
+              (initialTrip?.metadata as any)?.linkedReturnTripId ||
+              (initialTrip?.metadata as any)?.returnTripId
+          )
+        : false,
       additionalPassengers,
       selectedVehicles,
       carSeatsBreakdown: {
@@ -2233,6 +2247,242 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
         : driverId !== 'unassigned'
         ? driverId
         : null;
+
+      const createAndLinkReturnTrips = async (outboundTrips: Trip[]): Promise<Trip | null> => {
+        if (outboundTrips.length === 0 || !returnDate || !returnTime) return null;
+        try {
+          const retPickupAddr = returnPickupAddress.trim() || dropoffAddress;
+          const retDropoffAddr = returnDropoffAddress.trim() || pickupAddress;
+          const returnScheduledTimeIso = new Date(
+            `${returnDate}T${returnTime}:00`
+          ).toISOString();
+
+          const returnSpecialRequests = formatCarSeatSummaryLabel(returnCarSeats, {
+            rearFacing: returnRearFacing,
+            frontFacing: returnFrontFacing,
+            booster: returnBooster,
+          });
+
+          const isReturnMultiCar = returnVehicles.length > 1;
+          const retCarCount = Math.max(1, returnVehicles.length);
+          const returnGroupId = isReturnMultiCar ? generateMultiCarGroupId() : undefined;
+
+          const returnCarSpecs = isReturnMultiCar
+            ? buildPerVehiclePricingSpecs({
+                selectedVehicles: returnVehicles,
+                resolveTier: (c) => resolveVehicleEngineId(c, activeAdminVehicleIds),
+                resolveDisplayName: resolveDisplayNameForChoice,
+                vehicleQuotes: returnVehicleQuotes,
+                primaryPricing: returnPricing,
+                distanceMiles: returnEstimatedDistanceMiles || estimatedDistanceMiles,
+                durationMinutes: returnEstimatedDurationMinutes || estimatedDurationMinutes,
+                combinedTargetFare: returnLegFare,
+                isFareOverridden: Boolean(isFareOverridden && manualFare),
+              })
+            : (() => {
+                const returnPrimaryVehicle = returnVehicles[0] || 'any';
+                const returnTier = resolveVehicleEngineId(
+                  returnPrimaryVehicle,
+                  activeAdminVehicleIds
+                );
+                return [
+                  {
+                    carIndex: 1,
+                    vehicleChoice: returnPrimaryVehicle,
+                    vehicleTier: String(returnTier),
+                    vehicleDisplayName: resolveDisplayNameForChoice(
+                      returnPrimaryVehicle,
+                      String(returnTier)
+                    ),
+                    pricing: buildPersistedPricing(
+                      returnPricing,
+                      returnLegFare,
+                      returnEstimatedDistanceMiles || estimatedDistanceMiles,
+                      returnEstimatedDurationMinutes || estimatedDurationMinutes,
+                      Boolean(isFareOverridden && manualFare)
+                    ),
+                    fare: returnLegFare,
+                  },
+                ];
+              })();
+
+          const retPaxCaps = returnVehicles.map(
+            (v) => vehicleCapacities[v]?.maxPassengers || 4
+          );
+          const retBagCaps = returnVehicles.map((v) => vehicleCapacities[v]?.maxBags || 3);
+          const retPaxAlloc = isReturnMultiCar
+            ? distributeAcrossCars(returnPassengers, retCarCount, retPaxCaps, 1)
+            : [returnPassengers];
+          const retBagAlloc = isReturnMultiCar
+            ? distributeAcrossCars(returnBags, retCarCount, retBagCaps, 0)
+            : [returnBags];
+
+          const createdReturnTrips: Trip[] = [];
+          const primaryOutbound = outboundTrips[0];
+
+          for (let rIdx = 0; rIdx < returnCarSpecs.length; rIdx++) {
+            const rSpec = returnCarSpecs[rIdx];
+            const pairedOutbound = outboundTrips[rIdx] || primaryOutbound;
+            const returnPayload: CreateTripInput = {
+              status: 'CONFIRMED',
+              bookingType: 'scheduled',
+              scheduledPickupTime: returnScheduledTimeIso,
+              pickupLocation: {
+                address: retPickupAddr,
+                coordinates: returnPickupCoordinates || dropoffCoordinates,
+                placeId: returnPickupPlaceId || dropoffPlaceId,
+              },
+              dropoffLocation: {
+                address: retDropoffAddr,
+                coordinates: returnDropoffCoordinates || pickupCoordinates,
+                placeId: returnDropoffPlaceId || pickupPlaceId,
+              },
+              intermediateStops:
+                returnIntermediateStops.length > 0
+                  ? returnIntermediateStops.map((s) => ({
+                      address: s.address,
+                      coordinates: s.coordinates,
+                      placeId: s.placeId,
+                    }))
+                  : undefined,
+              passenger: {
+                firstName,
+                lastName,
+                phone,
+                email: effectivePassengerEmail,
+                passengerCount: retPaxAlloc[rIdx],
+                luggageCount: retBagAlloc[rIdx],
+                specialRequests: rIdx === 0 ? returnSpecialRequests : undefined,
+              },
+              ...packagePayloadFields,
+              vehicleTier: rSpec.vehicleTier as VehicleTier,
+              driverNotes: notesForAll,
+              flightNotes: returnLegFlightNotes || undefined,
+              ...(validDispReturnTelemetry ? { flightTelemetry: validDispReturnTelemetry } : {}),
+              pricing: rSpec.pricing,
+              payment: {
+                method,
+                status: 'pending',
+                amount: rSpec.fare,
+                corporateAccountId: matchedCorporateAccount?.id,
+                ...(paymentMethod === 'card'
+                  ? {
+                      vaultedCardId: effectiveVaultedPmId,
+                      cardBrand: effectiveCardBrand,
+                      cardLast4: effectiveCardLast4,
+                    }
+                  : {}),
+              },
+              ...(isReturnMultiCar
+                ? {
+                    multipleVehiclesRequested: true,
+                    vehicleCount: retCarCount,
+                    multiCarGroupId: returnGroupId,
+                    multiCarIndex: rIdx + 1,
+                    multiCarTotal: retCarCount,
+                  }
+                : {}),
+              linkedTripId: pairedOutbound.id,
+              isReturnRide: true,
+              metadata: {
+                ...metadataPayload,
+                vehicleTypeId: rSpec.vehicleChoice === 'any' ? 'any' : rSpec.vehicleTier,
+                vehicleDisplayName: rSpec.vehicleDisplayName,
+                selectedVehicles: [rSpec.vehicleChoice],
+                carryOnBags: returnCarryOnBags,
+                checkedBags: returnCheckedBags,
+                oversizedBagsCount: returnHasOversizedLuggage ? returnTotalOversizedCount : 0,
+                oversizedBags: returnOversizedBagsPayload,
+                hasOversizedLuggage:
+                  returnHasOversizedLuggage &&
+                  (returnTotalOversizedCount > 0 ||
+                    Boolean(returnOversizedLuggageNotes.trim())),
+                oversizedLuggageNotes:
+                  returnHasOversizedLuggage && returnOversizedLuggageNotes.trim()
+                    ? returnOversizedLuggageNotes.trim()
+                    : undefined,
+                oversizedItemsSummary: returnOversizedItemsSummary,
+                carSeatsBreakdown: {
+                  rearFacing: returnRearFacing,
+                  frontFacing: returnFrontFacing,
+                  booster: returnBooster,
+                },
+                linkedTripId: pairedOutbound.id,
+                isReturnRide: true,
+                hasReturnTrip: false,
+                createdByRole: 'dispatcher',
+                ...(isReturnMultiCar
+                  ? {
+                      multiCarGroupId: returnGroupId,
+                      multiCarIndex: rIdx + 1,
+                      multiCarTotal: retCarCount,
+                      multiCarTotalPassengers: returnPassengers,
+                      multiCarTotalBags: returnBags,
+                      multiCarOrderTotalFare: returnLegFare,
+                    }
+                  : {}),
+                flightNotes: returnLegFlightNotes || undefined,
+                provideFlightInfo: Boolean(returnProvideFlightInfo),
+                flightDetails: returnProvideFlightInfo
+                  ? {
+                      airlineName: returnAirline || undefined,
+                      flightNumber: returnFlightNumber || undefined,
+                      departureAirport: returnFlightOrigin || undefined,
+                      tailNumber: returnTailNumber || undefined,
+                      fboFacility: returnFboFacility || undefined,
+                      hasCheckedLuggage: returnHasCheckedLuggage,
+                    }
+                  : undefined,
+                airline: returnProvideFlightInfo ? returnAirline : undefined,
+                airlineName: returnProvideFlightInfo ? returnAirline : undefined,
+                flightNumber: returnProvideFlightInfo ? returnFlightNumber : undefined,
+                flightOrigin: returnProvideFlightInfo ? returnFlightOrigin : undefined,
+                departureAirport: returnProvideFlightInfo ? returnFlightOrigin : undefined,
+                tailNumber: returnProvideFlightInfo ? returnTailNumber : undefined,
+                fboFacility: returnProvideFlightInfo ? returnFboFacility : undefined,
+                isPrivateAviation: Boolean(returnAirportDetection.isPrivateAviation),
+                hasCheckedLuggage: returnProvideFlightInfo ? returnHasCheckedLuggage : false,
+                isAirportTrip: Boolean(returnAirportDetection.isAirportTrip),
+                airportIataCode: returnAirportDetection.airport?.iataCode,
+              },
+            };
+            const createdRet = await service.createBooking(returnPayload);
+            createdReturnTrips.push(createdRet);
+
+            if (service.updateTrip && createdRet?.id && pairedOutbound?.id) {
+              await service.updateTrip(pairedOutbound.id, {
+                linkedReturnTripId: createdRet.id,
+                returnScheduledPickupTime: returnScheduledTimeIso,
+                metadata: {
+                  ...pairedOutbound.metadata,
+                  hasReturnTrip: true,
+                  linkedReturnTripId: createdRet.id,
+                  returnScheduledPickupTime: returnScheduledTimeIso,
+                },
+              });
+            }
+          }
+
+          if (isReturnMultiCar && createdReturnTrips.length > 1 && service.updateTrip) {
+            const retIds = createdReturnTrips.map((t) => t.id);
+            const retAssociates = createdReturnTrips.map((t) => buildAssociateEntryFromTrip(t));
+            await Promise.all(
+              createdReturnTrips.map((t) =>
+                service.updateTrip!(t.id, {
+                  multiCarTripIds: retIds,
+                  multiCarAssociates: retAssociates,
+                  multiCarDriverIds: [],
+                })
+              )
+            );
+          }
+
+          return createdReturnTrips[0] || null;
+        } catch (retErr) {
+          console.warn('[DispatchBookingEngine] Failed to create linked return trip:', retErr);
+          return null;
+        }
+      };
 
       if (isEditMode && initialTrip) {
         const editPreservation = resolveAssignedTripEditPreservation({
@@ -2523,6 +2773,41 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
             );
           }
 
+          let updatedCar1: Trip = {
+            ...car1Updated,
+            multiCarTripIds: allTripIds,
+            multiCarAssociates: associates,
+            multiCarDriverIds: driverIds,
+          };
+
+          if (
+            !hasTripLinkedCounterpart(initialTrip, allTrips) &&
+            returnTrip &&
+            autoCreateReturnTrip &&
+            returnDate &&
+            returnTime
+          ) {
+            const createdRet = await createAndLinkReturnTrips(
+              convoyTrips.map((t) => ({
+                ...t,
+                multiCarTripIds: allTripIds,
+                multiCarAssociates: associates,
+                multiCarDriverIds: driverIds,
+              }))
+            );
+            if (createdRet?.id) {
+              updatedCar1 = {
+                ...updatedCar1,
+                linkedReturnTripId: createdRet.id,
+                metadata: {
+                  ...updatedCar1.metadata,
+                  hasReturnTrip: true,
+                  linkedReturnTripId: createdRet.id,
+                },
+              };
+            }
+          }
+
           if (driverExplicitlyChangedByUserRef) {
             driverExplicitlyChangedByUserRef.current = false;
           }
@@ -2530,15 +2815,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
             localStorage.removeItem(draftStorageKey);
           } catch {}
 
-          onBookingSuccess?.(
-            {
-              ...car1Updated,
-              multiCarTripIds: allTripIds,
-              multiCarAssociates: associates,
-              multiCarDriverIds: driverIds,
-            },
-            true
-          );
+          onBookingSuccess?.(updatedCar1, true);
           return;
         }
 
@@ -2689,6 +2966,29 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           ? await service.updateTrip(initialTrip.id, updates)
           : ({ ...initialTrip, ...updates } as Trip);
 
+        let finalUpdatedTrip = updatedTrip;
+        if (
+          !hasTripLinkedCounterpart(initialTrip, allTrips) &&
+          !isCancelled &&
+          returnTrip &&
+          autoCreateReturnTrip &&
+          returnDate &&
+          returnTime
+        ) {
+          const createdRet = await createAndLinkReturnTrips([updatedTrip]);
+          if (createdRet?.id) {
+            finalUpdatedTrip = {
+              ...updatedTrip,
+              linkedReturnTripId: createdRet.id,
+              metadata: {
+                ...updatedTrip.metadata,
+                hasReturnTrip: true,
+                linkedReturnTripId: createdRet.id,
+              },
+            };
+          }
+        }
+
         if (driverExplicitlyChangedByUserRef) {
           driverExplicitlyChangedByUserRef.current = false;
         }
@@ -2696,7 +2996,7 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
           localStorage.removeItem(draftStorageKey);
         } catch {}
 
-        onBookingSuccess?.(updatedTrip, true);
+        onBookingSuccess?.(finalUpdatedTrip, true);
       } else {
         const isMultiVehicle = selectedVehicles.length > 1;
         const carCount = Math.max(1, selectedVehicles.length);
@@ -2733,6 +3033,15 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
         const bagAlloc = isMultiVehicle
           ? distributeAcrossCars(bags, carCount, bagCaps, 0)
           : [bags];
+
+        const sourceOutboundTrip = linkedOutboundTripId
+          ? allTrips?.find((t) => t.id === linkedOutboundTripId)
+          : undefined;
+        const shouldLinkToSourceOutbound = Boolean(
+          linkedOutboundTripId &&
+            sourceOutboundTrip &&
+            !hasTripLinkedCounterpart(sourceOutboundTrip, allTrips)
+        );
 
         const createdOutboundTrips: Trip[] = [];
 
@@ -2827,8 +3136,21 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
                     multiCarOrderTotalFare: finalFare,
                   }
                 : {}),
+              ...(shouldLinkToSourceOutbound
+                ? {
+                    linkedTripId: linkedOutboundTripId,
+                    isReturnRide: true,
+                    hasReturnTrip: false,
+                  }
+                : {}),
               createdByRole: 'dispatcher',
             },
+            ...(shouldLinkToSourceOutbound
+              ? {
+                  linkedTripId: linkedOutboundTripId,
+                  isReturnRide: true,
+                }
+              : {}),
           };
 
           let createdCar = await service.createBooking(carPayload);
@@ -2925,237 +3247,37 @@ export function useDispatchBookingSubmission(params: UseDispatchBookingSubmissio
 
         const createdTrip = createdOutboundTrips[0];
 
-        let createdReturnTripForEmail: Trip | null = null;
-        if (returnTrip && autoCreateReturnTrip && returnDate && returnTime) {
+        if (
+          shouldLinkToSourceOutbound &&
+          sourceOutboundTrip &&
+          !hasTripLinkedCounterpart(sourceOutboundTrip, allTrips) &&
+          createdTrip?.id &&
+          service.updateTrip
+        ) {
           try {
-            const retPickupAddr = returnPickupAddress.trim() || dropoffAddress;
-            const retDropoffAddr = returnDropoffAddress.trim() || pickupAddress;
-            const returnScheduledTimeIso = new Date(
-              `${returnDate}T${returnTime}:00`
-            ).toISOString();
-
-            const returnSpecialRequests = formatCarSeatSummaryLabel(returnCarSeats, {
-              rearFacing: returnRearFacing,
-              frontFacing: returnFrontFacing,
-              booster: returnBooster,
+            const returnPickupIso = createdTrip.scheduledPickupTime || scheduledPickupTime;
+            await service.updateTrip(sourceOutboundTrip.id, {
+              linkedReturnTripId: createdTrip.id,
+              returnScheduledPickupTime: returnPickupIso,
+              metadata: {
+                ...sourceOutboundTrip.metadata,
+                hasReturnTrip: true,
+                linkedReturnTripId: createdTrip.id,
+                returnScheduledPickupTime: returnPickupIso,
+              },
             });
-
-            const isReturnMultiCar = returnVehicles.length > 1;
-            const retCarCount = Math.max(1, returnVehicles.length);
-            const returnGroupId = isReturnMultiCar ? generateMultiCarGroupId() : undefined;
-
-            const returnCarSpecs = isReturnMultiCar
-              ? buildPerVehiclePricingSpecs({
-                  selectedVehicles: returnVehicles,
-                  resolveTier: (c) => resolveVehicleEngineId(c, activeAdminVehicleIds),
-                  resolveDisplayName: resolveDisplayNameForChoice,
-                  vehicleQuotes: returnVehicleQuotes,
-                  primaryPricing: returnPricing,
-                  distanceMiles: returnEstimatedDistanceMiles || estimatedDistanceMiles,
-                  durationMinutes: returnEstimatedDurationMinutes || estimatedDurationMinutes,
-                  combinedTargetFare: returnLegFare,
-                  isFareOverridden: Boolean(isFareOverridden && manualFare),
-                })
-              : (() => {
-                  const returnPrimaryVehicle = returnVehicles[0] || 'any';
-                  const returnTier = resolveVehicleEngineId(
-                    returnPrimaryVehicle,
-                    activeAdminVehicleIds
-                  );
-                  return [
-                    {
-                      carIndex: 1,
-                      vehicleChoice: returnPrimaryVehicle,
-                      vehicleTier: String(returnTier),
-                      vehicleDisplayName: resolveDisplayNameForChoice(
-                        returnPrimaryVehicle,
-                        String(returnTier)
-                      ),
-                      pricing: buildPersistedPricing(
-                        returnPricing,
-                        returnLegFare,
-                        returnEstimatedDistanceMiles || estimatedDistanceMiles,
-                        returnEstimatedDurationMinutes || estimatedDurationMinutes,
-                        Boolean(isFareOverridden && manualFare)
-                      ),
-                      fare: returnLegFare,
-                    },
-                  ];
-                })();
-
-            const retPaxCaps = returnVehicles.map(
-              (v) => vehicleCapacities[v]?.maxPassengers || 4
+          } catch (linkErr) {
+            console.warn(
+              '[DispatchBookingEngine] Failed to link return booking to outbound trip:',
+              linkErr
             );
-            const retBagCaps = returnVehicles.map((v) => vehicleCapacities[v]?.maxBags || 3);
-            const retPaxAlloc = isReturnMultiCar
-              ? distributeAcrossCars(returnPassengers, retCarCount, retPaxCaps, 1)
-              : [returnPassengers];
-            const retBagAlloc = isReturnMultiCar
-              ? distributeAcrossCars(returnBags, retCarCount, retBagCaps, 0)
-              : [returnBags];
-
-            const createdReturnTrips: Trip[] = [];
-
-            for (let rIdx = 0; rIdx < returnCarSpecs.length; rIdx++) {
-              const rSpec = returnCarSpecs[rIdx];
-              const pairedOutbound = createdOutboundTrips[rIdx] || createdTrip;
-              const returnPayload: CreateTripInput = {
-                status: 'CONFIRMED',
-                bookingType: 'scheduled',
-                scheduledPickupTime: returnScheduledTimeIso,
-                pickupLocation: {
-                  address: retPickupAddr,
-                  coordinates: returnPickupCoordinates || dropoffCoordinates,
-                  placeId: returnPickupPlaceId || dropoffPlaceId,
-                },
-                dropoffLocation: {
-                  address: retDropoffAddr,
-                  coordinates: returnDropoffCoordinates || pickupCoordinates,
-                  placeId: returnDropoffPlaceId || pickupPlaceId,
-                },
-                intermediateStops:
-                  returnIntermediateStops.length > 0
-                    ? returnIntermediateStops.map((s) => ({
-                        address: s.address,
-                        coordinates: s.coordinates,
-                        placeId: s.placeId,
-                      }))
-                    : undefined,
-                passenger: {
-                  firstName,
-                  lastName,
-                  phone,
-                  email: effectivePassengerEmail,
-                  passengerCount: retPaxAlloc[rIdx],
-                  luggageCount: retBagAlloc[rIdx],
-                  specialRequests: rIdx === 0 ? returnSpecialRequests : undefined,
-                },
-                ...packagePayloadFields,
-                vehicleTier: rSpec.vehicleTier as VehicleTier,
-                driverNotes: notesForAll,
-                flightNotes: returnLegFlightNotes || undefined,
-                ...(validDispReturnTelemetry ? { flightTelemetry: validDispReturnTelemetry } : {}),
-                pricing: rSpec.pricing,
-                payment: {
-                  method,
-                  status: 'pending',
-                  amount: rSpec.fare,
-                  corporateAccountId: matchedCorporateAccount?.id,
-                  ...(paymentMethod === 'card'
-                    ? {
-                        vaultedCardId: effectiveVaultedPmId,
-                        cardBrand: effectiveCardBrand,
-                        cardLast4: effectiveCardLast4,
-                      }
-                    : {}),
-                },
-                ...(isReturnMultiCar
-                  ? {
-                      multipleVehiclesRequested: true,
-                      vehicleCount: retCarCount,
-                      multiCarGroupId: returnGroupId,
-                      multiCarIndex: rIdx + 1,
-                      multiCarTotal: retCarCount,
-                    }
-                  : {}),
-                metadata: {
-                  ...metadataPayload,
-                  vehicleTypeId: rSpec.vehicleChoice === 'any' ? 'any' : rSpec.vehicleTier,
-                  vehicleDisplayName: rSpec.vehicleDisplayName,
-                  selectedVehicles: [rSpec.vehicleChoice],
-                  carryOnBags: returnCarryOnBags,
-                  checkedBags: returnCheckedBags,
-                  oversizedBagsCount: returnHasOversizedLuggage ? returnTotalOversizedCount : 0,
-                  oversizedBags: returnOversizedBagsPayload,
-                  hasOversizedLuggage:
-                    returnHasOversizedLuggage &&
-                    (returnTotalOversizedCount > 0 ||
-                      Boolean(returnOversizedLuggageNotes.trim())),
-                  oversizedLuggageNotes:
-                    returnHasOversizedLuggage && returnOversizedLuggageNotes.trim()
-                      ? returnOversizedLuggageNotes.trim()
-                      : undefined,
-                  oversizedItemsSummary: returnOversizedItemsSummary,
-                  carSeatsBreakdown: {
-                    rearFacing: returnRearFacing,
-                    frontFacing: returnFrontFacing,
-                    booster: returnBooster,
-                  },
-                  linkedTripId: pairedOutbound.id,
-                  isReturnRide: true,
-                  hasReturnTrip: false,
-                  createdByRole: 'dispatcher',
-                  ...(isReturnMultiCar
-                    ? {
-                        multiCarGroupId: returnGroupId,
-                        multiCarIndex: rIdx + 1,
-                        multiCarTotal: retCarCount,
-                        multiCarTotalPassengers: returnPassengers,
-                        multiCarTotalBags: returnBags,
-                        multiCarOrderTotalFare: returnLegFare,
-                      }
-                    : {}),
-                  flightNotes: returnLegFlightNotes || undefined,
-                  provideFlightInfo: Boolean(returnProvideFlightInfo),
-                  flightDetails: returnProvideFlightInfo
-                    ? {
-                        airlineName: returnAirline || undefined,
-                        flightNumber: returnFlightNumber || undefined,
-                        departureAirport: returnFlightOrigin || undefined,
-                        tailNumber: returnTailNumber || undefined,
-                        fboFacility: returnFboFacility || undefined,
-                        hasCheckedLuggage: returnHasCheckedLuggage,
-                      }
-                    : undefined,
-                  airline: returnProvideFlightInfo ? returnAirline : undefined,
-                  airlineName: returnProvideFlightInfo ? returnAirline : undefined,
-                  flightNumber: returnProvideFlightInfo ? returnFlightNumber : undefined,
-                  flightOrigin: returnProvideFlightInfo ? returnFlightOrigin : undefined,
-                  departureAirport: returnProvideFlightInfo ? returnFlightOrigin : undefined,
-                  tailNumber: returnProvideFlightInfo ? returnTailNumber : undefined,
-                  fboFacility: returnProvideFlightInfo ? returnFboFacility : undefined,
-                  isPrivateAviation: Boolean(returnAirportDetection.isPrivateAviation),
-                  hasCheckedLuggage: returnProvideFlightInfo ? returnHasCheckedLuggage : false,
-                  isAirportTrip: Boolean(returnAirportDetection.isAirportTrip),
-                  airportIataCode: returnAirportDetection.airport?.iataCode,
-                },
-              };
-              const createdRet = await service.createBooking(returnPayload);
-              createdReturnTrips.push(createdRet);
-
-              if (service.updateTrip && createdRet?.id && pairedOutbound?.id) {
-                await service.updateTrip(pairedOutbound.id, {
-                  linkedReturnTripId: createdRet.id,
-                  returnScheduledPickupTime: returnScheduledTimeIso,
-                  metadata: {
-                    ...pairedOutbound.metadata,
-                    hasReturnTrip: true,
-                    linkedReturnTripId: createdRet.id,
-                    returnScheduledPickupTime: returnScheduledTimeIso,
-                  },
-                });
-              }
-            }
-
-            if (isReturnMultiCar && createdReturnTrips.length > 1 && service.updateTrip) {
-              const retIds = createdReturnTrips.map((t) => t.id);
-              const retAssociates = createdReturnTrips.map((t) => buildAssociateEntryFromTrip(t));
-              await Promise.all(
-                createdReturnTrips.map((t) =>
-                  service.updateTrip!(t.id, {
-                    multiCarTripIds: retIds,
-                    multiCarAssociates: retAssociates,
-                    multiCarDriverIds: [],
-                  })
-                )
-              );
-            }
-
-            createdReturnTripForEmail = createdReturnTrips[0] || null;
-          } catch (retErr) {
-            console.warn('[DispatchBookingEngine] Failed to create linked return trip:', retErr);
           }
         }
+
+        const createdReturnTripForEmail =
+          returnTrip && autoCreateReturnTrip && returnDate && returnTime
+            ? await createAndLinkReturnTrips(createdOutboundTrips)
+            : null;
 
         if (repeat && scheduledDate && scheduledTime) {
           const effectiveRecurringSkipDates = standingOrdersConfig.defaultSkipHolidays

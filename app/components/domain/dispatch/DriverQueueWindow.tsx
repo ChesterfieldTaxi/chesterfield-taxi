@@ -24,6 +24,7 @@ import {
   TripActionDropdown,
   type DispatchUniversalTripActions,
 } from './TripActionDropdown';
+import { hasTripLinkedCounterpart } from './client-profile-workflows.util';
 import type { DriverRosterItem } from '../../../core/services/operator.service';
 import type { Trip, TripPassenger } from '../../../core/types/trip';
 import { formatPhoneDisplay } from '../../../core/utils/phone.util';
@@ -554,6 +555,12 @@ export function DriverQueueWindow({
                     onFare={() => tripActions.onFare(activeItem.trip)}
                     onAudit={() => tripActions.onReview(activeItem.trip, 'audit')}
                     onClone={() => tripActions.onClone(activeItem.trip)}
+                    isLinkedTrip={hasTripLinkedCounterpart(activeItem.trip, trips)}
+                    onCreateReturnBooking={
+                      tripActions.onCreateReturnBooking
+                        ? () => tripActions.onCreateReturnBooking?.(activeItem.trip)
+                        : undefined
+                    }
                     onFocusMap={() => tripActions.onFocusMap(activeItem.trip)}
                     onStartAutoOffer={
                       tripActions.onStartAutoOffer
@@ -866,6 +873,12 @@ export function DriverQueueWindow({
                                 onFare={() => tripActions.onFare(item.trip)}
                                 onAudit={() => tripActions.onReview(item.trip, 'audit')}
                                 onClone={() => tripActions.onClone(item.trip)}
+                                isLinkedTrip={hasTripLinkedCounterpart(item.trip, trips)}
+                                onCreateReturnBooking={
+                                  tripActions.onCreateReturnBooking
+                                    ? () => tripActions.onCreateReturnBooking?.(item.trip)
+                                    : undefined
+                                }
                                 onFocusMap={() => tripActions.onFocusMap(item.trip)}
                                 onStartAutoOffer={
                                   tripActions.onStartAutoOffer

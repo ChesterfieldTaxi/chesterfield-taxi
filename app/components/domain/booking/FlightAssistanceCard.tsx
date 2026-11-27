@@ -226,8 +226,8 @@ export function FlightTelemetryCheckPanel({
             </span>
             <span>
               {isDropoffAirport && !isPickupAirport
-                ? `${terminalResolution.terminal} · Curbside Departures`
-                : terminalResolution.pickupDoorGuidance}
+                ? 'Curbside Departures'
+                : terminalResolution.doorLocation}
             </span>
           </div>
         )}
@@ -330,29 +330,29 @@ export function FlightTelemetryCheckPanel({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fg-secondary">
-            {activeTelemetry.terminal && (
-              <span>
-                <strong className="text-fg-primary">Terminal:</strong> {activeTelemetry.terminal}
-              </span>
-            )}
-            {activeTelemetry.gate && (
-              <span>
-                <strong className="text-fg-primary">Gate:</strong> {activeTelemetry.gate}
-              </span>
-            )}
-            {activeTelemetry.baggageClaim && (
-              <span>
-                <strong className="text-fg-primary">Baggage Belt:</strong>{' '}
-                {activeTelemetry.baggageClaim}
-              </span>
-            )}
-            {(terminalResolution?.pickupDoorGuidance || activeTelemetry.pickupDoorGuidance) && isPickupAirport && (
-              <span className="text-status-info-fg font-semibold">
-                Meet Driver: {terminalResolution?.pickupDoorGuidance || activeTelemetry.pickupDoorGuidance}
-              </span>
-            )}
-          </div>
+          {(activeTelemetry.gate ||
+            activeTelemetry.baggageClaim ||
+            (activeTelemetry.terminal && activeTelemetry.terminal !== terminalResolution?.terminal)) && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fg-secondary">
+              {activeTelemetry.terminal &&
+                activeTelemetry.terminal !== terminalResolution?.terminal && (
+                  <span>
+                    <strong className="text-fg-primary">Terminal:</strong> {activeTelemetry.terminal}
+                  </span>
+                )}
+              {activeTelemetry.gate && (
+                <span>
+                  <strong className="text-fg-primary">Gate:</strong> {activeTelemetry.gate}
+                </span>
+              )}
+              {activeTelemetry.baggageClaim && (
+                <span>
+                  <strong className="text-fg-primary">Baggage Belt:</strong>{' '}
+                  {activeTelemetry.baggageClaim}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -545,8 +545,10 @@ export function FlightAssistanceCard({
           <div className="sm:col-span-7 text-[11px] text-fg-secondary leading-snug">
             {dropoffTermInfo ? (
               <span>
-                <span className="font-bold text-fg-strong">{dropoffTermInfo.terminal || 'Terminal'}: </span>
-                {dropoffTermInfo.pickupDoorGuidance}
+                <span className="font-bold text-fg-strong">
+                  {dropoffTermInfo.shortTerminal || dropoffTermInfo.terminal || 'Terminal'}:{' '}
+                </span>
+                {dropoffTermInfo.doorLocation}
               </span>
             ) : (
               <span>

@@ -6,7 +6,7 @@ import type { Trip } from '../../../core/types/trip';
 import { LocationAutocomplete, type PlaceSelectedDetails } from '../LocationAutocomplete';
 import { MapPinIcon, XIcon } from '../../ui/Icons';
 import { Select } from '../../ui/Select';
-import type { ClientQuickPlaceItem } from './client-profile-workflows.util';
+import { hasTripLinkedCounterpart, type ClientQuickPlaceItem } from './client-profile-workflows.util';
 import { DispatchStatusBadge } from './queue/DispatchStatusBadge';
 
 export const SAVE_PLACE_CATEGORY_OPTIONS = [
@@ -36,20 +36,24 @@ function resolveDriverBadgeLabel(trip: Trip, drivers?: DriverRosterItem[]): stri
 
 export interface ClientUpcomingRidesStripProps {
   trips: ReadonlyArray<Trip>;
+  allTrips?: ReadonlyArray<Trip>;
   nowMs?: number;
   drivers?: DriverRosterItem[];
   onOpenTripDetails?: (trip: Trip) => void;
   onEditTrip?: (trip: Trip) => void;
   onFocusTripOnMap?: (trip: Trip) => void;
+  onBookReturn?: (trip: Trip) => void;
 }
 
 export function ClientUpcomingRidesStrip({
   trips,
+  allTrips,
   nowMs,
   drivers,
   onOpenTripDetails,
   onEditTrip,
   onFocusTripOnMap,
+  onBookReturn,
 }: ClientUpcomingRidesStripProps) {
   if (trips.length === 0) return null;
   return (
@@ -90,6 +94,16 @@ export function ClientUpcomingRidesStrip({
                 </div>
               </div>
               <div className="shrink-0 flex items-center gap-1">
+                {onBookReturn && !hasTripLinkedCounterpart(trip, allTrips || trips) && (
+                  <button
+                    type="button"
+                    onClick={() => onBookReturn(trip)}
+                    className="px-2 py-1 rounded-md bg-surface-card hover:bg-status-info-bg text-status-info-fg font-bold text-[10.5px] border border-status-info-border cursor-pointer active:scale-95"
+                    title="Create a linked return booking with the route reversed"
+                  >
+                    ⇄ Return
+                  </button>
+                )}
                 {onEditTrip && (
                   <button
                     type="button"

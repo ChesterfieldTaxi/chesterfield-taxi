@@ -106,6 +106,7 @@ export interface DispatchTripQueuePaneProps {
   onOpenReviewModal: (trip: Trip, initialTab?: 'details' | 'audit') => void;
   onOpenDriverModal: (trip: Trip) => void;
   onCloneBookingFromQueue: (trip: Trip) => void;
+  onCreateReturnBookingFromQueue?: (trip: Trip) => void;
   onOpenCompleteTripModal: (trip: Trip) => void;
   onPromptCancelTrip: (trip: Trip) => void;
   onReactivateTrip: (trip: Trip) => void;
@@ -195,6 +196,7 @@ export function DispatchTripQueuePane({
   onOpenReviewModal,
   onOpenDriverModal,
   onCloneBookingFromQueue,
+  onCreateReturnBookingFromQueue,
   onOpenCompleteTripModal,
   onPromptCancelTrip,
   onReactivateTrip,
@@ -344,6 +346,7 @@ export function DispatchTripQueuePane({
           queueWidthPx={queueWidthPx}
           settings={settings}
           drivers={drivers}
+          allTrips={trips}
           filteredTrips={visibleFilteredTrips}
           selectedTripIds={selectedTripIds}
           selectedQueueTripId={selectedQueueTripId}
@@ -361,6 +364,7 @@ export function DispatchTripQueuePane({
           onOpenReviewModal={onOpenReviewModal}
           onOpenDriverModal={onOpenDriverModal}
           onCloneBookingFromQueue={onCloneBookingFromQueue}
+          onCreateReturnBookingFromQueue={onCreateReturnBookingFromQueue}
           onOpenCompleteTripModal={onOpenCompleteTripModal}
           onPromptCancelTrip={onPromptCancelTrip}
           onReactivateTrip={onReactivateTrip}
@@ -376,6 +380,7 @@ export function DispatchTripQueuePane({
           isDesktop={isDesktop}
           drivers={drivers}
           dispatchAutomation={settings.dispatchAutomation}
+          allTrips={trips}
           filteredTrips={visibleFilteredTrips}
           selectedTripIds={selectedTripIds}
           selectedQueueTripId={selectedQueueTripId}
@@ -390,6 +395,7 @@ export function DispatchTripQueuePane({
           onOpenReviewModal={onOpenReviewModal}
           onOpenDriverModal={onOpenDriverModal}
           onCloneBookingFromQueue={onCloneBookingFromQueue}
+          onCreateReturnBookingFromQueue={onCreateReturnBookingFromQueue}
           onOpenCompleteTripModal={onOpenCompleteTripModal}
           onPromptCancelTrip={onPromptCancelTrip}
           onReactivateTrip={onReactivateTrip}
@@ -405,6 +411,7 @@ export function DispatchTripQueuePane({
           isDesktop={isDesktop}
           settings={settings}
           drivers={drivers}
+          allTrips={trips}
           filteredTrips={visibleFilteredTrips}
           selectedTripIds={selectedTripIds}
           allFilteredSelected={allFilteredSelected}
@@ -422,6 +429,7 @@ export function DispatchTripQueuePane({
           onOpenReviewModal={onOpenReviewModal}
           onOpenDriverModal={onOpenDriverModal}
           onCloneBookingFromQueue={onCloneBookingFromQueue}
+          onCreateReturnBookingFromQueue={onCreateReturnBookingFromQueue}
           onOpenCompleteTripModal={onOpenCompleteTripModal}
           onPromptCancelTrip={onPromptCancelTrip}
           onReactivateTrip={onReactivateTrip}

@@ -32,6 +32,7 @@ import {
   TripActionDropdown,
   type DispatchUniversalTripActions,
 } from './TripActionDropdown';
+import { hasTripLinkedCounterpart } from './client-profile-workflows.util';
 import {
   DispatchCompleteTripModal,
   DispatchDriverFareModal,
@@ -314,6 +315,16 @@ export function DispatchTripDetailsDrawer({
                       onReviewTripChange(null);
                       onCloneBookingFromReview(target);
                     }}
+                    isLinkedTrip={hasTripLinkedCounterpart(reviewTrip, trips)}
+                    onCreateReturnBooking={
+                      tripActions?.onCreateReturnBooking
+                        ? () => {
+                            const target = reviewTrip;
+                            onReviewTripChange(null);
+                            tripActions.onCreateReturnBooking?.(target);
+                          }
+                        : undefined
+                    }
                     onFocusMap={() => tripActions?.onFocusMap(reviewTrip)}
                     onStartAutoOffer={
                       onStartAutoOffer ? () => void onStartAutoOffer(reviewTrip) : undefined

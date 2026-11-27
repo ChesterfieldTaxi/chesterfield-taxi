@@ -19,6 +19,7 @@ import {
   getTripIntermediateStopCount,
 } from '../../../../core/utils/route-markers.util';
 import { TripActionDropdown } from '../TripActionDropdown';
+import { hasTripLinkedCounterpart } from '../client-profile-workflows.util';
 import {
   DispatchCascadePill,
   DispatchFlightTelemetryPill,
@@ -34,6 +35,7 @@ export interface TripQueueCompactListProps {
   isDesktop: boolean;
   drivers: LiveFleetDriver[];
   dispatchAutomation?: DispatchAutomationConfig;
+  allTrips?: ReadonlyArray<Trip>;
   filteredTrips: Trip[];
   selectedTripIds: string[];
   selectedQueueTripId: string | null;
@@ -48,6 +50,7 @@ export interface TripQueueCompactListProps {
   onOpenReviewModal: (trip: Trip, initialTab?: 'details' | 'audit') => void;
   onOpenDriverModal: (trip: Trip) => void;
   onCloneBookingFromQueue: (trip: Trip) => void;
+  onCreateReturnBookingFromQueue?: (trip: Trip) => void;
   onOpenCompleteTripModal: (trip: Trip) => void;
   onPromptCancelTrip: (trip: Trip) => void;
   onReactivateTrip: (trip: Trip) => void;
@@ -63,6 +66,7 @@ export function TripQueueCompactList({
   isDesktop,
   drivers,
   dispatchAutomation,
+  allTrips,
   filteredTrips,
   selectedTripIds,
   selectedQueueTripId,
@@ -77,6 +81,7 @@ export function TripQueueCompactList({
   onOpenReviewModal,
   onOpenDriverModal,
   onCloneBookingFromQueue,
+  onCreateReturnBookingFromQueue,
   onOpenCompleteTripModal,
   onPromptCancelTrip,
   onReactivateTrip,
@@ -308,6 +313,12 @@ export function TripQueueCompactList({
                   onFare={() => onOpenDriverModal(trip)}
                   onAudit={() => onOpenReviewModal(trip, 'audit')}
                   onClone={() => onCloneBookingFromQueue(trip)}
+                  isLinkedTrip={hasTripLinkedCounterpart(trip, allTrips || filteredTrips)}
+                  onCreateReturnBooking={
+                    onCreateReturnBookingFromQueue
+                      ? () => onCreateReturnBookingFromQueue(trip)
+                      : undefined
+                  }
                   onFocusMap={() => onFocusTripOnMapFromQueue(trip)}
                   onStartAutoOffer={() => onStartAutoOffer(trip)}
                   onCancelAutoOffer={() => onCancelAutoOffer(trip)}

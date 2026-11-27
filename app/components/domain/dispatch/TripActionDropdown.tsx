@@ -25,12 +25,14 @@ import {
   hasStagedDriver,
   isTripEligibleForStaging,
 } from '../../../core/services/dispatch/staged-driver-planner.service';
+import { hasTripLinkedCounterpart } from './client-profile-workflows.util';
 
 export interface DispatchUniversalTripActions {
   onReview: (trip: Trip, initialTab?: 'details' | 'audit') => void;
   onEdit: (trip: Trip) => void;
   onFare: (trip: Trip) => void;
   onClone: (trip: Trip) => void;
+  onCreateReturnBooking?: (trip: Trip) => void;
   onFocusMap: (trip: Trip) => void;
   onStartAutoOffer?: (trip: Trip) => void | Promise<void>;
   onCancelAutoOffer?: (trip: Trip) => void | Promise<void>;
@@ -53,6 +55,8 @@ export interface TripActionDropdownProps {
   onFare: () => void;
   onAudit: () => void;
   onClone: () => void;
+  onCreateReturnBooking?: () => void;
+  isLinkedTrip?: boolean;
   onFocusMap: () => void;
   onStartAutoOffer?: () => void;
   onCancelAutoOffer?: () => void;
@@ -82,6 +86,8 @@ export function TripActionDropdown({
   onFare,
   onAudit,
   onClone,
+  onCreateReturnBooking,
+  isLinkedTrip,
   onFocusMap,
   onStartAutoOffer,
   onCancelAutoOffer,
@@ -209,6 +215,7 @@ export function TripActionDropdown({
   const normStatus = String(trip.status || '').toLowerCase();
   const isCompleted = normStatus === 'completed';
   const isCancelled = normStatus === 'cancelled' || normStatus === 'declined';
+  const effectiveIsLinkedTrip = isLinkedTrip ?? hasTripLinkedCounterpart(trip);
   const shouldShowEdit = !hideEdit && (!isDesktop || showEditOnDesktop);
   const shouldShowFocusMap = !isDesktop || showFocusMapOnDesktop;
 
@@ -425,6 +432,21 @@ export function TripActionDropdown({
               <PlusIcon className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
               <span>Copy Booking</span>
             </button>
+
+            {onCreateReturnBooking && !isCancelled && !effectiveIsLinkedTrip && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleClose();
+                  onCreateReturnBooking();
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg transition-colors cursor-pointer"
+                title="Open a linked return booking with the route reversed"
+              >
+                <RefreshCwIcon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span>Create Return Booking</span>
+              </button>
+            )}
           </div>
 
           <div className="py-1">
