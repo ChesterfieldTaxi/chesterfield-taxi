@@ -74,11 +74,10 @@ export function TripQueueOverflowMenu({
     showColumnsInMenu &&
     (effectiveDisplayLayout === 'table' || displayLayout === 'table' || displayLayout === 'auto');
 
-  const hasAutoStageReady = Boolean(stagedPlanner && stagedPlanner.openScheduledUnstagedCount > 0);
   const hasAutoDispatchReady = Boolean(readyAutoDispatchCount > 0 && onRunAutoDispatchSweep);
   const hasAssignModeToggle = Boolean(stagedPlanner && effectiveDisplayLayout !== 'table');
   const hasDispatchSection =
-    showAssignmentInMenu && (hasAssignModeToggle || hasAutoStageReady || hasAutoDispatchReady);
+    showAssignmentInMenu && (hasAssignModeToggle || hasAutoDispatchReady);
 
   const estimatedMenuHeight =
     112 +
@@ -104,7 +103,7 @@ export function TripQueueOverflowMenu({
   const showFilterBadgeOnTrigger = showFiltersInMenu && activeFilterKeys.length > 0;
   const hasActiveState =
     showFilterBadgeOnTrigger ||
-    (showAssignmentInMenu && (hasAutoDispatchReady || hasAutoStageReady)) ||
+    (showAssignmentInMenu && hasAutoDispatchReady) ||
     (showColumnsSection && !isDefaultColumns);
 
   const handleTriggerClick = (e: React.MouseEvent) => {
@@ -149,7 +148,7 @@ export function TripQueueOverflowMenu({
             ? 'bg-status-info-bg border-blue-400 text-status-info-fg ring-2 ring-blue-500/20'
             : showFilterBadgeOnTrigger
             ? 'bg-status-info-bg/80 border-blue-400 text-status-info-fg hover:bg-status-info-bg'
-            : showAssignmentInMenu && (hasAutoDispatchReady || hasAutoStageReady)
+            : showAssignmentInMenu && hasAutoDispatchReady
             ? 'bg-status-staged-bg/90 border-status-staged-border text-status-staged-fg hover:bg-status-staged-bg-strong/70'
             : 'bg-surface-card border-border-strong hover:bg-surface-subtle text-fg-secondary'
         }`}
@@ -363,22 +362,6 @@ export function TripQueueOverflowMenu({
                           </button>
                         </div>
                       </div>
-                    )}
-
-                    {hasAutoStageReady && stagedPlanner && (
-                      <button
-                        type="button"
-                        disabled={stagedPlanner.isAutoStaging}
-                        onClick={() => {
-                          closeMenu();
-                          stagedPlanner.openAutoStagePreview();
-                        }}
-                        className="w-full h-7 px-2.5 rounded-lg border border-dashed border-indigo-400 bg-status-staged-bg/90 hover:bg-status-staged-bg-strong text-status-staged-fg text-[11px] font-extrabold tracking-tight flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
-                      >
-                        {stagedPlanner.isAutoStaging
-                          ? '📌 Staging...'
-                          : `📌 Auto-Stage Open (${stagedPlanner.openScheduledUnstagedCount})`}
-                      </button>
                     )}
 
                     {hasAutoDispatchReady && onRunAutoDispatchSweep && (

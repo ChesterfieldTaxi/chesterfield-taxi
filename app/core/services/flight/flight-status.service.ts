@@ -100,6 +100,45 @@ export interface TripFlightBadgeDescriptor {
   isSimulatedFallback: boolean;
 }
 
+export type DriverFlightTrackerTone = 'emerald' | 'amber' | 'rose' | 'blue' | 'slate';
+
+export interface DriverFlightTrackerModel {
+  hasCommercialFlight: boolean;
+  isPrivateAviation: boolean;
+  airlineName: string;
+  flightIdent: string;
+  /** Header display such as "Southwest Airlines · WN1425" or "WN1425" */
+  headerLabel: string;
+  /** Compact flight code such as "WN1425" or "SW #1425" */
+  compactIdent: string;
+  originIata: string;
+  originCity?: string;
+  destinationIata: string;
+  /** Route summary e.g. "SLC → STL" or "→ STL" */
+  routeLabel: string;
+  statusLabel: string;
+  tone: DriverFlightTrackerTone;
+  delayMinutes: number;
+  isDelayed: boolean;
+  isCancelledOrDiverted: boolean;
+  hasTelemetryTimes: boolean;
+  scheduledDepartureTime?: string;
+  updatedDepartureTime?: string;
+  departureChanged: boolean;
+  scheduledArrivalTime?: string;
+  updatedArrivalTime?: string;
+  arrivalChanged: boolean;
+  arrivalTerminal?: string;
+  /** Short terminal badge for compact view e.g. "T1" or "T2" */
+  compactTerminal?: string;
+  gate?: string;
+  baggageClaim?: string;
+  hasCheckedLuggage: boolean;
+  curbsideGuidance?: string;
+  remainingFlightNotes?: string;
+  externalFlightUrl?: string;
+}
+
 /**
  * Formats a Date or ISO timestamp into local `YYYY-MM-DD` for flight serviceDate queries.
  */
@@ -363,6 +402,208 @@ export function resolveTripFlightBadge(
     pickupDoorGuidance: effectivePickupDoorGuidance,
     delayMinutes: delay,
     isSimulatedFallback: false,
+  };
+}
+
+function formatFlightClockTime(iso?: string): string | undefined {
+  if (!iso) return undefined;
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return undefined;
+  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function stripRedundantFlightNotes(
+  rawNotes: string | undefined,
+  hasStructuredFlight: boolean
+): string | undefined {
+  const trimmed = (rawNotes || '').trim();
+  if (!trimmed) return undefined;
+  if (!hasStructuredFlight) return trimmed;
+
+  const withoutBracketed = trimmed
+    .replace(/\[\s*Flight\s*:[^\]]*\]/gi, '')
+    .replace(/(?:^|\n)\s*Flight\s*:[^\n]*/gi, '')
+    .replace(/^[\s·|\-–,;]+|[\s·|\-–,;]+$/g, '')
+    .trim();
+
+  return withoutBracketed || undefined;
+}
+
+function stripTerminalPrefix(guidance: string | undefined, terminal: string | undefined): string | undefined {
+  const trimmed = (guidance || '').trim();
+  if (!trimmed) return undefined;
+  if (!terminal) return trimmed;
+
+  const escaped = terminal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const stripped = trimmed
+    .replace(new RegExp(`^${escaped}\\s*(?:·|-|–|:|\\|)?\\s*`, 'i'), '')
+    .trim();
+
+  return stripped || trimmed;
+}
+
+/**
+ * Pure presenter helper producing the structured view-model for `DriverTripManifest`
+ * commercial flight tracking (Full and Compact modes) per Phase 110 & constitution.md.
+ */
+export function resolveDriverFlightTrackerModel(trip: Trip): DriverFlightTrackerModel {
+  const creds = extractTripFlightCredentials(trip);
+  const telemetry = trip.flightTelemetry;
+  const meta = (trip.metadata || {}) as Record<string, any>;
+
+  const rawNotes = typeof trip.flightNotes === 'string' ? trip.flightNotes.trim() : '';
+  const hasStructuredFlight = Boolean(
+    telemetry || creds.flightIdent || creds.airline || creds.flightNumber || creds.originIata
+  );
+
+  if (creds.isPrivateAviation || (!hasStructuredFlight && !rawNotes)) {
+    return {
+      hasCommercialFlight: false,
+      isPrivateAviation: creds.isPrivateAviation,
+      airlineName: '',
+      flightIdent: '',
+      headerLabel: '',
+      compactIdent: '',
+      originIata: '',
+      destinationIata: creds.airportCode || 'STL',
+      routeLabel: '',
+      statusLabel: 'Scheduled',
+      tone: 'slate',
+      delayMinutes: 0,
+      isDelayed: false,
+      isCancelledOrDiverted: false,
+      hasTelemetryTimes: false,
+      departureChanged: false,
+      arrivalChanged: false,
+      hasCheckedLuggage: creds.hasCheckedLuggage,
+    };
+  }
+
+  const destinationIata =
+    extractAirportIataCode(
+      telemetry?.destinationIata ||
+        (typeof meta.airportIataCode === 'string' ? meta.airportIataCode : '') ||
+        creds.airportCode ||
+        'STL'
+    ) || 'STL';
+
+  const originIata = (telemetry?.originIata || creds.originIata || '').trim().toUpperCase();
+  const originCity = telemetry?.originCity?.trim() || undefined;
+  const airlineName =
+    telemetry?.airlineName?.trim() ||
+    (typeof meta.airlineName === 'string' && meta.airlineName.trim()) ||
+    creds.airline ||
+    '';
+  const flightIdent = telemetry?.flightIdent || creds.flightIdent || (creds.flightNumber ? `#${creds.flightNumber}` : '');
+  const compactIdent = flightIdent || [creds.airline, creds.flightNumber].filter(Boolean).join(' ').trim();
+  const headerLabel =
+    airlineName && flightIdent && airlineName.toUpperCase() !== flightIdent.toUpperCase()
+      ? `${airlineName} · ${flightIdent}`
+      : flightIdent || airlineName || 'Commercial Flight';
+
+  const termInfo = resolveStlTerminalInfo(
+    telemetry?.airlineCode || creds.airline,
+    destinationIata,
+    getAdminConfigService().getCachedSettings().customerBookingConfig
+  );
+  const arrivalTerminal = telemetry?.terminal || termInfo.terminal;
+  const compactTerminal =
+    arrivalTerminal === 'Terminal 2'
+      ? 'T2'
+      : arrivalTerminal === 'Terminal 1'
+      ? 'T1'
+      : termInfo.shortTerminal?.replace(/^STL\s+/i, '') || arrivalTerminal;
+
+  const rawGuidance = termInfo.pickupDoorGuidance || telemetry?.pickupDoorGuidance;
+  const curbsideGuidance = stripTerminalPrefix(rawGuidance, arrivalTerminal);
+
+  const scheduledDepartureTime = formatFlightClockTime(telemetry?.scheduledDepartureIso);
+  const updatedDepartureTime = formatFlightClockTime(
+    telemetry?.estimatedDepartureIso || telemetry?.scheduledDepartureIso
+  );
+  const departureChanged = Boolean(
+    scheduledDepartureTime && updatedDepartureTime && scheduledDepartureTime !== updatedDepartureTime
+  );
+
+  const scheduledArrivalTime = formatFlightClockTime(telemetry?.scheduledArrivalIso);
+  const updatedArrivalTime = formatFlightClockTime(
+    telemetry?.estimatedArrivalIso || telemetry?.scheduledArrivalIso
+  );
+  const arrivalChanged = Boolean(
+    scheduledArrivalTime && updatedArrivalTime && scheduledArrivalTime !== updatedArrivalTime
+  );
+  const hasTelemetryTimes = Boolean(
+    scheduledDepartureTime || updatedDepartureTime || scheduledArrivalTime || updatedArrivalTime
+  );
+
+  const delayMinutes = telemetry?.delayMinutes || 0;
+  let statusLabel = 'Scheduled';
+  let tone: DriverFlightTrackerTone = 'slate';
+  let isDelayed = false;
+  let isCancelledOrDiverted = false;
+
+  if (telemetry) {
+    if (telemetry.status === 'cancelled') {
+      statusLabel = 'Cancelled';
+      tone = 'rose';
+      isCancelledOrDiverted = true;
+    } else if (telemetry.status === 'diverted') {
+      statusLabel = 'Diverted';
+      tone = 'rose';
+      isCancelledOrDiverted = true;
+    } else if (telemetry.status === 'landed') {
+      statusLabel = 'Landed';
+      tone = 'emerald';
+    } else if (telemetry.status === 'delayed' || delayMinutes >= 15) {
+      const plusMin = Math.max(15, delayMinutes);
+      statusLabel = `Delayed +${plusMin}m`;
+      tone = plusMin >= 45 ? 'rose' : 'amber';
+      isDelayed = true;
+    } else if (!telemetry.isSimulatedFallback) {
+      statusLabel = 'On Time';
+      tone = 'emerald';
+    }
+  }
+
+  const routeLabel = originIata ? `${originIata} → ${destinationIata}` : `→ ${destinationIata}`;
+  const searchQuery = flightIdent
+    ? `${flightIdent} flight status`
+    : [airlineName, creds.flightNumber, 'flight status'].filter(Boolean).join(' ');
+  const externalFlightUrl = searchQuery.trim()
+    ? `https://www.google.com/search?q=${encodeURIComponent(searchQuery.trim())}`
+    : undefined;
+
+  return {
+    hasCommercialFlight: true,
+    isPrivateAviation: false,
+    airlineName,
+    flightIdent,
+    headerLabel,
+    compactIdent,
+    originIata,
+    originCity,
+    destinationIata,
+    routeLabel,
+    statusLabel,
+    tone,
+    delayMinutes,
+    isDelayed,
+    isCancelledOrDiverted,
+    hasTelemetryTimes,
+    scheduledDepartureTime,
+    updatedDepartureTime,
+    departureChanged,
+    scheduledArrivalTime,
+    updatedArrivalTime,
+    arrivalChanged,
+    arrivalTerminal,
+    compactTerminal,
+    gate: telemetry?.gate,
+    baggageClaim: telemetry?.baggageClaim,
+    hasCheckedLuggage: creds.hasCheckedLuggage,
+    curbsideGuidance,
+    remainingFlightNotes: stripRedundantFlightNotes(rawNotes, hasStructuredFlight),
+    externalFlightUrl,
   };
 }
 

@@ -626,6 +626,29 @@ export function DriverQueueWindow({
                       </div>
                     )}
 
+                    {/* Centered Transit Buffer Between Trips */}
+                    {item.bufferMinutesAfterPrior !== null && (
+                      <div className="flex items-center justify-center">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
+                            item.conflictStatus === 'overlap'
+                              ? 'bg-status-danger-bg-strong text-status-danger-fg border border-status-danger-border'
+                              : item.conflictStatus === 'tight_turnaround'
+                              ? 'bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border'
+                              : 'bg-status-success-bg text-status-success-fg border border-status-success-border'
+                          }`}
+                          title="Transit buffer between prior dropoff and this pickup"
+                        >
+                          <ClockIcon className="w-2.5 h-2.5 shrink-0" />
+                          <span>
+                            {item.conflictStatus === 'overlap'
+                              ? `Overlap ${formatSignedMinutes(item.bufferMinutesAfterPrior)}`
+                              : `${formatSignedMinutes(item.bufferMinutesAfterPrior)} buffer`}
+                          </span>
+                        </span>
+                      </div>
+                    )}
+
                     <div
                       className={`rounded-xl shadow-2xs transition-all overflow-hidden ${
                         isStaged
@@ -725,7 +748,7 @@ export function DriverQueueWindow({
                           </div>
                         </div>
 
-                        {/* Timelines: Pickup, Dropoff & Buffer */}
+                        {/* Timelines: Pickup & Dropoff */}
                         <div className="bg-surface-subtle rounded-lg p-2 flex flex-wrap items-center justify-between gap-2 text-xs border border-border-faint">
                           <div className="flex items-center gap-1.5">
                             <ClockIcon className="w-3.5 h-3.5 text-blue-600" />
@@ -741,26 +764,6 @@ export function DriverQueueWindow({
                               ~{formatTimeStr(item.projectedDropoffMs)}
                             </span>
                           </div>
-
-                          {item.bufferMinutesAfterPrior !== null && (
-                            <span
-                              className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-1.5 py-0.2 rounded ${
-                                item.conflictStatus === 'overlap'
-                                  ? 'bg-status-danger-bg-strong text-status-danger-fg border border-status-danger-border'
-                                  : item.conflictStatus === 'tight_turnaround'
-                                  ? 'bg-status-warning-bg-strong text-status-warning-fg border border-status-warning-border'
-                                  : 'bg-status-success-bg text-status-success-fg border border-status-success-border'
-                              }`}
-                              title="Transit buffer between prior dropoff and this pickup"
-                            >
-                              <ClockIcon className="w-2.5 h-2.5 shrink-0" />
-                              <span>
-                                {item.conflictStatus === 'overlap'
-                                  ? `Overlap ${formatSignedMinutes(item.bufferMinutesAfterPrior)}`
-                                  : `${formatSignedMinutes(item.bufferMinutesAfterPrior)} buffer`}
-                              </span>
-                            </span>
-                          )}
                         </div>
 
                         {/* Card Action footer */}

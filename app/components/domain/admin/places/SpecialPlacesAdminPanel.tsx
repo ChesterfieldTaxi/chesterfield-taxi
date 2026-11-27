@@ -10,6 +10,7 @@ import { Input } from '~/components/ui/Input';
 import { Select } from '~/components/ui/Select';
 import { Badge } from '~/components/ui/Badge';
 import { AdminSlideOverDrawer } from '~/components/domain/admin/AdminSlideOverDrawer';
+import { LocationAutocomplete } from '~/components/domain/LocationAutocomplete';
 import {
   MapPinIcon,
   SearchIcon,
@@ -119,6 +120,28 @@ function SpecialPlaceCategoryIcon({
   }
 }
 
+function parseAddressParts(formattedAddress: string): {
+  city: string;
+  state: string;
+  zip: string;
+} {
+  const cleaned = formattedAddress.replace(/,\s*(USA|United States)$/i, '').trim();
+  const parts = cleaned.split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) {
+    return { city: '', state: '', zip: '' };
+  }
+  const last = parts[parts.length - 1];
+  const stateZipMatch = last.match(/^([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?$/i);
+  if (stateZipMatch) {
+    return {
+      city: parts.length >= 3 ? parts[parts.length - 2] : '',
+      state: stateZipMatch[1].toUpperCase(),
+      zip: stateZipMatch[2] || '',
+    };
+  }
+  return { city: '', state: '', zip: '' };
+}
+
 export function SpecialPlacesAdminPanel() {
   const [places, setPlaces] = useState<SpecialPlace[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -129,14 +152,15 @@ export function SpecialPlacesAdminPanel() {
   // Form / Editing State
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [coordinatesResolved, setCoordinatesResolved] = useState(false);
   const [formData, setFormData] = useState<SpecialPlace>({
     id: '',
     name: '',
     shortName: '',
     address: '',
-    city: 'Chesterfield',
-    state: 'MO',
-    zip: '63005',
+    city: '',
+    state: '',
+    zip: '',
     coordinates: { lat: 38.6631, lng: -90.5771 },
     category: 'custom',
     isPopular: true,
@@ -192,14 +216,15 @@ export function SpecialPlacesAdminPanel() {
 
   const handleStartCreate = () => {
     setEditingId(null);
+    setCoordinatesResolved(false);
     setFormData({
       id: `place-${Date.now()}`,
       name: '',
       shortName: '',
       address: '',
-      city: 'Chesterfield',
-      state: 'MO',
-      zip: '63005',
+      city: '',
+      state: '',
+      zip: '',
       coordinates: { lat: 38.6631, lng: -90.5771 },
       category: 'landmark',
       isPopular: true,
@@ -214,6 +239,7 @@ export function SpecialPlacesAdminPanel() {
 
   const handleStartEdit = (place: SpecialPlace) => {
     setEditingId(place.id);
+    setCoordinatesResolved(true);
     setFormData({ ...place });
     setAliasesRaw(place.aliases ? place.aliases.join(', ') : '');
     setIsEditing(true);
@@ -226,6 +252,53 @@ export function SpecialPlacesAdminPanel() {
       return;
     }
 
+    let resolvedCoordinates = formData.coordinates;
+    let resolvedAddress = formData.address.trim();
+    let resolvedCity = formData.city;
+    let resolvedState = formData.state;
+    let resolvedZip = formData.zip;
+
+    if (
+      !coordinatesResolved &&
+      typeof window !== 'undefined' &&
+      (window as any).google?.maps?.Geocoder
+    ) {
+      try {
+        const geocoder = new (window as any).google.maps.Geocoder();
+        const geocoded = await new Promise<{
+          coords: { lat: number; lng: number };
+          formattedAddress?: string;
+        } | null>((resolve) => {
+          geocoder.geocode(
+            { address: resolvedAddress },
+            (results: any[] | null, status: string) => {
+              if (status === 'OK' && results?.[0]?.geometry?.location) {
+                const loc = results[0].geometry.location;
+                resolve({
+                  coords: { lat: loc.lat(), lng: loc.lng() },
+                  formattedAddress: results[0].formatted_address,
+                });
+              } else {
+                resolve(null);
+              }
+            }
+          );
+        });
+        if (geocoded) {
+          resolvedCoordinates = geocoded.coords;
+          if (geocoded.formattedAddress) {
+            resolvedAddress = geocoded.formattedAddress;
+            const parsed = parseAddressParts(geocoded.formattedAddress);
+            resolvedCity = parsed.city || resolvedCity;
+            resolvedState = parsed.state || resolvedState;
+            resolvedZip = parsed.zip || resolvedZip;
+          }
+        }
+      } catch {
+        // Keep existing coordinates if geocoding fails
+      }
+    }
+
     const parsedAliases = aliasesRaw
       .split(',')
       .map((a) => a.trim())
@@ -234,6 +307,11 @@ export function SpecialPlacesAdminPanel() {
     const placeToSave: SpecialPlace = {
       ...formData,
       id: formData.id || `place-${Date.now()}`,
+      address: resolvedAddress,
+      city: resolvedCity,
+      state: resolvedState,
+      zip: resolvedZip,
+      coordinates: resolvedCoordinates,
       aliases: parsedAliases,
       updatedAt: new Date().toISOString(),
     };
@@ -421,57 +499,37 @@ export function SpecialPlacesAdminPanel() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div className="md:col-span-2">
-              <label className="text-xs font-medium text-fg-secondary block mb-1">
-                Street Address <span className="text-rose-500">*</span>
-              </label>
-              <Input
-                type="text"
-                placeholder="e.g. 10701 Lambert International Blvd"
-                required
-                value={formData.address}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setFormData({ ...formData, address: e.target.value })
+          <div>
+            <LocationAutocomplete
+              label="Address"
+              icon="map-pin"
+              required
+              placeholder="Search address or landmark..."
+              value={formData.address}
+              onChange={(val) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  address: val,
+                }));
+                setCoordinatesResolved(false);
+              }}
+              onPlaceSelected={(details) => {
+                const fullAddr = details.formattedAddress || details.address;
+                const parsed = parseAddressParts(fullAddr);
+                setFormData((prev) => ({
+                  ...prev,
+                  address: fullAddr,
+                  city: parsed.city || prev.city,
+                  state: parsed.state || prev.state,
+                  zip: parsed.zip || prev.zip,
+                  coordinates: details.coordinates ?? prev.coordinates,
+                }));
+                if (details.coordinates) {
+                  setCoordinatesResolved(true);
                 }
-                className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-fg-secondary block mb-1">City</label>
-              <Input
-                type="text"
-                value={formData.city}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setFormData({ ...formData, city: e.target.value })
-                }
-                className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-fg-secondary block mb-1">State & Zip</label>
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  value={formData.state}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setFormData({ ...formData, state: e.target.value })
-                  }
-                  className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary w-16 uppercase text-center font-bold"
-                />
-                <Input
-                  type="text"
-                  placeholder="63005"
-                  value={formData.zip}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setFormData({ ...formData, zip: e.target.value })
-                  }
-                  className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary flex-1 font-mono"
-                />
-              </div>
-            </div>
+              }}
+              helperText="Select a Google Places suggestion to automatically populate coordinates."
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -522,15 +580,16 @@ export function SpecialPlacesAdminPanel() {
                 type="number"
                 step="0.0001"
                 value={formData.coordinates.lat}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  setCoordinatesResolved(true);
                   setFormData({
                     ...formData,
                     coordinates: {
                       ...formData.coordinates,
                       lat: parseFloat(e.target.value) || 0,
                     },
-                  })
-                }
+                  });
+                }}
                 className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary font-mono"
               />
             </div>
@@ -541,15 +600,16 @@ export function SpecialPlacesAdminPanel() {
                 type="number"
                 step="0.0001"
                 value={formData.coordinates.lng}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  setCoordinatesResolved(true);
                   setFormData({
                     ...formData,
                     coordinates: {
                       ...formData.coordinates,
                       lng: parseFloat(e.target.value) || 0,
                     },
-                  })
-                }
+                  });
+                }}
                 className="h-8.5 text-xs bg-surface-card border-border-strong text-fg-primary font-mono"
               />
             </div>
@@ -761,7 +821,9 @@ export function SpecialPlacesAdminPanel() {
                     <div className="text-xs text-fg-secondary flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span className="flex items-center gap-1">
                         <MapPinIcon className="w-3 h-3 text-fg-subtle shrink-0" />
-                        {place.address}, {place.city}, {place.state} {place.zip}
+                        {place.city && !place.address.includes(place.city)
+                          ? `${place.address}, ${place.city}${place.state ? `, ${place.state}` : ''}${place.zip ? ` ${place.zip}` : ''}`
+                          : place.address}
                       </span>
                       <span className="font-mono text-[11px] text-fg-subtle">
                         ({place.coordinates.lat.toFixed(4)}, {place.coordinates.lng.toFixed(4)})

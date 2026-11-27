@@ -221,9 +221,10 @@ export function formatTripVehicleColumnDisplay(
       : '';
 
   const resolvedToken = explicitDriverTier || inferredFromDesc || fallbackNonDefaultTier;
+  const activeVehicles = (vehicles || []).filter((v) => !v.isArchived && v.isActive !== false);
   const matchedAdminTier =
-    findLiveVehicleTier(resolvedToken, vehicles) ||
-    findLiveVehicleTier(metaAssignedDisplay, vehicles);
+    findLiveVehicleTier(resolvedToken, activeVehicles) ||
+    findLiveVehicleTier(metaAssignedDisplay, activeVehicles);
   const assignedLabel = matchedAdminTier?.name?.trim();
   if (!assignedLabel || assignedLabel.toLowerCase() === 'any') {
     return 'Any';

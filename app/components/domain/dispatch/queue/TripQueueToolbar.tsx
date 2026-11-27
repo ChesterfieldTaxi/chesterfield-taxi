@@ -399,7 +399,7 @@ export function TripQueueToolbar({
 
         {/* Right-Aligned Group: Tier 3 (Assignment Dropdown), Tier 4 (Columns) & Overflow Menu */}
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Tier 3 (>= 840px): Compact Assignment Dropdown (Send|Hold, Auto-Stage Open, Auto-Dispatch Ready) */}
+          {/* Tier 3 (>= 840px): Compact Assignment Dropdown (Send|Hold, Auto-Dispatch Ready) */}
           {tiers.showAssignmentInline && (
             <TripQueueAssignmentDropdown
               effectiveDisplayLayout={effectiveDisplayLayout}

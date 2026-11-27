@@ -22,10 +22,10 @@ export interface DispatchStatusMeta {
 const STATUS_META_BY_KEY: Record<string, DispatchStatusMeta> = {
   late: { key: 'late', label: 'Late', tooltip: 'Late — Past scheduled pickup time', pillClass: 'bg-rose-600 text-white border-rose-500 animate-pulse' },
   unconfirmed: { key: 'unconfirmed', label: 'Unconfirmed', tooltip: 'Unconfirmed — Awaiting dispatch review', pillClass: 'bg-status-warning-bg-strong text-status-warning-fg border-status-warning-border animate-pulse' },
-  confirmed: { key: 'confirmed', label: 'Confirmed', tooltip: 'Confirmed — Ready for dispatch', pillClass: 'bg-status-success-bg-strong text-status-success-fg border-status-success-border' },
+  confirmed: { key: 'confirmed', label: 'Confirmed', tooltip: 'Confirmed — Ready for dispatch', pillClass: 'bg-status-info-bg-strong text-status-info-fg border-status-info-border' },
   pending: { key: 'pending', label: 'Pending', tooltip: 'Pending — Queued', pillClass: 'bg-status-warning-bg text-status-warning-fg border-status-warning-border' },
   offered: { key: 'offered', label: 'Offered', tooltip: 'Offered — Waiting for driver response', pillClass: 'bg-status-info-bg-strong text-status-info-fg border-status-info-border dark:bg-sky-950/80 dark:text-sky-300 dark:border-sky-700' },
-  assigned: { key: 'assigned', label: 'Assigned', tooltip: 'Assigned to driver', pillClass: 'bg-status-info-bg-strong text-status-info-fg border-status-info-border' },
+  assigned: { key: 'assigned', label: 'Assigned', tooltip: 'Assigned to driver', pillClass: 'bg-status-success-bg-strong text-status-success-fg border-status-success-border' },
   accepted: { key: 'accepted', label: 'Accepted', tooltip: 'Accepted — Driver acknowledged', pillClass: 'bg-status-staged-bg-strong text-status-staged-fg border-status-staged-border dark:bg-purple-950/80 dark:text-purple-300 dark:border-purple-700' },
   en_route: { key: 'en_route', label: 'En Route', tooltip: 'En Route to pickup', pillClass: 'bg-status-staged-bg-strong text-status-staged-fg border-status-staged-border' },
   arrived: { key: 'arrived', label: 'Arrived', tooltip: 'Arrived at pickup', pillClass: 'bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-950/80 dark:text-orange-300 dark:border-orange-700' },

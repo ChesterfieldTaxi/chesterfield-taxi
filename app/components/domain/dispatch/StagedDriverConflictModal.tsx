@@ -260,8 +260,8 @@ export function AutoStageSuggestionsModal({
               </p>
               <p className="text-[11px] text-fg-muted">
                 {unmatchedTripIds.length > 0
-                  ? `${unmatchedTripIds.length} open scheduled ride(s) could not be paired without creating a < 15m turnaround conflict or vehicle mismatch.`
-                  : 'There are currently no open unstaged scheduled trips in this view.'}
+                  ? `${unmatchedTripIds.length} selected scheduled ride(s) could not be paired without creating a < 15m turnaround conflict or vehicle mismatch.`
+                  : 'There are currently no eligible unstaged scheduled trips in your selection.'}
               </p>
             </div>
           ) : (
@@ -320,7 +320,7 @@ export function AutoStageSuggestionsModal({
 
           {unmatchedTripIds.length > 0 && suggestions.length > 0 && (
             <div className="p-2.5 rounded-xl bg-status-warning-bg border border-status-warning-border text-[11px] text-status-warning-fg font-medium">
-              Note: {unmatchedTripIds.length} open ride(s) were skipped to avoid &lt;15m turnaround
+              Note: {unmatchedTripIds.length} selected ride(s) were skipped to avoid &lt;15m turnaround
               overlaps or vehicle capacity mismatches.
             </div>
           )}

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import type { Trip } from '../../../../core/types/trip';
 import type { DispatchStagedPlannerController } from '../../../../core/hooks/dispatch/useDispatchStagedPlanner';
+import { usePortalDropdownPosition } from './TripQueueFilterPopovers';
 import {
   BanIcon,
   BoltIcon,
@@ -125,11 +126,20 @@ export function TripQueueBatchActionBar({
   stagedPlanner,
 }: TripQueueBatchActionBarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAssignMenuOpen, setIsAssignMenuOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [coords, setCoords] = useState<{ top: number; left: number; openUpward: boolean } | null>(
     null
   );
+  const closeAssignMenu = useCallback(() => setIsAssignMenuOpen(false), []);
+  const assignDropdown = usePortalDropdownPosition({
+    isOpen: isAssignMenuOpen,
+    onClose: closeAssignMenu,
+    menuWidth: 236,
+    estimatedHeight: 196,
+    align: 'right',
+  });
 
   const tier = resolveBatchActionBarTier(isDesktop, queueWidthPx);
   const isCompactDropdown = tier === 'compact_dropdown';
@@ -147,11 +157,13 @@ export function TripQueueBatchActionBar({
 
   const stagedCount = stagedPlanner?.selectedStagedCount ?? 0;
   const stageableCount = stagedPlanner?.selectedStageableCount ?? 0;
+  const selectedAutoStageCount = stagedPlanner?.selectedScheduledUnstagedCount ?? 0;
   const autoDispatchableCount = stagedPlanner?.selectedAutoDispatchableCount ?? 0;
 
   useEffect(() => {
     if (selectedTripIds.length === 0) {
       setIsMenuOpen(false);
+      setIsAssignMenuOpen(false);
     }
   }, [selectedTripIds.length]);
 
@@ -230,8 +242,85 @@ export function TripQueueBatchActionBar({
 
   const runAndClose = (fn?: () => void) => {
     setIsMenuOpen(false);
+    setIsAssignMenuOpen(false);
     fn?.();
   };
+
+  const renderAssignmentMenuItems = () => (
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          runAndClose(() => {
+            stagedPlanner?.setBatchAssignMode('send_to_driver');
+            onBatchAssignDriver();
+          })
+        }
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg transition-colors cursor-pointer"
+      >
+        <span className="flex items-center gap-2 min-w-0">
+          <UsersIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+          <span>Assign Driver (Send)</span>
+        </span>
+        <span className="text-[10.5px] font-bold text-fg-subtle">
+          {selectedTripIds.length}
+        </span>
+      </button>
+
+      {stagedPlanner && stageableCount > 0 && (
+        <button
+          type="button"
+          onClick={() => runAndClose(() => stagedPlanner.openBatchStageDriverModal())}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-status-staged-fg hover:bg-status-staged-bg/80 transition-colors cursor-pointer"
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="text-xs leading-none shrink-0">📌</span>
+            <span>Stage Driver (Hold)</span>
+          </span>
+          <span className="text-[10.5px] font-bold px-1.5 py-0.2 rounded border border-dashed border-status-staged-border bg-status-staged-bg text-status-staged-fg">
+            {stageableCount}
+          </span>
+        </button>
+      )}
+
+      {stagedPlanner && selectedAutoStageCount > 0 && (
+        <button
+          type="button"
+          disabled={stagedPlanner.isAutoStaging}
+          onClick={() => runAndClose(() => stagedPlanner.openAutoStagePreview())}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold text-status-staged-fg hover:bg-status-staged-bg/80 transition-colors cursor-pointer disabled:opacity-50"
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="text-xs leading-none shrink-0">📌</span>
+            <span>{stagedPlanner.isAutoStaging ? 'Staging...' : 'Auto-Stage Selected'}</span>
+          </span>
+          <span className="text-[10.5px] font-extrabold px-1.5 py-0.2 rounded bg-status-staged-bg-strong text-status-staged-fg">
+            {selectedAutoStageCount}
+          </span>
+        </button>
+      )}
+
+      {stagedPlanner && autoDispatchableCount > 0 && (
+        <button
+          type="button"
+          onClick={() =>
+            runAndClose(() =>
+              void stagedPlanner.requestBatchAutoDispatchWithStagedCheck()
+            )
+          }
+          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold text-status-staged-fg hover:bg-status-staged-bg/90 transition-colors cursor-pointer"
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <RadarBroadcastIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            <span>Auto-Dispatch Selected</span>
+          </span>
+          <span className="text-[10.5px] font-extrabold px-1.5 py-0.2 rounded bg-status-staged-bg-strong text-status-staged-fg">
+            {autoDispatchableCount}
+          </span>
+        </button>
+      )}
+    </>
+  );
 
   return (
     <div
@@ -270,16 +359,36 @@ export function TripQueueBatchActionBar({
             )}
 
             <button
+              ref={assignDropdown.triggerRef}
               type="button"
-              onClick={() => {
-                stagedPlanner?.setBatchAssignMode('send_to_driver');
-                onBatchAssignDriver();
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsMenuOpen(false);
+                if (isAssignMenuOpen) {
+                  assignDropdown.setCoords(null);
+                  setIsAssignMenuOpen(false);
+                } else {
+                  const initial = assignDropdown.computeCoords();
+                  if (initial) assignDropdown.setCoords(initial);
+                  setIsAssignMenuOpen(true);
+                }
               }}
-              className="px-2.5 py-1 bg-surface-header-elevated hover:bg-surface-header-muted border border-border-header rounded-lg text-fg-on-header font-bold text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0"
-              title="Assign driver to selected trips"
+              aria-haspopup="true"
+              aria-expanded={isAssignMenuOpen}
+              className={`px-2.5 py-1 border rounded-lg font-bold text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0 ${
+                isAssignMenuOpen
+                  ? 'bg-surface-header-muted border-slate-500 text-white'
+                  : 'bg-surface-header-elevated hover:bg-surface-header-muted border-border-header text-fg-on-header'
+              }`}
+              title="Assign, stage hold, or auto-stage selected trips"
             >
               <UsersIcon className="w-3.5 h-3.5 shrink-0" />
               <span>Assign</span>
+              <ChevronDownIcon
+                className={`w-3 h-3 shrink-0 transition-transform duration-150 ${
+                  isAssignMenuOpen ? 'rotate-180' : ''
+                }`}
+              />
             </button>
 
             {tier === 'wide_hybrid' && stagedPlanner && stagedCount > 0 && (
@@ -399,26 +508,7 @@ export function TripQueueBatchActionBar({
                 </button>
               )}
 
-              {isCompactDropdown && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    runAndClose(() => {
-                      stagedPlanner?.setBatchAssignMode('send_to_driver');
-                      onBatchAssignDriver();
-                    })
-                  }
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-fg-secondary hover:bg-status-info-bg/80 hover:text-status-info-fg transition-colors cursor-pointer"
-                >
-                  <span className="flex items-center gap-2 min-w-0">
-                    <UsersIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span>Assign Driver</span>
-                  </span>
-                  <span className="text-[10.5px] font-bold text-fg-subtle">
-                    {selectedTripIds.length}
-                  </span>
-                </button>
-              )}
+              {isCompactDropdown && renderAssignmentMenuItems()}
 
               {stagedPlanner && stagedCount > 0 && tier !== 'wide_hybrid' && (
                 <button
@@ -432,42 +522,6 @@ export function TripQueueBatchActionBar({
                   </span>
                   <span className="text-[10.5px] font-extrabold px-1.5 py-0.2 rounded bg-indigo-600 text-white">
                     {stagedCount}
-                  </span>
-                </button>
-              )}
-
-              {stagedPlanner && stageableCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => runAndClose(() => stagedPlanner.openBatchStageDriverModal())}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-status-staged-fg hover:bg-status-staged-bg/80 transition-colors cursor-pointer"
-                >
-                  <span className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs leading-none shrink-0">📌</span>
-                    <span>Stage Driver (Hold)</span>
-                  </span>
-                  <span className="text-[10.5px] font-bold px-1.5 py-0.2 rounded border border-dashed border-status-staged-border bg-status-staged-bg text-status-staged-fg">
-                    {stageableCount}
-                  </span>
-                </button>
-              )}
-
-              {stagedPlanner && autoDispatchableCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    runAndClose(() =>
-                      void stagedPlanner.requestBatchAutoDispatchWithStagedCheck()
-                    )
-                  }
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold text-status-staged-fg hover:bg-status-staged-bg/90 transition-colors cursor-pointer"
-                >
-                  <span className="flex items-center gap-2 min-w-0">
-                    <RadarBroadcastIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                    <span>Auto-Dispatch</span>
-                  </span>
-                  <span className="text-[10.5px] font-extrabold px-1.5 py-0.2 rounded bg-status-staged-bg-strong text-status-staged-fg">
-                    {autoDispatchableCount}
                   </span>
                 </button>
               )}
@@ -535,6 +589,38 @@ export function TripQueueBatchActionBar({
                 </button>
               )}
             </div>
+          </div>,
+          document.body
+        )}
+
+      {isAssignMenuOpen &&
+        assignDropdown.coords !== null &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={assignDropdown.menuRef}
+            data-ui-select-portal="true"
+            style={{
+              position: 'fixed',
+              ...(assignDropdown.coords.openUpward
+                ? { bottom: `${assignDropdown.coords.bottom}px` }
+                : { top: `${assignDropdown.coords.top}px` }),
+              left: `${assignDropdown.coords.left}px`,
+              width: '236px',
+              zIndex: 99999,
+              transformOrigin: assignDropdown.coords.openUpward ? 'bottom right' : 'top right',
+            }}
+            className="bg-surface-card rounded-xl shadow-2xl border border-border-subtle py-1 text-xs text-fg-strong animate-in fade-in zoom-in-95 duration-100 divide-y divide-border-faint select-none"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
+            <div className="px-3 py-1.5 bg-surface-subtle/80 rounded-t-xl flex items-center justify-between gap-2">
+              <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-fg-muted">
+                Assign Selected ({selectedTripIds.length})
+              </span>
+            </div>
+            <div className="py-1">{renderAssignmentMenuItems()}</div>
           </div>,
           document.body
         )}

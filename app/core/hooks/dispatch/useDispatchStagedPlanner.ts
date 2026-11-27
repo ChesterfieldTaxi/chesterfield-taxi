@@ -47,6 +47,7 @@ export interface DispatchStagedPlannerController {
   setDriverPickerMode: (mode: DriverDispatchPlacementMode) => void;
 
   openScheduledUnstagedCount: number;
+  selectedScheduledUnstagedCount: number;
   stagedInFilteredCount: number;
   selectedStagedCount: number;
   selectedStageableCount: number;
@@ -160,18 +161,20 @@ export function useDispatchStagedPlanner({
     });
   }, []);
 
+  const isOpenScheduledUnstagedTrip = useCallback(
+    (t: Trip) =>
+      !t.assignedDriverId &&
+      !t.plannedDriverId &&
+      !t.isArchived &&
+      !t.isBlacklisted &&
+      Boolean(t.scheduledPickupTime) &&
+      ['CONFIRMED', 'confirmed', 'accepted', 'pending'].includes(t.status),
+    []
+  );
+
   const openScheduledUnstagedCount = useMemo(
-    () =>
-      filteredTrips.filter(
-        (t) =>
-          !t.assignedDriverId &&
-          !t.plannedDriverId &&
-          !t.isArchived &&
-          !t.isBlacklisted &&
-          Boolean(t.scheduledPickupTime) &&
-          ['CONFIRMED', 'confirmed', 'accepted', 'pending'].includes(t.status)
-      ).length,
-    [filteredTrips]
+    () => filteredTrips.filter(isOpenScheduledUnstagedTrip).length,
+    [filteredTrips, isOpenScheduledUnstagedTrip]
   );
 
   const stagedInFilteredCount = useMemo(
@@ -182,6 +185,11 @@ export function useDispatchStagedPlanner({
   const selectedTrips = useMemo(
     () => trips.filter((t) => selectedTripIds.includes(t.id)),
     [trips, selectedTripIds]
+  );
+
+  const selectedScheduledUnstagedCount = useMemo(
+    () => selectedTrips.filter(isOpenScheduledUnstagedTrip).length,
+    [selectedTrips, isOpenScheduledUnstagedTrip]
   );
 
   const selectedStagedCount = useMemo(
@@ -539,8 +547,9 @@ export function useDispatchStagedPlanner({
   ]);
 
   const openAutoStagePreview = useCallback(() => {
+    if (selectedScheduledUnstagedCount === 0) return;
     const result = computeAutoStageSuggestions({
-      trips: filteredTrips,
+      trips: selectedTrips,
       allTrips: trips,
       drivers,
       settings,
@@ -550,7 +559,7 @@ export function useDispatchStagedPlanner({
       suggestions: result.suggestions,
       unmatchedTripIds: result.unmatchedTripIds,
     });
-  }, [filteredTrips, trips, drivers, settings]);
+  }, [selectedScheduledUnstagedCount, selectedTrips, trips, drivers, settings]);
 
   const closeAutoStageModal = useCallback(() => {
     setAutoStageModal((prev) => ({ ...prev, isOpen: false }));
@@ -575,6 +584,7 @@ export function useDispatchStagedPlanner({
         setReviewTrip((prev) => (prev ? mapById.get(prev.id) || prev : null));
       }
 
+      setSelectedTripIds([]);
       setAutoStageModal({ isOpen: false, suggestions: [], unmatchedTripIds: [] });
       showDispatchToast(
         `📌 Auto-staged ${updated.length} scheduled trip(s) with non-overlapping shift placeholders.`,
@@ -598,6 +608,7 @@ export function useDispatchStagedPlanner({
     actorRole,
     setTrips,
     setReviewTrip,
+    setSelectedTripIds,
     showDispatchToast,
   ]);
 
@@ -824,6 +835,7 @@ export function useDispatchStagedPlanner({
     driverPickerMode,
     setDriverPickerMode,
     openScheduledUnstagedCount,
+    selectedScheduledUnstagedCount,
     stagedInFilteredCount,
     selectedStagedCount,
     selectedStageableCount,

@@ -21,7 +21,10 @@ import { formatVehicleTierDisplay } from '../../../core/utils/vehicle-tier-forma
 import { reconcileBreakdownWithoutRounding } from '../../../core/utils/fare-breakdown.util';
 import { resolveStlTerminalInfo } from '../../../core/config/airports';
 import { getAdminConfigService } from '../../../core/services/config/admin-config.service';
-import { resolveTripFlightBadge } from '../../../core/services/flight/flight-status.service';
+import {
+  resolveDriverFlightTrackerModel,
+  type DriverFlightTrackerTone,
+} from '../../../core/services/flight/flight-status.service';
 
 export interface DriverTripManifestProps {
   trip: Trip;
@@ -117,27 +120,13 @@ export function DriverTripManifest({ trip, adminVehicles, compact = false }: Dri
       ? meta.customExtrasSummary.trim()
       : '';
 
-  // Private Aviation vs Commercial Flight (reads structured metadata AND legacy flightNotes)
+  // Private Aviation vs Commercial Flight
   const isPrivateAviation = Boolean(meta.isPrivateAviation || meta.tailNumber || meta.fboFacility);
   const tailNumber = typeof meta.tailNumber === 'string' ? meta.tailNumber.trim() : '';
   const fboFacility = typeof meta.fboFacility === 'string' ? meta.fboFacility.trim() : '';
-  const airline = typeof (meta.airline || meta.airlineName) === 'string' ? String(meta.airline || meta.airlineName).trim() : '';
-  const flightNumber = typeof meta.flightNumber === 'string' ? meta.flightNumber.trim() : '';
-  const flightOrigin = typeof (meta.flightOrigin || meta.departureAirport) === 'string'
-    ? String(meta.flightOrigin || meta.departureAirport).trim()
-    : '';
   const hasCheckedLuggage = Boolean(meta.hasCheckedLuggage);
-  const legacyFlightNotes = typeof trip.flightNotes === 'string' ? trip.flightNotes.trim() : '';
-  const flightBadge = resolveTripFlightBadge(trip);
-  const hasAviationInfo = Boolean(
-    isPrivateAviation ||
-      airline ||
-      flightNumber ||
-      flightOrigin ||
-      legacyFlightNotes ||
-      trip.flightTelemetry ||
-      flightBadge.hasFlight
-  );
+  const flightTracker = resolveDriverFlightTrackerModel(trip);
+  const hasAviationInfo = Boolean(isPrivateAviation || flightTracker.hasCommercialFlight);
 
   // Booker vs Passenger contact
   const bookerName =
@@ -369,40 +358,38 @@ export function DriverTripManifest({ trip, adminVehicles, compact = false }: Dri
 
       {/* Aviation / Flight Information */}
       {hasAviationInfo && (() => {
-        const snap = trip.flightTelemetry;
-        const termInfo = resolveStlTerminalInfo(
-          snap?.airlineCode || airline || fboFacility,
-          snap?.destinationIata || (typeof meta.airportIataCode === 'string' ? meta.airportIataCode : undefined),
-          getAdminConfigService().getCachedSettings().customerBookingConfig
-        );
-        const pillToneMap: Record<typeof flightBadge.tone, string> = {
-          emerald: 'bg-emerald-500/20 text-emerald-200 border-emerald-400/40',
-          amber: 'bg-amber-500/25 text-amber-200 border-amber-400/50',
-          rose: 'bg-rose-500/25 text-rose-200 border-rose-400/50',
-          blue: 'bg-sky-500/25 text-sky-200 border-sky-400/45',
+        const pillToneMap: Record<DriverFlightTrackerTone, string> = {
+          emerald: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40',
+          amber: 'bg-amber-500/25 text-amber-300 border-amber-400/50',
+          rose: 'bg-rose-500/25 text-rose-300 border-rose-400/50',
+          blue: 'bg-sky-500/25 text-sky-300 border-sky-400/45',
           slate: 'bg-slate-800 text-slate-200 border-slate-600',
         };
-        const doorGuidance =
-          termInfo.pickupDoorGuidance || flightBadge.pickupDoorGuidance || snap?.pickupDoorGuidance;
 
-        return (
-          <div className="bg-sky-950/35 border border-sky-700/40 rounded-2xl p-3 space-y-1.5 text-xs">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-400">
-                {isPrivateAviation ? 'Private Aviation (FBO / Tail #)' : 'Live Flight & Terminal Manifest'}
-              </span>
-              {flightBadge.hasFlight && flightBadge.shortLabel && (
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10.5px] font-extrabold border ${
-                    pillToneMap[flightBadge.tone]
-                  }`}
-                >
-                  {flightBadge.shortLabel}
+        const updatedTimeToneMap: Record<DriverFlightTrackerTone, string> = {
+          emerald: 'text-emerald-300',
+          amber: 'text-amber-300',
+          rose: 'text-rose-300',
+          blue: 'text-sky-300',
+          slate: 'text-slate-100',
+        };
+
+        if (isPrivateAviation) {
+          const snap = trip.flightTelemetry;
+          const termInfo = resolveStlTerminalInfo(
+            snap?.airlineCode || fboFacility,
+            snap?.destinationIata || (typeof meta.airportIataCode === 'string' ? meta.airportIataCode : undefined),
+            getAdminConfigService().getCachedSettings().customerBookingConfig
+          );
+          const doorGuidance = termInfo.pickupDoorGuidance || snap?.pickupDoorGuidance;
+
+          return (
+            <div className="bg-sky-950/35 border border-sky-700/40 rounded-2xl p-3 space-y-1.5 text-xs">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-400">
+                  Private Aviation (FBO / Tail #)
                 </span>
-              )}
-            </div>
-
-            {isPrivateAviation ? (
+              </div>
               <div className="text-sky-100 space-y-1">
                 {tailNumber && (
                   <div>
@@ -424,68 +411,209 @@ export function DriverTripManifest({ trip, adminVehicles, compact = false }: Dri
                   <div className="text-[11px] text-sky-200 font-semibold">Checked / Ramp Luggage Expected</div>
                 )}
               </div>
-            ) : (
-              <div className="text-sky-100 space-y-1">
-                {(snap?.flightIdent || airline || flightNumber) && (
-                  <div>
-                    <strong className="text-sky-300">Flight:</strong>{' '}
-                    {snap?.airlineName || airline}{' '}
-                    {snap?.flightIdent
-                      ? `(${snap.flightIdent})`
-                      : flightNumber
-                      ? `#${flightNumber}`
-                      : ''}
-                    {snap?.originIata || flightOrigin
-                      ? ` · from ${snap?.originIata || flightOrigin}${
-                          snap?.originCity ? ` (${snap.originCity})` : ''
-                        }`
-                      : ''}
-                  </div>
-                )}
+            </div>
+          );
+        }
 
-                {(snap?.estimatedArrivalIso || snap?.scheduledArrivalIso) && (
-                  <div>
-                    <strong className="text-sky-300">Est. Arrival:</strong>{' '}
-                    <span className="font-mono font-bold text-white">
-                      {new Date(
-                        (snap.estimatedArrivalIso || snap.scheduledArrivalIso)!
-                      ).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+        if (compact) {
+          return (
+            <div className="bg-sky-950/35 border border-sky-700/40 rounded-2xl px-3 py-2.5 text-xs">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className="font-mono font-extrabold text-white">
+                    {flightTracker.compactIdent || flightTracker.headerLabel}
+                  </span>
+                  <span className="text-sky-200 font-semibold">
+                    {flightTracker.routeLabel}
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${pillToneMap[flightTracker.tone]}`}
+                  >
+                    {flightTracker.statusLabel}
+                  </span>
+                  {(flightTracker.updatedArrivalTime || flightTracker.compactTerminal) && (
+                    <span className="text-[11px] text-slate-300 font-semibold">
+                      {flightTracker.updatedArrivalTime ? (
+                        <span className={`font-mono font-bold ${updatedTimeToneMap[flightTracker.tone]}`}>
+                          {flightTracker.updatedArrivalTime}
+                        </span>
+                      ) : null}
+                      {flightTracker.updatedArrivalTime && flightTracker.compactTerminal ? ' · ' : ''}
+                      {flightTracker.compactTerminal ? (
+                        <span className="text-sky-300 font-bold">{flightTracker.compactTerminal}</span>
+                      ) : null}
                     </span>
-                  </div>
-                )}
+                  )}
+                </div>
 
-                {((snap?.terminal || termInfo.terminal) || snap?.gate || snap?.baggageClaim) && (
-                  <div className="flex flex-wrap gap-1.5 pt-0.5">
-                    {(snap?.terminal || termInfo.terminal) && (
-                      <span className="px-2 py-0.5 rounded bg-sky-900/60 border border-sky-700/60 text-sky-100 font-bold text-[11px]">
-                        {snap?.terminal || termInfo.terminal}
+                {flightTracker.externalFlightUrl && (
+                  <a
+                    href={flightTracker.externalFlightUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/35 text-[10.5px] font-bold transition-colors shrink-0"
+                  >
+                    Check Flight ↗
+                  </a>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        const renderLegTimes = (scheduled?: string, updated?: string, changed?: boolean) => {
+          if (!scheduled && !updated) return null;
+
+          if (flightTracker.isCancelledOrDiverted) {
+            return (
+              <div className="text-[11px] font-mono text-slate-400 line-through">
+                {updated || scheduled}
+              </div>
+            );
+          }
+
+          if (flightTracker.isDelayed && changed && scheduled && updated) {
+            return (
+              <div className="flex items-baseline gap-2 flex-wrap text-[11px]">
+                <span className="font-mono text-slate-400 line-through">{scheduled}</span>
+                <span className={`font-mono font-bold ${updatedTimeToneMap[flightTracker.tone]}`}>
+                  {updated}
+                </span>
+              </div>
+            );
+          }
+
+          return (
+            <div className="space-y-0.5 text-[11px]">
+              {scheduled && (
+                <div className="text-slate-400">
+                  Scheduled: <span className="font-mono text-slate-300">{scheduled}</span>
+                </div>
+              )}
+              {updated && (
+                <div className="text-slate-300">
+                  Updated:{' '}
+                  <span className={`font-mono font-bold ${updatedTimeToneMap[flightTracker.tone]}`}>
+                    {updated}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div className="bg-sky-950/35 border border-sky-700/40 rounded-2xl p-3 space-y-2 text-xs">
+            {/* Header: Airline + Flight # once, Status Pill, External Check Flight Link */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                <span className="text-[11px] font-extrabold text-white tracking-tight truncate">
+                  {flightTracker.headerLabel}
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border shrink-0 ${pillToneMap[flightTracker.tone]}`}
+                >
+                  {flightTracker.statusLabel}
+                </span>
+              </div>
+
+              {flightTracker.externalFlightUrl && (
+                <a
+                  href={flightTracker.externalFlightUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/35 text-[10.5px] font-bold transition-colors shrink-0 whitespace-nowrap"
+                >
+                  Check Flight ↗
+                </a>
+              )}
+            </div>
+
+            {/* Two-Column Departure -> Arrival Grid (always side-by-side) */}
+            <div className="bg-slate-950/55 border border-sky-800/40 rounded-xl p-2.5 space-y-1.5">
+              <div className="grid grid-cols-2 gap-3">
+                {/* Departure */}
+                <div className="space-y-0.5 min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-sky-400">
+                    Departure
+                  </div>
+                  <div className="font-bold text-slate-100 truncate">
+                    {flightTracker.originIata || 'Origin'}
+                    {flightTracker.originCity ? (
+                      <span className="text-slate-400 font-normal"> · {flightTracker.originCity}</span>
+                    ) : null}
+                  </div>
+                  {flightTracker.hasTelemetryTimes &&
+                    renderLegTimes(
+                      flightTracker.scheduledDepartureTime,
+                      flightTracker.updatedDepartureTime,
+                      flightTracker.departureChanged
+                    )}
+                </div>
+
+                {/* Arrival */}
+                <div className="space-y-0.5 min-w-0 border-l border-sky-800/40 pl-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-sky-400">
+                    Arrival
+                  </div>
+                  <div className="font-bold text-slate-100 flex items-center gap-1.5 flex-wrap">
+                    <span>{flightTracker.destinationIata}</span>
+                    {flightTracker.arrivalTerminal && (
+                      <span className="px-1.5 py-0.5 rounded bg-sky-900/60 border border-sky-700/60 text-sky-200 text-[10px] font-extrabold">
+                        {flightTracker.arrivalTerminal}
                       </span>
                     )}
-                    {snap?.gate && (
-                      <span className="px-2 py-0.5 rounded bg-slate-900/80 border border-slate-700 text-slate-200 font-semibold text-[11px]">
-                        Gate {snap.gate}
-                      </span>
-                    )}
-                    {snap?.baggageClaim && (
-                      <span className="px-2 py-0.5 rounded bg-slate-900/80 border border-slate-700 text-slate-200 font-semibold text-[11px]">
-                        Baggage Belt {snap.baggageClaim}
-                      </span>
-                    )}
                   </div>
-                )}
+                  {flightTracker.hasTelemetryTimes &&
+                    renderLegTimes(
+                      flightTracker.scheduledArrivalTime,
+                      flightTracker.updatedArrivalTime,
+                      flightTracker.arrivalChanged
+                    )}
+                </div>
+              </div>
 
-                {doorGuidance && (
-                  <div className="text-[11px] font-bold text-emerald-300 bg-slate-950/70 border border-emerald-700/40 rounded-lg px-2.5 py-1.5">
-                    Curbside Door: {doorGuidance}
-                  </div>
-                )}
+              {!flightTracker.hasTelemetryTimes && (
+                <div className="text-[10.5px] text-slate-400 pt-1 border-t border-sky-800/30">
+                  Live flight times unavailable — use Check Flight ↗ for real-time ETA
+                </div>
+              )}
+            </div>
 
-                {hasCheckedLuggage && (
-                  <div className="text-[11px] text-sky-200 font-semibold">Passenger Has Checked Luggage</div>
+            {/* Logistics Pills Row: Gate, Baggage Belt, Checked Luggage */}
+            {(flightTracker.gate || flightTracker.baggageClaim || flightTracker.hasCheckedLuggage) && (
+              <div className="flex flex-wrap gap-1.5">
+                {flightTracker.gate && (
+                  <span className="px-2 py-0.5 rounded bg-slate-900/80 border border-slate-700 text-slate-200 font-semibold text-[11px]">
+                    Gate {flightTracker.gate}
+                  </span>
                 )}
-                {legacyFlightNotes && (
-                  <div className="text-[11px] text-sky-200/90">{legacyFlightNotes}</div>
+                {flightTracker.baggageClaim && (
+                  <span className="px-2 py-0.5 rounded bg-slate-900/80 border border-slate-700 text-slate-200 font-semibold text-[11px]">
+                    Baggage Belt {flightTracker.baggageClaim}
+                  </span>
                 )}
+                {flightTracker.hasCheckedLuggage && (
+                  <span className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/35 text-amber-200 font-semibold text-[11px]">
+                    Checked Luggage
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Curbside Door Guidance Footer (terminal prefix stripped when already shown) */}
+            {flightTracker.curbsideGuidance && (
+              <div className="text-[11px] font-bold text-emerald-300 bg-slate-950/70 border border-emerald-700/40 rounded-lg px-2.5 py-1.5">
+                Curbside Door: {flightTracker.curbsideGuidance}
+              </div>
+            )}
+
+            {/* Remaining non-flight notes */}
+            {flightTracker.remainingFlightNotes && (
+              <div className="text-[11px] text-sky-200/90 leading-relaxed">
+                {flightTracker.remainingFlightNotes}
               </div>
             )}
           </div>

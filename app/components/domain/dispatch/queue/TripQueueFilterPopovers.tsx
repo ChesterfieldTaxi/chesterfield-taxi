@@ -618,7 +618,7 @@ export interface TripQueueAssignmentDropdownProps {
 
 /**
  * Compact `Assign: Send/Hold ▾` trigger + portal popover consolidating
- * Queue Assign Mode (`Send | 📌 Hold`), `📌 Auto-Stage Open (N)`, and `⚡ Auto-Dispatch Ready (N)`.
+ * queue-wide Queue Assign Mode (`Send | 📌 Hold`) and `⚡ Auto-Dispatch Ready (N)`.
  */
 export function TripQueueAssignmentDropdown({
   effectiveDisplayLayout,
@@ -640,13 +640,11 @@ export function TripQueueAssignmentDropdown({
     align: 'right',
   });
 
-  const openStagedCount = stagedPlanner?.openScheduledUnstagedCount ?? 0;
-  const hasAutoStageReady = Boolean(stagedPlanner && openStagedCount > 0);
   const hasAutoDispatchReady = Boolean(readyAutoDispatchCount > 0 && onRunAutoDispatchSweep);
   const hasAssignModeToggle = Boolean(stagedPlanner && effectiveDisplayLayout !== 'table');
-  const totalActionCount = (hasAutoStageReady ? openStagedCount : 0) + (hasAutoDispatchReady ? readyAutoDispatchCount : 0);
+  const totalActionCount = hasAutoDispatchReady ? readyAutoDispatchCount : 0;
 
-  if (!hasAssignModeToggle && !hasAutoStageReady && !hasAutoDispatchReady) {
+  if (!hasAssignModeToggle && !hasAutoDispatchReady) {
     return null;
   }
 
@@ -752,22 +750,6 @@ export function TripQueueAssignmentDropdown({
                     </button>
                   </div>
                 </div>
-              )}
-
-              {hasAutoStageReady && stagedPlanner && (
-                <button
-                  type="button"
-                  disabled={stagedPlanner.isAutoStaging}
-                  onClick={() => {
-                    closeMenu();
-                    stagedPlanner.openAutoStagePreview();
-                  }}
-                  className="w-full h-7 px-2.5 rounded-lg border border-dashed border-indigo-400 bg-status-staged-bg/90 hover:bg-status-staged-bg-strong text-status-staged-fg text-[11px] font-extrabold tracking-tight flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
-                >
-                  {stagedPlanner.isAutoStaging
-                    ? '📌 Staging...'
-                    : `📌 Auto-Stage Open (${openStagedCount})`}
-                </button>
               )}
 
               {hasAutoDispatchReady && onRunAutoDispatchSweep && (
